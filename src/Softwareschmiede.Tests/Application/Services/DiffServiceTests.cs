@@ -11,7 +11,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>DiffServiceTests.</summary>
 public sealed class DiffServiceTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly IMemoryCache _memoryCache;
     private readonly DiffService _sut;
 
@@ -25,9 +25,9 @@ public sealed class DiffServiceTests : IDisposable
         _sut = new DiffService(_db, algorithm, caching, NullLogger<DiffService>.Instance);
     }
 
-    /// <summary><summary>GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist.</summary>.</summary>
+    /// <summary>GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist.</summary>
     [Fact]
-    public async Task GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenAufgabeDoesNotExist()
+    public async Task GenerateDiffAsync_ShouldThrowInvalidOperationException_WhenWorkItemDoesNotExist()
     {
         // Act
         var act = () => _sut.GenerateDiffAsync(Guid.NewGuid(), "src/file.cs", "a", "b");
@@ -36,15 +36,15 @@ public sealed class DiffServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    /// <summary><summary>GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists.</summary>.</summary>
+    /// <summary>GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists.</summary>
     [Fact]
-    public async Task GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenAufgabeExists()
+    public async Task GenerateDiffAsync_ShouldPersistGeneratedDiff_WhenWorkItemExists()
     {
         // Arrange
-        var aufgabeId = await SeedAufgabeAsync();
+        var workItemId = await SeedWorkItemAsync();
 
         // Act
-        var result = await _sut.GenerateDiffAsync(aufgabeId, "src/file.cs", "a\nb\nc", "a\nx\nc", ct: TestContext.Current.CancellationToken);
+        var result = await _sut.GenerateDiffAsync(workItemId, "src/file.cs", "a\nb\nc", "a\nx\nc", ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.Status.Should().Be(DiffResultStatus.Generated);
@@ -55,49 +55,49 @@ public sealed class DiffServiceTests : IDisposable
         _db.DiffResults.Should().ContainSingle(dr => dr.Id == result.Id && dr.Status == DiffResultStatus.Generated);
     }
 
-    /// <summary><summary>GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit.</summary>.</summary>
+    /// <summary>GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit.</summary>
     [Fact]
     public async Task GenerateDiffAsync_ShouldNotStoreInlineContents_WhenPayloadExceedsLimit()
     {
         // Arrange
-        var aufgabeId = await SeedAufgabeAsync();
+        var workItemId = await SeedWorkItemAsync();
         var largeSource = new string('a', 102401);
         var largeTarget = new string('b', 102401);
 
         // Act
-        var result = await _sut.GenerateDiffAsync(aufgabeId, "src/huge.txt", largeSource, largeTarget, ct: TestContext.Current.CancellationToken);
+        var result = await _sut.GenerateDiffAsync(workItemId, "src/huge.txt", largeSource, largeTarget, ct: TestContext.Current.CancellationToken);
 
         // Assert
         result.SourceContent.Should().BeNull();
         result.TargetContent.Should().BeNull();
     }
 
-    /// <summary><summary>GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows.</summary>.</summary>
+    /// <summary>GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows.</summary>
     [Fact]
     public async Task GenerateDiffAsync_ShouldPersistErrorStatus_WhenAlgorithmThrows()
     {
         // Arrange
-        var aufgabeId = await SeedAufgabeAsync();
+        var workItemId = await SeedWorkItemAsync();
 
         // Act
-        var act = () => _sut.GenerateDiffAsync(aufgabeId, "src/file.cs", " ", "target");
+        var act = () => _sut.GenerateDiffAsync(workItemId, "src/file.cs", " ", "target");
 
         // Assert
         await act.Should().ThrowAsync<ArgumentNullException>();
-        _db.DiffResults.Should().ContainSingle(dr => dr.AufgabeId == aufgabeId && dr.Status == DiffResultStatus.Error);
+        _db.DiffResults.Should().ContainSingle(dr => dr.WorkItemId == workItemId && dr.Status == DiffResultStatus.Error);
     }
 
-    /// <summary><summary>GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe.</summary>.</summary>
+    /// <summary>GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe.</summary>
     [Fact]
-    public async Task GetStatisticsAsync_ShouldReturnAggregatesPerAufgabe()
+    public async Task GetStatisticsAsync_ShouldReturnAggregatesPerWorkItem()
     {
         // Arrange
-        var aufgabeId = await SeedAufgabeAsync();
+        var workItemId = await SeedWorkItemAsync();
         _db.DiffResults.AddRange(
             new DiffResult
             {
                 Id = Guid.NewGuid(),
-                AufgabeId = aufgabeId,
+                WorkItemId = workItemId,
                 FilePath = "a.cs",
                 SourceVersion = "v1",
                 TargetVersion = "v2",
@@ -111,7 +111,7 @@ public sealed class DiffServiceTests : IDisposable
             new DiffResult
             {
                 Id = Guid.NewGuid(),
-                AufgabeId = aufgabeId,
+                WorkItemId = workItemId,
                 FilePath = "b.cs",
                 SourceVersion = "v2",
                 TargetVersion = "v3",
@@ -125,7 +125,7 @@ public sealed class DiffServiceTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // Act
-        var stats = await _sut.GetStatisticsAsync(aufgabeId, TestContext.Current.CancellationToken);
+        var stats = await _sut.GetStatisticsAsync(workItemId, TestContext.Current.CancellationToken);
 
         // Assert
         stats.TotalDiffCount.Should().Be(2);
@@ -136,13 +136,13 @@ public sealed class DiffServiceTests : IDisposable
         stats.StatusBreakdown[DiffResultStatus.Error].Should().Be(1);
     }
 
-    /// <summary><summary>DeleteDiffAsync_ShouldDeleteDiff_WhenExisting.</summary>.</summary>
+    /// <summary>DeleteDiffAsync_ShouldDeleteDiff_WhenExisting.</summary>
     [Fact]
     public async Task DeleteDiffAsync_ShouldDeleteDiff_WhenExisting()
     {
         // Arrange
-        var aufgabeId = await SeedAufgabeAsync();
-        var diff = await _sut.GenerateDiffAsync(aufgabeId, "src/file.cs", "a", "b", ct: TestContext.Current.CancellationToken);
+        var workItemId = await SeedWorkItemAsync();
+        var diff = await _sut.GenerateDiffAsync(workItemId, "src/file.cs", "a", "b", ct: TestContext.Current.CancellationToken);
 
         // Act
         var deleted = await _sut.DeleteDiffAsync(diff.Id, TestContext.Current.CancellationToken);
@@ -159,26 +159,26 @@ public sealed class DiffServiceTests : IDisposable
         _db.Dispose();
     }
 
-    private async Task<Guid> SeedAufgabeAsync()
+    private async Task<Guid> SeedWorkItemAsync()
     {
-        var projektId = Guid.NewGuid();
-        var aufgabeId = Guid.NewGuid();
-        _db.Projekte.Add(new Projekt
+        var projectId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
+        _db.Projects.Add(new Project
         {
-            Id = projektId,
-            Name = $"Projekt-{projektId:N}",
-            Status = ProjektStatus.Aktiv,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            Id = projectId,
+            Name = $"Projekt-{projectId:N}",
+            Status = ProjectStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow
         });
-        _db.Aufgaben.Add(new Aufgabe
+        _db.WorkItems.Add(new WorkItem
         {
-            Id = aufgabeId,
-            ProjektId = projektId,
-            Titel = "Diff-Aufgabe",
-            Status = AufgabeStatus.Neu,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            Id = workItemId,
+            ProjectId = projectId,
+            Title = "Diff-Aufgabe",
+            Status = WorkItemStatus.New,
+            CreatedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync();
-        return aufgabeId;
+        return workItemId;
     }
 }

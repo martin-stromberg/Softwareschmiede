@@ -27,7 +27,7 @@ public sealed class ClaudeCliPluginTests
     {
         _sut.PluginName.Should().Be("Claude CLI");
         _sut.PluginPrefix.Should().Be("Softwareschmiede.ClaudeCli");
-        _sut.ProviderDateiPraefix.Should().Be("claude");
+        _sut.ProviderFilePrefix.Should().Be("claude");
         _sut.GetSettingGroups().SelectMany(g => g.Fields).Should().Contain(f => f.Key == "Token");
     }
 
@@ -47,7 +47,7 @@ public sealed class ClaudeCliPluginTests
 
     /// <summary>Die Issue-Ausfuellhilfe uebergibt Template und Originalanforderung vollstaendig ueber stdin.</summary>
     [Fact]
-    public void BuildIssueTemplateFillInvocation_ShouldIncludeTemplateAndRequirement_InStandardInput()
+    public void BuildIssueTemplateFillInvocation_ShouldIncludeTemplateAndRequirement_InDefaultInput()
     {
         const string templateBody = "## Akzeptanzkriterien\n- offen";
         const string originalRequirement = "Die Issue-Anlage soll Templates per KI ausfuellen.";
@@ -62,7 +62,7 @@ public sealed class ClaudeCliPluginTests
         invocation.StandardInput.Should().Contain(originalRequirement);
     }
 
-    /// <summary>StartCliAsync returns ProcessStartInfo with claude as filename (absolute path from PATH or fallback).</summary>
+    /// <summary>StartCliAsync gibt ProcessStartInfo mit claude als Dateiname zurück (absoluter Pfad aus PATH oder Fallback).</summary>
     [Fact]
     public async Task StartCliAsync_ShouldReturnProcessStartInfo_WithClaudeCommand()
     {
@@ -74,14 +74,14 @@ public sealed class ClaudeCliPluginTests
 
     /// <summary>StartCliAsync passes optional parameters as arguments.</summary>
     [Fact]
-    public async Task StartCliAsync_ShouldPassParameters_AsArguments()
+    public async Task StartCliAsync_ShouldPassParameter_AsArguments()
     {
         var psi = await _sut.StartCliAsync("/repo", "--continue session-123", TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Be("--continue session-123");
     }
 
-    /// <summary>StartCliAsync sets ANTHROPIC_API_KEY when credential is stored.</summary>
+    /// <summary>StartCliAsync setzt ANTHROPIC_API_KEY, wenn Anmeldedaten gespeichert sind.</summary>
     [Fact]
     public async Task StartCliAsync_ShouldSetApiKeyEnvironmentVariable_WhenTokenIsStored()
     {
@@ -117,7 +117,7 @@ public sealed class ClaudeCliPluginTests
 
     /// <summary>StartCliAsync appends CommandLineParameters from credential store to arguments.</summary>
     [Fact]
-    public async Task StartCliAsync_ShouldIncludeCommandLineParameters_InProcessStartInfo()
+    public async Task StartCliAsync_ShouldIncludeCommandLineParameter_InProcessStartInfo()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.ClaudeCli.CommandLineParameters"))
             .Returns("--dangerously-skip-permissions");

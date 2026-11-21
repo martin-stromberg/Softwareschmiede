@@ -8,7 +8,7 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Infrastructure.Plugins;
 
 /// <summary>Devin-CLI Plugin fuer KI-gestuetzte Entwicklung.</summary>
-public sealed class DevinPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
+public sealed class DevinPlugin : CliAiPluginBase, IIssueTemplateTextGenerator
 {
     private const string ExecutablePathSettingKey = "ExecutablePath";
 
@@ -21,7 +21,7 @@ public sealed class DevinPlugin : CliKiPluginBase, IIssueTemplateTextGenerator
     public override string PluginName => "Devin CLI";
 
     /// <inheritdoc/>
-    public override string ProviderDateiPraefix => "devin";
+    public override string ProviderFilePrefix => "devin";
 
     /// <inheritdoc/>
     public override string PluginPrefix => "Softwareschmiede.Devin";

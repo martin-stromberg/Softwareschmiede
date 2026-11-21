@@ -66,7 +66,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Apply(TextWrittenEvent) schreibt Zeichen an die korrekte Position im Grid.</summary>
     [Fact]
-    public void Buffer_SchreibtText_AktualisiertZellen()
+    public void Buffer_WritesText_UpdatesCells()
     {
         var sut = new TerminalBuffer(80, 24);
 
@@ -80,7 +80,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Apply(CursorMovedEvent) aktualisiert CursorRow und CursorCol.</summary>
     [Fact]
-    public void Buffer_CursorMove_AktualisiertPosition()
+    public void Buffer_CursorMove_UpdatesPosition()
     {
         var sut = new TerminalBuffer(80, 24);
 
@@ -92,7 +92,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Newline in letzter Zeile scrollt den Buffer um eine Zeile nach oben.</summary>
     [Fact]
-    public void Buffer_Newline_ScrolltBeiLetzterZeile()
+    public void Buffer_Newline_ScrollsAtLastLine()
     {
         var sut = new TerminalBuffer(80, 2);
 
@@ -103,16 +103,16 @@ public sealed class TerminalBufferTests
 
         // Cursor is now on last row — apply another newline via CursorMovedRelative
         sut.Apply(new CursorMovedEvent(1, 0, true));
-        // Writing on the last row and advancing should scroll
+        // Schreiben in der letzten Zeile und Weiterschalten soll scrollen
         sut.Apply(new TextWrittenEvent("C\n"));
 
-        // After scroll the buffer still has 2 rows, content shifted
+        // Nach dem Scroll hat der Puffer weiterhin 2 Zeilen, Inhalt verschoben
         sut.Rows.Should().Be(2);
     }
 
     /// <summary>Resize erhält sichtbaren Inhalt im sichtbaren Bereich.</summary>
     [Fact]
-    public void Buffer_Resize_ErhaeltSichtbarenInhalt()
+    public void Buffer_Resize_ReceivesVisibleContent()
     {
         var sut = new TerminalBuffer(10, 5);
         sut.Apply(new TextWrittenEvent("Hello"));
@@ -128,7 +128,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Apply(ScreenClearedEvent(2)) setzt alle Zellen zurück und Cursor auf (0,0).</summary>
     [Fact]
-    public void Buffer_ClearScreen_SetzAllesZurueck()
+    public void Buffer_ClearScreen_SetAllBack()
     {
         var sut = new TerminalBuffer(80, 24);
         sut.Apply(new TextWrittenEvent("Hallo Welt"));
@@ -144,7 +144,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Apply(ColorChangedEvent) setzt SGR-Attribut und nachfolgende Zeichen erben die Farbe.</summary>
     [Fact]
-    public void Buffer_ColorChange_NachfolgenderTextErbtFarbe()
+    public void Buffer_ColorChange_SubsequentTextInheritsColor()
     {
         var sut = new TerminalBuffer(80, 24);
         var redFg = Color.FromArgb(255, 0, 0);
@@ -160,7 +160,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>GetRow gibt eine Kopie zurück — Änderungen am Ergebnis beeinflussen den Buffer nicht.</summary>
     [Fact]
-    public void Buffer_GetRow_GibtKopieZurueck()
+    public void Buffer_GetRow_ReturnsCopyBack()
     {
         var sut = new TerminalBuffer(80, 24);
         sut.Apply(new TextWrittenEvent("A"));
@@ -174,7 +174,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Resize auf kleinere Größe schneidet Inhalt ab ohne Exception.</summary>
     [Fact]
-    public void Buffer_Resize_KleinerAlsInhalt_WirftNicht()
+    public void Buffer_Resize_SmallAsContent_ThrowsNot()
     {
         var sut = new TerminalBuffer(80, 24);
         sut.Apply(new TextWrittenEvent("ABCDEFGHIJ"));
@@ -218,9 +218,9 @@ public sealed class TerminalBufferTests
             }
         }, TestContext.Current.CancellationToken);
 
-        await AwaitOhneTimeoutExceptionAsync(writer, TimeSpan.FromSeconds(10));
+        await AwaitWithoutTimeoutExceptionAsync(writer, TimeSpan.FromSeconds(10));
         stop.Cancel();
-        await AwaitOhneTimeoutExceptionAsync(reader, TimeSpan.FromSeconds(10));
+        await AwaitWithoutTimeoutExceptionAsync(reader, TimeSpan.FromSeconds(10));
 
         readerException.Should().BeNull("parallele Lesezugriffe während laufender Apply()-Aufrufe dürfen zu keiner Exception führen");
     }
@@ -262,9 +262,9 @@ public sealed class TerminalBufferTests
             }
         }, TestContext.Current.CancellationToken);
 
-        await AwaitOhneTimeoutExceptionAsync(writer, TimeSpan.FromSeconds(10));
+        await AwaitWithoutTimeoutExceptionAsync(writer, TimeSpan.FromSeconds(10));
         stop.Cancel();
-        await AwaitOhneTimeoutExceptionAsync(reader, TimeSpan.FromSeconds(10));
+        await AwaitWithoutTimeoutExceptionAsync(reader, TimeSpan.FromSeconds(10));
 
         readerException.Should().BeNull("GetSnapshot() muss auch unter parallelen Apply()/Resize()-Aufrufen einen intern konsistenten Zustand liefern");
     }
@@ -273,7 +273,7 @@ public sealed class TerminalBufferTests
     /// eine TimeoutException zu werfen (Verhalten von Task.Wait(TimeSpan) für Stresstests nachgebildet).</summary>
     /// <param name="task">Der zu erwartende Task.</param>
     /// <param name="timeout">Maximale Wartezeit.</param>
-    private static async Task AwaitOhneTimeoutExceptionAsync(Task task, TimeSpan timeout)
+    private static async Task AwaitWithoutTimeoutExceptionAsync(Task task, TimeSpan timeout)
     {
         try
         {
@@ -286,7 +286,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Ein alleinstehendes Linefeed setzt die Cursor-Spalte auf 0 (kein Treppeneffekt).</summary>
     [Fact]
-    public void Buffer_LineFeed_SetztSpalteAufNull()
+    public void Buffer_LineFeed_SetsColumnOnNull()
     {
         var sut = new TerminalBuffer(80, 24);
 
@@ -298,7 +298,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>"A\r\nB" erzeugt genau einen Zeilenvorschub, B landet in Zeile 1 Spalte 0.</summary>
     [Fact]
-    public void Buffer_CarriageReturnLineFeed_ErgibtEinenUmbruch()
+    public void Buffer_CarriageReturnLineFeed_YieldsAWrap()
     {
         var sut = new TerminalBuffer(80, 24);
 
@@ -311,7 +311,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Ein alleinstehendes Carriage Return überschreibt Spalte 0 der aktuellen Zeile ohne Zeilenvorschub.</summary>
     [Fact]
-    public void Buffer_CarriageReturnAllein_BleibtInZeile()
+    public void Buffer_CarriageReturnAlone_RemainsInLine()
     {
         var sut = new TerminalBuffer(80, 24);
 
@@ -326,7 +326,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Verkleinert man die Zeilenzahl, bleiben die zuletzt geschriebenen (unteren) Zeilen sichtbar, obere entfernt.</summary>
     [Fact]
-    public void Buffer_ResizeKleiner_ErhaeltUntereZeilen()
+    public void Buffer_ResizeSmall_ReceivesLowerLines()
     {
         var sut = new TerminalBuffer(10, 5);
         for (var r = 0; r < 5; r++)
@@ -344,7 +344,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Die Cursor-Zeile wird nach Verkleinerung um den Versatz reduziert und anschließend geklemmt.</summary>
     [Fact]
-    public void Buffer_ResizeKleiner_CursorFolgtUnterenZeilen()
+    public void Buffer_ResizeSmall_CursorFollowsUnderLines()
     {
         var sut = new TerminalBuffer(10, 5);
         sut.Apply(new CursorMovedEvent(1, 0, true));
@@ -357,7 +357,7 @@ public sealed class TerminalBufferTests
     /// <summary>Eine vor dem Resize bildschirmfüllende Scroll-Region wächst mit der neuen Höhe,
     /// damit Zeilenumbrüche am neuen unteren Rand weiterhin ins Scrollback verschieben.</summary>
     [Fact]
-    public void Buffer_ResizeHoeher_VollstaendigeScrollRegionWaechstUndFuelltScrollback()
+    public void Buffer_ResizeHigher_CompleteScrollRegionGrowsAndFillsScrollback()
     {
         var sut = new TerminalBuffer(10, 50);
         sut.Apply(new CursorMovedEvent(0, 0, true));
@@ -375,7 +375,7 @@ public sealed class TerminalBufferTests
     /// <summary>Eine explizit eingeschränkte Scroll-Region darf durch einen Resize nicht zu einer
     /// bildschirmfüllenden Region werden.</summary>
     [Fact]
-    public void Buffer_ResizeHoeher_EingeschraenkteScrollRegionBleibtEingeschraenkt()
+    public void Buffer_ResizeHigher_RestrictedScrollRegionRemainsRestricted()
     {
         var sut = new TerminalBuffer(10, 5);
         sut.Apply(new ScrollRegionChangedEvent(1, 3));
@@ -389,7 +389,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Verkleinert man die Spaltenzahl, wird der Zeileninhalt rechts abgeschnitten statt in die nächste Zeile umzubrechen.</summary>
     [Fact]
-    public void Buffer_ResizeSchmaler_SchneidetRechtsAb()
+    public void Buffer_ResizeNarrower_CutsRightFrom()
     {
         var sut = new TerminalBuffer(10, 5);
         sut.Apply(new TextWrittenEvent("ABCDEFGHIJ"));
@@ -405,7 +405,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Nach ScreenClearedEvent(2) sind alle Zellen TerminalCell.Default und der Cursor steht bei (0,0).</summary>
     [Fact]
-    public void Buffer_ClearScreenMode2_AlleZellenLeer()
+    public void Buffer_ClearScreenMode2_AllCellsEmpty()
     {
         var sut = new TerminalBuffer(10, 5);
         sut.Apply(new TextWrittenEvent("Hallo"));
@@ -426,7 +426,7 @@ public sealed class TerminalBufferTests
     /// <summary>Nach genügend Zeilenvorschüben (gefülltem Scrollback) und anschließendem ScreenClearedEvent(2)
     /// muss der Scrollback geleert sein.</summary>
     [Fact]
-    public void Buffer_ClearScreenMode2_LeertScrollback()
+    public void Buffer_ClearScreenMode2_ClearsScrollback()
     {
         var sut = new TerminalBuffer(10, 2);
         for (var i = 0; i < 10; i++)
@@ -441,7 +441,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>GetSnapshot() liefert Scrollback-Zeilen in chronologischer Reihenfolge vor dem sichtbaren Grid.</summary>
     [Fact]
-    public void Buffer_GetSnapshot_EnthaeltScrollbackVorSichtbaremGrid()
+    public void Buffer_GetSnapshot_ContainsScrollbackBeforeVisibleGrid()
     {
         var sut = new TerminalBuffer(4, 2);
 
@@ -458,7 +458,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>GetSnapshot() gibt auch für Scrollback-Zeilen Kopien zurück.</summary>
     [Fact]
-    public void Buffer_GetSnapshot_ScrollbackRowsSindKopien()
+    public void Buffer_GetSnapshot_ScrollbackRowsAreCopy()
     {
         var sut = new TerminalBuffer(4, 2);
         sut.Apply(new TextWrittenEvent("A\nB\nC"));
@@ -473,7 +473,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Der Snapshot respektiert die bestehende Scrollback-Grenze von 1000 Zeilen.</summary>
     [Fact]
-    public void Buffer_GetSnapshot_BegrenztScrollbackAufJuengste1000Zeilen()
+    public void Buffer_GetSnapshot_LimitedScrollbackOnLatest1000Lines()
     {
         var sut = new TerminalBuffer(8, 1);
 
@@ -491,7 +491,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>ScreenClearedEvent(2) entfernt Scrollback auch aus dem erweiterten Snapshot.</summary>
     [Fact]
-    public void Buffer_GetSnapshot_ClearScreenMode2_LeertSnapshotScrollback()
+    public void Buffer_GetSnapshot_ClearScreenMode2_ClearsSnapshotScrollback()
     {
         var sut = new TerminalBuffer(10, 2);
         for (var i = 0; i < 10; i++)
@@ -506,7 +506,7 @@ public sealed class TerminalBufferTests
     /// <summary>AlternateScreenChangedEvent(true) aktiviert den Alternativ-Bildschirm; GetSnapshot
     /// liefert nur das Alt-Grid ohne Scrollback.</summary>
     [Fact]
-    public void Buffer_AlternateScreen_GetSnapshotZeigtNurAltGrid()
+    public void Buffer_AlternateScreen_GetSnapshotShowsOnlyAltGrid()
     {
         var sut = new TerminalBuffer(8, 3);
         for (var i = 0; i < 8; i++)
@@ -524,7 +524,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>Nach dem Zurückwechseln (false) ist der Hauptbildschirm inkl. Inhalt wiederhergestellt.</summary>
     [Fact]
-    public void Buffer_AlternateScreenDeaktiviert_StelltHauptbildschirmWiederHer()
+    public void Buffer_AlternateScreenDisabled_SetsMainscreenReStore()
     {
         var sut = new TerminalBuffer(8, 3);
         sut.Apply(new TextWrittenEvent("MAIN"));
@@ -540,7 +540,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>LinesInsertedEvent schiebt Inhalte unterhalb der Cursorzeile nach unten.</summary>
     [Fact]
-    public void Buffer_LinesInserted_SchiebtZeilenNachUnten()
+    public void Buffer_LinesInserted_PushesLinesAfterBottom()
     {
         var sut = new TerminalBuffer(4, 3);
         sut.Apply(new TextWrittenEvent("AAA"));
@@ -557,7 +557,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>LinesDeletedEvent entfernt die Cursorzeile und schiebt darunterliegende nach oben.</summary>
     [Fact]
-    public void Buffer_LinesDeleted_SchiebtZeilenNachOben()
+    public void Buffer_LinesDeleted_PushesLinesAfterTop()
     {
         var sut = new TerminalBuffer(4, 3);
         sut.Apply(new TextWrittenEvent("AAA"));
@@ -573,7 +573,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>CharsInsertedEvent schiebt Zeichen ab dem Cursor nach rechts.</summary>
     [Fact]
-    public void Buffer_CharsInserted_SchiebtZeichenNachRechts()
+    public void Buffer_CharsInserted_PushesCharacterAfterRight()
     {
         var sut = new TerminalBuffer(8, 2);
         sut.Apply(new TextWrittenEvent("ABCD"));
@@ -586,7 +586,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>CharsDeletedEvent entfernt Zeichen ab dem Cursor.</summary>
     [Fact]
-    public void Buffer_CharsDeleted_EntferntZeichenAbCursor()
+    public void Buffer_CharsDeleted_RemovesCharacterFromCursor()
     {
         var sut = new TerminalBuffer(8, 2);
         sut.Apply(new TextWrittenEvent("ABCD"));
@@ -599,7 +599,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>CharsErasedEvent löscht Zeichen ab dem Cursor ohne Verschieben.</summary>
     [Fact]
-    public void Buffer_CharsErased_LoeschtZeichenAbCursor()
+    public void Buffer_CharsErased_DeletesCharacterFromCursor()
     {
         var sut = new TerminalBuffer(8, 2);
         sut.Apply(new TextWrittenEvent("ABCD"));
@@ -613,7 +613,7 @@ public sealed class TerminalBufferTests
     /// <summary>ScrollRegionChangedEvent beschränkt das Scrollen: Zeilen außerhalb der Region bleiben stehen,
     /// innerhalb wird rotiert.</summary>
     [Fact]
-    public void Buffer_ScrollRegion_NewlineScrolltNurRegion()
+    public void Buffer_ScrollRegion_NewlineScrollsOnlyRegion()
     {
         var sut = new TerminalBuffer(4, 4);
         sut.Apply(new TextWrittenEvent("AAAA\nBBBB\nCCCC\nDDDD"));
@@ -634,7 +634,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>CursorSavedEvent/Restore stellt eine zwischenzeitlich veränderte Cursorposition wieder her.</summary>
     [Fact]
-    public void Buffer_SaveRestoreCursor_StelltPositionWiederHer()
+    public void Buffer_SaveRestoreCursor_SetsPositionReStore()
     {
         var sut = new TerminalBuffer(8, 4);
         sut.Apply(new CursorMovedEvent(2, 3, true));
@@ -649,7 +649,7 @@ public sealed class TerminalBufferTests
 
     /// <summary>TerminalResetEvent setzt Buffer, Cursor und Alternate-Screen-Status zurück.</summary>
     [Fact]
-    public void Buffer_TerminalReset_SetztAllesZurueck()
+    public void Buffer_TerminalReset_SetsAllBack()
     {
         var sut = new TerminalBuffer(8, 4);
         sut.Apply(new AlternateScreenChangedEvent(true));
@@ -668,23 +668,23 @@ public sealed class TerminalBufferTests
     /// schieben — anders als der Newline-Scroll am Regionsrand gehören SU-Zeilen nach xterm-Semantik
     /// nicht in den Verlauf.</summary>
     [Fact]
-    public void Buffer_ScreenScrolled_SchiebtNichtInScrollback()
+    public void Buffer_ScreenScrolled_PushesNotInScrollback()
     {
         var sut = new TerminalBuffer(4, 2);
         sut.Apply(new TextWrittenEvent("A\nB"));
 
-        var scrollbackVorher = sut.ScrollbackCount;
+        var scrollbackBefore = sut.ScrollbackCount;
 
         sut.Apply(new ScreenScrolledEvent(5)); // Delta >= _rows (bisheriger Triggermechanismus)
         sut.Apply(new ScreenScrolledEvent(1));
 
-        sut.ScrollbackCount.Should().Be(scrollbackVorher, "SU-Scrolls dürfen den Scrollback nicht füllen");
+        sut.ScrollbackCount.Should().Be(scrollbackBefore, "SU-Scrolls dürfen den Scrollback nicht füllen");
     }
 
     /// <summary>Ein ScreenScrolledEvent im Alternate Screen darf keine Alt-Screen-Zeilen in den
     /// Hauptscreen-Scrollback schieben — sie wären nach dem Verlassen des Alt-Screens sichtbar.</summary>
     [Fact]
-    public void Buffer_ScreenScrolled_AlternateScreen_KeinScrollback()
+    public void Buffer_ScreenScrolled_AlternateScreen_NoScrollback()
     {
         var sut = new TerminalBuffer(4, 2);
         sut.Apply(new AlternateScreenChangedEvent(true));
@@ -699,7 +699,7 @@ public sealed class TerminalBufferTests
     /// <summary>Verkleinert man den Buffer bei aktivem Alternate Screen, wandern die wegfallenden
     /// Alt-Screen-Zeilen nicht in den Hauptscreen-Scrollback.</summary>
     [Fact]
-    public void Buffer_ResizeKleiner_AlternateScreen_KeinScrollback()
+    public void Buffer_ResizeSmall_AlternateScreen_NoScrollback()
     {
         var sut = new TerminalBuffer(10, 5);
         sut.Apply(new AlternateScreenChangedEvent(true));

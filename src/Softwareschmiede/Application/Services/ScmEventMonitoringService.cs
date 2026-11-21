@@ -31,33 +31,33 @@ public sealed class ScmEventMonitoringService(
     {
         await startup.WaitAsync(ct);
         using var scope = scopes.CreateScope();
-        var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+        var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
         // Laufzeit-Schalter (Einstellungen → Automatisierung → Aufgaben ausführen): Bei deaktivierter
         // Überwachung wird weder beobachtet/enumeriert noch automatisch zugestellt. Bereits in
         // der Inbox vorhandene Ereignisse und alle Checkpoints bleiben unverändert bestehen.
-        if (!await einstellungen.GetScmMonitoringEnabledAsync(ct))
+        if (!await settings.GetScmMonitoringEnabledAsync(ct))
         {
             logger.LogDebug("SCM-Ereignisüberwachung ist deaktiviert; Durchlauf wird übersprungen.");
             return;
         }
-        var triggerKeyword = await einstellungen.GetScmTriggerKeywordAsync(ct);
-        var delayKeyword = await einstellungen.GetScmDelayKeywordAsync(ct);
-        var kontoModus = await einstellungen.GetScmKontoModusAsync(ct);
-        var issueAufbereitungAktiv = await einstellungen.GetScmIssueAufbereitungEnabledAsync(ct);
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var triggerKeyword = await settings.GetScmTriggerKeywordAsync(ct);
+        var delayKeyword = await settings.GetScmDelayKeywordAsync(ct);
+        var accountMode = await settings.GetScmAccountModeAsync(ct);
+        var issuePreparationEnabled = await settings.GetScmIssuePreparationEnabledAsync(ct);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         // Zweck-markierte Aufgaben (z. B. Issue-Aufbereitung) sind keine verknüpften Quellen:
         // Sie dürfen weder Ereignisse auf ihre Issue-Nummer ziehen noch PR-Kontext liefern.
-        var tasks = await db.Aufgaben.AsNoTracking().Include(x => x.GitRepository).Include(x => x.IssueReferenz)
-            .Include(x => x.PullRequests).Where(x => x.GitRepository != null && x.GitRepository.Aktiv && x.Zweck == null).ToListAsync(ct);
-        var repositories = await db.GitRepositories.AsNoTracking().Where(x => x.Aktiv).ToListAsync(ct);
+        var tasks = await db.WorkItems.AsNoTracking().Include(x => x.GitRepository).Include(x => x.IssueReference)
+            .Include(x => x.PullRequests).Where(x => x.GitRepository != null && x.GitRepository.Active && x.Purpose == null).ToListAsync(ct);
+        var repositories = await db.GitRepositories.AsNoTracking().Where(x => x.Active).ToListAsync(ct);
         var plugins = scope.ServiceProvider.GetRequiredService<IPluginManager>().GetSourceCodeManagementPlugins();
         var pendingInboxCommits = new List<(string Key, DateTimeOffset Now, string Diagnostic)>();
         var linked = new List<(Guid TaskId, GitRepository Repository, ScmReferenceKind Kind, int Number, string RepositoryId)>();
         foreach (var task in tasks)
         {
             var repository = task.GitRepository!;
-            if (task.IssueReferenz?.IssueNummer is > 0)
-                linked.Add((task.Id, repository, ScmReferenceKind.Issue, task.IssueReferenz.IssueNummer.Value, repository.RepositoryUrl));
+            if (task.IssueReference?.IssueNumber is > 0)
+                linked.Add((task.Id, repository, ScmReferenceKind.Issue, task.IssueReference.IssueNumber.Value, repository.RepositoryUrl));
             foreach (var reference in task.PullRequests)
                 linked.Add((task.Id, repository, ScmReferenceKind.PullRequest, reference.PullRequestNumber, reference.RepositoryId));
         }
@@ -73,9 +73,9 @@ public sealed class ScmEventMonitoringService(
             // Im SeparatesKonto ordnet die Inbox über Repository-Node-IDs zu, es wird nichts geraten.
             // Ein für das Konto unsichtbares Repository (404/403) liefert ihm auch keine Notifications
             // und wird daher nur ausgelassen, statt die Überwachung aller Repositories anzuhalten.
-            var inboxMode = kontoModus == ScmKontoModus.SeparatesKonto && plugin is IScmNotificationSource;
-            // Resolve the entire local reference set before assigning any incoming event.
-            // Raw HTTPS/SSH addresses and plugin display names are not repository identities.
+            var inboxMode = accountMode == ScmAccountMode.SeparateAccount && plugin is IScmNotificationSource;
+            // Die gesamte lokale Referenzmenge auflösen, bevor irgendein eingehendes Ereignis zugeordnet
+            // wird. Rohe HTTPS/SSH-Adressen und Plugin-Anzeigenamen sind keine Repository-Identitäten.
             var aliasGroups = linked.Where(x => ScmPluginMatcher.MatchesPlugin(plugin, x.Repository))
                 .GroupBy(x => x.RepositoryId, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(x => x.Key, x => (Repository: x.First().Repository, Linked: x.ToList()), StringComparer.OrdinalIgnoreCase);
@@ -86,7 +86,7 @@ public sealed class ScmEventMonitoringService(
             foreach (var (alias, aliasGroup) in aliasGroups)
             {
                 using var resolutionScope = scopes.CreateScope();
-                var resolutionDb = resolutionScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+                var resolutionDb = resolutionScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
                 var resolutionKey = $"repository/{plugin.PluginPrefix.ToLowerInvariant()}/{Uri.EscapeDataString(alias.ToLowerInvariant())}";
                 var checkpoint = await resolutionDb.ScmObservationCheckpoints.FindAsync([resolutionKey], ct);
                 if (checkpoint?.NextAttemptUtc > _time.GetUtcNow().ToUnixTimeMilliseconds())
@@ -97,7 +97,7 @@ public sealed class ScmEventMonitoringService(
                 }
                 try
                 {
-                    var repository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(aliasGroup.Repository.Id, plugin.PluginPrefix, alias, kontoModus), ct);
+                    var repository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(aliasGroup.Repository.Id, plugin.PluginPrefix, alias, accountMode), ct);
                     resolved.AddRange(aliasGroup.Linked.Select(x => ((Guid?)x.TaskId, new ScmEventReference(repository, x.Kind, x.Number))));
                     if (!localRepositories.TryGetValue(repository, out var candidates))
                         localRepositories[repository] = candidates = [];
@@ -128,9 +128,9 @@ public sealed class ScmEventMonitoringService(
                         retryPermanent: true);
                 }
             }
-            // An unresolved alias could name any of the resolved repositories. Do not guess an assignment.
+            // Ein unaufgelöster Alias könnte jedes der aufgelösten Repositories meinen. Keine Zuordnung raten.
             if (!complete) continue;
-            if (kontoModus == ScmKontoModus.SeparatesKonto && plugin is IScmNotificationSource notificationSource)
+            if (accountMode == ScmAccountMode.SeparateAccount && plugin is IScmNotificationSource notificationSource)
             {
                 // Im SeparatesKonto ersetzt die Inbox des separaten Kontos die repository-weite
                 // Enumeration; verknüpfte Referenzen aus Aufgaben werden nicht als Quellen übernommen.
@@ -139,7 +139,7 @@ public sealed class ScmEventMonitoringService(
                 {
                     using var inboxScope = scopes.CreateScope();
                     await EnumerateNotificationsAsync(notificationSource, plugin, host,
-                        inboxScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>(),
+                        inboxScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>(),
                         resolved, repositoriesForEnumeration, pendingInboxCommits, cycle, ct);
                 }
             }
@@ -170,7 +170,7 @@ public sealed class ScmEventMonitoringService(
                 foreach (var kind in kinds)
                 {
                     using var batchScope = scopes.CreateScope();
-                    var batchDb = batchScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+                    var batchDb = batchScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
                     var sourceKey = string.Join('/', new[] { group.Key.Provider, group.Key.Host, group.Key.RepositoryId,
                         reference.Kind.ToString(), reference.Number.ToString(System.Globalization.CultureInfo.InvariantCulture), kind.ToString() }.Select(Uri.EscapeDataString));
                     var checkpoint = await batchDb.ScmObservationCheckpoints.FindAsync([sourceKey], ct);
@@ -185,29 +185,29 @@ public sealed class ScmEventMonitoringService(
                                 || x.Diagnostic == ScmEventStore.UnassignedDiagnostic), ct))
                             request = request with { SinceUtc = null };
                         var batch = await source.ReadEventsAsync(request, ct);
-                        var aufgabeId = taskIds.Length == 1 ? taskIds[0] : (Guid?)null;
+                        var workItemId = taskIds.Length == 1 ? taskIds[0] : (Guid?)null;
                         var unassigned = taskIds.Length == 0;
                         if (unassigned && localRepositories.TryGetValue(reference.Repository, out var candidates)
                             && batch.Observations.FirstOrDefault(x => ScmEventValidationService.GetRejection(x, triggerKeyword) is null) is { } trigger)
                         {
                             var resolution = await batchScope.ServiceProvider.GetRequiredService<ScmEventTaskResolver>()
                                 .ResolveAsync(reference, source, trigger, candidates, ct);
-                            aufgabeId = resolution.AufgabeId;
+                            workItemId = resolution.WorkItemId;
                             unassigned = resolution.Kind == ScmTaskResolutionKind.Unassigned;
                         }
                         // „Issue erstellt"-Erkennung läuft vor der Inbox-Aufnahme; der
                         // Auswertungs-Checkpoint je Issue dedupliziert Erst- und
                         // Folgebeobachtungen. Nur der repository-weite Enumerationskanal
                         // (kein Inbox-Modus) meldet neue Issues.
-                        if (!inboxMode && issueAufbereitungAktiv && reference.Kind == ScmReferenceKind.Issue
+                        if (!inboxMode && issuePreparationEnabled && reference.Kind == ScmReferenceKind.Issue
                             && kind == ScmContentKind.Description && batch.Observations.Count > 0
-                            && localRepositories.TryGetValue(reference.Repository, out var aufbereitungRepositories))
+                            && localRepositories.TryGetValue(reference.Repository, out var preparationRepositories))
                         {
-                            await batchScope.ServiceProvider.GetRequiredService<ScmIssueAufbereitungsService>()
-                                .ErkennenUndEinreihenAsync(source, reference, batch, aufbereitungRepositories, ct);
+                            await batchScope.ServiceProvider.GetRequiredService<ScmIssuePreparationService>()
+                                .DetectAndEnqueueAsync(source, reference, batch, preparationRepositories, ct);
                         }
                         await batchScope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(
-                            aufgabeId, sourceKey, batch, unassigned, triggerKeyword, delayKeyword, ct);
+                            workItemId, sourceKey, batch, unassigned, triggerKeyword, delayKeyword, ct);
                     }
                     catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                     catch (Exception ex)
@@ -223,7 +223,7 @@ public sealed class ScmEventMonitoringService(
                 foreach (var (commitKey, commitNow, diagnostic) in pendingInboxCommits)
                 {
                     using var commitScope = scopes.CreateScope();
-                    var commitDb = commitScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+                    var commitDb = commitScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
                     var commitCheckpoint = await commitDb.ScmObservationCheckpoints.FindAsync([commitKey], ct);
                     if (commitCheckpoint is null)
                     {
@@ -251,7 +251,7 @@ public sealed class ScmEventMonitoringService(
     /// Repositories ab. Der Watermark wird erst nach vollständiger Verarbeitung des Zyklus committet;
     /// verworfene Fremd-Notifications werden als nicht-alarmierende Diagnose sichtbar.</summary>
     private async Task EnumerateNotificationsAsync(IScmNotificationSource source, IGitPlugin plugin, string host,
-        SoftwareschmiededDbContext db,
+        SoftwareschmiedeDbContext db,
         List<(Guid? TaskId, ScmEventReference Reference)> resolved, IReadOnlyList<ScmEventRepository> repositories,
         List<(string Key, DateTimeOffset Now, string Diagnostic)> pendingInboxCommits,
         CycleState cycle, CancellationToken ct)

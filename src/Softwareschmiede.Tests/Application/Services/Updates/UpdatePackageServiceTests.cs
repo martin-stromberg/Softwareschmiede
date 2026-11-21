@@ -36,10 +36,10 @@ public sealed class UpdatePackageServiceTests
         File.Exists(Path.Combine(result.ExtractedDirectory, "version.json")).Should().BeTrue();
         File.Exists(result.ScriptPath).Should().BeTrue();
         progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.Download);
-        progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.Verifizieren);
-        progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.Entpacken);
-        progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.UpdateVorbereiten);
-        handler.RequestedUrls.Should().Equal(PrimaryDownloadUrl.AbsoluteUri, ManifestDownloadUrl.AbsoluteUri);
+        progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.Verify);
+        progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.Extract);
+        progressItems.Should().Contain(p => p.Phase == UpdatePreparationPhase.PrepareUpdate);
+        handler.RequestedUrl.Should().Equal(PrimaryDownloadUrl.AbsoluteUri, ManifestDownloadUrl.AbsoluteUri);
     }
 
     /// <summary>Ein Paket, dessen SHA-256 nicht zum Manifest passt, wird vor dem Entpacken verworfen und aufgeräumt.</summary>
@@ -48,7 +48,7 @@ public sealed class UpdatePackageServiceTests
     {
         using var temp = new TempDirectory();
         var zipBytes = CreateZip(includeExe: true, includeVersion: true);
-        var handler = CreateRoutingHandler(zipBytes, manifestJson: UpdateE2EFixture.ErzeugeManifestJson("1.2.3", PrimaryDownloadUrl.AbsoluteUri, zipBytes, sha256Override: new string('0', 64)));
+        var handler = CreateRoutingHandler(zipBytes, manifestJson: UpdateE2EFixture.CreateManifestJson("1.2.3", PrimaryDownloadUrl.AbsoluteUri, zipBytes, sha256Override: new string('0', 64)));
         var sut = CreateSut(temp.Path, handler);
 
         var act = () => sut.PreparePackageAsync(CreateUpdateInfo(), null);
@@ -70,7 +70,7 @@ public sealed class UpdatePackageServiceTests
         var act = () => sut.PreparePackageAsync(CreateUpdateInfo() with { ManifestDownload = null }, null);
 
         await act.Should().ThrowAsync<InvalidDataException>();
-        handler.RequestedUrls.Should().Equal(PrimaryDownloadUrl.AbsoluteUri);
+        handler.RequestedUrl.Should().Equal(PrimaryDownloadUrl.AbsoluteUri);
         Directory.Exists(Path.Combine(temp.Path, "updates", "extracted", "1.2.3")).Should().BeFalse();
     }
 
@@ -83,7 +83,7 @@ public sealed class UpdatePackageServiceTests
         using var temp = new TempDirectory();
         var zipBytes = CreateZip(includeExe: true, includeVersion: true);
         var handler = CreateRoutingHandler(zipBytes);
-        RegistriereFehler(handler, ManifestDownloadUrl, statusCode);
+        RegisterError(handler, ManifestDownloadUrl, statusCode);
         var sut = CreateSut(temp.Path, handler);
 
         var act = () => sut.PreparePackageAsync(CreateUpdateInfo(), null);
@@ -100,18 +100,18 @@ public sealed class UpdatePackageServiceTests
         using var temp = new TempDirectory();
         var zipBytes = CreateZip(includeExe: true, includeVersion: true);
         var handler = CreateRoutingHandler(zipBytes);
-        RegistriereFehler(handler, ManifestDownloadUrl, HttpStatusCode.InternalServerError);
+        RegisterError(handler, ManifestDownloadUrl, HttpStatusCode.InternalServerError);
         handler.AddHandler(ManifestFallbackAssetApiUrl.AbsoluteUri,
             _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(UpdateE2EFixture.ErzeugeManifestJson("1.2.3", PrimaryDownloadUrl.AbsoluteUri, zipBytes))
+                Content = new StringContent(UpdateE2EFixture.CreateManifestJson("1.2.3", PrimaryDownloadUrl.AbsoluteUri, zipBytes))
             }));
         var sut = CreateSut(temp.Path, handler);
 
         var result = await sut.PreparePackageAsync(CreateUpdateInfo(manifestFallbackDownloadUrl: ManifestFallbackAssetApiUrl), null, TestContext.Current.CancellationToken);
 
         File.Exists(Path.Combine(result.ExtractedDirectory, "Softwareschmiede.exe")).Should().BeTrue();
-        handler.RequestedUrls.Should().Equal(
+        handler.RequestedUrl.Should().Equal(
             PrimaryDownloadUrl.AbsoluteUri,
             ManifestDownloadUrl.AbsoluteUri,
             ManifestFallbackAssetApiUrl.AbsoluteUri);
@@ -230,7 +230,7 @@ public sealed class UpdatePackageServiceTests
         using var temp = new TempDirectory();
         var zipBytes = CreateZip(includeExe: true, includeVersion: true);
         var handler = CreateRoutingHandler(zipBytes);
-        RegistriereFehler(handler, PrimaryDownloadUrl, HttpStatusCode.InternalServerError);
+        RegisterError(handler, PrimaryDownloadUrl, HttpStatusCode.InternalServerError);
         handler.AddHandler(FallbackAssetApiUrl.AbsoluteUri,
             _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
@@ -243,7 +243,7 @@ public sealed class UpdatePackageServiceTests
         File.Exists(result.ZipPath).Should().BeTrue();
         File.Exists(Path.Combine(result.ExtractedDirectory, "Softwareschmiede.exe")).Should().BeTrue();
         File.Exists(result.ScriptPath).Should().BeTrue();
-        handler.RequestedUrls.Should().Equal(PrimaryDownloadUrl.AbsoluteUri, FallbackAssetApiUrl.AbsoluteUri, ManifestDownloadUrl.AbsoluteUri);
+        handler.RequestedUrl.Should().Equal(PrimaryDownloadUrl.AbsoluteUri, FallbackAssetApiUrl.AbsoluteUri, ManifestDownloadUrl.AbsoluteUri);
         handler.RequestedAcceptHeaders.Should().HaveCount(3);
         handler.RequestedAcceptHeaders[1].Should().Contain("application/octet-stream");
     }
@@ -254,8 +254,8 @@ public sealed class UpdatePackageServiceTests
     {
         using var temp = new TempDirectory();
         var handler = new RoutingHttpHandler();
-        RegistriereFehler(handler, PrimaryDownloadUrl, HttpStatusCode.InternalServerError);
-        RegistriereFehler(handler, FallbackAssetApiUrl, HttpStatusCode.BadGateway);
+        RegisterError(handler, PrimaryDownloadUrl, HttpStatusCode.InternalServerError);
+        RegisterError(handler, FallbackAssetApiUrl, HttpStatusCode.BadGateway);
         var sut = CreateSut(temp.Path, handler);
 
         var act = () => sut.PreparePackageAsync(CreateUpdateInfo(fallbackDownloadUrl: FallbackAssetApiUrl), null);
@@ -263,7 +263,7 @@ public sealed class UpdatePackageServiceTests
         await act.Should().ThrowAsync<HttpRequestException>();
         File.Exists(Path.Combine(temp.Path, "updates", "download", "release.zip")).Should().BeFalse();
         File.Exists(Path.Combine(temp.Path, "updates", "download", "release.zip.download")).Should().BeFalse();
-        handler.RequestedUrls.Should().Equal(PrimaryDownloadUrl.AbsoluteUri, FallbackAssetApiUrl.AbsoluteUri);
+        handler.RequestedUrl.Should().Equal(PrimaryDownloadUrl.AbsoluteUri, FallbackAssetApiUrl.AbsoluteUri);
     }
 
     /// <summary>Ein Nicht-5xx-Fehler der primären URL wirft sofort - ohne Fallback-Request.</summary>
@@ -273,7 +273,7 @@ public sealed class UpdatePackageServiceTests
         using var temp = new TempDirectory();
         var zipBytes = CreateZip(includeExe: true, includeVersion: true);
         var handler = new RoutingHttpHandler();
-        RegistriereFehler(handler, PrimaryDownloadUrl, HttpStatusCode.NotFound);
+        RegisterError(handler, PrimaryDownloadUrl, HttpStatusCode.NotFound);
         handler.AddHandler(FallbackAssetApiUrl.AbsoluteUri,
             _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
@@ -284,7 +284,7 @@ public sealed class UpdatePackageServiceTests
         var act = () => sut.PreparePackageAsync(CreateUpdateInfo(fallbackDownloadUrl: FallbackAssetApiUrl), null);
 
         await act.Should().ThrowAsync<HttpRequestException>();
-        handler.RequestedUrls.Should().Equal(PrimaryDownloadUrl.AbsoluteUri);
+        handler.RequestedUrl.Should().Equal(PrimaryDownloadUrl.AbsoluteUri);
     }
 
     /// <summary>Bereinigung und Vorbereitung dürfen nicht über eine Verzeichnisgrenze aus dem Programmverzeichnis ausbrechen.</summary>
@@ -338,7 +338,7 @@ public sealed class UpdatePackageServiceTests
         handler.AddHandler(ManifestDownloadUrl.AbsoluteUri,
             _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(manifestJson ?? UpdateE2EFixture.ErzeugeManifestJson("1.2.3", PrimaryDownloadUrl.AbsoluteUri, zipBytes))
+                Content = new StringContent(manifestJson ?? UpdateE2EFixture.CreateManifestJson("1.2.3", PrimaryDownloadUrl.AbsoluteUri, zipBytes))
             }));
         return handler;
     }
@@ -357,7 +357,7 @@ public sealed class UpdatePackageServiceTests
             baseDirectory);
     }
 
-    private static void RegistriereFehler(RoutingHttpHandler handler, Uri url, HttpStatusCode statusCode)
+    private static void RegisterError(RoutingHttpHandler handler, Uri url, HttpStatusCode statusCode)
         => handler.AddHandler(url.AbsoluteUri, _ => Task.FromResult(new HttpResponseMessage(statusCode)));
 
     private static UpdateInfo CreateUpdateInfo(

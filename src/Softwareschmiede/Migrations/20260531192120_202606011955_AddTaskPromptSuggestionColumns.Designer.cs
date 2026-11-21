@@ -10,7 +10,7 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Migrations
 {
-    [DbContext(typeof(SoftwareschmiededDbContext))]
+    [DbContext(typeof(SoftwareschmiedeDbContext))]
     [Migration("20260531192120_202606011955_AddTaskPromptSuggestionColumns")]
     partial class _202606011955_AddTaskPromptSuggestionColumns
     {

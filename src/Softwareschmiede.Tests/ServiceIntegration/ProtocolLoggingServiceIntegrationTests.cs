@@ -9,72 +9,72 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 /// <summary>E2E-Test: Stdout-Streaming und Protokoll-Eintrag in UI.</summary>
 public sealed class ProtocolLoggingServiceIntegrationTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
-    private readonly ProtokollService _protokollService;
-    private readonly AufgabeService _aufgabeService;
-    private readonly ProjektService _projektService;
-    private Guid _aufgabeId;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
+    private readonly LogService _logService;
+    private readonly WorkItemService _workItemService;
+    private readonly ProjectService _projectService;
+    private Guid _workItemId;
 
     /// <summary>ProtocolLoggingServiceIntegrationTests.</summary>
     public ProtocolLoggingServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
-        _protokollService = new ProtokollService(_db, NullLogger<ProtokollService>.Instance);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
-        _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
+        _logService = new LogService(_db, NullLogger<LogService>.Instance);
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _projectService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    private async Task SeedAufgabeAsync()
+    private async Task SeedWorkItemAsync()
     {
-        var projekt = await _projektService.CreateAsync("Log-Projekt", null);
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Log-Aufgabe", null);
-        _aufgabeId = aufgabe.Id;
+        var project = await _projectService.CreateAsync("Log-Projekt", null);
+        var workItem = await _workItemService.CreateAsync(project.Id, "Log-Aufgabe", null);
+        _workItemId = workItem.Id;
     }
 
-    /// <summary><summary>AddCliOutputAsync_StreichtAusgabeInProtokoll.</summary>.</summary>
+    /// <summary>AddCliOutputAsync_StreichtAusgabeInProtokoll.</summary>
     [Fact]
-    public async Task AddCliOutputAsync_StreichtAusgabeInProtokoll()
+    public async Task AddCliOutputAsync_StrikesOutputInLog()
     {
-        await SeedAufgabeAsync();
+        await SeedWorkItemAsync();
 
-        await _protokollService.AddCliOutputAsync(_aufgabeId, "Zeile 1 der Ausgabe", TestContext.Current.CancellationToken);
-        await _protokollService.AddCliOutputAsync(_aufgabeId, "Zeile 2 der Ausgabe", TestContext.Current.CancellationToken);
+        await _logService.AddCliOutputAsync(_workItemId, "Zeile 1 der Ausgabe", TestContext.Current.CancellationToken);
+        await _logService.AddCliOutputAsync(_workItemId, "Zeile 2 der Ausgabe", TestContext.Current.CancellationToken);
 
-        var eintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
-        eintraege.Should().HaveCount(2);
-        eintraege.All(e => e.Typ == ProtokollTyp.CliOutput).Should().BeTrue();
+        var entries = await _logService.GetByWorkItemAsync(_workItemId, TestContext.Current.CancellationToken);
+        entries.Should().HaveCount(2);
+        entries.All(e => e.Type == LogEntryType.CliOutput).Should().BeTrue();
     }
 
-    /// <summary><summary>AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert.</summary>.</summary>
+    /// <summary>AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert.</summary>
     [Fact]
-    public async Task AddCliOutputAsync_MehrereZeilen_SindInReihenfolgeGespeichert()
+    public async Task AddCliOutputAsync_SeveralLines_AreInOrderSaved()
     {
-        await SeedAufgabeAsync();
-        var zeilen = Enumerable.Range(1, 5).Select(i => $"Ausgabezeile {i}").ToList();
+        await SeedWorkItemAsync();
+        var lines = Enumerable.Range(1, 5).Select(i => $"Ausgabezeile {i}").ToList();
 
-        foreach (var zeile in zeilen)
-            await _protokollService.AddCliOutputAsync(_aufgabeId, zeile, TestContext.Current.CancellationToken);
+        foreach (var line in lines)
+            await _logService.AddCliOutputAsync(_workItemId, line, TestContext.Current.CancellationToken);
 
-        var eintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
-        eintraege.Should().HaveCount(5);
-        for (var i = 0; i < zeilen.Count; i++)
-            eintraege[i].Inhalt.Should().Be(zeilen[i]);
+        var entries = await _logService.GetByWorkItemAsync(_workItemId, TestContext.Current.CancellationToken);
+        entries.Should().HaveCount(5);
+        for (var i = 0; i < lines.Count; i++)
+            entries[i].Content.Should().Be(lines[i]);
     }
 
-    /// <summary><summary>AddStatusUebergangAsync_ErstelltEintragImProtokoll.</summary>.</summary>
+    /// <summary>AddStatusUebergangAsync_ErstelltEintragImProtokoll.</summary>
     [Fact]
-    public async Task AddStatusUebergangAsync_ErstelltEintragImProtokoll()
+    public async Task AddStatusTransitionAsync_CreatesEntryInLog()
     {
-        await SeedAufgabeAsync();
+        await SeedWorkItemAsync();
 
-        await _protokollService.AddStatusUebergangAsync(_aufgabeId, AufgabeStatus.Neu, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
+        await _logService.AddStatusTransitionAsync(_workItemId, WorkItemStatus.New, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 
-        var eintraege = await _protokollService.GetByAufgabeAsync(_aufgabeId, TestContext.Current.CancellationToken);
-        eintraege.Should().HaveCount(1);
-        eintraege[0].Typ.Should().Be(ProtokollTyp.StatusUebergang);
-        eintraege[0].Inhalt.Should().Contain("Gestartet");
+        var entries = await _logService.GetByWorkItemAsync(_workItemId, TestContext.Current.CancellationToken);
+        entries.Should().HaveCount(1);
+        entries[0].Type.Should().Be(LogEntryType.StatusTransition);
+        entries[0].Content.Should().Contain("Gestartet");
     }
 }

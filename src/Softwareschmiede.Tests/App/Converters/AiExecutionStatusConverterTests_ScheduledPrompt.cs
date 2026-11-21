@@ -1,0 +1,70 @@
+using System.Globalization;
+using FluentAssertions;
+using Softwareschmiede.App.Converters;
+using Softwareschmiede.App.ViewModels;
+using Softwareschmiede.Domain.Enums;
+
+namespace Softwareschmiede.Tests.App.Converters;
+
+/// <summary>Tests für KiAusfuehrungsStatusConverter im Zusammenhang mit zeitgesteuerten Prompts.</summary>
+public sealed class AiExecutionStatusConverterTests_ScheduledPrompt
+{
+    private readonly AiExecutionStatusConverter _sut = new();
+
+    /// <summary>Steht für eine Aufgabe ein zeitgesteuerter Prompt in der Warteschlange (HasScheduledPrompt), muss
+    /// die Seitenleiste "Prompt in Wartestellung" statt des allgemeinen "Wartet"-Status anzeigen.</summary>
+    [Fact]
+    public void Convert_ShouldReturnPromptInQueue_WhenHasScheduledPromptIsTrue()
+    {
+        var item = new ActiveWorkItemPanelItem
+        {
+            Id = Guid.NewGuid(),
+            Title = "Aufgabe mit geplantem Prompt",
+            Status = WorkItemStatus.Waiting,
+            HasScheduledPrompt = true
+        };
+
+        var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().Be("⏳ Prompt in Wartestellung");
+    }
+
+    /// <summary>HasScheduledPrompt hat Vorrang vor dem sonst aus ActiveRunId/LaufStatus abgeleiteten "▶ Läuft".</summary>
+    [Fact]
+    public void Convert_ShouldReturnPromptInQueue_EvenWhenCliIsRunning()
+    {
+        var item = new ActiveWorkItemPanelItem
+        {
+            Id = Guid.NewGuid(),
+            Title = "Laufende Aufgabe mit geplantem Prompt",
+            Status = WorkItemStatus.Started,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            ActiveRunId = "run-1",
+            LastHeartbeatUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
+            RunStatus = WorkItemRunStatus.Running,
+            HasScheduledPrompt = true
+        };
+
+        var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().Be("⏳ Prompt in Wartestellung");
+    }
+
+    /// <summary>Ist kein Prompt geplant (HasScheduledPrompt false), bleibt das bisherige Statusverhalten unverändert.</summary>
+    [Fact]
+    public void Convert_ShouldReturnWaitsString_WhenHasScheduledPromptIsFalse()
+    {
+        var item = new ActiveWorkItemPanelItem
+        {
+            Id = Guid.NewGuid(),
+            Title = "Aufgabe ohne geplanten Prompt",
+            Status = WorkItemStatus.Waiting,
+            ExecutionStatus = WorkItemExecutionStatus.Active,
+            HasScheduledPrompt = false
+        };
+
+        var result = _sut.Convert(item, typeof(string), null!, CultureInfo.InvariantCulture);
+
+        result.Should().Be("⏸ Wartet");
+    }
+}

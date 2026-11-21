@@ -25,7 +25,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
     /// <summary>Listet Dateien und Verzeichnisse innerhalb der Standard-Ladetiefe (maxInitialDepth = 2) auf; tiefere Einträge werden nicht mitgeladen.</summary>
     [Fact]
-    public async Task LoadWorkingTreeAsync_ListetDateienUndVerzeichnisse()
+    public async Task LoadWorkingTreeAsync_ListsFilesAndDirectories()
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src", "nested"));
@@ -47,7 +47,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
     /// <summary>Bei maxInitialDepth = 2 sind nur Ebene 0 und 1 als echte Knoten geladen; tiefere Einträge fehlen.</summary>
     [Fact]
-    public async Task LoadWorkingTreeAsync_LaedtNurMaxInitialDepthEbenen()
+    public async Task LoadWorkingTreeAsync_LoadsOnlyMaxInitialDepthLevel()
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src", "nested"));
@@ -64,7 +64,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
     /// <summary>Depth wird für die oberste Ebene auf 0 und für deren Kinder auf 1 gesetzt.</summary>
     [Fact]
-    public async Task LoadWorkingTreeAsync_SetztDepthKorrekt()
+    public async Task LoadWorkingTreeAsync_SetsDepthCorrect()
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src"));
@@ -82,7 +82,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
     /// <summary>Ein Verzeichnis auf der Grenztiefe hat ChildrenLoaded == false und genau einen Platzhalter-Kindknoten.</summary>
     [Fact]
-    public async Task LoadWorkingTreeAsync_GrenztiefeVerzeichnis_ChildrenLoadedFalseUndPlatzhalter()
+    public async Task LoadWorkingTreeAsync_DepthlimitDirectory_ChildrenLoadedFalseAndPlaceholder()
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src", "nested"));
@@ -100,7 +100,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
     /// <summary>Ein Verzeichnis oberhalb der Grenztiefe hat echte Kinder und ChildrenLoaded == true, keinen Platzhalter.</summary>
     [Fact]
-    public async Task LoadWorkingTreeAsync_ObereEbeneVerzeichnis_ChildrenLoadedTrue()
+    public async Task LoadWorkingTreeAsync_UpperLevelDirectory_ChildrenLoadedTrue()
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src"));
@@ -118,7 +118,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
     /// <summary>Das .git-Verzeichnis wird von der Baumaufzählung ausgeschlossen.</summary>
     [Fact]
-    public async Task LoadWorkingTreeAsync_SchliesstGitVerzeichnisAus()
+    public async Task LoadWorkingTreeAsync_ClosesGitDirectoryOut()
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, ".git"));
@@ -135,7 +135,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
     /// <summary>Ein nicht existierender Pfad liefert eine leere Liste ohne Ausnahme.</summary>
     [Fact]
-    public async Task LoadWorkingTreeAsync_NichtExistierenderPfad_LiefertLeereListe()
+    public async Task LoadWorkingTreeAsync_NotExistingPath_ReturnsEmptyList()
     {
         var missingPath = Path.Combine(CreateTempDirectory(), "missing");
         var service = CreateService();
@@ -147,7 +147,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
     /// <summary>LoadSubtreeAsync gibt genau die unmittelbaren Kinder von parentPath zurück.</summary>
     [Fact]
-    public async Task LoadSubtreeAsync_LaedtEineEbeneUnterhalbParent()
+    public async Task LoadSubtreeAsync_LoadsALevelBelowParent()
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src", "nested"));
@@ -164,7 +164,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
     /// <summary>Alle von LoadSubtreeAsync zurückgegebenen Knoten haben Depth == depth.</summary>
     [Fact]
-    public async Task LoadSubtreeAsync_SetztDepthAufUebergebenenWert()
+    public async Task LoadSubtreeAsync_SetsDepthOnPassValue()
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src", "nested"));
@@ -180,7 +180,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
     /// <summary>Zurückgegebene Unterverzeichnisse tragen einen Platzhalter und ChildrenLoaded == false.</summary>
     [Fact]
-    public async Task LoadSubtreeAsync_UnterverzeichnisMitPlatzhalterUndChildrenLoadedFalse()
+    public async Task LoadSubtreeAsync_SubdirectoryWithPlaceholderAndChildrenLoadedFalse()
     {
         var repositoryPath = CreateTempDirectory();
         Directory.CreateDirectory(Path.Combine(repositoryPath, "src", "nested"));
@@ -196,7 +196,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
     /// <summary>Ein nicht existierender parentPath liefert eine leere Liste ohne Ausnahme.</summary>
     [Fact]
-    public async Task LoadSubtreeAsync_NichtExistierenderPfad_LeereListe()
+    public async Task LoadSubtreeAsync_NotExistingPath_EmptyList()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService();
@@ -208,7 +208,7 @@ public sealed class GitWorkspaceBrowserServiceWorkingTreeTests : IDisposable
 
     /// <summary>Prüft den Schutz gegen Pfad-Traversal außerhalb des Repository-Roots.</summary>
     [Fact]
-    public async Task LoadSubtreeAsync_PfadAusserhalbRepository_WirftException()
+    public async Task LoadSubtreeAsync_PathOutsideRepository_ThrowsException()
     {
         var repositoryPath = CreateTempDirectory();
         var service = CreateService();

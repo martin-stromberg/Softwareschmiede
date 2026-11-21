@@ -28,7 +28,7 @@ public sealed class Win32PseudoConsoleProcessLauncher : IPseudoConsoleProcessLau
     public bool IsPseudoTerminal => true;
 
     /// <inheritdoc/>
-    public TerminalSessionStartResult Start(Guid aufgabeId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null)
+    public TerminalSessionStartResult Start(Guid workItemId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null)
     {
         var workingDir = !string.IsNullOrEmpty(spec.WorkingDirectory) && Directory.Exists(spec.WorkingDirectory)
             ? spec.WorkingDirectory
@@ -44,7 +44,7 @@ public sealed class Win32PseudoConsoleProcessLauncher : IPseudoConsoleProcessLau
         foreach (var entry in spec.EnvironmentVariables)
             psi.EnvironmentVariables[entry.Key] = entry.Value;
 
-        _logger.LogInformation("CLI-Prozess (ConPTY, {FileName} {Arguments}) für Aufgabe {AufgabeId} starten.", spec.FileName, spec.Arguments, aufgabeId);
+        _logger.LogInformation("CLI-Prozess (ConPTY, {FileName} {Arguments}) für Aufgabe {AufgabeId} starten.", spec.FileName, spec.Arguments, workItemId);
 
         var pseudoConsole = PseudoConsole.Create((short)_options.Value.DefaultCols, (short)_options.Value.DefaultRows);
 
@@ -76,7 +76,7 @@ public sealed class Win32PseudoConsoleProcessLauncher : IPseudoConsoleProcessLau
         PseudoConsoleSession session;
         try
         {
-            session = CreatePseudoConsoleSession(aufgabeId, pseudoConsole, process, startResult.ProcessHandle, outputSink, spec);
+            session = CreatePseudoConsoleSession(workItemId, pseudoConsole, process, startResult.ProcessHandle, outputSink, spec);
         }
         catch
         {
@@ -93,7 +93,7 @@ public sealed class Win32PseudoConsoleProcessLauncher : IPseudoConsoleProcessLau
         return new TerminalSessionStartResult(process, session, IsPseudoTerminal: true);
     }
 
-    private PseudoConsoleSession CreatePseudoConsoleSession(Guid aufgabeId, PseudoConsole pseudoConsole, Process process, IntPtr nativeProcessHandle, ITerminalOutputSink? outputSink, TerminalSessionStartSpec spec)
+    private PseudoConsoleSession CreatePseudoConsoleSession(Guid workItemId, PseudoConsole pseudoConsole, Process process, IntPtr nativeProcessHandle, ITerminalOutputSink? outputSink, TerminalSessionStartSpec spec)
     {
         FileStream? inputStream = null;
         FileStream? outputStream = null;
@@ -130,7 +130,7 @@ public sealed class Win32PseudoConsoleProcessLauncher : IPseudoConsoleProcessLau
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Anlegen der PseudoConsoleSession für Aufgabe {AufgabeId}.", aufgabeId);
+            _logger.LogError(ex, "Fehler beim Anlegen der PseudoConsoleSession für Aufgabe {AufgabeId}.", workItemId);
             inputStream?.Dispose();
             outputStream?.Dispose();
             throw;

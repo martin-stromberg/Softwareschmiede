@@ -85,7 +85,7 @@ internal static class TerminalExecutableResolver
         // neben <name>.cmd ablegt), kann CreateProcess nicht laden (Win32Exception 193). Er wird daher
         // übersprungen, damit PATHEXT-Kandidaten (z. B. <name>.cmd) noch gefunden werden; bleibt er der
         // einzige Treffer, wird er als NotExecutable gemeldet statt als NotFound.
-        string? nichtAusfuehrbarerTreffer = null;
+        string? nonExecutableMatch = null;
         foreach (var directory in searchDirectories)
         {
             string? hit = null;
@@ -97,7 +97,7 @@ internal static class TerminalExecutableResolver
 
                 if (!Path.HasExtension(candidatePath) && !IsPeImage(candidatePath))
                 {
-                    nichtAusfuehrbarerTreffer ??= candidatePath;
+                    nonExecutableMatch ??= candidatePath;
                     continue;
                 }
 
@@ -111,13 +111,13 @@ internal static class TerminalExecutableResolver
             return CreateResolution(spec, hit);
         }
 
-        if (nichtAusfuehrbarerTreffer is not null)
+        if (nonExecutableMatch is not null)
         {
             return new TerminalExecutableResolution(
                 spec,
                 TerminalExecutableStatus.NotExecutable,
-                nichtAusfuehrbarerTreffer,
-                $"'{nichtAusfuehrbarerTreffer}' ist ein Skript ohne Erweiterung (kein PE-Image) und für CreateProcess nicht ausführbar.");
+                nonExecutableMatch,
+                $"'{nonExecutableMatch}' ist ein Skript ohne Erweiterung (kein PE-Image) und für CreateProcess nicht ausführbar.");
         }
 
         return new TerminalExecutableResolution(

@@ -18,15 +18,15 @@ public sealed class ScmEventPersistenceTests
     public async Task MigrationAndReplayPreserveOldTasksAndObserveVersions()
     {
         var path = Path.Combine(Path.GetTempPath(), "scm-db-" + Guid.NewGuid().ToString("N") + ".db");
-        var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>().UseSqlite($"Data Source={path};Pooling=False").Options;
+        var options = new DbContextOptionsBuilder<SoftwareschmiedeDbContext>().UseSqlite($"Data Source={path};Pooling=False").Options;
         try
         {
             var taskId = Guid.NewGuid();
-            await using (var db = new SoftwareschmiededDbContext(options))
+            await using (var db = new SoftwareschmiedeDbContext(options))
             {
                 await db.GetService<IMigrator>().MigrateAsync("20260916094502_AddAufgabePausiertBisUtc", TestContext.Current.CancellationToken);
-                var project = new Projekt { Id = Guid.NewGuid(), Name = "Altbestand" };
-                db.Projekte.Add(project);
+                var project = new Project { Id = Guid.NewGuid(), Name = "Altbestand" };
+                db.Projects.Add(project);
                 await db.SaveChangesAsync(TestContext.Current.CancellationToken);
                 // Der Altbestand wird roh eingefügt: Das aktuelle Modell enthält neuere
                 // Aufgaben-Spalten, die es zu diesem Migrationsstand noch nicht gibt.
@@ -37,9 +37,9 @@ public sealed class ScmEventPersistenceTests
                 await store.AcceptBatchAsync(taskId, "source", Batch(observation), ct: TestContext.Current.CancellationToken);
                 await store.AcceptBatchAsync(taskId, "source", Batch(observation with { UpdatedAt = observation.UpdatedAt.AddHours(1) }), ct: TestContext.Current.CancellationToken);
                 Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-                Assert.Equal("Bestehende Aufgabe", (await db.Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.Titel);
+                Assert.Equal("Bestehende Aufgabe", (await db.WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.Title);
             }
-            await using (var db = new SoftwareschmiededDbContext(options))
+            await using (var db = new SoftwareschmiedeDbContext(options))
             {
                 var store = new ScmEventStore(db, new(), TimeProvider.System);
                 var observation = Observe();
@@ -73,7 +73,7 @@ public sealed class ScmEventPersistenceTests
     [Fact]
     public async Task MissingEditorCanResolveLaterWithoutAcceptingForeignEditor()
     {
-        await using var db = new SoftwareschmiededDbContext(new DbContextOptionsBuilder<SoftwareschmiededDbContext>().UseSqlite("Data Source=:memory:").Options);
+        await using var db = new SoftwareschmiedeDbContext(new DbContextOptionsBuilder<SoftwareschmiedeDbContext>().UseSqlite("Data Source=:memory:").Options);
         await db.Database.OpenConnectionAsync(cancellationToken: TestContext.Current.CancellationToken);
         await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
         var observation = Observe() with { LastEditedAt = Observe().CreatedAt.AddSeconds(1) };
@@ -90,7 +90,7 @@ public sealed class ScmEventPersistenceTests
     [Fact]
     public async Task AtomicLeaseExcludesOtherConsumers()
     {
-        await using var db = new SoftwareschmiededDbContext(new DbContextOptionsBuilder<SoftwareschmiededDbContext>().UseSqlite("Data Source=:memory:").Options);
+        await using var db = new SoftwareschmiedeDbContext(new DbContextOptionsBuilder<SoftwareschmiedeDbContext>().UseSqlite("Data Source=:memory:").Options);
         await db.Database.OpenConnectionAsync(cancellationToken: TestContext.Current.CancellationToken);
         await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
         var store = new ScmEventStore(db, new(), TimeProvider.System);

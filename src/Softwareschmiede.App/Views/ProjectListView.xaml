@@ -18,12 +18,12 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
 
                 <!-- Gruppe: Projekt -->
-                <controls:RibbonGroup GruppenName="Projekt">
+                <controls:RibbonGroup GroupName="Projekt">
                     <controls:RibbonGroup.ItemsContent>
                         <controls:RibbonLargeButton ButtonIcon="➕"
                                                     ButtonText="Neu"
-                                                    AutomationName="Neu"
-                                                    ButtonCommand="{Binding ZeigeErstellungsFormularCommand}" />
+                                                    AutomationName="New"
+                                                    ButtonCommand="{Binding ShowCreationFormCommand}" />
                     </controls:RibbonGroup.ItemsContent>
                 </controls:RibbonGroup>
 
@@ -36,8 +36,8 @@
                       HorizontalScrollBarVisibility="Disabled">
             <StackPanel>
                 <!-- Projektkacheln -->
-                <ItemsControl ItemsSource="{Binding Projekte}"
-                              AutomationProperties.AutomationId="ProjektKachelnListe"
+                <ItemsControl ItemsSource="{Binding Projects}"
+                              AutomationProperties.AutomationId="ProjectTilesList"
                               Margin="24,24,24,0">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -58,10 +58,10 @@
                                     Focusable="True"
                                     KeyboardNavigation.IsTabStop="True">
                                 <Border.InputBindings>
-                                    <MouseBinding Command="{Binding DataContext.WaehleProjektCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    <MouseBinding Command="{Binding DataContext.SelectProjectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                  CommandParameter="{Binding}"
                                                  MouseAction="LeftClick" />
-                                    <KeyBinding Command="{Binding DataContext.WaehleProjektCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    <KeyBinding Command="{Binding DataContext.SelectProjectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 Key="Return" />
                                 </Border.InputBindings>
@@ -97,7 +97,7 @@
 
                                     <!-- Kurzbeschreibung -->
                                     <TextBlock Grid.Row="2"
-                                               Text="{Binding Beschreibung}"
+                                               Text="{Binding Description}"
                                                Foreground="{DynamicResource SecondaryTextBrush}"
                                                FontSize="13"
                                                TextWrapping="Wrap"
@@ -192,8 +192,8 @@
                 VerticalAlignment="Bottom"
                 Margin="0,0,0,24"
                 Panel.ZIndex="20"
-                Visibility="{Binding FehlerMeldung, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
-            <TextBlock Text="{Binding FehlerMeldung}"
+                Visibility="{Binding ErrorMessage, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+            <TextBlock Text="{Binding ErrorMessage}"
                        Foreground="White"
                        FontSize="14"
                        TextWrapping="Wrap" />

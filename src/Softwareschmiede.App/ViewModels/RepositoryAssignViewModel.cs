@@ -39,7 +39,7 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
     public event EventHandler<bool>? CloseRequested;
 
     /// <summary>Verfügbare Repositories zur Auswahl (aus externer Plugin-Quelle).</summary>
-    public ObservableCollection<AvailableRepository> VerfuegbareRepositories { get; } = new();
+    public ObservableCollection<AvailableRepository> AvailableRepositories { get; } = new();
 
     /// <summary>Ausgewähltes Repository.</summary>
     public AvailableRepository? SelectedRepository
@@ -175,10 +175,10 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Bestätigt die Auswahl und schließt den Dialog.</summary>
-    public ICommand BestaetigenCommand { get; }
+    public ICommand ConfirmCommand { get; }
 
     /// <summary>Bricht die Auswahl ab und schließt den Dialog.</summary>
-    public ICommand AbbrechenCommand { get; }
+    public ICommand CancelCommand { get; }
 
     /// <summary>Der laufende Reload-Task; nur für Tests.</summary>
     internal Task? CurrentReloadTask { get; private set; }
@@ -201,15 +201,15 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
         _directoryStructureService = directoryStructureService;
         _pluginActivationService = pluginActivationService;
 
-        BestaetigenCommand = new RelayCommand(
+        ConfirmCommand = new RelayCommand(
             Confirm,
             CanConfirm);
-        AbbrechenCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false));
+        CancelCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false));
     }
 
     /// <summary>Lädt alle verfügbaren (aktiven) SCM-Plugins.</summary>
     /// <param name="ct">Abbruchtoken.</param>
-    public async Task LadenAsync(CancellationToken ct = default)
+    public async Task LoadAsync(CancellationToken ct = default)
     {
         IsLoading = true;
         try
@@ -267,7 +267,7 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
     {
         if (_pluginManager == null || SelectedScmPlugin == null)
         {
-            VerfuegbareRepositories.Clear();
+            AvailableRepositories.Clear();
             return;
         }
 
@@ -277,9 +277,9 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
             var repos = await SelectedScmPlugin.GetAvailableRepositoriesAsync(ct);
             ct.ThrowIfCancellationRequested();
             var sorted = repos.OrderByDescending(r => r.UpdatedAt).ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase).ToList();
-            VerfuegbareRepositories.Clear();
+            AvailableRepositories.Clear();
             foreach (var repo in sorted)
-                VerfuegbareRepositories.Add(repo);
+                AvailableRepositories.Add(repo);
             SelectedRepository = null;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -289,7 +289,7 @@ public sealed class RepositoryAssignViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Laden der Repositories für das ausgewählte Plugin.");
-            VerfuegbareRepositories.Clear();
+            AvailableRepositories.Clear();
         }
         finally
         {

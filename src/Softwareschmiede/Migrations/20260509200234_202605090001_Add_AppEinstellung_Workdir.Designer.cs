@@ -10,7 +10,7 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Migrations
 {
-    [DbContext(typeof(SoftwareschmiededDbContext))]
+    [DbContext(typeof(SoftwareschmiedeDbContext))]
     [Migration("20260509200234_202605090001_Add_AppEinstellung_Workdir")]
     partial class _202605090001_Add_AppEinstellung_Workdir
     {

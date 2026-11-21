@@ -6,12 +6,12 @@ namespace Softwareschmiede.Tests.Helpers;
 /// <summary>
 /// Test-Handler, der HTTP-Anfragen anhand der exakten Anfrage-URL auf konfigurierte Antworten
 /// routet. Nicht konfigurierte URLs liefern 404 mit leerer Liste; alle abgerufenen URLs werden
-/// in <see cref="RequestedUrls"/> protokolliert.
+/// in <see cref="RequestedUrl"/> protokolliert.
 /// </summary>
 public sealed class RoutingHttpHandler : HttpMessageHandler
 {
     private readonly Dictionary<string, Func<CancellationToken, Task<HttpResponseMessage>>> _routes = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<string> _requestedUrls = [];
+    private readonly List<string> _requestedUrl = [];
     private readonly List<string?> _requestedAcceptHeaders = [];
 
     /// <inheritdoc cref="RoutingHttpHandler"/>
@@ -28,9 +28,9 @@ public sealed class RoutingHttpHandler : HttpMessageHandler
     }
 
     /// <summary>Die in Aufrufreihenfolge angefragten URLs.</summary>
-    public IReadOnlyList<string> RequestedUrls => _requestedUrls;
+    public IReadOnlyList<string> RequestedUrl => _requestedUrl;
 
-    /// <summary>Die <c>Accept</c>-Header der Requests in Aufrufreihenfolge (parallel zu <see cref="RequestedUrls"/>).</summary>
+    /// <summary>Die <c>Accept</c>-Header der Requests in Aufrufreihenfolge (parallel zu <see cref="RequestedUrl"/>).</summary>
     public IReadOnlyList<string?> RequestedAcceptHeaders => _requestedAcceptHeaders;
 
     /// <summary>Registriert eine Seitenantwort, optional mit Link-Header auf eine Folgeseite.</summary>
@@ -62,7 +62,7 @@ public sealed class RoutingHttpHandler : HttpMessageHandler
     /// <inheritdoc/>
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        _requestedUrls.Add(request.RequestUri!.AbsoluteUri);
+        _requestedUrl.Add(request.RequestUri!.AbsoluteUri);
         _requestedAcceptHeaders.Add(request.Headers.Accept?.ToString());
         return _routes.TryGetValue(request.RequestUri!.AbsoluteUri, out var handler)
             ? handler(cancellationToken)

@@ -11,12 +11,12 @@ public sealed class PluginDefaultSettingsService
 {
     private const string DefaultKeyPrefix = "plugins.default.";
 
-    private readonly SoftwareschmiededDbContext _db;
+    private readonly SoftwareschmiedeDbContext _db;
     private readonly ILogger<PluginDefaultSettingsService> _logger;
 
     /// <inheritdoc cref="PluginDefaultSettingsService"/>
     public PluginDefaultSettingsService(
-        SoftwareschmiededDbContext db,
+        SoftwareschmiedeDbContext db,
         ILogger<PluginDefaultSettingsService> logger)
     {
         _db = db;
@@ -27,13 +27,13 @@ public sealed class PluginDefaultSettingsService
     public async Task<string?> GetDefaultPluginPrefixAsync(PluginType pluginType, CancellationToken ct = default)
     {
         var key = BuildKey(pluginType);
-        var setting = await _db.AppEinstellungen
+        var setting = await _db.AppSettings
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Schluessel == key, ct);
+            .FirstOrDefaultAsync(s => s.Key == key, ct);
 
-        return string.IsNullOrWhiteSpace(setting?.Wert)
+        return string.IsNullOrWhiteSpace(setting?.Value)
             ? null
-            : setting.Wert.Trim();
+            : setting.Value.Trim();
     }
 
     /// <summary>Speichert (oder entfernt) die Standard-Plugin-ID (PluginPrefix) für den angegebenen Typ.</summary>
@@ -41,21 +41,21 @@ public sealed class PluginDefaultSettingsService
     {
         var key = BuildKey(pluginType);
         var normalizedPrefix = string.IsNullOrWhiteSpace(pluginPrefix) ? null : pluginPrefix.Trim();
-        var setting = await _db.AppEinstellungen
-            .FirstOrDefaultAsync(s => s.Schluessel == key, ct);
+        var setting = await _db.AppSettings
+            .FirstOrDefaultAsync(s => s.Key == key, ct);
 
         if (setting is null)
         {
-            setting = new AppEinstellung
+            setting = new AppSetting
             {
                 Id = Guid.NewGuid(),
-                Schluessel = key
+                Key = key
             };
-            _db.AppEinstellungen.Add(setting);
+            _db.AppSettings.Add(setting);
         }
 
-        setting.Wert = normalizedPrefix;
-        setting.AktualisiertAm = DateTimeOffset.UtcNow;
+        setting.Value = normalizedPrefix;
+        setting.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation(
@@ -65,48 +65,48 @@ public sealed class PluginDefaultSettingsService
     }
 
     /// <summary>Liest den gespeicherten Projekt-Standard-Plugin-Prefix für den angegebenen Typ.</summary>
-    public async Task<string?> GetProjectDefaultPluginPrefixAsync(Guid projektId, PluginType pluginType, CancellationToken ct = default)
+    public async Task<string?> GetProjectDefaultPluginPrefixAsync(Guid projectId, PluginType pluginType, CancellationToken ct = default)
     {
-        var key = BuildProjectKey(projektId, pluginType);
-        var setting = await _db.AppEinstellungen
+        var key = BuildProjectKey(projectId, pluginType);
+        var setting = await _db.AppSettings
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Schluessel == key, ct);
+            .FirstOrDefaultAsync(s => s.Key == key, ct);
 
-        return string.IsNullOrWhiteSpace(setting?.Wert)
+        return string.IsNullOrWhiteSpace(setting?.Value)
             ? null
-            : setting.Wert.Trim();
+            : setting.Value.Trim();
     }
 
     /// <summary>Speichert (oder entfernt) den Projekt-Standard-Plugin-Prefix für den angegebenen Typ.</summary>
-    public async Task SaveProjectDefaultPluginPrefixAsync(Guid projektId, PluginType pluginType, string? pluginPrefix, CancellationToken ct = default)
+    public async Task SaveProjectDefaultPluginPrefixAsync(Guid projectId, PluginType pluginType, string? pluginPrefix, CancellationToken ct = default)
     {
-        var key = BuildProjectKey(projektId, pluginType);
+        var key = BuildProjectKey(projectId, pluginType);
         var normalizedPrefix = string.IsNullOrWhiteSpace(pluginPrefix) ? null : pluginPrefix.Trim();
-        var setting = await _db.AppEinstellungen
-            .FirstOrDefaultAsync(s => s.Schluessel == key, ct);
+        var setting = await _db.AppSettings
+            .FirstOrDefaultAsync(s => s.Key == key, ct);
 
         if (setting is null)
         {
-            setting = new AppEinstellung
+            setting = new AppSetting
             {
                 Id = Guid.NewGuid(),
-                Schluessel = key
+                Key = key
             };
-            _db.AppEinstellungen.Add(setting);
+            _db.AppSettings.Add(setting);
         }
 
-        setting.Wert = normalizedPrefix;
-        setting.AktualisiertAm = DateTimeOffset.UtcNow;
+        setting.Value = normalizedPrefix;
+        setting.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
 
         _logger.LogInformation(
             "Projekt-Standard-Plugin gespeichert: Projekt {ProjektId}, {PluginType} => {PluginPrefix}",
-            projektId,
+            projectId,
             pluginType,
             normalizedPrefix ?? "<none>");
     }
 
     private static string BuildKey(PluginType pluginType) => $"{DefaultKeyPrefix}{pluginType}";
 
-    private static string BuildProjectKey(Guid projektId, PluginType pluginType) => $"{DefaultKeyPrefix}project.{projektId}.{pluginType}";
+    private static string BuildProjectKey(Guid projectId, PluginType pluginType) => $"{DefaultKeyPrefix}project.{projectId}.{pluginType}";
 }

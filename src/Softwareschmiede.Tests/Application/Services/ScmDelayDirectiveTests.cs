@@ -16,7 +16,7 @@ public sealed class ScmDelayDirectiveTests
     [InlineData("$Softwareschmiede bitte übernehmen")]
     [InlineData("$Softwareschmiede #verzögert4h")] // Keyword klebt am Argument
     [InlineData("$Softwareschmiede '#verzögert 4h'")] // zitiertes Vorkommen
-    public void Parse_LiefertNone_OhneFreiStehendesKeyword(string? body)
+    public void Parse_ReturnsNone_WithoutFreeStandingKeyword(string? body)
     {
         ScmDelayDirective.Parse(body, null, Now).Kind.Should().Be(ScmDelayDirective.ResultKind.None);
     }
@@ -30,17 +30,17 @@ public sealed class ScmDelayDirectiveTests
     [InlineData("1w", 7, 0, 0)]
     [InlineData("32t", 32, 0, 0)]
     [InlineData("46080min", 32, 0, 0)] // exakt 32 Tage am Maximum
-    public void Parse_LiefertDeferred_BeiRelativerAngabe(string angabe, int tage, int stunden, int minuten)
+    public void Parse_ReturnsDeferred_AtRelativeSpecification(string specification, int day, int hours, int minutes)
     {
-        var result = ScmDelayDirective.Parse($"$Softwareschmiede #verzögert {angabe} bitte", null, Now);
+        var result = ScmDelayDirective.Parse($"$Softwareschmiede #verzögert {specification} bitte", null, Now);
         result.Kind.Should().Be(ScmDelayDirective.ResultKind.Deferred);
-        result.TargetUtc.Should().Be(Now + new TimeSpan(tage, stunden, minuten, 0));
-        result.Argument.Should().Be(angabe);
+        result.TargetUtc.Should().Be(Now + new TimeSpan(day, hours, minutes, 0));
+        result.Argument.Should().Be(specification);
     }
 
     /// <summary>Keyword und Einheit werden unabhängig von der Schreibweise erkannt.</summary>
     [Fact]
-    public void Parse_IgnoriertGrossKleinschreibung()
+    public void Parse_IgnoresLargeLowercase()
     {
         var result = ScmDelayDirective.Parse("$Softwareschmiede #VERZÖGERT 4H", null, Now);
         result.Kind.Should().Be(ScmDelayDirective.ResultKind.Deferred);
@@ -59,16 +59,16 @@ public sealed class ScmDelayDirectiveTests
     [InlineData("#verzögert m32")]
     [InlineData("#verzögert bald")]
     [InlineData("#verzögert")]
-    public void Parse_LiefertInvalid_BeiUngueltigerAngabe(string direktive)
+    public void Parse_ReturnsInvalid_AtInvalidSpecification(string directive)
     {
-        var result = ScmDelayDirective.Parse($"$Softwareschmiede {direktive}", null, Now);
+        var result = ScmDelayDirective.Parse($"$Softwareschmiede {directive}", null, Now);
         result.Kind.Should().Be(ScmDelayDirective.ResultKind.Invalid);
         result.Reason.Should().NotBeNullOrWhiteSpace();
     }
 
     /// <summary>Abschließende Satzzeichen hinter der Angabe werden toleriert.</summary>
     [Fact]
-    public void Parse_ToleriertSatzzeichenHinterDerAngabe()
+    public void Parse_ToleratesPunctuationBehindTheSpecification()
     {
         var result = ScmDelayDirective.Parse("$Softwareschmiede (#verzögert 4h).", null, Now);
         result.Kind.Should().Be(ScmDelayDirective.ResultKind.Deferred);
@@ -77,7 +77,7 @@ public sealed class ScmDelayDirectiveTests
 
     /// <summary>Ein späterer Monatstag im laufenden Monat bleibt im Monat.</summary>
     [Fact]
-    public void Parse_Monatstag_ImLaufendenMonat()
+    public void Parse_Monthday_InRunningMonth()
     {
         // Now: 20.11.2026 — der 25. liegt noch vor uns.
         var result = ScmDelayDirective.Parse("$Softwareschmiede #verzögert m25", null, Now);
@@ -90,16 +90,16 @@ public sealed class ScmDelayDirectiveTests
     [Theory]
     [InlineData("m1", 2026, 12, 1)]   // 1.11. liegt hinter dem 20.11.
     [InlineData("m20", 2026, 12, 20)] // heute erreicht → Folgemonat
-    public void Parse_Monatstag_ImFolgemonat(string angabe, int jahr, int monat, int tag)
+    public void Parse_Monthday_InNextmonth(string specification, int year, int month, int tag)
     {
-        var result = ScmDelayDirective.Parse($"$Softwareschmiede #verzögert {angabe}", null, Now);
+        var result = ScmDelayDirective.Parse($"$Softwareschmiede #verzögert {specification}", null, Now);
         result.Kind.Should().Be(ScmDelayDirective.ResultKind.Deferred);
-        result.TargetUtc.Should().Be(new DateTimeOffset(jahr, monat, tag, 9, 30, 0, Now.Offset));
+        result.TargetUtc.Should().Be(new DateTimeOffset(year, month, tag, 9, 30, 0, Now.Offset));
     }
 
     /// <summary>Über den Jahreswechsel zählt der Januar des Folgejahres.</summary>
     [Fact]
-    public void Parse_Monatstag_UeberJahreswechsel()
+    public void Parse_Monthday_OverYearturn()
     {
         var dez = new DateTimeOffset(2026, 12, 20, 9, 30, 0, Now.Offset);
         var result = ScmDelayDirective.Parse("$Softwareschmiede #verzögert m1", null, dez);
@@ -110,7 +110,7 @@ public sealed class ScmDelayDirectiveTests
     /// <summary>Ein Monatstag, dessen nächster Termin über 32 Tage entfernt liegt
     /// (z. B. m31 im April), wird verworfen.</summary>
     [Fact]
-    public void Parse_Monatstag_JenseitsDesMaximums()
+    public void Parse_Monthday_BeyondOfMaximums()
     {
         var april = new DateTimeOffset(2027, 4, 10, 9, 30, 0, Now.Offset); // nächster 31. = 31.05. (51 Tage)
         var result = ScmDelayDirective.Parse("$Softwareschmiede #verzögert m31", null, april);
@@ -122,7 +122,7 @@ public sealed class ScmDelayDirectiveTests
 
     /// <summary>Monate ohne den Monatstag werden übersprungen (m31 im Februar → März).</summary>
     [Fact]
-    public void Parse_Monatstag_UeberspringtMonateOhneTag()
+    public void Parse_Monthday_SkipsMonthWithoutTag()
     {
         var februar = new DateTimeOffset(2027, 2, 27, 9, 30, 0, Now.Offset); // 2027 ist kein Schaltjahr
         var result = ScmDelayDirective.Parse("$Softwareschmiede #verzögert m28", null, februar);
@@ -132,7 +132,7 @@ public sealed class ScmDelayDirectiveTests
 
     /// <summary>Die erste frei stehende Direktive im Text gewinnt.</summary>
     [Fact]
-    public void Parse_NimmtErsteDirektive()
+    public void Parse_TakesFirstDirective()
     {
         var result = ScmDelayDirective.Parse("$Softwareschmiede #verzögert 4h und später #verzögert 2t", null, Now);
         result.Kind.Should().Be(ScmDelayDirective.ResultKind.Deferred);
@@ -141,7 +141,7 @@ public sealed class ScmDelayDirectiveTests
 
     /// <summary>Ein konfiguriertes Keyword ersetzt den Standard.</summary>
     [Fact]
-    public void Parse_NutztKonfiguriertesKeyword()
+    public void Parse_UsesConfiguredKeyword()
     {
         ScmDelayDirective.Parse("$Softwareschmiede #verzögert 4h", "#warte", Now).Kind
             .Should().Be(ScmDelayDirective.ResultKind.None);
@@ -152,7 +152,7 @@ public sealed class ScmDelayDirectiveTests
 
     /// <summary>Leere Keyword-Konfiguration fällt auf den Standard zurück.</summary>
     [Fact]
-    public void Parse_FaelltAufStandardZurueck_BeiLeeremKeyword()
+    public void Parse_FallsOnDefaultBack_AtEmptyKeyword()
     {
         var result = ScmDelayDirective.Parse("$Softwareschmiede #verzögert 4h", "   ", Now);
         result.Kind.Should().Be(ScmDelayDirective.ResultKind.Deferred);

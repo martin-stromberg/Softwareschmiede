@@ -15,12 +15,12 @@ namespace Softwareschmiede.Tests.E2E;
 /// </summary>
 public partial class End2EndTest
 {
-    private const string ViewPatternProjektName = "ViewPatternProjekt";
-    private const string ViewPatternAufgabenTitel = "ViewPattern-Aufgabe";
+    private const string ViewPatternProjectName = "ViewPatternProjekt";
+    private const string ViewPatternWorkItemsTitle = "ViewPattern-Aufgabe";
 
     /// <summary>Happy Path: Dashboard → Projektliste → Projekt anlegen/öffnen → Aufgabe anlegen/speichern, jeweils über View-Erkennung geprüft.</summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster.</param>
-    protected void ViewPatternHappyPath_NavigiertUndErstelltKorrekt_E2E(Window mainWindow)
+    protected void ViewPatternHappyPath_NavigatesAndCreatesCorrect_E2E(Window mainWindow)
     {
         // Die vorherige Phase (CommandLineParameters) endet auf der Einstellungsseite, nicht dem
         // Dashboard - ForceShow() stellt den erwarteten Ausgangszustand her, statt ihn stillschweigend
@@ -33,23 +33,23 @@ public partial class End2EndTest
         var projectListView = Assert.IsType<ProjectListView>(mainWindow.CurrentView());
         Assert.True(projectListView.IsVisible);
 
-        projectListView.CreateProject(ViewPatternProjektName);
-        var projectDetailView = projectListView.OpenProject(ViewPatternProjektName);
+        projectListView.CreateProject(ViewPatternProjectName);
+        var projectDetailView = projectListView.OpenProject(ViewPatternProjectName);
         Assert.True(projectDetailView.IsVisible);
-        Assert.Equal(ViewPatternProjektName, projectDetailView.GetProjectName());
+        Assert.Equal(ViewPatternProjectName, projectDetailView.GetProjectName());
         Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
         var taskDetailView = projectDetailView.CreateTask();
         Assert.True(taskDetailView.IsVisible);
         Assert.IsType<TaskDetailView>(mainWindow.CurrentView());
 
-        taskDetailView.SetTaskTitle(ViewPatternAufgabenTitel).SaveTask();
-        Assert.Equal(ViewPatternAufgabenTitel, taskDetailView.GetTaskTitle());
+        taskDetailView.SetTaskTitle(ViewPatternWorkItemsTitle).SaveTask();
+        Assert.Equal(ViewPatternWorkItemsTitle, taskDetailView.GetTaskTitle());
     }
 
     /// <summary>Prüft, dass <see cref="WindowExtensions.CurrentView"/> TaskDetail, ProjectDetail, ProjectList, Settings und Dashboard korrekt erkennt.</summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster.</param>
-    protected void AnsichtenErkennung_LiefertKorrekteViewTypen_E2E(Window mainWindow)
+    protected void ViewDetection_ReturnsCorrectViewTypes_E2E(Window mainWindow)
     {
         var taskDetailView = Assert.IsType<TaskDetailView>(mainWindow.CurrentView());
 
@@ -60,7 +60,7 @@ public partial class End2EndTest
         projectDetailView.ForceClose(recurseToDashboard: false);
         var projectListView = Assert.IsType<ProjectListView>(mainWindow.CurrentView());
         Assert.True(projectListView.IsVisible);
-        Assert.Contains(projectListView.GetProjectElements(), e => e.Name == ViewPatternProjektName);
+        Assert.Contains(projectListView.GetProjectElements(), e => e.Name == ViewPatternProjectName);
 
         var settingsView = new SettingsView(mainWindow).ForceShow();
         Assert.True(settingsView.IsVisible);
@@ -75,9 +75,9 @@ public partial class End2EndTest
         Assert.True(dashboardView.IsVisible);
     }
 
-    /// <summary>Prüft, dass <see cref="MenuView"/> zwischen Projektliste, Einstellungen und Dashboard navigiert.</summary>
+    /// <summary>Prüft, dass <see cref="MenuView"/> zwischen Projektliste, Settings und Dashboard navigiert.</summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster.</param>
-    protected void MenueNavigation_WechseltZwischenAnsichten_E2E(Window mainWindow)
+    protected void MenuNavigation_SwitchesBetweenView_E2E(Window mainWindow)
     {
         var menu = new MenuView(mainWindow);
         Assert.True(menu.IsVisible);
@@ -94,7 +94,7 @@ public partial class End2EndTest
 
     /// <summary>Prüft <see cref="BaseWindowView.ForceShow"/> für Dashboard, ProjectList und ProjectDetail, inklusive No-Op bei bereits sichtbarer Ansicht.</summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster.</param>
-    protected void ForceShow_NavigiertKorrektZuAnsicht_E2E(Window mainWindow)
+    protected void ForceShow_NavigatesCorrectToView_E2E(Window mainWindow)
     {
         var dashboardView = new DashboardView(mainWindow).ForceShow();
         Assert.True(dashboardView.IsVisible);
@@ -102,7 +102,7 @@ public partial class End2EndTest
         var projectListView = new ProjectListView(mainWindow).ForceShow();
         Assert.True(projectListView.IsVisible);
 
-        var projectDetailView = projectListView.OpenProject(ViewPatternProjektName);
+        var projectDetailView = projectListView.OpenProject(ViewPatternProjectName);
         Assert.True(projectDetailView.IsVisible);
 
         // ForceShow() ist No-Op, wenn die Ansicht bereits sichtbar ist (siehe Designentscheidung in plan.md).
@@ -113,11 +113,11 @@ public partial class End2EndTest
 
     /// <summary>Prüft, dass <c>TaskDetailView.ForceClose(recurseToDashboard: false)</c> nur bis ProjectDetailView schließt.</summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster.</param>
-    protected void ForceClose_OhneRekursion_SchliesstNurEineEbene_E2E(Window mainWindow)
+    protected void ForceClose_WithoutRecursion_ClosesOnlyALevel_E2E(Window mainWindow)
     {
         var projectDetailView = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
         var taskDetailView = projectDetailView.CreateTask();
-        taskDetailView.SetTaskTitle(ViewPatternAufgabenTitel + "-OhneRekursion").SaveTask();
+        taskDetailView.SetTaskTitle(ViewPatternWorkItemsTitle + "-OhneRekursion").SaveTask();
 
         taskDetailView.ForceClose(recurseToDashboard: false);
         var projectDetailViewAfterClose = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
@@ -127,11 +127,11 @@ public partial class End2EndTest
 
     /// <summary>Prüft, dass <c>TaskDetailView.ForceClose(recurseToDashboard: true)</c> bis zum Dashboard durchreicht.</summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster.</param>
-    protected void ForceClose_MitRekursion_SchliesstBisDashboard_E2E(Window mainWindow)
+    protected void ForceClose_WithRecursion_ClosesUntilDashboard_E2E(Window mainWindow)
     {
         var projectDetailView = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
         var taskDetailView = projectDetailView.CreateTask();
-        taskDetailView.SetTaskTitle(ViewPatternAufgabenTitel + "-MitRekursion").SaveTask();
+        taskDetailView.SetTaskTitle(ViewPatternWorkItemsTitle + "-MitRekursion").SaveTask();
 
         taskDetailView.ForceClose(recurseToDashboard: true);
         var dashboardView = Assert.IsType<DashboardView>(mainWindow.CurrentView());
@@ -140,12 +140,12 @@ public partial class End2EndTest
 
     /// <summary>Prüft, dass <see cref="WindowExtensions.CurrentView"/> den Repository-Zuweisungs- und den KI-Plugin-Auswahl-Dialog erkennt.</summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster.</param>
-    protected void DialogErkennung_LiefertKorrekteDialogViewTypen_E2E(Window mainWindow)
+    protected void DialogDetection_ReturnsCorrectDialogViewTypes_E2E(Window mainWindow)
     {
         var dashboardView = Assert.IsType<DashboardView>(mainWindow.CurrentView());
         dashboardView.Menu.NavigateToProjects();
         var projectListView = Assert.IsType<ProjectListView>(mainWindow.CurrentView());
-        var projectDetailView = projectListView.OpenProject(ViewPatternProjektName);
+        var projectDetailView = projectListView.OpenProject(ViewPatternProjectName);
 
         var repositoryDialog = new RepositoryAssignDialogView(mainWindow).ForceShow();
         Assert.True(repositoryDialog.IsVisible);
@@ -163,7 +163,7 @@ public partial class End2EndTest
 
         // Prüft den Abbrechen-Pfad des nativen Löschdialogs: Aufgabe bleibt erhalten, wenn der
         // Bestätigungsdialog über "Nein" (DeleteConfirmationDialogView.Cancel()) verlassen wird.
-        WaitForElement(mainWindow, cf => cf.ByName("Löschen"), Short).AsButton().ClickInForeground();
+        WaitForElement(mainWindow, cf => cf.ByName("Delete"), Short).AsButton().ClickInForeground();
         new DeleteConfirmationDialogView(mainWindow).Cancel();
         Assert.IsType<TaskDetailView>(mainWindow.CurrentView());
 
@@ -183,10 +183,10 @@ public partial class End2EndTest
     /// <see cref="DeleteConfirmationDialogView"/> bereits ein bekannter, korrekt erkannter Marker ist.
     /// </summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster.</param>
-    protected void UnbekannteAnsicht_WirftAussagekraeftigeException_E2E(Window mainWindow)
+    protected void UnknownView_ThrowsMeaningfulException_E2E(Window mainWindow)
     {
-        const string unbekannterTitel = "ViewPattern-Test-UnbekannteAnsicht";
-        var messageBoxThread = new Thread(() => System.Windows.MessageBox.Show("Fenster ohne View-Marker.", unbekannterTitel))
+        const string unknownTitle = "ViewPattern-Test-UnbekannteAnsicht";
+        var messageBoxThread = new Thread(() => System.Windows.MessageBox.Show("Fenster ohne View-Marker.", unknownTitle))
         {
             IsBackground = true
         };
@@ -195,7 +195,7 @@ public partial class End2EndTest
 
         try
         {
-            var msgBoxWindow = WaitForWindow(unbekannterTitel, Short).AsWindow();
+            var msgBoxWindow = WaitForWindow(unknownTitle, Short).AsWindow();
 
             var exception = Assert.Throws<InvalidOperationException>(() => msgBoxWindow.CurrentView());
             Assert.Contains("konnte keine bekannte Ansicht erkennen", exception.Message);
@@ -214,14 +214,14 @@ public partial class End2EndTest
 
     /// <summary>Prüft, dass <see cref="WindowExtensions.CurrentView"/> das Fehlerbanner als <see cref="ErrorView"/> erkennt, ausgelöst durch ein fehlendes Arbeitsverzeichnis.</summary>
     /// <param name="mainWindow">Das bereits laufende Hauptfenster.</param>
-    protected async Task FehlerAnsichtErkennung_ZeigtFehlermeldung_E2E(Window mainWindow)
+    protected async Task ErrorViewDetection_ShowsErrormessage_E2E(Window mainWindow)
     {
-        SetupProjectMitNeuerAufgabeForStartedApp(mainWindow, "ViewPattern-Fehler-Repo", "ViewPattern-Fehler-Projekt");
+        SetupProjectWithNewWorkItemForStartedApp(mainWindow, "ViewPattern-Fehler-Repo", "ViewPattern-Fehler-Projekt");
 
         await SeedRepositoryWorkingDirectoryAsync("does-not-exist");
 
         new WindowsCredentialStore().SetCredential("LocalDirectoryPlugin.ConfirmGitInitInSourceDirectory", "true");
-        StartenUndPluginWaehlen(mainWindow, "Softwareschmiede.KiSimulator");
+        StartAndPluginSelect(mainWindow, "Softwareschmiede.KiSimulator");
 
         var errorView = Assert.IsType<ErrorView>(mainWindow.CurrentView());
         Assert.True(errorView.IsVisible);

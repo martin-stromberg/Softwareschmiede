@@ -29,7 +29,7 @@ public sealed class PluginManagerTests : IDisposable
             Path.Combine(_tempDirectory, "_netrc"));
     }
 
-    /// <summary><summary>GetSourceCodeManagementPlugins_ShouldReturnEmpty_WhenPluginDirectoryMissing.</summary>.</summary>
+    /// <summary>GetSourceCodeManagementPlugins_ShouldReturnEmpty_WhenPluginDirectoryMissing.</summary>
     [Fact]
     public void GetSourceCodeManagementPlugins_ShouldReturnEmpty_WhenPluginDirectoryMissing()
     {
@@ -39,7 +39,7 @@ public sealed class PluginManagerTests : IDisposable
         sut.GetDevelopmentAutomationPlugins().Should().BeEmpty();
     }
 
-    /// <summary><summary>GetSourceCodeManagementPlugins_ShouldSkipInvalidDll_WhenBadDllExists.</summary>.</summary>
+    /// <summary>GetSourceCodeManagementPlugins_ShouldSkipInvalidDll_WhenBadDllExists.</summary>
     [Fact]
     public void GetSourceCodeManagementPlugins_ShouldSkipInvalidDll_WhenBadDllExists()
     {
@@ -52,9 +52,9 @@ public sealed class PluginManagerTests : IDisposable
         sut.GetDevelopmentAutomationPlugins().Should().BeEmpty();
     }
 
-    /// <summary><summary>GetSourceCodeManagementPlugins_ShouldLoadGitAndKiPlugins_WhenValidPluginDllsExist.</summary>.</summary>
+    /// <summary>GetSourceCodeManagementPlugins_ShouldLoadGitAndKiPlugins_WhenValidPluginDllsExist.</summary>
     [Fact]
-    public void GetSourceCodeManagementPlugins_ShouldLoadGitAndKiPlugins_WhenValidPluginDllsExist()
+    public void GetSourceCodeManagementPlugins_ShouldLoadGitAndAiPlugins_WhenValidPluginDllsExist()
     {
         Directory.CreateDirectory(_tempDirectory);
         File.Copy(typeof(GitHubPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHub.dll"), overwrite: true);
@@ -63,25 +63,25 @@ public sealed class PluginManagerTests : IDisposable
         File.Copy(typeof(ClaudeCliPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.ClaudeCli.dll"), overwrite: true);
         File.Copy(typeof(CodexPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.Codex.dll"), overwrite: true);
         File.Copy(typeof(DevinPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.Devin.dll"), overwrite: true);
-        File.Copy(typeof(KiSimulatorPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.KiSimulator.dll"), overwrite: true);
+        File.Copy(typeof(AiSimulatorPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.KiSimulator.dll"), overwrite: true);
 
         var sut = CreateSut(_tempDirectory);
 
         var scmPlugins = sut.GetSourceCodeManagementPlugins();
-        var kiPlugins = sut.GetDevelopmentAutomationPlugins();
+        var aiPlugins = sut.GetDevelopmentAutomationPlugins();
 
         scmPlugins.Should().HaveCount(2);
         scmPlugins.Should().Contain(p => p.PluginName == "GitHub");
         scmPlugins.Should().Contain(p => p.PluginName == "Local Directory");
-        kiPlugins.Should().HaveCount(5);
-        kiPlugins.Should().Contain(p => p.PluginName == "GitHub Copilot");
-        kiPlugins.Should().Contain(p => p.PluginName == "Claude CLI");
-        kiPlugins.Should().Contain(p => p.PluginName == "Codex CLI");
-        kiPlugins.Should().Contain(p => p.PluginName == "Devin CLI");
-        kiPlugins.Should().Contain(p => p.PluginName == "KI Simulator");
+        aiPlugins.Should().HaveCount(5);
+        aiPlugins.Should().Contain(p => p.PluginName == "GitHub Copilot");
+        aiPlugins.Should().Contain(p => p.PluginName == "Claude CLI");
+        aiPlugins.Should().Contain(p => p.PluginName == "Codex CLI");
+        aiPlugins.Should().Contain(p => p.PluginName == "Devin CLI");
+        aiPlugins.Should().Contain(p => p.PluginName == "KI Simulator");
     }
 
-    /// <summary><summary>GetDefaultSourceCodeManagementPlugin_ShouldThrow_WhenNoPluginLoaded.</summary>.</summary>
+    /// <summary>GetDefaultSourceCodeManagementPlugin_ShouldThrow_WhenNoPluginLoaded.</summary>
     [Fact]
     public void GetDefaultSourceCodeManagementPlugin_ShouldThrow_WhenNoPluginLoaded()
     {
@@ -93,7 +93,7 @@ public sealed class PluginManagerTests : IDisposable
             .WithMessage("*Source-Code-Management-Plugin*");
     }
 
-    /// <summary><summary>GetDefaultDevelopmentAutomationPlugin_ShouldThrow_WhenNoPluginLoaded.</summary>.</summary>
+    /// <summary>GetDefaultDevelopmentAutomationPlugin_ShouldThrow_WhenNoPluginLoaded.</summary>
     [Fact]
     public void GetDefaultDevelopmentAutomationPlugin_ShouldThrow_WhenNoPluginLoaded()
     {
@@ -105,9 +105,9 @@ public sealed class PluginManagerTests : IDisposable
             .WithMessage("*Development-Automation-Plugin*");
     }
 
-    /// <summary><summary>GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleKiPluginsLoaded.</summary>.</summary>
+    /// <summary>GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleKiPluginsLoaded.</summary>
     [Fact]
-    public void GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleKiPluginsLoaded()
+    public void GetDefaultDevelopmentAutomationPlugin_ShouldPreferCopilot_WhenMultipleAiPluginsLoaded()
     {
         Directory.CreateDirectory(_tempDirectory);
         File.Copy(typeof(GitHubCopilotPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.GitHubCopilot.dll"), overwrite: true);
@@ -121,7 +121,7 @@ public sealed class PluginManagerTests : IDisposable
         result.PluginName.Should().Be("GitHub Copilot");
     }
 
-    /// <summary><summary>GetDefaultDevelopmentAutomationPlugin_ShouldReturnClaude_WhenOnlyClaudePluginLoaded.</summary>.</summary>
+    /// <summary>GetDefaultDevelopmentAutomationPlugin_ShouldReturnClaude_WhenOnlyClaudePluginLoaded.</summary>
     [Fact]
     public void GetDefaultDevelopmentAutomationPlugin_ShouldReturnClaude_WhenOnlyClaudePluginLoaded()
     {
@@ -135,7 +135,7 @@ public sealed class PluginManagerTests : IDisposable
         result.PluginName.Should().Be("Claude CLI");
     }
 
-    /// <summary><summary>GetSourceCodeManagementPlugins_ShouldNotDuplicatePlugins_WhenCalledMultipleTimes.</summary>.</summary>
+    /// <summary>GetSourceCodeManagementPlugins_ShouldNotDuplicatePlugins_WhenCalledMultipleTimes.</summary>
     [Fact]
     public void GetSourceCodeManagementPlugins_ShouldNotDuplicatePlugins_WhenCalledMultipleTimes()
     {
@@ -146,19 +146,19 @@ public sealed class PluginManagerTests : IDisposable
         File.Copy(typeof(ClaudeCliPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.ClaudeCli.dll"), overwrite: true);
         File.Copy(typeof(CodexPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.Codex.dll"), overwrite: true);
         File.Copy(typeof(DevinPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.Devin.dll"), overwrite: true);
-        File.Copy(typeof(KiSimulatorPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.KiSimulator.dll"), overwrite: true);
+        File.Copy(typeof(AiSimulatorPlugin).Assembly.Location, Path.Combine(_tempDirectory, "Softwareschmiede.Plugin.KiSimulator.dll"), overwrite: true);
 
         var sut = CreateSut(_tempDirectory);
 
         var firstCall = sut.GetSourceCodeManagementPlugins();
         var secondCall = sut.GetSourceCodeManagementPlugins();
-        var kiFirst = sut.GetDevelopmentAutomationPlugins();
-        var kiSecond = sut.GetDevelopmentAutomationPlugins();
+        var aiFirst = sut.GetDevelopmentAutomationPlugins();
+        var aiSecond = sut.GetDevelopmentAutomationPlugins();
 
         firstCall.Should().HaveCount(2);
         secondCall.Should().HaveCount(2);
-        kiFirst.Should().HaveCount(5);
-        kiSecond.Should().HaveCount(5);
+        aiFirst.Should().HaveCount(5);
+        aiSecond.Should().HaveCount(5);
     }
 
     /// <summary>GetIdePlugins gibt die eingebauten IDE-Plugins (Visual Studio, Visual Studio Code) zurück.</summary>
@@ -189,7 +189,7 @@ public sealed class PluginManagerTests : IDisposable
     [Fact]
     public void GetDefaultIdePlugin_ShouldThrowInvalidOperationException_WhenNoPluginsRegistered()
     {
-        // Ohne registrierten IProzessStarter/IVisualStudioCodeLocator kann ActivatorUtilities die
+        // Ohne registrierten IProcessStarter/IVisualStudioCodeLocator kann ActivatorUtilities die
         // eingebauten IDE-Plugins nicht instanziieren; TryCreateAndRegister fängt die Exception ab
         // und überspringt die Registrierung, sodass _idePlugins leer bleibt.
         var services = new ServiceCollection()
@@ -221,7 +221,7 @@ public sealed class PluginManagerTests : IDisposable
             .AddLogging()
             .AddSingleton(new Mock<ICliRunner>().Object)
             .AddSingleton(new Mock<ICredentialStore>().Object)
-            .AddSingleton(new Mock<IProzessStarter>().Object)
+            .AddSingleton(new Mock<IProcessStarter>().Object)
             .AddSingleton(new Mock<IVisualStudioCodeLocator>().Object)
             .BuildServiceProvider();
         return new PluginManager(services, NullLogger<PluginManager>.Instance, pluginDirectory);

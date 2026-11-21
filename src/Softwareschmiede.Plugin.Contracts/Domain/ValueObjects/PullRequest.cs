@@ -3,8 +3,8 @@ namespace Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Domain.Enums;
 
 /// <summary>Pull Request aus einem Git-Provider.</summary>
-/// <param name="Nummer">PR-Nummer im Provider.</param>
-/// <param name="Titel">Titel des Pull Requests.</param>
+/// <param name="Number">PR-Nummer im Provider.</param>
+/// <param name="Title">Titel des Pull Requests.</param>
 /// <param name="Url">URL des Pull Requests im Provider.</param>
 /// <param name="BranchName">Name des Quell-Branches.</param>
 /// <param name="Provider">Provider des Pull Requests.</param>
@@ -17,8 +17,8 @@ using Softwareschmiede.Domain.Enums;
 /// <param name="SourceRef">Vom Provider fetchbare Quell-Referenz.</param>
 /// <param name="Body">Beschreibungstext des Pull Requests.</param>
 public sealed record PullRequest(
-    int Nummer,
-    string Titel,
+    int Number,
+    string Title,
     string Url,
     string BranchName,
     PullRequestProvider Provider = PullRequestProvider.GitHub,

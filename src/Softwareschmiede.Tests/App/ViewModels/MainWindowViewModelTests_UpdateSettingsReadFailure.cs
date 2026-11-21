@@ -29,10 +29,10 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
     {
         /// <summary>Einmalige Startautomatik nach Fensterbereitschaft.</summary>
         Startautomatik,
-        /// <summary>Manuelle Prüfung über UpdatePruefenCommand.</summary>
-        ManuellPruefen,
+        /// <summary>Manuelle Prüfung über CheckUpdateCommand.</summary>
+        CheckManual,
         /// <summary>Manueller Installationsstart über UpdateStartenCommand.</summary>
-        ManuellInstallieren
+        InstallManual
     }
 
     private readonly UpdateSettingsReadFailureInterceptor _interceptor = new();
@@ -44,30 +44,30 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
     /// <summary>
     /// Ein Lesefehler beim ersten Settings-Zugriff stoppt vor jedem Release-Request –
     /// für Startautomatik, manuelle Prüfung und direkten Installationsaufruf gleichermaßen.
-    /// Es gibt keinen internen Retry; über die Settings-UI ist eine Wiederherstellung möglich.
+    /// Es gibt keinen internen Retry; über die Einstellungen-UI ist eine Wiederherstellung möglich.
     /// </summary>
     [Theory]
     [InlineData(UpdateEinstieg.Startautomatik)]
-    [InlineData(UpdateEinstieg.ManuellPruefen)]
-    [InlineData(UpdateEinstieg.ManuellInstallieren)]
+    [InlineData(UpdateEinstieg.CheckManual)]
+    [InlineData(UpdateEinstieg.InstallManual)]
     public async Task UpdateSettingsReadFailure_InitialStopsBeforeReleaseRequest(UpdateEinstieg einstieg)
     {
-        await SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
+        await SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath));
         _updateServiceMock
             .Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(NeuesUpdate));
+            .ReturnsAsync(UpdateCheckResult.UpdateAvailable(NewUpdate));
         _safetyServiceMock.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliUpdateSafetyResult(0, []));
 
         var sut = CreateSut();
 
-        var erwartetePruefungen = 0;
-        if (einstieg == UpdateEinstieg.ManuellInstallieren)
+        var expectedCheck = 0;
+        if (einstieg == UpdateEinstieg.InstallManual)
         {
             // Zuvor ein sichtbares Angebot herstellen, damit der Installationspfad getestet wird
             await sut.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
-            sut.UpdateVerfuegbar.Should().BeTrue();
-            erwartetePruefungen = 1;
+            sut.UpdateAvailable.Should().BeTrue();
+            expectedCheck = 1;
         }
 
         _interceptor.ActivateFailure();
@@ -78,11 +78,11 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
             case UpdateEinstieg.Startautomatik:
                 await sut.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
                 break;
-            case UpdateEinstieg.ManuellPruefen:
-                await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
+            case UpdateEinstieg.CheckManual:
+                await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
                 break;
-            case UpdateEinstieg.ManuellInstallieren:
-                await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
+            case UpdateEinstieg.InstallManual:
+                await ((AsyncRelayCommand)sut.StartUpdateCommand).ExecuteAsync();
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(einstieg), einstieg, "Unbekannter Update-Einstieg.");
@@ -92,7 +92,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
             "ein Lesefehler darf nicht intern wiederholt werden");
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(erwartetePruefungen),
+            Times.Exactly(expectedCheck),
             "nach einem Lesefehler darf kein Release-Request mehr gesendet werden");
         _safetyServiceMock.Verify(s => s.CheckAsync(It.IsAny<CancellationToken>()), Times.Never);
         _progressDialogMock.Verify(d => d.Show(It.IsAny<UpdateProgressViewModel>()), Times.Never);
@@ -102,29 +102,29 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         _updateServiceMock.Verify(
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             Times.Never);
-        sut.UpdateHinweis.Should().NotBeNullOrEmpty(
+        sut.UpdateNotice.Should().NotBeNullOrEmpty(
             "ein Lesefehler muss einen sichtbaren Hinweis setzen");
-        sut.UpdateVerfuegbar.Should().BeFalse();
-        sut.VerfuegbaresUpdate.Should().BeNull();
-        sut.UpdateCheckLaeuft.Should().BeFalse();
-        sut.UpdateWirdVorbereitet.Should().BeFalse();
+        sut.UpdateAvailable.Should().BeFalse();
+        sut.AvailableUpdate.Should().BeNull();
+        sut.UpdateCheckRunning.Should().BeFalse();
+        sut.UpdateBeingPrepared.Should().BeFalse();
 
-        // Wiederherstellung: Fehler deaktivieren, Einstellungen über die UI neu laden und speichern
+        // Wiederherstellung: Fehler deaktivieren, Settings über die UI neu laden und speichern
         _interceptor.DeactivateFailure();
-        await SpeichereUpdateEinstellungenUeberUiAsync(
-            sut, UpdateModusOption.FuerModus(UpdateMode.BeiProgrammstartPruefenUndAusfuehren), UpdatePfadKanalResolver.VorabversionenPfad);
+        await SaveUpdateSettingsOverUiAsync(
+            sut, UpdateModeOption.ForMode(UpdateMode.CheckAndRunAtStartup), UpdatePathChannelResolver.PrereleaseVersionsPath);
 
-        sut.UpdatePruefenCommand.CanExecute(null).Should().BeTrue(
+        sut.CheckUpdateCommand.CanExecute(null).Should().BeTrue(
             "nach erfolgreichem Speichern muss die Prüfung wieder verfügbar sein");
-        await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
 
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(
-                It.Is<UpdateCheckOptions>(o => o.UpdatePfad == UpdatePfadKanalResolver.VorabversionenPfad), It.IsAny<CancellationToken>()),
+                It.Is<UpdateCheckOptions>(o => o.UpdatePath == UpdatePathChannelResolver.PrereleaseVersionsPath), It.IsAny<CancellationToken>()),
             Times.Once, "die Folgeprüfung muss die aktuelle Update-Pfad-Einstellung übergeben");
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(erwartetePruefungen + 1));
+            Times.Exactly(expectedCheck + 1));
         _updateServiceMock.Verify(
             s => s.PrepareUpdateAsync(It.IsAny<UpdateInfo>(), It.IsAny<IProgress<UpdatePreparationProgress>>(), It.IsAny<CancellationToken>()),
             Times.Never, "eine manuelle Prüfung darf keine automatische Installation auslösen");
@@ -140,20 +140,20 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task UpdateSettingsReadFailure_BeforePreparationStopsInstall(bool automatisch)
+    public async Task UpdateSettingsReadFailure_BeforePreparationStopsInstall(bool automatic)
     {
         await SetUpdateSettingsAsync(new UpdateSettings(
-            automatisch ? UpdateMode.BeiProgrammstartPruefenUndAusfuehren : UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
-        var aktivierenBeiAufruf = automatisch ? 1 : 2;
+            automatic ? UpdateMode.CheckAndRunAtStartup : UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath));
+        var activateAtCall = automatic ? 1 : 2;
         var checkCalls = 0;
         _updateServiceMock
             .Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
             .Returns<UpdateCheckOptions, CancellationToken>((_, _) =>
             {
                 checkCalls++;
-                if (checkCalls == aktivierenBeiAufruf)
+                if (checkCalls == activateAtCall)
                     _interceptor.ActivateFailure();
-                return Task.FromResult(UpdateCheckResult.UpdateVerfuegbar(NeuesUpdate));
+                return Task.FromResult(UpdateCheckResult.UpdateAvailable(NewUpdate));
             });
         _safetyServiceMock.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliUpdateSafetyResult(0, []));
@@ -163,10 +163,10 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
 
         var sut = CreateSut();
         await sut.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
-        if (!automatisch)
+        if (!automatic)
         {
-            sut.UpdateVerfuegbar.Should().BeTrue();
-            await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
+            sut.UpdateAvailable.Should().BeTrue();
+            await ((AsyncRelayCommand)sut.StartUpdateCommand).ExecuteAsync();
         }
 
         _updateServiceMock.Verify(
@@ -177,24 +177,24 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
             Times.Never);
         progressViewModel.Should().NotBeNull("der Fortschrittsdialog war bereits geöffnet");
         progressViewModel!.HasError.Should().BeTrue("späte Lesefehler müssen im Dialog sichtbar sein");
-        progressViewModel.Message.Should().Contain("Update-Einstellungen");
+        progressViewModel.Message.Should().Contain("Update--Einstellungen");
         progressViewModel.CanClose.Should().BeTrue();
-        sut.UpdateHinweis.Should().NotBeNullOrEmpty();
-        sut.UpdateVerfuegbar.Should().BeFalse();
-        sut.VerfuegbaresUpdate.Should().BeNull();
-        sut.UpdateCheckLaeuft.Should().BeFalse();
-        sut.UpdateWirdVorbereitet.Should().BeFalse();
+        sut.UpdateNotice.Should().NotBeNullOrEmpty();
+        sut.UpdateAvailable.Should().BeFalse();
+        sut.AvailableUpdate.Should().BeNull();
+        sut.UpdateCheckRunning.Should().BeFalse();
+        sut.UpdateBeingPrepared.Should().BeFalse();
 
-        // Wiederherstellung über die Settings-UI: Neue Prüfung findet das Update erneut.
-        var checksVorWiederherstellung = checkCalls;
+        // Wiederherstellung über die Einstellungen-UI: Neue Prüfung findet das Update erneut.
+        var checksBeforeRestore = checkCalls;
         _interceptor.DeactivateFailure();
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.NurPruefen), UpdatePfadKanalResolver.ProduktivversionenPfad);
-        await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
+        await SaveUpdateSettingsOverUiAsync(sut, UpdateModeOption.ForMode(UpdateMode.CheckOnly), UpdatePathChannelResolver.StableVersionsPath);
+        await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
 
         _updateServiceMock.Verify(
             s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(checksVorWiederherstellung + 1));
-        sut.UpdateVerfuegbar.Should().BeTrue();
+            Times.Exactly(checksBeforeRestore + 1));
+        sut.UpdateAvailable.Should().BeTrue();
         _updateServiceMock.Verify(
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -207,21 +207,21 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task UpdateSettingsReadFailure_BeforeUpdaterStartStopsInstall(bool automatisch)
+    public async Task UpdateSettingsReadFailure_BeforeUpdaterStartStopsInstall(bool automatic)
     {
         await SetUpdateSettingsAsync(new UpdateSettings(
-            automatisch ? UpdateMode.BeiProgrammstartPruefenUndAusfuehren : UpdateMode.NurPruefen, UpdatePfadKanalResolver.ProduktivversionenPfad));
+            automatic ? UpdateMode.CheckAndRunAtStartup : UpdateMode.CheckOnly, UpdatePathChannelResolver.StableVersionsPath));
         _updateServiceMock
             .Setup(s => s.CheckForUpdateAsync(It.IsAny<UpdateCheckOptions>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateCheckResult.UpdateVerfuegbar(NeuesUpdate));
+            .ReturnsAsync(UpdateCheckResult.UpdateAvailable(NewUpdate));
         var prepareCalls = 0;
         _updateServiceMock
-            .Setup(s => s.PrepareUpdateAsync(NeuesUpdate, It.IsAny<IProgress<UpdatePreparationProgress>>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.PrepareUpdateAsync(NewUpdate, It.IsAny<IProgress<UpdatePreparationProgress>>(), It.IsAny<CancellationToken>()))
             .Returns<UpdateInfo, IProgress<UpdatePreparationProgress>?, CancellationToken>((_, _, _) =>
             {
                 prepareCalls++;
                 _interceptor.ActivateFailure();
-                return Task.FromResult(FertigeVorbereitung);
+                return Task.FromResult(DonePreparation);
             });
         _safetyServiceMock.Setup(s => s.CheckAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CliUpdateSafetyResult(0, []));
@@ -231,10 +231,10 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
 
         var sut = CreateSut();
         await sut.InitializeUpdatesAfterWindowReadyAsync(TestContext.Current.CancellationToken);
-        if (!automatisch)
+        if (!automatic)
         {
-            sut.UpdateVerfuegbar.Should().BeTrue();
-            await ((AsyncRelayCommand)sut.UpdateStartenCommand).ExecuteAsync();
+            sut.UpdateAvailable.Should().BeTrue();
+            await ((AsyncRelayCommand)sut.StartUpdateCommand).ExecuteAsync();
         }
 
         prepareCalls.Should().Be(1);
@@ -243,20 +243,20 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
             Times.Never, "ein Lesefehler vor dem Updater-Start muss den Start verhindern");
         progressViewModel.Should().NotBeNull();
         progressViewModel!.HasError.Should().BeTrue();
-        progressViewModel.Message.Should().Contain("Update-Einstellungen",
+        progressViewModel.Message.Should().Contain("Update--Einstellungen",
             "der Fehlerzustand darf nicht als erfolgreicher Start erscheinen");
         progressViewModel.CanClose.Should().BeTrue();
-        sut.UpdateHinweis.Should().NotBeNullOrEmpty();
-        sut.UpdateVerfuegbar.Should().BeFalse();
-        sut.VerfuegbaresUpdate.Should().BeNull();
-        sut.UpdateWirdVorbereitet.Should().BeFalse();
+        sut.UpdateNotice.Should().NotBeNullOrEmpty();
+        sut.UpdateAvailable.Should().BeFalse();
+        sut.AvailableUpdate.Should().BeNull();
+        sut.UpdateBeingPrepared.Should().BeFalse();
 
-        // Wiederherstellung über die Settings-UI: Neue Prüfung findet das Update erneut.
+        // Wiederherstellung über die Einstellungen-UI: Neue Prüfung findet das Update erneut.
         _interceptor.DeactivateFailure();
-        await SpeichereUpdateEinstellungenUeberUiAsync(sut, UpdateModusOption.FuerModus(UpdateMode.NurPruefen), UpdatePfadKanalResolver.ProduktivversionenPfad);
-        await ((AsyncRelayCommand)sut.UpdatePruefenCommand).ExecuteAsync();
+        await SaveUpdateSettingsOverUiAsync(sut, UpdateModeOption.ForMode(UpdateMode.CheckOnly), UpdatePathChannelResolver.StableVersionsPath);
+        await ((AsyncRelayCommand)sut.CheckUpdateCommand).ExecuteAsync();
 
-        sut.UpdateVerfuegbar.Should().BeTrue();
+        sut.UpdateAvailable.Should().BeTrue();
         _updateServiceMock.Verify(
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             Times.Never);

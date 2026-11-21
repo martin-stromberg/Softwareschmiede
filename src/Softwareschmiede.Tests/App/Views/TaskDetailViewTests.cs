@@ -18,18 +18,18 @@ public sealed class TaskDetailViewTests
 
         var xaml = File.ReadAllText(xamlPath);
 
-        xaml.Should().Contain("GruppenName=\"Pull Request\"");
-        xaml.Should().Contain("AutomationName=\"PullRequestErstellen\"");
-        xaml.Should().Contain("ButtonCommand=\"{Binding PullRequestErstellenCommand}\"");
-        xaml.Should().Contain("AutomationName=\"PullRequestsAktualisieren\"");
-        xaml.Should().Contain("ButtonCommand=\"{Binding PullRequestsAktualisierenCommand}\"");
-        xaml.Should().Contain("AutomationProperties.Name=\"PullRequestUrlOeffnen\"");
-        xaml.Should().Contain("Command=\"{Binding DataContext.PullRequestUrlOeffnenCommand, ElementName=Root}\"");
+        xaml.Should().Contain("GroupName=\"Pull Request\"");
+        xaml.Should().Contain("AutomationName=\"CreatePullRequest\"");
+        xaml.Should().Contain("ButtonCommand=\"{Binding CreatePullRequestCommand}\"");
+        xaml.Should().Contain("AutomationName=\"RefreshPullRequests\"");
+        xaml.Should().Contain("ButtonCommand=\"{Binding RefreshPullRequestsCommand}\"");
+        xaml.Should().Contain("AutomationProperties.Name=\"OpenPullRequestUrl\"");
+        xaml.Should().Contain("Command=\"{Binding DataContext.OpenPullRequestUrlCommand, ElementName=Root}\"");
     }
 
     /// <summary>Die CLI-Konsole liegt in einem vertikalen ScrollViewer, bleibt aber unter ihrem stabilen Automation-Namen erreichbar.</summary>
     [Fact]
-    public void Xaml_CliKonsole_IstVertikalScrollbar()
+    public void Xaml_CliConsole_IsVerticalScrollbar()
     {
         var solutionRoot = FindSolutionRoot();
         var xamlPath = Path.Combine(solutionRoot, "src", "Softwareschmiede.App", "Views", "TaskDetailView.xaml");
@@ -54,14 +54,14 @@ public sealed class TaskDetailViewTests
 
         var xaml = File.ReadAllText(xamlPath);
 
-        xaml.Should().Contain("GruppenName=\"CLI\"");
+        xaml.Should().Contain("GroupName=\"CLI\"");
         xaml.Should().Contain("AutomationName=\"CliRawExport\"");
         xaml.Should().Contain("ButtonCommand=\"{Binding ExportCliRawCommand}\"");
     }
 
     /// <summary>Klicks in die CLI-Fläche sollen den Terminal-Fokuspfad auslösen, Scrollbar-Bedienung nicht.</summary>
     [Fact]
-    public void TerminalScrollViewer_Clickziel_SteuertFokuspfad()
+    public void TerminalScrollViewer_Clicktarget_ControlsFocuspath()
     {
         RunOnSta(() =>
         {

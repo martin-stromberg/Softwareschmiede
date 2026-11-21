@@ -27,7 +27,7 @@ Die Implementierung verwendet Presentation-Model-Pattern (`FileExplorerViewModel
 | `DiffLineStatusToBrushConverter` | IValueConverter | Wandelt `DiffLineStatus` (Added/Removed/Modified/Context) in Hintergrund-Brush um |
 | `WorkspaceFileNode` | DTO/ViewModel | Baum-Knoten (domain) mit Properties: `Name`, `RelativePath`, `IsDirectory`, `Children`, `Status`, `CommitSha` (für Vergleich) |
 | `TextDiffLine` | Value Object | Eine Diff-Zeile mit `Content`, `Status`, `OldLineNumber`, `NewLineNumber`, `InlineSegments` |
-| `DateibrowserAnsichtsmodus` | Enum | Modus-Umschalter: `Standard` vs. `Vergleich` |
+| `FileBrowserViewMode` | Enum | Modus-Umschalter: `Standard` vs. `Vergleich` |
 | `WorkingTreeWalkContext` | Internal Class | Kontext für Directory-Walk (enthält `RootPath`, `MaxDepth`, `CancellationToken`, `NodeCount` zum Zählen aufgezählter Knoten) |
 
 ## Programmabläufe
@@ -43,9 +43,9 @@ TaskDetailViewModel.DateiViewCommand
   ↓
 FileExplorerView wird sichtbar (Binding an Visibility)
   ↓
-FileExplorerViewModel.InitialisierenAsync(aufgabe.LokalerKlonPfad)
+FileExplorerViewModel.InitialisierenAsync(aufgabe.LocalClonePath)
   ↓
-  1. setze AktuellerModus = DateibrowserAnsichtsmodus.Standard
+  1. setze AktuellerModus = FileBrowserViewMode.Standard
   2. rufe LadeArbeitsbaumAsync() auf
     ↓
     IGitWorkspaceBrowserService.LoadWorkingTreeAsync(repositoryPath, maxInitialDepth=2)
@@ -167,7 +167,7 @@ TreeView zeigt weniger Knoten (tiefer geladene Knoten entfernt)
 ```
 
 **Beteiligte Klassen:**
-- `FileExplorerView` (Code-Behind, Event-Handler `OnBaumKnotenCollapsed`)
+- `FileExplorerView` (Code-Behind, Event-Handler `OnTreeNodeCollapsed`)
 - `FileExplorerViewModel` (Methode `BeraeumeKnoten`)
 - `WorkspaceFileNode` (mit `ReplaceAll`-Extension und `CreatePlaceholder`-Fabrik-Methode)
 
@@ -184,7 +184,7 @@ Benutzer: Klick auf Datei-Knoten im TreeView
   ↓
 AusgewaehlterKnoten = knoten (Binding)
   ↓
-DateiLadenAsync(knoten, CancellationToken)
+DateiLoadAsync(knoten, CancellationToken)
   ↓
   wenn knoten.IsDirectory: abbruch (nichts tun)
   ↓
@@ -230,9 +230,9 @@ Dies verhindert, dass technische Platzhalter-Knoten als Auswahl behandelt werden
 ```
 Benutzer: Klick auf "Vergleich"-Button
   ↓
-VergleichCommand → VergleichAsync()
+CompareCommand → CompareAsync()
   ↓
-  1. setze AktuellerModus = DateibrowserAnsichtsmodus.Vergleich
+  1. setze AktuellerModus = FileBrowserViewMode.Vergleich
   2. rufe IGitWorkspaceBrowserService.LoadSnapshotAsync(repositoryPath) auf
     ↓
     Git diff --name-status -z origin/HEAD..HEAD (oder origin/main..HEAD)
@@ -297,7 +297,7 @@ Benutzer: Klick auf Datei unterhalb eines Commits
   ↓
 AusgewaehlterKnoten = datei-knoten (mit CommitSha)
   ↓
-DateiLadenAsync(knoten, CancellationToken)
+DateiLoadAsync(knoten, CancellationToken)
   ↓
   IGitWorkspaceBrowserService.LoadCommitPreviewAsync(repositoryPath, knoten)
     ↓
@@ -344,7 +344,7 @@ AktualisierenCommand → AktualisierenAsync()
   wenn AktuellerModus == Standard:
     StandardAnsichtAsync() (wie Ablauf 1)
   sonst:
-    VergleichAsync() (wie Ablauf 3)
+    CompareAsync() (wie Ablauf 3)
   ↓
 Baum/Commits werden neu geladen und angezeigt
 ```

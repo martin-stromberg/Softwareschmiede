@@ -21,7 +21,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// </summary>
 public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirectory : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly GitOrchestrationService _sut;
     private readonly string _sourceDir;
     private readonly string _clonePath;
@@ -31,9 +31,9 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
     public GitOrchestrationServiceTests_WorkingDirectoryInSourceDirectory()
     {
         _db = TestDbContextFactory.Create();
-        var aufgabeService = new AufgabeService(_db, new Mock<ILogger<AufgabeService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
-        var projektService = new ProjektService(_db, new Mock<ILogger<ProjektService>>().Object);
-        var protokollService = new ProtokollService(_db, new Mock<ILogger<ProtokollService>>().Object);
+        var workItemService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
+        var projectService = new ProjectService(_db, new Mock<ILogger<ProjectService>>().Object);
+        var logService = new LogService(_db, new Mock<ILogger<LogService>>().Object);
 
         var defaultPluginMock = new Mock<IGitPlugin>();
         defaultPluginMock.SetupGet(p => p.PluginName).Returns("Mock Git");
@@ -45,9 +45,9 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
         pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([defaultPluginMock.Object]);
         pluginManagerMock.Setup(m => m.GetDefaultSourceCodeManagementPlugin()).Returns(defaultPluginMock.Object);
         pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
-        pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IKiPlugin>().Object);
+        pluginManagerMock.Setup(m => m.GetDefaultDevelopmentAutomationPlugin()).Returns(new Mock<IAiPlugin>().Object);
         var pluginDefaultSettings = new PluginDefaultSettingsService(_db, new Mock<ILogger<PluginDefaultSettingsService>>().Object);
-        var pluginActivationService = new PluginActivationService(new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
+        var pluginActivationService = new PluginActivationService(new AppSettingService(_db, NullLogger<AppSettingService>.Instance), pluginManagerMock.Object, new Mock<ILogger<PluginActivationService>>().Object);
         var pluginSelectionService = new PluginSelectionService(
             pluginManagerMock.Object,
             pluginDefaultSettings,
@@ -55,9 +55,9 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
             new Mock<ILogger<PluginSelectionService>>().Object);
 
         _sut = new GitOrchestrationService(
-            aufgabeService,
-            projektService,
-            protokollService,
+            workItemService,
+            projectService,
+            logService,
             defaultPluginMock.Object,
             pluginSelectionService,
             new Mock<ILogger<GitOrchestrationService>>().Object);
@@ -114,7 +114,7 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
     {
         // Arrange
         await _gitPlugin.CloneRepositoryAsync(_sourceDir, _clonePath, TestContext.Current.CancellationToken);
-        var startConfig = new RepositoryStartKonfiguration { WorkingDirectoryRelativePath = "backend" };
+        var startConfig = new RepositoryStartConfiguration { WorkingDirectoryRelativePath = "backend" };
 
         // Act
         var act = () => _sut.ValidateWorkingDirectoryAfterCloneAsync(_clonePath, startConfig, _gitPlugin);
@@ -132,7 +132,7 @@ public sealed class GitOrchestrationServiceTests_WorkingDirectoryInSourceDirecto
     {
         // Arrange
         await _gitPlugin.CloneRepositoryAsync(_sourceDir, _clonePath, TestContext.Current.CancellationToken);
-        var startConfig = new RepositoryStartKonfiguration { WorkingDirectoryRelativePath = "backend" };
+        var startConfig = new RepositoryStartConfiguration { WorkingDirectoryRelativePath = "backend" };
 
         // Act
         var act = () => _sut.ValidateWorkingDirectoryAfterCloneAsync(_clonePath, startConfig);

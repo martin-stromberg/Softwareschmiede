@@ -6,10 +6,10 @@ using Softwareschmiede.Domain.Interfaces;
 namespace Softwareschmiede.App.Services;
 
 /// <summary>
-/// WPF-Implementierung von <see cref="IBenachrichtigungsAudioService"/>.
+/// WPF-Implementierung von <see cref="INotificationAudioService"/>.
 /// Verwendet <see cref="MediaPlayer"/> für die Audiowiedergabe (MP3, WAV – ohne NuGet).
 /// </summary>
-public sealed class WpfAudioService : IBenachrichtigungsAudioService
+public sealed class WpfAudioService : INotificationAudioService
 {
     private readonly ILogger<WpfAudioService> _logger;
     private readonly HashSet<MediaPlayer> _activePlayers = new();

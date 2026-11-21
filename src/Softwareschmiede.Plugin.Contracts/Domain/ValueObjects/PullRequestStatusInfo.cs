@@ -6,10 +6,10 @@ namespace Softwareschmiede.Domain.ValueObjects;
 public sealed record PullRequestStatusInfo(
     PullRequestProvider Provider,
     string RepositoryId,
-    int Nummer,
+    int Number,
     string? ProviderPullRequestId,
     string Url,
-    string Titel,
+    string Title,
     string SourceBranch,
     string TargetBranch,
     string? HeadSha,

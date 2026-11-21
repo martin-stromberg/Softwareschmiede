@@ -25,8 +25,8 @@ namespace Softwareschmiede.Tests.E2E;
 /// App-Start/ConPTY-Abhängigkeit isoliert zu verifizieren; sie laufen deshalb in der regulären Testlane
 /// statt unter Category=OsInterface.
 ///
-/// Statt eines echten Prozessstarts wird <see cref="IProzessStarter"/> durch einen aufzeichnenden
-/// Test-Double ersetzt (analog zu <see cref="Softwareschmiede.Infrastructure.Services.AufzeichnenderProzessStarter"/>,
+/// Statt eines echten Prozessstarts wird <see cref="IProcessStarter"/> durch einen aufzeichnenden
+/// Test-Double ersetzt (analog zu <see cref="Softwareschmiede.Infrastructure.Services.RecordingProcessStarter"/>,
 /// der auch für echte FlaUI-E2E-Tests im Testmodus verwendet wird).
 /// </summary>
 public sealed class E2E_IdePluginSelection : IDisposable
@@ -43,13 +43,13 @@ public sealed class E2E_IdePluginSelection : IDisposable
         var repository = _tempDirectoryFixture.CreateTempDirectory("e2e_ide_selection_mit_sln");
         File.WriteAllText(Path.Combine(repository, "Loesung.sln"), string.Empty);
 
-        var (pluginSelectionService, prozessStarter) = CreateStack();
+        var (pluginSelectionService, processStarter) = CreateStack();
 
         await OpenRepositoryInIdeAsync(pluginSelectionService, repository);
 
-        prozessStarter.Aufrufe.Should().ContainSingle();
-        prozessStarter.Aufrufe[0].DateiName.Should().Be(Path.Combine(repository, "Loesung.sln"));
-        prozessStarter.Aufrufe[0].ShellAusfuehren.Should().BeTrue();
+        processStarter.Calls.Should().ContainSingle();
+        processStarter.Calls[0].FileName.Should().Be(Path.Combine(repository, "Loesung.sln"));
+        processStarter.Calls[0].UseShellExecute.Should().BeTrue();
     }
 
     /// <summary>Ein Repository ohne .sln-Datei wird automatisch mit Visual Studio Code geöffnet (Fallback).</summary>
@@ -58,14 +58,14 @@ public sealed class E2E_IdePluginSelection : IDisposable
     {
         var repository = _tempDirectoryFixture.CreateTempDirectory("e2e_ide_selection_ohne_sln");
 
-        var (pluginSelectionService, prozessStarter) = CreateStack();
+        var (pluginSelectionService, processStarter) = CreateStack();
 
         await OpenRepositoryInIdeAsync(pluginSelectionService, repository);
 
-        prozessStarter.Aufrufe.Should().ContainSingle();
-        prozessStarter.Aufrufe[0].DateiName.Should().Be("code.cmd");
-        prozessStarter.Aufrufe[0].Argumente.Should().Be($"\"{repository}\"");
-        prozessStarter.Aufrufe[0].ShellAusfuehren.Should().BeFalse();
+        processStarter.Calls.Should().ContainSingle();
+        processStarter.Calls[0].FileName.Should().Be("code.cmd");
+        processStarter.Calls[0].Arguments.Should().Be($"\"{repository}\"");
+        processStarter.Calls[0].UseShellExecute.Should().BeFalse();
     }
 
     /// <summary>
@@ -78,18 +78,18 @@ public sealed class E2E_IdePluginSelection : IDisposable
         var repository = _tempDirectoryFixture.CreateTempDirectory("e2e_ide_selection_vs_deaktiviert");
         File.WriteAllText(Path.Combine(repository, "Loesung.sln"), string.Empty);
 
-        var (pluginSelectionService, prozessStarter, pluginActivationService) = CreateStackWithActivationService();
+        var (pluginSelectionService, processStarter, pluginActivationService) = CreateStackWithActivationService();
         await pluginActivationService.SetPluginEnabledAsync("Softwareschmiede.VisualStudio", false, TestContext.Current.CancellationToken);
 
         await OpenRepositoryInIdeAsync(pluginSelectionService, repository);
 
-        prozessStarter.Aufrufe.Should().ContainSingle();
-        prozessStarter.Aufrufe[0].DateiName.Should().Be("code.cmd");
-        prozessStarter.Aufrufe[0].ShellAusfuehren.Should().BeFalse();
+        processStarter.Calls.Should().ContainSingle();
+        processStarter.Calls[0].FileName.Should().Be("code.cmd");
+        processStarter.Calls[0].UseShellExecute.Should().BeFalse();
     }
 
     /// <summary>
-    /// Bildet den Resolve/Find/Open-Ablauf nach, den auch <c>TaskDetailViewModel.OeffneIdeInternAsync</c>
+    /// Bildet den Resolve/Find/Open-Ablauf nach, den auch <c>TaskDetailViewModel.OpenIdeInternalAsync</c>
     /// nutzt: Plugin über <see cref="PluginSelectionService.ResolveIdePluginAsync"/> auflösen, dessen
     /// Einstiegspunkte ermitteln und den ersten öffnen. Alle Szenarien dieser Klasse liefern genau einen
     /// Einstiegspunkt, daher wird hier bewusst keine Mehrfach-Auswahl-Verzweigung nachgebildet.
@@ -103,21 +103,21 @@ public sealed class E2E_IdePluginSelection : IDisposable
         await plugin.OpenEntryPointAsync(entryPoints[0]);
     }
 
-    private (PluginSelectionService PluginSelectionService, RecordingProzessStarter ProzessStarter) CreateStack()
+    private (PluginSelectionService PluginSelectionService, RecordingProcessStarter ProcessStarter) CreateStack()
     {
-        var (pluginSelectionService, prozessStarter, _) = CreateStackWithActivationService();
-        return (pluginSelectionService, prozessStarter);
+        var (pluginSelectionService, processStarter, _) = CreateStackWithActivationService();
+        return (pluginSelectionService, processStarter);
     }
 
-    private (PluginSelectionService PluginSelectionService, RecordingProzessStarter ProzessStarter, PluginActivationService PluginActivationService) CreateStackWithActivationService()
+    private (PluginSelectionService PluginSelectionService, RecordingProcessStarter ProcessStarter, PluginActivationService PluginActivationService) CreateStackWithActivationService()
     {
         var db = TestDbContextFactory.Create();
-        var prozessStarter = new RecordingProzessStarter();
+        var processStarter = new RecordingProcessStarter();
         var visualStudioCodeLocator = new TestVisualStudioCodeLocator(new VisualStudioCodeAvailability(true, "code.cmd"));
 
         var services = new ServiceCollection()
             .AddLogging()
-            .AddSingleton<IProzessStarter>(prozessStarter)
+            .AddSingleton<IProcessStarter>(processStarter)
             .AddSingleton<IVisualStudioCodeLocator>(visualStudioCodeLocator)
             .BuildServiceProvider();
 
@@ -126,23 +126,23 @@ public sealed class E2E_IdePluginSelection : IDisposable
             NullLogger<PluginManager>.Instance,
             Path.Combine(Path.GetTempPath(), $"e2e_ide_selection_keine_plugins_{Guid.NewGuid():N}"));
 
-        var appEinstellungService = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        var pluginActivationService = new PluginActivationService(appEinstellungService, pluginManager, NullLogger<PluginActivationService>.Instance);
+        var appSettingService = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        var pluginActivationService = new PluginActivationService(appSettingService, pluginManager, NullLogger<PluginActivationService>.Instance);
         var defaultSettingsService = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
         var pluginSelectionService = new PluginSelectionService(
             pluginManager,
             defaultSettingsService,
             pluginActivationService,
             NullLogger<PluginSelectionService>.Instance,
-            appEinstellungService);
+            appSettingService);
 
-        return (pluginSelectionService, prozessStarter, pluginActivationService);
+        return (pluginSelectionService, processStarter, pluginActivationService);
     }
 
-    private sealed class RecordingProzessStarter : IProzessStarter
+    private sealed class RecordingProcessStarter : IProcessStarter
     {
-        public List<ProzessStartAnfrage> Aufrufe { get; } = [];
+        public List<ProcessStartRequest> Calls { get; } = [];
 
-        public void Starten(ProzessStartAnfrage anfrage) => Aufrufe.Add(anfrage);
+        public void Start(ProcessStartRequest request) => Calls.Add(request);
     }
 }

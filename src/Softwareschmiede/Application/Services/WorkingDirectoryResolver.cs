@@ -5,7 +5,7 @@ namespace Softwareschmiede.Application.Services;
 
 /// <summary>
 /// Löst das effektive Arbeitsverzeichnis eines Repositories anhand einer optionalen
-/// <see cref="RepositoryStartKonfiguration"/> auf. Von <see cref="KiAusfuehrungsService"/> (CLI-Start) und
+/// <see cref="RepositoryStartConfiguration"/> auf. Von <see cref="AiExecutionService"/> (CLI-Start) und
 /// <see cref="GitOrchestrationService"/> (Validierung nach Klon) gemeinsam genutzt, damit keiner der beiden
 /// Services in die jeweils andere, fachlich fremde Klasse greifen muss.
 /// </summary>
@@ -29,7 +29,7 @@ public static class WorkingDirectoryResolver
     /// <returns>Das effektive Arbeitsverzeichnis (Repository-Root, falls kein Unterverzeichnis konfiguriert ist).</returns>
     public static async Task<string> DetermineEffectiveWorkingDirectoryAsync(
         string localRepoPath,
-        RepositoryStartKonfiguration? startConfig,
+        RepositoryStartConfiguration? startConfig,
         IGitPlugin? gitPlugin = null,
         CancellationToken ct = default)
     {

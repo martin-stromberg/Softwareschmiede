@@ -133,24 +133,24 @@
                         <StackPanel Orientation="Horizontal"
                                     Margin="8,0,8,4"
                                     Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <RadioButton GroupName="AufgabenModus"
+                            <RadioButton GroupName="WorkItemMode"
                                          Content="Datum"
-                                         IsChecked="{Binding AufgabenListenModus, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Datum}"
-                                         AutomationProperties.Name="AufgabenModus:Datum"
+                                         IsChecked="{Binding WorkItemListMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Date}"
+                                         AutomationProperties.Name="WorkItemsMode:Date"
                                          ToolTip="Flache Liste, sortiert nach letzter Ausführung"
                                          FontSize="11"
                                          Margin="0,0,8,0" />
-                            <RadioButton GroupName="AufgabenModus"
+                            <RadioButton GroupName="WorkItemMode"
                                          Content="Repository"
-                                         IsChecked="{Binding AufgabenListenModus, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Repository}"
-                                         AutomationProperties.Name="AufgabenModus:Repository"
+                                         IsChecked="{Binding WorkItemListMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Repository}"
+                                         AutomationProperties.Name="WorkItemsMode:Repository"
                                          ToolTip="Gruppiert nach Repository-Name"
                                          FontSize="11"
                                          Margin="0,0,8,0" />
-                            <RadioButton GroupName="AufgabenModus"
+                            <RadioButton GroupName="WorkItemMode"
                                          Content="KI"
-                                         IsChecked="{Binding AufgabenListenModus, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Ki}"
-                                         AutomationProperties.Name="AufgabenModus:KI"
+                                         IsChecked="{Binding WorkItemListMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Ai}"
+                                         AutomationProperties.Name="WorkItemsMode:AI"
                                          ToolTip="Gruppiert nach aktiver bzw. zuletzt verwendeter KI"
                                          FontSize="11" />
                         </StackPanel>
@@ -161,10 +161,10 @@
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
                               Visibility="{Binding IsDashboardVisible, Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                    <controls:ActiveTasksListControl ItemsSource="{Binding AktiveAufgabenListe}"
-                                                      NavigateCommand="{Binding NavigateZuAufgabeCommand}"
-                                                      ListenModus="{Binding AufgabenListenModus}"
-                                                      AutomationProperties.AutomationId="AktiveAufgabenListeMenue" />
+                    <controls:ActiveTasksListControl ItemsSource="{Binding ActiveWorkItemsList}"
+                                                      NavigateCommand="{Binding NavigateToWorkItemCommand}"
+                                                      ListMode="{Binding WorkItemListMode}"
+                                                      AutomationProperties.AutomationId="ActiveWorkItemsListMenu" />
                 </ScrollViewer>
 
                 <StackPanel Grid.Row="2"
@@ -175,57 +175,57 @@
 
                     <!-- Sektion: Auto-Shutdown bei Abschluss aller laufenden Automatisierungen -->
                     <StackPanel Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <TextBlock Text="{Binding LaufendeAutomatisierungenAnzahl, StringFormat={}{0} laufende Automatisierung(en)}"
-                                   AutomationProperties.AutomationId="AutoShutdownLaufendeAnzahl"
+                        <TextBlock Text="{Binding RunningAutomationsCount, StringFormat={}{0} laufende Automatisierung(en)}"
+                                   AutomationProperties.AutomationId="AutoShutdownRunningCount"
                                    FontSize="11"
                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                    Margin="8,0,8,4" />
-                        <CheckBox IsChecked="{Binding AutoShutdownAktiviert}"
+                        <CheckBox IsChecked="{Binding AutoShutdownEnabled}"
                                   Content="Nach Leerlauf PC herunterfahren"
                                   ToolTip="Fährt den Computer herunter, sobald keine Aufgabe mehr läuft und die Wartezeit abgelaufen ist. Andere Programme werden ebenfalls beendet."
-                                  AutomationProperties.AutomationId="AutoShutdownAktivieren"
+                                  AutomationProperties.AutomationId="ActivateAutoShutdown"
                                   AutomationProperties.Name="Auto-Shutdown"
                                   FontSize="11"
                                   Margin="8,0,8,2"
-                                  Visibility="{Binding AutoShutdownUiSichtbar, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                  Visibility="{Binding AutoShutdownUiVisible, Converter={StaticResource BoolToVisibilityConverter}}" />
                         <StackPanel Orientation="Horizontal"
                                     Margin="8,0,8,2"
                                     ToolTip="So lange wird nach dem Ende der letzten laufenden Aufgabe noch gewartet, bevor der Computer herunterfährt."
-                                    Visibility="{Binding AutoShutdownOptionenSichtbar, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    Visibility="{Binding AutoShutdownOptionsVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                             <TextBlock Text="Wartezeit (Minuten):"
                                        FontSize="11"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource SecondaryTextBrush}" />
-                            <TextBox Text="{Binding AutoShutdownToleranzMinuten, UpdateSourceTrigger=PropertyChanged}"
-                                     AutomationProperties.AutomationId="AutoShutdownToleranzMinuten"
+                            <TextBox Text="{Binding AutoShutdownToleranceMinutes, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.AutomationId="AutoShutdownToleranceMinutes"
                                      AutomationProperties.Name="Auto-Shutdown-Wartezeit in Minuten"
                                      FontSize="11"
                                      Width="48"
                                      Margin="4,0,0,0"
                                      Padding="2,1" />
                         </StackPanel>
-                        <CheckBox IsChecked="{Binding AutoShutdownErzwingen}"
+                        <CheckBox IsChecked="{Binding ForceAutoShutdown}"
                                   Content="Herunterfahren erzwingen"
                                   ToolTip="Erzwingt das Herunterfahren auch dann, wenn andere Programme das Beenden verweigern — nicht gespeicherte Daten gehen dabei verloren."
-                                  AutomationProperties.AutomationId="AutoShutdownErzwingen"
-                                  AutomationProperties.Name="Herunterfahren erzwingen"
+                                  AutomationProperties.AutomationId="ForceAutoShutdown"
+                                  AutomationProperties.Name="ForceShutdown"
                                   FontSize="11"
                                   Margin="8,0,8,2"
-                                  Visibility="{Binding AutoShutdownOptionenSichtbar, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                  Visibility="{Binding AutoShutdownOptionsVisible, Converter={StaticResource BoolToVisibilityConverter}}" />
                         <TextBlock Text="{Binding AutoShutdownCountdownText}"
                                    AutomationProperties.AutomationId="AutoShutdownCountdown"
                                    FontSize="11"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource SecondaryTextBrush}"
                                    Margin="8,0,8,2"
-                                   Visibility="{Binding AutoShutdownCountdownAktiv, Converter={StaticResource BoolToVisibilityConverter}}" />
-                        <TextBlock Text="{Binding AutoShutdownToleranzFehler}"
-                                   AutomationProperties.AutomationId="AutoShutdownToleranzFehler"
+                                   Visibility="{Binding AutoShutdownCountdownActive, Converter={StaticResource BoolToVisibilityConverter}}" />
+                        <TextBlock Text="{Binding AutoShutdownToleranceError}"
+                                   AutomationProperties.AutomationId="AutoShutdownToleranceError"
                                    FontSize="11"
                                    Foreground="{DynamicResource ErrorBrush}"
                                    TextWrapping="Wrap"
                                    Margin="8,0,8,2"
-                                   Visibility="{Binding AutoShutdownToleranzFehler, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+                                   Visibility="{Binding AutoShutdownToleranceError, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
                     </StackPanel>
 
                     <TextBlock Text="{Binding CurrentVersion}"
@@ -235,10 +235,10 @@
                                Margin="8,0,8,8"
                                Visibility="{Binding IsNavigationExpanded, Converter={StaticResource BoolToVisibilityConverter}}" />
 
-                    <Button Command="{Binding UpdateStartenCommand}"
-                            Visibility="{Binding UpdateVerfuegbar, Converter={StaticResource BoolToVisibilityConverter}}"
+                    <Button Command="{Binding StartUpdateCommand}"
+                            Visibility="{Binding UpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}"
                             AutomationProperties.Name="Programmupdate starten"
-                            ToolTip="{Binding VerfuegbaresUpdate.Version, StringFormat=Update auf Version {0} vorbereiten}"
+                            ToolTip="{Binding AvailableUpdate.Version, StringFormat=Update auf Version {0} vorbereiten}"
                             Margin="0,2"
                             Padding="8,8"
                             Background="Transparent"
@@ -253,9 +253,9 @@
                         </StackPanel>
                     </Button>
 
-                    <Button Command="{Binding UpdatePruefenCommand}"
+                    <Button Command="{Binding CheckUpdateCommand}"
                             AutomationProperties.Name="Programmupdate prüfen"
-                            ToolTip="{Binding UpdatePruefenTooltip}"
+                            ToolTip="{Binding UpdateCheckTooltip}"
                             ToolTipService.ShowOnDisabled="True"
                             Margin="0,2"
                             Padding="8,8"
@@ -273,13 +273,13 @@
 
                     <!-- Kein AutomationProperties.Name: Für E2E-Tests muss der gebundene Hinweistext
                          als UIA-Name lesbar bleiben; die Adressierung läuft über die AutomationId. -->
-                    <TextBlock Text="{Binding UpdateHinweis}"
-                               AutomationProperties.AutomationId="UpdateHinweis"
+                    <TextBlock Text="{Binding UpdateNotice}"
+                               AutomationProperties.AutomationId="UpdateNotice"
                                FontSize="11"
                                Foreground="{DynamicResource SecondaryTextBrush}"
                                TextWrapping="Wrap"
                                Margin="8,4,8,0"
-                               Visibility="{Binding UpdateHinweis, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+                               Visibility="{Binding UpdateNotice, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
                 </StackPanel>
             </Grid>
         </Border>

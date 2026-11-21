@@ -13,9 +13,9 @@ public sealed partial class StatusIndicatorControl : UserControl
     public static readonly DependencyProperty StatusProperty =
         DependencyProperty.Register(
             nameof(Status),
-            typeof(AufgabeStatus),
+            typeof(WorkItemStatus),
             typeof(StatusIndicatorControl),
-            new PropertyMetadata(AufgabeStatus.Neu, OnStatusChanged));
+            new PropertyMetadata(WorkItemStatus.New, OnStatusChanged));
 
     /// <summary>Dependency Property für den Statustext.</summary>
     /// <returns>Registrierte <see cref="DependencyProperty"/>-Instanz.</returns>
@@ -45,9 +45,9 @@ public sealed partial class StatusIndicatorControl : UserControl
             new PropertyMetadata(null));
 
     /// <summary>Aufgaben-Status.</summary>
-    public AufgabeStatus Status
+    public WorkItemStatus Status
     {
-        get => (AufgabeStatus)GetValue(StatusProperty);
+        get => (WorkItemStatus)GetValue(StatusProperty);
         set => SetValue(StatusProperty, value);
     }
 
@@ -80,21 +80,21 @@ public sealed partial class StatusIndicatorControl : UserControl
 
     private static void OnStatusChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is StatusIndicatorControl control && e.NewValue is AufgabeStatus status)
+        if (d is StatusIndicatorControl control && e.NewValue is WorkItemStatus status)
         {
-            control.AktualisierenFuerStatus(status);
+            control.RefreshForStatus(status);
         }
     }
 
-    private void AktualisierenFuerStatus(AufgabeStatus status)
+    private void RefreshForStatus(WorkItemStatus status)
     {
         (StatusText, StatusColor) = status switch
         {
-            AufgabeStatus.Neu => ("Neu", Brushes.Gray),
-            AufgabeStatus.Gestartet => ("Gestartet", Brushes.DodgerBlue),
-            AufgabeStatus.Wartend => ("Wartend", Brushes.Goldenrod),
-            AufgabeStatus.Beendet => ("Beendet", Brushes.SeaGreen),
-            AufgabeStatus.Archiviert => ("Archiviert", Brushes.DimGray),
+            WorkItemStatus.New => ("Neu", Brushes.Gray),
+            WorkItemStatus.Started => ("Gestartet", Brushes.DodgerBlue),
+            WorkItemStatus.Waiting => ("Wartend", Brushes.Goldenrod),
+            WorkItemStatus.Completed => ("Beendet", Brushes.SeaGreen),
+            WorkItemStatus.Archived => ("Archiviert", Brushes.DimGray),
             _ => (status.ToString(), Brushes.Gray)
         };
     }

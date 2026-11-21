@@ -9,19 +9,19 @@ public abstract class PeriodicBackgroundService : BackgroundService
     private readonly TimeSpan _pollingInterval;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
-    private readonly string _fehlerMeldung;
+    private readonly string _errorMessage;
 
     /// <inheritdoc cref="PeriodicBackgroundService"/>
     /// <param name="pollingInterval">Wartezeit zwischen zwei Durchlaeufen.</param>
     /// <param name="timeProvider">Zeitquelle für das Polling-Delay (testbar via <see cref="TimeProvider"/>).</param>
     /// <param name="logger">Logger für Fehlermeldungen bei fehlgeschlagenen Durchlaeufen.</param>
-    /// <param name="fehlerMeldung">Log-Meldung, die bei einem fehlgeschlagenen Durchlauf protokolliert wird.</param>
-    protected PeriodicBackgroundService(TimeSpan pollingInterval, TimeProvider timeProvider, ILogger logger, string fehlerMeldung)
+    /// <param name="errorMessage">Log-Meldung, die bei einem fehlgeschlagenen Durchlauf protokolliert wird.</param>
+    protected PeriodicBackgroundService(TimeSpan pollingInterval, TimeProvider timeProvider, ILogger logger, string errorMessage)
     {
         _pollingInterval = pollingInterval;
         _timeProvider = timeProvider;
         _logger = logger;
-        _fehlerMeldung = fehlerMeldung;
+        _errorMessage = errorMessage;
     }
 
     /// <inheritdoc/>
@@ -39,7 +39,7 @@ public abstract class PeriodicBackgroundService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, _fehlerMeldung);
+                _logger.LogError(ex, _errorMessage);
             }
 
             try

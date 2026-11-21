@@ -16,7 +16,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// (<c>echo [[...]]</c>) auf dem echten Ausgabepfad <c>PseudoConsoleSession → CliOutputProtokollWriter</c>
 /// einer laufenden KiSimulator-Aufgabe emittiert. Erwartet: RateLimit-Protokolleintrag an der
 /// auslösenden Aufgabe, persistiertes Plugin-Limit unter
-/// <c>plugins.sessionlimit.Softwareschmiede.KiSimulator</c>, PausiertBisUtc auf allen laufenden
+/// <c>plugins.sessionlimit.Softwareschmiede.KiSimulator</c>, PausedUntilUtc auf allen laufenden
 /// Aufgaben desselben Prefix, pausierte Kacheln — ohne Unterbrechung der laufenden CLI.
 /// Zusätzlich wird die Update-Sicherheitsprüfung (<see cref="CliUpdateSafetyService"/>) mit einem
 /// in-Test instanziierten Service gegen die laufende Test-DB geprüft.
@@ -32,23 +32,23 @@ namespace Softwareschmiede.Tests.E2E;
 /// </summary>
 public partial class End2EndTest
 {
-    private const string LimitTitelA = "Limit-Aufgabe-A";
-    private const string LimitTitelB = "Limit-Aufgabe-B";
-    private const string MarkerVorlagenName = "SessionLimit-Marker";
+    private const string LimitTitleA = "Limit-Aufgabe-A";
+    private const string LimitTitleB = "Limit-Aufgabe-B";
+    private const string MarkerTemplatesName = "SessionLimit-Marker";
     private const string SimulatorPrefix = "Softwareschmiede.KiSimulator";
-    private const string FremdPrefix = "E2E.Anderes.KiPlugin";
+    private const string ForeignPrefix = "E2E.Anderes.KiPlugin";
 
     /// <summary>
     /// Szenario: Zwei Aufgaben laufen mit dem KiSimulator; über die UI wird an Aufgabe B ein
     /// zeitgesteuerter Prompt mit vergangener Zielzeit (→ Sofortversand) gesendet, der den
     /// Rate-Limit-Marker per <c>echo</c> auf die CLI-Ausgabe schreibt. Anschließend werden
-    /// Protokolleintrag, App-Einstellung, PausiertBisUtc beider Aufgaben und die pausierten
+    /// Protokolleintrag, App-Einstellung, PausedUntilUtc beider Aufgaben und die pausierten
     /// Seitenleisten-Kacheln geprüft — bei weiterlaufender CLI von B (kein Unterbrechen). Danach
     /// wird die Update-Sicherheitsprüfung verifiziert: Limit-Aufgaben trotz frischem Heartbeat
     /// nicht riskant, Fremd-Prefix-Aufgabe riskant, nach Ablauf des Limits wieder riskant.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    protected async Task SessionLimit_MarkerPauseProtokollUndUpdateSicherheit_E2E(Window mainWindow)
+    protected async Task SessionLimit_MarkerPauseLogAndUpdateSafe_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
@@ -65,121 +65,121 @@ public partial class End2EndTest
         projectDetail = repoDialog.Confirm();
 
         // Promptvorlage mit Marker-Echo VOR dem Öffnen der Detailansichten seeden, damit sie in
-        // der ComboBox „PromptVorlagenAuswahl" der jeweils geladenen Detailansicht enthalten ist.
+        // der ComboBox „PromptTemplateSelection" der jeweils geladenen Detailansicht enthalten ist.
         var resetUtc = DateTimeOffset.UtcNow.AddHours(2);
-        var markerZeile = $"echo [[SOFTWARESCHMIEDE_RATE_LIMIT:{resetUtc:O}]]";
+        var markerLine = $"echo [[SOFTWARESCHMIEDE_RATE_LIMIT:{resetUtc:O}]]";
         await using (var db = OpenTestDbContext())
         {
-            db.PromptVorlagen.Add(new PromptVorlage
+            db.PromptTemplates.Add(new PromptTemplate
             {
-                Name = MarkerVorlagenName,
-                Prompttext = markerZeile,
-                Sortierung = 0
+                Name = MarkerTemplatesName,
+                PromptText = markerLine,
+                SortOrder = 0
             });
             await db.SaveChangesAsync();
         }
 
         // Aufgabe A anlegen und CLI starten, dann zurück zum Projekt für Aufgabe B.
-        var taskA = ErstelleUndStarteLimitAufgabe(projectDetail, LimitTitelA);
+        var taskA = CreateAndStartLimitWorkItem(projectDetail, LimitTitleA);
         taskA.GoBack();
         var projectDetailForB = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
         // Aufgabe B anlegen, CLI starten und geöffnet lassen — über sie wird der Marker gesendet.
-        var taskB = ErstelleUndStarteLimitAufgabe(projectDetailForB, LimitTitelB);
+        var taskB = CreateAndStartLimitWorkItem(projectDetailForB, LimitTitleB);
 
         Guid idA;
         Guid idB;
         string runIdB;
-        await WartenBisAsync(async () =>
+        await WaitUntilAsync(async () =>
         {
             await using var db = OpenTestDbContext();
-            var a = await db.Aufgaben.SingleOrDefaultAsync(x => x.Titel == LimitTitelA);
-            var b = await db.Aufgaben.SingleOrDefaultAsync(x => x.Titel == LimitTitelB);
-            return a?.AktiveRunId is not null && b?.AktiveRunId is not null;
+            var a = await db.WorkItems.SingleOrDefaultAsync(x => x.Title == LimitTitleA);
+            var b = await db.WorkItems.SingleOrDefaultAsync(x => x.Title == LimitTitleB);
+            return a?.ActiveRunId is not null && b?.ActiveRunId is not null;
         });
         await using (var db = OpenTestDbContext())
         {
-            idA = (await db.Aufgaben.SingleAsync(x => x.Titel == LimitTitelA)).Id;
-            var b = await db.Aufgaben.SingleAsync(x => x.Titel == LimitTitelB);
+            idA = (await db.WorkItems.SingleAsync(x => x.Title == LimitTitleA)).Id;
+            var b = await db.WorkItems.SingleAsync(x => x.Title == LimitTitleB);
             idB = b.Id;
-            runIdB = b.AktiveRunId!;
+            runIdB = b.ActiveRunId!;
         }
 
         // Zeitgesteuerter Versand mit bereits vergangener Zielzeit → der Service versendet sofort.
         // Skip-Guard analog ZeitgesteuerterPrompt_NachPlanen_..._E2E: Zwischen 00:00 und 00:10 läge
         // "jetzt - 10 min" noch am Vortag; die App interpretiert die eingegebene Uhrzeit aber immer
         // als heutiges Datum — eine Zukunftszeit würde geplant statt gesendet.
-        var jetzt = DateTime.Now;
-        Assert.SkipWhen(jetzt.Hour == 0 && jetzt.Minute < 10, "Kurz nach Mitternacht: 'jetzt - 10 min' wäre als heutige Uhrzeit eine Zukunftszeit.");
-        var vergangen = jetzt.AddMinutes(-10);
+        var now = DateTime.Now;
+        Assert.SkipWhen(now.Hour == 0 && now.Minute < 10, "Kurz nach Mitternacht: 'jetzt - 10 min' wäre als heutige Uhrzeit eine Zukunftszeit.");
+        var vergangen = now.AddMinutes(-10);
 
         taskB.SetScheduledPromptTime(vergangen.Hour, vergangen.Minute);
-        taskB.SelectPromptTemplate(MarkerVorlagenName);
-        WaitForElement(mainWindow, cf => cf.ByName("ZeitgesteuertSenden"), Short).AsButton().Click();
+        taskB.SelectPromptTemplate(MarkerTemplatesName);
+        WaitForElement(mainWindow, cf => cf.ByName("ScheduledSend"), Short).AsButton().Click();
 
         // Warten, bis der Marker auf dem echten Ausgabepfad verarbeitet wurde:
-        // RateLimit-Protokolleintrag an Aufgabe B + PausiertBisUtc an beiden Aufgaben.
+        // RateLimit-Protokolleintrag an Aufgabe B + PausedUntilUtc an beiden Aufgaben.
         // Die interaktive /k-Shell des KiSimulators (Issue #271) führt den echo-Befehl sofort aus —
         // kein 30-s-Blocker durch ein Einmal-Kommando mehr.
-        await WartenBisAsync(async () =>
+        await WaitUntilAsync(async () =>
         {
             await using var db = OpenTestDbContext();
-            var hatRateLimitEintrag = await db.Protokolleintraege
-                .AnyAsync(p => p.AufgabeId == idB && p.Typ == ProtokollTyp.RateLimit);
-            var a = await db.Aufgaben.SingleAsync(x => x.Id == idA);
-            var b = await db.Aufgaben.SingleAsync(x => x.Id == idB);
-            return hatRateLimitEintrag && a.PausiertBisUtc is not null && b.PausiertBisUtc is not null;
-        }, maxVersuche: 250);
+            var hasRateLimitEntry = await db.LogEntries
+                .AnyAsync(p => p.WorkItemId == idB && p.Type == LogEntryType.RateLimit);
+            var a = await db.WorkItems.SingleAsync(x => x.Id == idA);
+            var b = await db.WorkItems.SingleAsync(x => x.Id == idB);
+            return hasRateLimitEntry && a.PausedUntilUtc is not null && b.PausedUntilUtc is not null;
+        }, maxAttempts: 250);
 
         await using (var db = OpenTestDbContext())
         {
             // Plugin-weit persistiertes Session-Limit.
-            var limitEintrag = await db.AppEinstellungen
-                .SingleOrDefaultAsync(e => e.Schluessel == KiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
-            Assert.NotNull(limitEintrag);
+            var limitEntry = await db.AppSettings
+                .SingleOrDefaultAsync(e => e.Key == AiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
+            Assert.NotNull(limitEntry);
             Assert.True(
-                DateTimeOffset.TryParse(limitEintrag!.Wert, out var persistiertesLimit),
-                $"Persistierter Limit-Wert '{limitEintrag.Wert}' ist kein gültiger Zeitstempel.");
+                DateTimeOffset.TryParse(limitEntry!.Value, out var persistedLimit),
+                $"Persistierter Limit-Wert '{limitEntry.Value}' ist kein gültiger Zeitstempel.");
             Assert.True(
-                Math.Abs((persistiertesLimit - resetUtc).TotalSeconds) < 2,
-                $"Persistiertes Limit '{persistiertesLimit:O}' weicht vom Marker '{resetUtc:O}' ab.");
+                Math.Abs((persistedLimit - resetUtc).TotalSeconds) < 2,
+                $"Persistiertes Limit '{persistedLimit:O}' weicht vom Marker '{resetUtc:O}' ab.");
 
             // Beide Aufgaben desselben Prefix sind pausiert.
-            var a = await db.Aufgaben.SingleAsync(x => x.Id == idA);
-            var b = await db.Aufgaben.SingleAsync(x => x.Id == idB);
-            AssertPausiertBisUtc(a.PausiertBisUtc, resetUtc, LimitTitelA);
-            AssertPausiertBisUtc(b.PausiertBisUtc, resetUtc, LimitTitelB);
+            var a = await db.WorkItems.SingleAsync(x => x.Id == idA);
+            var b = await db.WorkItems.SingleAsync(x => x.Id == idB);
+            AssertPausedUntilUtc(a.PausedUntilUtc, resetUtc, LimitTitleA);
+            AssertPausedUntilUtc(b.PausedUntilUtc, resetUtc, LimitTitleB);
 
-            // Kein Unterbrechen: AktiveRunId von B ist unverändert, Status weiterhin Gestartet/Aktiv.
-            Assert.Equal(runIdB, b.AktiveRunId);
-            Assert.Equal(AufgabeAusfuehrungsStatus.Aktiv, b.AusfuehrungsStatus);
+            // Kein Unterbrechen: ActiveRunId von B ist unverändert, Status weiterhin Gestartet/Aktiv.
+            Assert.Equal(runIdB, b.ActiveRunId);
+            Assert.Equal(WorkItemExecutionStatus.Active, b.ExecutionStatus);
         }
 
         // Die CLI von B läuft sichtbar weiter (Stoppen-Button).
         Assert.True(taskB.IsCliRunning(), "Der 'CliStoppen'-Button von Aufgabe B muss trotz Pause sichtbar bleiben — der laufende Prozess wird nicht unterbrochen.");
 
         // Beide Seitenleisten-Kacheln zeigen den Pausiert-Status mit Countdown und Abblendungs-Marker.
-        WarteAufKachelStatus(mainWindow, LimitTitelA, s => s.StartsWith("⏸ Pausiert", StringComparison.Ordinal), Long);
-        WarteAufKachelStatus(mainWindow, LimitTitelB, s => s.StartsWith("⏸ Pausiert", StringComparison.Ordinal), Long);
-        WarteAufKachelPausiertMarker(mainWindow, LimitTitelA, "Pausiert:True", Long);
-        WarteAufKachelPausiertMarker(mainWindow, LimitTitelB, "Pausiert:True", Long);
+        WaitOnTileStatus(mainWindow, LimitTitleA, s => s.StartsWith("⏸ Pausiert", StringComparison.Ordinal), Long);
+        WaitOnTileStatus(mainWindow, LimitTitleB, s => s.StartsWith("⏸ Pausiert", StringComparison.Ordinal), Long);
+        WaitOnTilePausedMarker(mainWindow, LimitTitleA, "Paused:True", Long);
+        WaitOnTilePausedMarker(mainWindow, LimitTitleB, "Paused:True", Long);
 
         // Dritte Aufgabe mit Fremd-Prefix und frischem Heartbeat seeden (kein echter CLI-Start nötig —
         // CliUpdateSafetyService bewertet ausschließlich persistierte Lauf-Indikatoren).
         await using (var db = OpenTestDbContext())
         {
-            var projekt = await db.Projekte.FirstAsync();
-            db.Aufgaben.Add(new Aufgabe
+            var project = await db.Projects.FirstAsync();
+            db.WorkItems.Add(new WorkItem
             {
                 Id = Guid.NewGuid(),
-                ProjektId = projekt.Id,
-                Titel = "Limit-FremdPrefix-Aufgabe",
-                Status = AufgabeStatus.Gestartet,
-                AusfuehrungsStatus = AufgabeAusfuehrungsStatus.Aktiv,
-                KiPluginPrefix = FremdPrefix,
-                AktiveRunId = Guid.NewGuid().ToString("N"),
+                ProjectId = project.Id,
+                Title = "Limit-FremdPrefix-Aufgabe",
+                Status = WorkItemStatus.Started,
+                ExecutionStatus = WorkItemExecutionStatus.Active,
+                AiPluginPrefix = ForeignPrefix,
+                ActiveRunId = Guid.NewGuid().ToString("N"),
                 LastHeartbeatUtc = DateTimeOffset.UtcNow,
-                ErstellungsDatum = DateTimeOffset.UtcNow
+                CreatedAt = DateTimeOffset.UtcNow
             });
             await db.SaveChangesAsync();
         }
@@ -188,9 +188,9 @@ public partial class End2EndTest
         // frischem Heartbeat nicht riskant (Heartbeat-Toleranz entfällt), die Fremd-Prefix-Aufgabe bleibt riskant.
         await using (var db = OpenTestDbContext())
         {
-            var result = await ErstelleSafetyService(db).CheckAsync();
-            Assert.DoesNotContain(result.RiskyTasks, t => t.Contains(LimitTitelA, StringComparison.Ordinal));
-            Assert.DoesNotContain(result.RiskyTasks, t => t.Contains(LimitTitelB, StringComparison.Ordinal));
+            var result = await CreateSafetyService(db).CheckAsync();
+            Assert.DoesNotContain(result.RiskyTasks, t => t.Contains(LimitTitleA, StringComparison.Ordinal));
+            Assert.DoesNotContain(result.RiskyTasks, t => t.Contains(LimitTitleB, StringComparison.Ordinal));
             Assert.Contains(result.RiskyTasks, t => t.Contains("Limit-FremdPrefix-Aufgabe", StringComparison.Ordinal));
         }
 
@@ -198,18 +198,18 @@ public partial class End2EndTest
         // Heartbeat-Bewertung wieder: die laufenden Simulator-Aufgaben sind wieder riskant.
         await using (var db = OpenTestDbContext())
         {
-            var eintrag = await db.AppEinstellungen
-                .SingleAsync(e => e.Schluessel == KiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
-            eintrag.Wert = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("O", System.Globalization.CultureInfo.InvariantCulture);
-            eintrag.AktualisiertAm = DateTimeOffset.UtcNow;
+            var entry = await db.AppSettings
+                .SingleAsync(e => e.Key == AiPluginLimitService.SessionLimitKeyPrefix + SimulatorPrefix);
+            entry.Value = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+            entry.UpdatedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync();
         }
 
         await using (var db = OpenTestDbContext())
         {
-            var result = await ErstelleSafetyService(db).CheckAsync();
-            Assert.Contains(result.RiskyTasks, t => t.Contains(LimitTitelA, StringComparison.Ordinal));
-            Assert.Contains(result.RiskyTasks, t => t.Contains(LimitTitelB, StringComparison.Ordinal));
+            var result = await CreateSafetyService(db).CheckAsync();
+            Assert.Contains(result.RiskyTasks, t => t.Contains(LimitTitleA, StringComparison.Ordinal));
+            Assert.Contains(result.RiskyTasks, t => t.Contains(LimitTitleB, StringComparison.Ordinal));
         }
 
         // Aufräumen: laufende CLI von B stoppen und das Projekt löschen. Task B wurde über die
@@ -226,41 +226,41 @@ public partial class End2EndTest
     /// die CLI mit dem KI-Simulator-Plugin (gleiches Muster wie
     /// <c>E2E_TaskWechselUeberMenue.ErstelleUndStarteAufgabe</c>).
     /// </summary>
-    private static TaskDetailView ErstelleUndStarteLimitAufgabe(ProjectDetailView projectDetail, string titel)
+    private static TaskDetailView CreateAndStartLimitWorkItem(ProjectDetailView projectDetail, string title)
     {
         var task = projectDetail.CreateTask();
-        task.SetTaskTitle(titel);
+        task.SetTaskTitle(title);
         task.SaveTask();
         task.GoBack();
 
         var projectDetailAfterSave = Assert.IsType<ProjectDetailView>(task.Window.CurrentView());
-        var taskReopened = projectDetailAfterSave.OpenTask(titel);
-        taskReopened.Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskReopened = projectDetailAfterSave.OpenTask(title);
+        taskReopened.Start("Softwareschmiede.KiSimulator", forProjectUse: false);
         taskReopened.WaitForCliRunning();
 
         return taskReopened;
     }
 
-    private static CliUpdateSafetyService ErstelleSafetyService(Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext db)
+    private static CliUpdateSafetyService CreateSafetyService(Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext db)
     {
-        var aufgabeService = new AufgabeService(
+        var workItemService = new WorkItemService(
             db,
-            NullLogger<AufgabeService>.Instance,
+            NullLogger<WorkItemService>.Instance,
             new TodoService(db, NullLogger<TodoService>.Instance));
-        var appEinstellungService = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        var limitService = new KiPluginLimitService(
+        var appSettingService = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        var limitService = new AiPluginLimitService(
             db,
-            appEinstellungService,
-            new AufgabeLaufdatenChangedNotifier(),
-            NullLogger<KiPluginLimitService>.Instance);
-        return new CliUpdateSafetyService(aufgabeService, limitService, NullLogger<CliUpdateSafetyService>.Instance);
+            appSettingService,
+            new WorkItemRunDataChangedNotifier(),
+            NullLogger<AiPluginLimitService>.Instance);
+        return new CliUpdateSafetyService(workItemService, limitService, NullLogger<CliUpdateSafetyService>.Instance);
     }
 
-    private static void AssertPausiertBisUtc(DateTimeOffset? pausiertBisUtc, DateTimeOffset erwartet, string titel)
+    private static void AssertPausedUntilUtc(DateTimeOffset? pausedUntilUtc, DateTimeOffset expected, string title)
     {
-        Assert.NotNull(pausiertBisUtc);
+        Assert.NotNull(pausedUntilUtc);
         Assert.True(
-            Math.Abs((pausiertBisUtc!.Value - erwartet).TotalSeconds) < 2,
-            $"PausiertBisUtc von '{titel}' ('{pausiertBisUtc:O}') weicht vom Marker-Zeitpunkt '{erwartet:O}' ab.");
+            Math.Abs((pausedUntilUtc!.Value - expected).TotalSeconds) < 2,
+            $"PausiertBisUtc von '{title}' ('{pausedUntilUtc:O}') weicht vom Marker-Zeitpunkt '{expected:O}' ab.");
     }
 }

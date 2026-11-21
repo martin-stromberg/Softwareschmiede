@@ -12,11 +12,11 @@ public sealed class SystemShutdownServiceTests
 {
     /// <summary>Auf Windows liefert das Erzwingen-Flag das Forced-Shutdown-Kommando.</summary>
     [Fact]
-    public void ResolveShutdownCommand_WindowsMitErzwingen_LiefertForcedShutdown()
+    public void ResolveShutdownCommand_ForceWindowsWith_ReturnsForcedShutdown()
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows-spezifisches Mapping.");
 
-        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(erzwingen: true);
+        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(force: true);
 
         fileName.Should().Be("shutdown");
         arguments.Should().Be("/s /f /t 0");
@@ -24,11 +24,11 @@ public sealed class SystemShutdownServiceTests
 
     /// <summary>Auf Windows liefert der Shutdown ohne Erzwingen das reguläre Kommando.</summary>
     [Fact]
-    public void ResolveShutdownCommand_WindowsOhneErzwingen_LiefertRegulaeresShutdown()
+    public void ResolveShutdownCommand_ForceWindowsWithout_ReturnsRegularShutdown()
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows-spezifisches Mapping.");
 
-        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(erzwingen: false);
+        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(force: false);
 
         fileName.Should().Be("shutdown");
         arguments.Should().Be("/s /t 0");
@@ -36,11 +36,11 @@ public sealed class SystemShutdownServiceTests
 
     /// <summary>Unter Linux bleibt das Shutdown-Kommando unverändert <c>shutdown -h now</c>.</summary>
     [Fact]
-    public void ResolveShutdownCommand_Linux_BleibtUnveraendert()
+    public void ResolveShutdownCommand_Linux_RemainsUnchanged()
     {
         Assert.SkipUnless(OperatingSystem.IsLinux(), "Linux-spezifisches Mapping.");
 
-        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(erzwingen: true);
+        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(force: true);
 
         fileName.Should().Be("shutdown");
         arguments.Should().Be("-h now");
@@ -48,11 +48,11 @@ public sealed class SystemShutdownServiceTests
 
     /// <summary>Unter macOS bleibt das AppleScript-Kommando unverändert.</summary>
     [Fact]
-    public void ResolveShutdownCommand_MacOS_BleibtUnveraendert()
+    public void ResolveShutdownCommand_MacOS_RemainsUnchanged()
     {
         Assert.SkipUnless(OperatingSystem.IsMacOS(), "macOS-spezifisches Mapping.");
 
-        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(erzwingen: true);
+        var (fileName, arguments) = SystemShutdownService.ResolveShutdownCommand(force: true);
 
         fileName.Should().Be("osascript");
         arguments.Should().Contain("System Events");

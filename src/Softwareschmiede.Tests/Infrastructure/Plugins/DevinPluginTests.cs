@@ -29,7 +29,7 @@ public sealed class DevinPluginTests
     {
         _sut.PluginName.Should().Be("Devin CLI");
         _sut.PluginPrefix.Should().Be("Softwareschmiede.Devin");
-        _sut.ProviderDateiPraefix.Should().Be("devin");
+        _sut.ProviderFilePrefix.Should().Be("devin");
         _sut.PluginType.Should().Be(PluginType.DevelopmentAutomation);
 
         var settings = _sut.GetSettingGroups();
@@ -143,16 +143,16 @@ public sealed class DevinPluginTests
     [InlineData("--prompt-file prompt.md")]
     [InlineData("--model sonnet")]
     [InlineData("--permission-mode plan")]
-    public async Task StartCliAsync_ShouldPassOptionalDevinParameters_AsArguments(string parameters)
+    public async Task StartCliAsync_ShouldPassOptionalDevinParameter_AsArguments(string parameter)
     {
-        var psi = await _sut.StartCliAsync("/repo", parameters, TestContext.Current.CancellationToken);
+        var psi = await _sut.StartCliAsync("/repo", parameter, TestContext.Current.CancellationToken);
 
-        psi.Arguments.Should().Be(parameters);
+        psi.Arguments.Should().Be(parameter);
     }
 
     /// <summary>StartCliAsync appends CommandLineParameters from credential store to arguments.</summary>
     [Fact]
-    public async Task StartCliAsync_ShouldIncludeCommandLineParameters_InProcessStartInfo()
+    public async Task StartCliAsync_ShouldIncludeCommandLineParameter_InProcessStartInfo()
     {
         _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Devin.CommandLineParameters"))
             .Returns("--permission-mode plan --model sonnet");
@@ -211,7 +211,7 @@ public sealed class DevinPluginTests
 
     /// <summary>BuildIssueTemplateFillInvocation haengt gespeicherte CommandLineParameters als einzelne Argumente an.</summary>
     [Fact]
-    public void BuildIssueTemplateFillInvocation_ShouldAppendCommandLineParameters()
+    public void BuildIssueTemplateFillInvocation_ShouldAppendCommandLineParameter()
     {
         _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Devin.CommandLineParameters"))
             .Returns("--model sonnet --permission-mode plan");

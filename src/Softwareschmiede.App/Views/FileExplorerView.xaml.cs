@@ -26,57 +26,57 @@ public sealed partial class FileExplorerView : UserControl
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         if (_subscribedViewModel is not null)
-            _subscribedViewModel.DiffZeileFokussiert -= OnDiffZeileFokussiert;
+            _subscribedViewModel.DiffLineFocused -= OnDiffLineFocused;
 
         _subscribedViewModel = e.NewValue as FileExplorerViewModel;
 
         if (_subscribedViewModel is not null)
-            _subscribedViewModel.DiffZeileFokussiert += OnDiffZeileFokussiert;
+            _subscribedViewModel.DiffLineFocused += OnDiffLineFocused;
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         if (_subscribedViewModel is not null)
-            _subscribedViewModel.DiffZeileFokussiert -= OnDiffZeileFokussiert;
+            _subscribedViewModel.DiffLineFocused -= OnDiffLineFocused;
 
         _subscribedViewModel = null;
     }
 
-    private void OnDiffZeileFokussiert(int index)
+    private void OnDiffLineFocused(int index)
     {
         DiffViewerControl.ScrollToIndex(index);
     }
 
-    private void OnBaumSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    private void OnTreeSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (DataContext is FileExplorerViewModel vm)
-            vm.AusgewaehlterKnoten = e.NewValue as WorkspaceFileNode;
+            vm.SelectedNode = e.NewValue as WorkspaceFileNode;
     }
 
-    private void OnCommitKnotenExpanded(object sender, RoutedEventArgs e)
+    private void OnCommitNodeExpanded(object sender, RoutedEventArgs e)
     {
         if (e.OriginalSource is TreeViewItem { DataContext: BranchCommit commit }
             && DataContext is FileExplorerViewModel vm)
         {
-            vm.CommitAufklappenAsync(commit).SafeFireAndForget(_logger, "FileExplorerView.CommitAufklappenAsync");
+            vm.ExpandCommitAsync(commit).SafeFireAndForget(_logger, "FileExplorerView.CommitAufklappenAsync");
         }
     }
 
-    private void OnBaumKnotenExpanded(object sender, RoutedEventArgs e)
+    private void OnTreeNodeExpanded(object sender, RoutedEventArgs e)
     {
         if (e.OriginalSource is TreeViewItem { DataContext: WorkspaceFileNode node }
             && DataContext is FileExplorerViewModel vm)
         {
-            vm.LadeKinderAsync(node).SafeFireAndForget(_logger, "FileExplorerView.LadeKinderAsync");
+            vm.LoadChildrenAsync(node).SafeFireAndForget(_logger, "FileExplorerView.LadeKinderAsync");
         }
     }
 
-    private void OnBaumKnotenCollapsed(object sender, RoutedEventArgs e)
+    private void OnTreeNodeCollapsed(object sender, RoutedEventArgs e)
     {
         if (e.OriginalSource is TreeViewItem { DataContext: WorkspaceFileNode node }
             && DataContext is FileExplorerViewModel vm)
         {
-            vm.BeraeumeKnoten(node);
+            vm.CleanNode(node);
         }
     }
 }

@@ -14,9 +14,9 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>Unit-Tests für ProjectListViewModel.</summary>
 public sealed class ProjectListViewModelTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
-    private readonly ProjektService _projektService;
-    private readonly AufgabeService _aufgabeService;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
+    private readonly ProjectService _projectService;
+    private readonly WorkItemService _workItemService;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IDialogService> _dialogServiceMock;
     private readonly Mock<IPluginManager> _pluginManagerMock;
@@ -30,8 +30,8 @@ public sealed class ProjectListViewModelTests : IDisposable
         _pluginManagerMock = new Mock<IPluginManager>();
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
         _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
-        _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance, _pluginManagerMock.Object);
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _projectService = new ProjectService(_db, NullLogger<ProjectService>.Instance, _pluginManagerMock.Object);
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
     }
 
     /// <summary>Dispose.</summary>
@@ -40,7 +40,7 @@ public sealed class ProjectListViewModelTests : IDisposable
     private ProjectListViewModel CreateSut()
     {
         return new ProjectListViewModel(
-            _projektService,
+            _projectService,
             _serviceProviderMock.Object,
             _pluginManagerMock.Object,
             NullLogger<ProjectListViewModel>.Instance);
@@ -49,8 +49,8 @@ public sealed class ProjectListViewModelTests : IDisposable
     private ProjectDetailViewModel CreateProjectDetailViewModel()
     {
         return new ProjectDetailViewModel(
-            _projektService,
-            _aufgabeService,
+            _projectService,
+            _workItemService,
             _serviceProviderMock.Object,
             _dialogServiceMock.Object,
             _pluginManagerMock.Object,
@@ -58,7 +58,7 @@ public sealed class ProjectListViewModelTests : IDisposable
     }
 
     private TaskDetailViewModel CreateTaskDetailViewModel() =>
-        TaskDetailViewModelTestFactory.Create(_db, _aufgabeService);
+        TaskDetailViewModelTestFactory.Create(_db, _workItemService);
 
     private static Mock<IGitPlugin> CreatePluginMockWithRepositories(params AvailableRepository[] repositories)
     {
@@ -70,9 +70,9 @@ public sealed class ProjectListViewModelTests : IDisposable
         return mock;
     }
 
-    /// <summary>LadenRepositorienSuggestionsAsync befüllt UnassignedRepositories und setzt IsLoadingRepositories korrekt.</summary>
+    /// <summary>LoadRepositoriesSuggestionsAsync befüllt UnassignedRepositories und setzt IsLoadingRepositories korrekt.</summary>
     [Fact]
-    public async Task LadenRepositorienSuggestionsAsync_ShouldLoadAndPopulateUnassignedRepositories()
+    public async Task LoadRepositoriesSuggestionAsync_ShouldLoadAndPopulateUnassignedRepositories()
     {
         // Arrange
         var repo = new AvailableRepository("test-repo", DateTime.UtcNow, "owner/test-repo", "https://github.com/owner/test-repo");
@@ -80,20 +80,20 @@ public sealed class ProjectListViewModelTests : IDisposable
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin.Object]);
         var sut = CreateSut();
 
-        var loadingWasTrue = false;
+        var loadingWhatTrue = false;
         sut.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(sut.IsLoadingRepositories) && sut.IsLoadingRepositories)
-                loadingWasTrue = true;
+                loadingWhatTrue = true;
         };
 
         // Act
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         // Assert
         sut.UnassignedRepositories.Should().HaveCount(1);
         sut.UnassignedRepositories.Single().Url.Should().Be("https://github.com/owner/test-repo");
-        loadingWasTrue.Should().BeTrue();
+        loadingWhatTrue.Should().BeTrue();
         sut.IsLoadingRepositories.Should().BeFalse();
     }
 
@@ -112,16 +112,16 @@ public sealed class ProjectListViewModelTests : IDisposable
         await sut.RepositoryDoubleclickCommand.ExecuteAsync(repo);
 
         // Assert
-        var projekte = await _projektService.GetAllAsync(TestContext.Current.CancellationToken);
-        projekte.Should().HaveCount(1);
-        projekte[0].Name.Should().Be("new-repo");
+        var projects = await _projectService.GetAllAsync(TestContext.Current.CancellationToken);
+        projects.Should().HaveCount(1);
+        projects[0].Name.Should().Be("new-repo");
 
-        var detail = await _projektService.GetDetailAsync(projekte[0].Id, TestContext.Current.CancellationToken);
+        var detail = await _projectService.GetDetailAsync(projects[0].Id, TestContext.Current.CancellationToken);
         detail!.Repositories.Should().HaveCount(1);
         detail.Repositories[0].RepositoryUrl.Should().Be(repoUrl);
     }
 
-    /// <summary>RepositoryDoubleclickCommand lädt Projekte und Repositories nach der Erstellung neu.</summary>
+    /// <summary>RepositoryDoubleclickCommand lädt Projects und Repositories nach der Erstellung neu.</summary>
     [Fact]
     public async Task RepositoryDoubleclickCommand_ShouldReloadProjectsAndRepositories_AfterCreation()
     {
@@ -130,22 +130,22 @@ public sealed class ProjectListViewModelTests : IDisposable
         var plugin = CreatePluginMockWithRepositories(repo);
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([plugin.Object]);
         var sut = CreateSut();
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         // Act
         await sut.RepositoryDoubleclickCommand.ExecuteAsync(repo);
 
         // Assert
-        sut.Projekte.Should().HaveCount(1);
+        sut.Projects.Should().HaveCount(1);
         sut.UnassignedRepositories.Should().BeEmpty();
     }
 
-    /// <summary>KehreZuProjectZurueck lädt unzugeordnete Repositories neu.</summary>
+    /// <summary>NavigateBackToProject lädt unzugeordnete Repositories neu.</summary>
     [Fact]
-    public async Task KehreZuProjectZurueck_ShouldReloadUnassignedRepositories()
+    public async Task ReturnToProjectBack_ShouldReloadUnassignedRepositories()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Test-Projekt", null, TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Test-Projekt", null, TestContext.Current.CancellationToken);
         _serviceProviderMock
             .Setup(sp => sp.GetService(typeof(ProjectDetailViewModel)))
             .Returns(() => CreateProjectDetailViewModel());
@@ -153,7 +153,7 @@ public sealed class ProjectListViewModelTests : IDisposable
             .Setup(sp => sp.GetService(typeof(TaskDetailViewModel)))
             .Returns(() => CreateTaskDetailViewModel());
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(project.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
 
         var repo = new AvailableRepository("reload-repo", DateTime.UtcNow, "owner/reload-repo", "https://github.com/owner/reload-repo");
         var tcs = new TaskCompletionSource<IEnumerable<AvailableRepository>>();
@@ -164,14 +164,14 @@ public sealed class ProjectListViewModelTests : IDisposable
             .Returns(tcs.Task);
         _pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([pluginMock.Object]);
         var sut = CreateSut();
-        sut.SelectedProjekt = projekt;
+        sut.SelectedProject = project;
         var projectDetailViewModel = (ProjectDetailViewModel)sut.DetailViewModel!;
-        projectDetailViewModel.AufgabeOeffnenCommand.Execute(aufgabe.Id);
+        projectDetailViewModel.OpenWorkItemCommand.Execute(workItem.Id);
         tcs.SetResult([repo]);
 
         // Act
         var taskViewModel = (TaskDetailViewModel)sut.DetailViewModel!;
-        taskViewModel.ZurueckCommand.Execute(null);
+        taskViewModel.BackCommand.Execute(null);
         await Task.Delay(200, TestContext.Current.CancellationToken);
 
         // Assert
@@ -179,12 +179,12 @@ public sealed class ProjectListViewModelTests : IDisposable
         sut.UnassignedRepositories.Single().Url.Should().Be("https://github.com/owner/reload-repo");
     }
 
-    /// <summary>ZeigeTaskDetailView setzt DetailViewModel auf das übergebene TaskDetailViewModel.</summary>
+    /// <summary>ShowTaskDetailView setzt DetailViewModel auf das übergebene TaskDetailViewModel.</summary>
     [Fact]
-    public async Task ProjectListViewModel_ZeigeTaskDetailView_SetsDetailViewModelToTask()
+    public async Task ProjectListViewModel_ShowTaskDetailView_SetsDetailViewModelToTask()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Task-Navigations-Projekt", null, TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Task-Navigations-Projekt", null, TestContext.Current.CancellationToken);
         _serviceProviderMock
             .Setup(sp => sp.GetService(typeof(ProjectDetailViewModel)))
             .Returns(() => CreateProjectDetailViewModel());
@@ -193,24 +193,24 @@ public sealed class ProjectListViewModelTests : IDisposable
             .Returns(() => CreateTaskDetailViewModel());
 
         var sut = CreateSut();
-        sut.SelectedProjekt = projekt;
+        sut.SelectedProject = project;
         var projectDetailViewModel = (ProjectDetailViewModel)sut.DetailViewModel!;
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        var workItem = await _workItemService.CreateAsync(project.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
 
         // Act
-        projectDetailViewModel.AufgabeOeffnenCommand.Execute(aufgabe.Id);
+        projectDetailViewModel.OpenWorkItemCommand.Execute(workItem.Id);
 
         // Assert
         sut.DetailViewModel.Should().BeOfType<TaskDetailViewModel>();
     }
 
-    /// <summary>KehreZuProjectZurueck setzt DetailViewModel zurück zum ProjectDetailViewModel.</summary>
+    /// <summary>NavigateBackToProject setzt DetailViewModel zurück zum ProjectDetailViewModel.</summary>
     [Fact]
-    public async Task ProjectListViewModel_KehreZuProjectZurueck_RestoresProjectDetailView()
+    public async Task ProjectListViewModel_ReturnToProjectBack_RestoresProjectDetailView()
     {
         // Arrange
-        var projekt = await _projektService.CreateAsync("Zurueck-Navigations-Projekt", null, TestContext.Current.CancellationToken);
+        var project = await _projectService.CreateAsync("Zurueck-Navigations-Projekt", null, TestContext.Current.CancellationToken);
         _serviceProviderMock
             .Setup(sp => sp.GetService(typeof(ProjectDetailViewModel)))
             .Returns(() => CreateProjectDetailViewModel());
@@ -219,15 +219,15 @@ public sealed class ProjectListViewModelTests : IDisposable
             .Returns(() => CreateTaskDetailViewModel());
 
         var sut = CreateSut();
-        sut.SelectedProjekt = projekt;
+        sut.SelectedProject = project;
         var projectDetailViewModel = (ProjectDetailViewModel)sut.DetailViewModel!;
 
-        var aufgabe = await _aufgabeService.CreateAsync(projekt.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
-        projectDetailViewModel.AufgabeOeffnenCommand.Execute(aufgabe.Id);
+        var workItem = await _workItemService.CreateAsync(project.Id, "Testaufgabe", "Beschreibung", ct: TestContext.Current.CancellationToken);
+        projectDetailViewModel.OpenWorkItemCommand.Execute(workItem.Id);
         var taskDetailViewModel = (TaskDetailViewModel)sut.DetailViewModel!;
 
         // Act
-        taskDetailViewModel.ZurueckCommand.Execute(null);
+        taskDetailViewModel.BackCommand.Execute(null);
 
         // Assert
         sut.DetailViewModel.Should().BeSameAs(projectDetailViewModel);

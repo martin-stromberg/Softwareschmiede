@@ -2,72 +2,72 @@
 
 ## Entitäten
 
-### `Aufgabe`
+### `WorkItem`
 
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
 | `Id` | `Guid` | Primärschlüssel |
-| `ProjektId` | `Guid` | FK → Projekt |
+| `ProjectId` | `Guid` | FK → Projekt |
 | `GitRepositoryId` | `Guid?` | FK → GitRepository |
-| `Titel` | `string` | Aufgabentitel |
-| `AnforderungsBeschreibung` | `string?` | Prompt-Vorlage / Anforderungstext |
-| `Status` | `AufgabeStatus` | Aktueller Status (siehe unten) |
-| `AusfuehrungsStatus` | `AufgabeAusfuehrungsStatus` | Persistenter Lebenszyklus der KI-Ausführung, unabhängig vom Gesamtstatus der Aufgabe |
+| `Title` | `string` | Aufgabentitel |
+| `RequirementDescription` | `string?` | Prompt-Vorlage / Anforderungstext |
+| `Status` | `WorkItemStatus` | Aktueller Status (siehe unten) |
+| `ExecutionStatus` | `WorkItemExecutionStatus` | Persistenter Lebenszyklus der KI-Ausführung, unabhängig vom Gesamtstatus der Aufgabe |
 | `BranchName` | `string?` | Name des Git-Branches |
-| `LokalerKlonPfad` | `string?` | Lokaler Pfad des geklonten Repositories |
-| `AgentenpaketName` | `string?` | Name des Agentenpakets |
-| `AgentenName` | `string?` | Name des gewählten Agenten |
-| `KiPluginPrefix` | `string?` | Plugin-Prefix des KI-Plugins |
-| `ErstellungsDatum` | `DateTimeOffset` | Anlagezeitpunkt |
-| `AbschlussDatum` | `DateTimeOffset?` | Abschlusszeitpunkt |
-| `AktiveRunId` | `string?` | Run-ID eines laufenden KI-Prozesses |
+| `LocalClonePath` | `string?` | Lokaler Pfad des geklonten Repositories |
+| `AgentPackageName` | `string?` | Name des Agentenpakets |
+| `AgentName` | `string?` | Name des gewählten Agenten |
+| `AiPluginPrefix` | `string?` | Plugin-Prefix des KI-Plugins |
+| `CreatedAt` | `DateTimeOffset` | Anlagezeitpunkt |
+| `CompletedAt` | `DateTimeOffset?` | Abschlusszeitpunkt |
+| `ActiveRunId` | `string?` | Run-ID eines laufenden KI-Prozesses |
 | `LastHeartbeatUtc` | `DateTimeOffset?` | Letzter Heartbeat-Zeitstempel |
-| `LaufStatus` | `AufgabeLaufStatus?` | Persistierter Laufzeit-Substatus des aktiven Laufs (`Laeuft`/`WartetAufEingabe`); wird über `AktivenLaufSicherstellenAsync` gepflegt und beim Beenden zurückgesetzt |
-| `LetzterCliStartUtc` | `DateTimeOffset?` | Zeitpunkt des letzten echten CLI-Prozessstarts; dient als stabile Sortiergrundlage fuer aktive Aufgabenlisten |
-| `PausiertBisUtc` | `DateTimeOffset?` | Endzeitpunkt einer aktiven Pause; `null` = keine Pause |
+| `RunStatus` | `WorkItemRunStatus?` | Persistierter Laufzeit-Substatus des aktiven Laufs (`Running`/`WaitingForInput`); wird über `EnsureActiveRunAsync` gepflegt und beim Beenden zurückgesetzt |
+| `LastCliStartUtc` | `DateTimeOffset?` | Zeitpunkt des letzten echten CLI-Prozessstarts; dient als stabile Sortiergrundlage fuer aktive Aufgabenlisten |
+| `PausedUntilUtc` | `DateTimeOffset?` | Endzeitpunkt einer aktiven Pause; `null` = keine Pause |
 | `RecoveryVersion` | `int` | Concurrency-Token für Recovery |
-| `VorschlagPrompt` | `string?` | Gespeicherter Rate-Limit-Prompt-Vorschlag |
-| `VorschlagAusfuehrenAbUtc` | `DateTimeOffset?` | Geplanter Ausführungszeitpunkt des Vorschlags |
-| `AlertReferenz` | `AlertReferenz?` | Optionale Herkunftsreferenz, wenn die Aufgabe aus einem SCM-Alert erstellt wurde |
+| `SuggestedPrompt` | `string?` | Gespeicherter Rate-Limit-Prompt-Vorschlag |
+| `SuggestedExecuteAfterUtc` | `DateTimeOffset?` | Geplanter Ausführungszeitpunkt des Vorschlags |
+| `AlertReference` | `AlertReference?` | Optionale Herkunftsreferenz, wenn die Aufgabe aus einem SCM-Alert erstellt wurde |
 | `ScmAbschlussErkanntUtc` | `DateTimeOffset?` | UTC-Zeitpunkt, ab dem die Abschlussüberwachung die verknüpfte SCM-Referenz (Pull Request oder Issue) erstmals als geschlossen/gemergt beobachtet hat; persistierter Startpunkt der einstellbaren Abschluss-Wartezeit (neustartsicher), `null` solange die Referenz offen ist oder noch nicht geprüft wurde |
 | `ScmAbschlussReferenz` | `string?` | Anzeigetext der für den Abschluss beobachteten SCM-Referenz (z. B. „Pull Request #7" oder „Issue #3") — Diagnose-/Protokollwert zu `ScmAbschlussErkanntUtc` |
-| `PullRequests` | `ICollection<PullRequestReferenz>` | Persistierte Pull Requests, die aus der Aufgabe heraus erstellt wurden |
+| `PullRequests` | `ICollection<PullRequestReference>` | Persistierte Pull Requests, die aus der Aufgabe heraus erstellt wurden |
 
-`PausiertBisUtc` modelliert die Pause als zeitbasiertes Overlay — es gibt **kein** eigenes `AufgabeStatus.Pausiert`. Eine Aufgabe gilt genau dann als pausiert, wenn `PausiertBisUtc > UtcNow` gilt (Referenzdefinition: Extension `KiAusfuehrungsStatusKlassifikation.IstAktuellPausiert`, striktes Größer-als); abgelaufene Werte verbleiben wirkungslos in der Datenbank. Die Spalte wird als nullable Unix-Millisekunden-Wert (`long?`) über `NullableUnixMillisConverter` persistiert (Migration `20260916094502_AddAufgabePausiertBisUtc`).
+`PausedUntilUtc` modelliert die Pause als zeitbasiertes Overlay — es gibt **kein** eigenes `WorkItemStatus.Paused`. Eine Aufgabe gilt genau dann als pausiert, wenn `PausedUntilUtc > UtcNow` gilt (Referenzdefinition: Extension `AiExecutionStatusClassification.IsCurrentlyPaused`, striktes Größer-als); abgelaufene Werte verbleiben wirkungslos in der Datenbank. Die Spalte wird als nullable Unix-Millisekunden-Wert (`long?`) über `NullableUnixMillisConverter` persistiert (Migration `20260916094502_AddAufgabePausiertBisUtc`).
 
-### `Protokolleintrag`
+### `LogEntry`
 
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
 | `Id` | `Guid` | Primärschlüssel |
-| `AufgabeId` | `Guid` | FK → Aufgabe |
+| `WorkItemId` | `Guid` | FK → Aufgabe |
 | `Zeitstempel` | `DateTimeOffset` | Zeitpunkt des Eintrags |
-| `Typ` | `ProtokollTyp` | `Prompt`, `KiAntwort`, `GitAktion`, `StatusUebergang`, `TestErgebnis`, `CliOutput`, `RateLimit`, `SystemMeldung` |
+| `Typ` | `LogEntryType` | `Prompt`, `KiAntwort`, `GitAktion`, `StatusUebergang`, `TestResult`, `CliOutput`, `RateLimit`, `SystemMessage` |
 | `Inhalt` | `string` | Inhalt (Markdown) |
 | `AgentName` | `string?` | Name des Agenten |
 
-### `IssueReferenz`
+### `IssueReference`
 
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
 | `Id` | `Guid` | Primärschlüssel |
-| `AufgabeId` | `Guid` | FK → Aufgabe |
-| `IssueNummer` | `int` | Issue-Nummer im Provider |
-| `Titel` | `string` | Titel des Issues |
+| `WorkItemId` | `Guid` | FK → Aufgabe |
+| `IssueNumber` | `int` | Issue-Nummer im Provider |
+| `Title` | `string` | Titel des Issues |
 | `IssueUrl` | `string?` | Direkt-URL zum Issue |
 
-### `AlertReferenz`
+### `AlertReference`
 
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
 | `Id` | `Guid` | Primärschlüssel |
-| `AufgabeId` | `Guid` | FK -> Aufgabe |
+| `WorkItemId` | `Guid` | FK -> Aufgabe |
 | `Provider` | `string` | SCM-Provider, z. B. `github` |
 | `RepositoryId` | `string` | Repository-Kennung beim Provider |
 | `AlertType` | `string` | Alert-Art, initial `CodeScanning` |
 | `SourceKey` | `string` | Providerweit stabile Alert-Kennung zur Duplikatvermeidung |
 | `AlertUrl` | `string?` | Direkt-URL zum ursprünglichen Alert |
-| `Titel` | `string` | Alert-Titel zum Zeitpunkt der Konvertierung |
+| `Title` | `string` | Alert-Titel zum Zeitpunkt der Konvertierung |
 | `Severity` | `string?` | Von GitHub gelieferte Severity |
 | `State` | `string?` | Von GitHub gelieferter Alert-Status |
 | `RuleId` | `string?` | Code-Scanning-Regelkennung |
@@ -75,18 +75,18 @@
 
 `SourceKey` ist eindeutig indiziert. Dadurch kann derselbe GitHub-Code-Scanning-Alert auch bei parallelen oder wiederholten UI-Aktionen nicht mehrfach als lokale Aufgabe gespeichert werden.
 
-### `PullRequestReferenz`
+### `PullRequestReference`
 
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
 | `Id` | `Guid` | Primärschlüssel |
-| `AufgabeId` | `Guid` | FK -> Aufgabe |
+| `WorkItemId` | `Guid` | FK -> Aufgabe |
 | `Provider` | `PullRequestProvider` | Provider des Pull Requests, initial `GitHub` |
 | `RepositoryId` | `string` | Repository-Identifier beim Provider, z. B. `owner/repo` |
 | `PullRequestNumber` | `int` | Pull-Request-Nummer beim Provider |
 | `ProviderPullRequestId` | `string?` | Optionale eindeutige Provider-ID |
 | `Url` | `string` | Direkt-URL zum Pull Request |
-| `Titel` | `string` | Pull-Request-Titel |
+| `Title` | `string` | Pull-Request-Titel |
 | `SourceBranch` | `string` | Quellbranch |
 | `TargetBranch` | `string` | Zielbranch |
 | `HeadSha` | `string?` | Head-SHA des Pull Requests |
@@ -104,7 +104,7 @@
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
 | `Id` | `Guid` | Primärschlüssel |
-| `PullRequestReferenzId` | `Guid` | FK -> PullRequestReferenz |
+| `PullRequestReferenceId` | `Guid` | FK -> PullRequestReferenz |
 | `ProviderRunId` | `string` | Run-ID beim Provider |
 | `Name` | `string` | Workflow- oder Check-Name |
 | `Url` | `string?` | Direkt-URL zum Workflow-Run |
@@ -122,84 +122,84 @@
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
 | `Id` | `Guid` | Primärschlüssel |
-| `AufgabeId` | `Guid` | FK → Aufgabe |
-| `Beschreibung` | `string` | Beschreibungstext des To-Dos |
-| `ErledaltAm` | `DateTimeOffset?` | Zeitstempel der Fertigstellung; `null` = offen, gesetzt = erledigt |
-| `ErstellungsDatum` | `DateTimeOffset` | Zeitstempel der Erstellung |
-| `Aufgabe` | `Aufgabe` | Navigationseigenschaft zurück zur Aufgabe |
+| `WorkItemId` | `Guid` | FK → Aufgabe |
+| `Description` | `string` | Beschreibungstext des To-Dos |
+| `CompletedAt` | `DateTimeOffset?` | Zeitstempel der Fertigstellung; `null` = offen, gesetzt = erledigt |
+| `CreatedAt` | `DateTimeOffset` | Zeitstempel der Erstellung |
+| `WorkItem` | `WorkItem` | Navigationseigenschaft zurück zur Aufgabe |
 
-### `ZeitgesteuerterPrompt`
+### `ScheduledPrompt`
 
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
 | `Id` | `Guid` | Primärschlüssel |
-| `AufgabeId` | `Guid` | FK → Aufgabe (eindeutig, `DeleteBehavior.Cascade`) |
+| `WorkItemId` | `Guid` | FK → Aufgabe (eindeutig, `DeleteBehavior.Cascade`) |
 | `PromptText` | `string` | Der bereits platzhalteraufgelöste Prompttext (required) |
 | `ZielZeitpunktUtc` | `DateTimeOffset` | UTC-Zielzeitpunkt des Versands |
-| `ErstelltAmUtc` | `DateTimeOffset` | Erstellungszeitpunkt des Datensatzes |
+| `CreatedAtUtc` | `DateTimeOffset` | Erstellungszeitpunkt des Datensatzes |
 | `AktualisiertAmUtc` | `DateTimeOffset` | Letzter Aktualisierungszeitpunkt (Ersetzen, Pausenverschiebung) |
 
-Persistierter Datensatz eines geplanten zeitgesteuerten Prompts (Tabelle `ZeitgesteuertePrompts`, Migration `20261107211018_AddZeitgesteuerterPrompt`). Die drei `DateTimeOffset`-Spalten werden als Unix-Millisekunden (`long`) über `UnixMillisConverter` gespeichert. Der Unique-Index `IX_ZeitgesteuertePrompts_AufgabeId` setzt die Ersetzungsregel „max. ein Plan pro Aufgabe" datenbankseitig durch. Der Datensatz wird beim erfolgreichen Versand, beim Storno („Wartestellung aufheben", Aufgabenabschluss) und per Cascade beim Löschen der Aufgabe entfernt; der EF-Zugriff läuft über den scoped Service `ZeitgesteuerterPromptStore`.
+Persistierter Datensatz eines geplanten zeitgesteuerten Prompts (Tabelle `ZeitgesteuertePrompts`, Migration `20261107211018_AddZeitgesteuerterPrompt`). Die drei `DateTimeOffset`-Spalten werden als Unix-Millisekunden (`long`) über `UnixMillisConverter` gespeichert. Der Unique-Index `IX_ZeitgesteuertePrompts_AufgabeId` setzt die Ersetzungsregel „max. ein Plan pro Aufgabe" datenbankseitig durch. Der Datensatz wird beim erfolgreichen Versand, beim Storno („Wartestellung aufheben", Aufgabenabschluss) und per Cascade beim Löschen der Aufgabe entfernt; der EF-Zugriff läuft über den scoped Service `ScheduledPromptStore`.
 
 ## Statusübergänge
 
-`Aufgabe.Status` beschreibt den fachlichen Gesamtstatus der Aufgabe. Die KI-Ausführung besitzt zusätzlich den unabhängigen Status `AufgabeAusfuehrungsStatus`:
+`WorkItem.Status` beschreibt den fachlichen Gesamtstatus der Aufgabe. Die KI-Ausführung besitzt zusätzlich den unabhängigen Status `WorkItemExecutionStatus`:
 
 | Wert | Bedeutung |
 |------|-----------|
-| `NichtGestartet` | Für die Aufgabe wurde noch keine KI-Ausführung gestartet |
-| `Aktiv` | Eine KI-Ausführung läuft oder ist als wiederherstellbarer Lauf gespeichert |
-| `Beendet` | Die KI-Ausführung wurde gestoppt oder ist natürlich beendet; die Aufgabe selbst kann weiterhin offen sein |
+| `NotStarted` | Für die Aufgabe wurde noch keine KI-Ausführung gestartet |
+| `Active` | Eine KI-Ausführung läuft oder ist als wiederherstellbarer Lauf gespeichert |
+| `Completed` | Die KI-Ausführung wurde gestoppt oder ist natürlich beendet; die Aufgabe selbst kann weiterhin offen sein |
 
-Nur der Gesamtstatus `Beendet` oder `Archiviert` sperrt einen erneuten Start fachlich. Eine Aufgabe mit `AusfuehrungsStatus.Beendet` kann über **Starten** erneut im vorhandenen Arbeitsverzeichnis ausgeführt werden, solange der Gesamtstatus nicht terminal ist.
+Nur der Gesamtstatus `Completed` oder `Archived` sperrt einen erneuten Start fachlich. Eine Aufgabe mit `ExecutionStatus.Completed` kann über **Starten** erneut im vorhandenen Arbeitsverzeichnis ausgeführt werden, solange der Gesamtstatus nicht terminal ist.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Neu : Neu angelegt
-    Neu --> Gestartet : Repository eingerichtet + CLI gestartet
-    Gestartet --> Wartend : Rate-Limit erkannt
-    Gestartet --> Beendet : Abschließen
-    Wartend --> Beendet : Abschließen
-    Wartend --> Gestartet : Recovery (manuell)
-    Beendet --> Archiviert : Archivieren
-    Neu --> Archiviert : Archivieren
-    Gestartet --> Archiviert : Archivieren
+    [*] --> New : Neu angelegt
+    New --> Started : Repository eingerichtet + CLI gestartet
+    Started --> Waiting : Rate-Limit erkannt
+    Started --> Completed : Abschließen
+    Waiting --> Completed : Abschließen
+    Waiting --> Started : Recovery (manuell)
+    Completed --> Archived : Archivieren
+    New --> Archived : Archivieren
+    Started --> Archived : Archivieren
 ```
 
 ## Beziehungen
 
 ```mermaid
 erDiagram
-    Aufgabe {
+    WorkItem {
         Guid Id
-        Guid ProjektId
-        string Titel
-        AufgabeStatus Status
-        AufgabeAusfuehrungsStatus AusfuehrungsStatus
+        Guid ProjectId
+        string Title
+        WorkItemStatus Status
+        WorkItemExecutionStatus ExecutionStatus
         string BranchName
-        string LokalerKlonPfad
-        DateTimeOffset PausiertBisUtc
+        string LocalClonePath
+        DateTimeOffset PausedUntilUtc
     }
-    Protokolleintrag {
+    LogEntry {
         Guid Id
-        Guid AufgabeId
-        ProtokollTyp Typ
+        Guid WorkItemId
+        LogEntryType Typ
         string Inhalt
     }
-    IssueReferenz {
+    IssueReference {
         Guid Id
-        Guid AufgabeId
-        int IssueNummer
+        Guid WorkItemId
+        int IssueNumber
     }
-    AlertReferenz {
+    AlertReference {
         Guid Id
-        Guid AufgabeId
+        Guid WorkItemId
         string SourceKey
         string AlertType
     }
-    PullRequestReferenz {
+    PullRequestReference {
         Guid Id
-        Guid AufgabeId
+        Guid WorkItemId
         string RepositoryId
         int PullRequestNumber
         string Status
@@ -207,63 +207,63 @@ erDiagram
     }
     PullRequestWorkflowRun {
         Guid Id
-        Guid PullRequestReferenzId
+        Guid PullRequestReferenceId
         string ProviderRunId
         string Status
         string Conclusion
     }
     Todo {
         Guid Id
-        Guid AufgabeId
-        string Beschreibung
-        DateTimeOffset ErledaltAm
-        DateTimeOffset ErstellungsDatum
+        Guid WorkItemId
+        string Description
+        DateTimeOffset CompletedAt
+        DateTimeOffset CreatedAt
     }
-    ZeitgesteuerterPrompt {
+    ScheduledPrompt {
         Guid Id
-        Guid AufgabeId
+        Guid WorkItemId
         string PromptText
         DateTimeOffset ZielZeitpunktUtc
     }
-    Aufgabe ||--o{ Protokolleintrag : "hat"
-    Aufgabe ||--o| IssueReferenz : "hat"
-    Aufgabe ||--o| AlertReferenz : "hat"
-    Aufgabe ||--o{ PullRequestReferenz : "hat"
-    Aufgabe ||--o{ Todo : "hat"
-    Aufgabe ||--o| ZeitgesteuerterPrompt : "hat"
-    PullRequestReferenz ||--o{ PullRequestWorkflowRun : "hat"
+    WorkItem ||--o{ LogEntry : "hat"
+    WorkItem ||--o| IssueReference : "hat"
+    WorkItem ||--o| AlertReference : "hat"
+    WorkItem ||--o{ PullRequestReference : "hat"
+    WorkItem ||--o{ Todo : "hat"
+    WorkItem ||--o| ScheduledPrompt : "hat"
+    PullRequestReference ||--o{ PullRequestWorkflowRun : "hat"
 ```
 
 ## CLI-Ausgabeprotokoll
 
-CLI-Ausgaben werden ohne neue Tabelle im bestehenden `Protokolleintrag`-Modell gespeichert:
+CLI-Ausgaben werden ohne neue Tabelle im bestehenden `LogEntry`-Modell gespeichert:
 
 | Feld | Wert bei CLI-Ausgabe |
 |------|----------------------|
-| `AufgabeId` | Die Aufgabe, deren Terminal-Sitzung den Output erzeugt hat |
-| `Typ` | `ProtokollTyp.CliOutput` |
+| `WorkItemId` | Die Aufgabe, deren Terminal-Sitzung den Output erzeugt hat |
+| `Typ` | `LogEntryType.CliOutput` |
 | `Inhalt` | Eine dekodierte Ausgabezeile aus dem Terminal-Output |
 | `Zeitstempel` | Persistenzzeitpunkt des Protokolleintrags |
 
-`ProtokollService.AddCliOutputAsync` ist der zentrale Persistenzpfad. Erkennt die Methode in einer Ausgabezeile einen Rate-Limit-Marker (`[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]`), wird zusätzlich ein `ProtokollTyp.RateLimit`-Eintrag erzeugt.
+`LogService.AddCliOutputAsync` ist der zentrale Persistenzpfad. Erkennt die Methode in einer Ausgabezeile einen Rate-Limit-Marker (`[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]`), wird zusätzlich ein `LogEntryType.RateLimit`-Eintrag erzeugt.
 
 ## Persistiertes Plugin-Session-Limit
 
-Enthält der Rate-Limit-Marker einen gültigen Reset-Zeitpunkt, speichert `KiPluginLimitService` diesen zusätzlich als Key-Value-Eintrag in der `AppEinstellung`-Tabelle:
+Enthält der Rate-Limit-Marker einen gültigen Reset-Zeitpunkt, speichert `AiPluginLimitService` diesen zusätzlich als Key-Value-Eintrag in der `AppSetting`-Tabelle:
 
 | Schlüssel | Wert | Zweck |
 |-----------|------|-------|
-| `plugins.sessionlimit.<KiPluginPrefix>` | ISO-8601-Roundtrip-Zeitstempel (UTC) | Letztes bekanntes Session-Limit des KI-Plugins; Grundlage für die automatische Pause aktiver Aufgaben mit demselben Prefix und für die Update-Sicherheitsprüfung |
+| `plugins.sessionlimit.<AiPluginPrefix>` | ISO-8601-Roundtrip-Zeitstempel (UTC) | Letztes bekanntes Session-Limit des KI-Plugins; Grundlage für die automatische Pause aktiver Aufgaben mit demselben Prefix und für die Update-Sicherheitsprüfung |
 
-Dieser Eintrag ist **Laufzeitstatus**, keine Anwender-Konfiguration — er wird ausschließlich vom System geschrieben. Abgelaufene oder ungültige Werte werden beim Lesen (`GetAktiveSessionLimitsAsync`) ignoriert und beim nächsten Marker-Ereignis überschrieben. Details zum `AppEinstellung`-Modell: [Einstellungen — Datenmodell](../einstellungen/datenmodell.md).
+Dieser Eintrag ist **Laufzeitstatus**, keine Anwender-Konfiguration — er wird ausschließlich vom System geschrieben. Abgelaufene oder ungültige Werte werden beim Lesen (`GetActiveSessionLimitsAsync`) ignoriert und beim nächsten Marker-Ereignis überschrieben. Details zum `AppSetting`-Modell: [Einstellungen — Datenmodell](../einstellungen/datenmodell.md).
 
-## Persistierter Anzeigemodus der Aufgabenliste
+## Persistierter Anzeigemodus der WorkItemsList
 
-Der Anzeigemodus der aktiven Aufgabenliste wird je Ansicht als eigener Key-Value-Eintrag in der `AppEinstellung`-Tabelle gespeichert (kein eigenes Schema, keine Migration):
+Der Anzeigemodus der aktiven WorkItemsList wird je Ansicht als eigener Key-Value-Eintrag in der `AppSetting`-Tabelle gespeichert (kein eigenes Schema, keine Migration):
 
 | Schlüssel | Wert | Zweck |
 |-----------|------|-------|
-| `aktiveaufgaben.listenmodus` (`AppEinstellungService.AktiveAufgabenListenModusKey`) | Enum-Name des `AufgabenListenModus` (`Datum`, `Repository`, `Ki`) | Anzeigemodus der Seitenleisten-Aufgabenliste; beim App-Start wiederhergestellt |
-| `aktiveaufgaben.listenmodus.dashboard` (`AppEinstellungService.AktiveAufgabenListenModusDashboardKey`) | Enum-Name des `AufgabenListenModus` | Anzeigemodus der Dashboard-Aufgabenliste — unabhängig vom Menü-Modus |
+| `aktiveaufgaben.listenmodus` (`AppSettingService.ActiveWorkItemsListModeKey`) | Enum-Name des `WorkItemListMode` (`Date`, `Repository`, `Ai`) | Anzeigemodus der Seitenleisten-WorkItemsList; beim App-Start wiederhergestellt |
+| `aktiveaufgaben.listenmodus.dashboard` (`AppSettingService.ActiveWorkItemsListModeDashboardKey`) | Enum-Name des `WorkItemListMode` | Anzeigemodus der Dashboard-WorkItemsList — unabhängig vom Menü-Modus |
 
-Lesen und Schreiben laufen über den `AufgabenListenModusService` (Singleton) mit eigenem DI-Scope pro Operation — kein gemeinsamer `DbContext` mit dem 5-Sekunden-Aufgaben-Refresh. Fehlende oder ungültige Werte fallen beim Lesen auf `Datum` zurück (`Enum.TryParse` + `Enum.IsDefined`). Die Einträge entstehen als Datenzeilen zur Laufzeit über `AppEinstellungService.SetSettingAsync` beim ersten expliziten Moduswechsel — die Wiederherstellung schreibt nicht zurück.
+Lesen und Schreiben laufen über den `WorkItemListModeService` (Singleton) mit eigenem DI-Scope pro Operation — kein gemeinsamer `DbContext` mit dem 5-Sekunden-Aufgaben-Refresh. Fehlende oder ungültige Werte fallen beim Lesen auf `Datum` zurück (`Enum.TryParse` + `Enum.IsDefined`). Die Einträge entstehen als Datenzeilen zur Laufzeit über `AppSettingService.SetSettingAsync` beim ersten expliziten Moduswechsel — die Wiederherstellung schreibt nicht zurück.

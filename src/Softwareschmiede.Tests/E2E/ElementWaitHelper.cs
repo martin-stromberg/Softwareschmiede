@@ -41,15 +41,15 @@ internal static class ElementWaitHelper
     /// </summary>
     /// <remarks>
     /// Als Fail-Fast-Diagnose wird bei jeder Polling-Iteration zusätzlich nach einem Fehlerbanner
-    /// ("FehlerMeldung") gesucht: Wer auf ein *anderes* Element wartet, soll sofort mit einer
+    /// ("ErrorMessage") gesucht: Wer auf ein *anderes* Element wartet, soll sofort mit einer
     /// aussagekräftigen Meldung abbrechen, statt erst nach Ablauf des vollen Timeouts. Da die Suche nach
-    /// <paramref name="conditionFunc"/> und die Suche nach "FehlerMeldung" zwei separate, nicht-atomare
+    /// <paramref name="conditionFunc"/> und die Suche nach "ErrorMessage" zwei separate, nicht-atomare
     /// UI-Automation-Aufrufe sind, kann es vorkommen, dass der erste Aufruf ein gerade erst erscheinendes
     /// Element knapp verpasst, während der zweite (Millisekunden später) es bereits findet. Für Aufrufer,
-    /// deren <paramref name="conditionFunc"/> selbst auf "FehlerMeldung" zielt (z. B. Fehlerfall-Tests, die
+    /// deren <paramref name="conditionFunc"/> selbst auf "ErrorMessage" zielt (z. B. Fehlerfall-Tests, die
     /// genau dieses Element als Erfolgskriterium erwarten), würde das fälschlich als Abbruchgrund statt als
     /// gefundenes Zielelement gewertet. Deshalb wird die Zielsuche unmittelbar vor dem Werfen der Exception
-    /// erneut versucht: Ist "FehlerMeldung" tatsächlich das gesuchte Zielelement, ist es zu diesem Zeitpunkt
+    /// erneut versucht: Ist "ErrorMessage" tatsächlich das gesuchte Zielelement, ist es zu diesem Zeitpunkt
     /// im Automation-Baum bereits vorhanden (der Fehlerbanner-Check hat es ja soeben gefunden) und die
     /// erneute Zielsuche liefert es als regulären Treffer zurück. Zielt <paramref name="conditionFunc"/> auf
     /// ein anderes Element, bleibt die erneute Suche erfolglos und die Fail-Fast-Diagnose greift wie bisher.
@@ -74,10 +74,10 @@ internal static class ElementWaitHelper
             if (element is not null && isVisible(element))
                 return element;
 
-            var fehlerMeldung = parent.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-            if (fehlerMeldung is not null && isVisible(fehlerMeldung))
+            var errorMessage = parent.FindFirstDescendant(cf => cf.ByName("ErrorMessage"));
+            if (errorMessage is not null && isVisible(errorMessage))
             {
-                // Letzter Versuch: Falls conditionFunc selbst auf "FehlerMeldung" zielt, ist das Element
+                // Letzter Versuch: Falls conditionFunc selbst auf "ErrorMessage" zielt, ist das Element
                 // inzwischen sicher auffindbar (siehe Erklärung oben) und der Aufruf soll regulär mit
                 // diesem Treffer zurückkehren statt in den Fehlerpfad zu laufen.
                 element = parent.FindFirstDescendant(conditionFunc);
@@ -85,7 +85,7 @@ internal static class ElementWaitHelper
                     return element;
 
                 throw new InvalidOperationException(
-                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(fehlerMeldung)}");
+                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(errorMessage)}");
             }
 
             Thread.Sleep(200);
@@ -187,10 +187,10 @@ internal static class ElementWaitHelper
             if (element is not null && isVisible(element))
                 return element;
 
-            var fehlerMeldung = scopeElement.FindFirstDescendant(cf => cf.ByName("FehlerMeldung"));
-            if (fehlerMeldung is not null && isVisible(fehlerMeldung))
+            var errorMessage = scopeElement.FindFirstDescendant(cf => cf.ByName("ErrorMessage"));
+            if (errorMessage is not null && isVisible(errorMessage))
                 throw new InvalidOperationException(
-                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(fehlerMeldung)}");
+                    $"In der Anwendung wird eine Fehlermeldung angezeigt: {GetHelpTextOrName(errorMessage)}");
 
             Thread.Sleep(200);
         }
@@ -362,25 +362,25 @@ internal static class ElementWaitHelper
     /// </summary>
     /// <param name="element">Das zu klickende Element.</param>
     internal static void ClickInForeground(this AutomationElement element)
-        => KlickInVordergrund(element, e => e.Click());
+        => ClickInForeground(element, e => e.Click());
 
     /// <summary>
-    /// Wie <see cref="ClickInForeground"/>, nur als Doppelklick (z. B. zum Öffnen von Listeneinträgen).
+    /// Wie <see cref="ClickInForeground(FlaUI.Core.AutomationElements.AutomationElement)"/>, nur als Doppelklick (z. B. zum Öffnen von Listeneinträgen).
     /// Beim Invoke-Fallback entspricht ein einzelner Invoke dem Aktivieren des Elements.
     /// </summary>
     /// <param name="element">Das zu doppelklickende Element.</param>
     internal static void DoubleClickInForeground(this AutomationElement element)
-        => KlickInVordergrund(element, e => e.DoubleClick());
+        => ClickInForeground(element, e => e.DoubleClick());
 
     internal static string DescribeClickTarget(this AutomationElement element)
     {
         var target = $"Name={element.Name}, Type={element.ControlType}, Enabled={element.IsEnabled}, Offscreen={element.IsOffscreen}, Bounds={element.BoundingRectangle}, PID={element.Properties.ProcessId.ValueOrDefault}, Handle={element.Properties.NativeWindowHandle.ValueOrDefault}";
-        if (!HatKlickbarenPunkt(element, out var point)) return target + "; no clickable point";
+        if (!HasClickablePoint(element, out var point)) return target + "; no clickable point";
         var hit = element.Automation.FromPoint(point);
         return target + $"; Point={point}, HitType={hit?.ControlType}, HitPID={hit?.Properties.ProcessId.ValueOrDefault}, HitHandle={hit?.Properties.NativeWindowHandle.ValueOrDefault}, HitName={(hit?.Properties.ProcessId.ValueOrDefault == element.Properties.ProcessId.ValueOrDefault ? hit?.Name : "other process")}";
     }
 
-    private static void KlickInVordergrund(AutomationElement element, Action<AutomationElement> klick)
+    private static void ClickInForeground(AutomationElement element, Action<AutomationElement> click)
     {
         try
         {
@@ -392,9 +392,9 @@ internal static class ElementWaitHelper
             // Vordergrund-Aktivierung ist Best-Effort - der Klick wird trotzdem ausgeführt.
         }
 
-        if (HatKlickbarenPunkt(element, out var punkt) && !IstPunktVerdeckt(element, punkt))
+        if (HasClickablePoint(element, out var point) && !IsPointCovered(element, point))
         {
-            klick(element);
+            click(element);
             return;
         }
 
@@ -404,23 +404,23 @@ internal static class ElementWaitHelper
             return;
         }
 
-        try { klick(element); }
+        try { click(element); }
         catch (FlaUI.Core.Exceptions.NoClickablePointException ex)
         {
             throw new InvalidOperationException(element.DescribeClickTarget(), ex);
         }
     }
 
-    private static bool HatKlickbarenPunkt(AutomationElement element, out System.Drawing.Point punkt)
+    private static bool HasClickablePoint(AutomationElement element, out System.Drawing.Point point)
     {
         try
         {
-            punkt = element.GetClickablePoint();
+            point = element.GetClickablePoint();
             return true;
         }
         catch (FlaUI.Core.Exceptions.NoClickablePointException)
         {
-            punkt = default;
+            point = default;
             return false;
         }
     }
@@ -430,26 +430,26 @@ internal static class ElementWaitHelper
     /// das Zielelement (Verdeckung durch Fremd- oder eigenes Dialogfenster). Fensterlose
     /// WPF-Controls melden als <c>NativeWindowHandle</c> das Handle ihres Hostfensters.
     /// </summary>
-    private static bool IstPunktVerdeckt(AutomationElement element, System.Drawing.Point punkt)
+    private static bool IsPointCovered(AutomationElement element, System.Drawing.Point point)
     {
-        AutomationElement? treffer;
+        AutomationElement? match;
         try
         {
-            treffer = element.Automation.FromPoint(punkt);
+            match = element.Automation.FromPoint(point);
         }
         catch (Exception)
         {
             return false;
         }
 
-        if (treffer is null)
+        if (match is null)
             return false;
 
         try
         {
-            var fensterZiel = element.Properties.NativeWindowHandle.ValueOrDefault;
-            var fensterTreffer = treffer.Properties.NativeWindowHandle.ValueOrDefault;
-            return fensterZiel != IntPtr.Zero && fensterTreffer != IntPtr.Zero && fensterZiel != fensterTreffer;
+            var windowTarget = element.Properties.NativeWindowHandle.ValueOrDefault;
+            var windowHit = match.Properties.NativeWindowHandle.ValueOrDefault;
+            return windowTarget != IntPtr.Zero && windowHit != IntPtr.Zero && windowTarget != windowHit;
         }
         catch (Exception)
         {

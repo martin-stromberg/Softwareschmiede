@@ -11,7 +11,7 @@
 | `GitHubCopilotPlugin` | GitHub Copilot CLI (`copilot`) installiert und eingeloggt |
 | `CodexPlugin` | Codex CLI (`codex`) installiert und eingeloggt |
 | `DevinPlugin` | Devin CLI (`devin`) installiert und mit `devin auth login` eingeloggt |
-| `KiSimulatorPlugin` | Keine — nur für Tests |
+| `AiSimulatorPlugin` | Keine — nur für Tests |
 
 ## Plugin-Verzeichnis
 

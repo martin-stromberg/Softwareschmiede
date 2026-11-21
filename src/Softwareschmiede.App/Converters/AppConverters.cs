@@ -114,28 +114,28 @@ public sealed class GreaterThanZeroToVisibilityConverter : IValueConverter
 
 /// <summary>
 /// App-seitiger Adapter der gemeinsamen Statusklassifikation
-/// (<see cref="Softwareschmiede.Application.Services.KiAusfuehrungsStatusKlassifikation"/>) für
-/// <see cref="KiAusfuehrungsStatusConverter"/> (Volltext) und
-/// <see cref="KiAusfuehrungsStatusSymbolConverter"/> (nur Glyph): mappt die Eingabetypen
-/// <see cref="Aufgabe"/> und <see cref="AktiveAufgabePanelItem"/> auf
-/// <see cref="KiAusfuehrungsStatusDaten"/> und delegiert die eigentliche Regellogik.
+/// (<see cref="Softwareschmiede.Application.Services.AiExecutionStatusClassification"/>) für
+/// <see cref="AiExecutionStatusConverter"/> (Volltext) und
+/// <see cref="AiExecutionStatusSymbolConverter"/> (nur Glyph): mappt die Eingabetypen
+/// <see cref="WorkItem"/> und <see cref="ActiveWorkItemPanelItem"/> auf
+/// <see cref="AiExecutionStatusData"/> und delegiert die eigentliche Regellogik.
 /// </summary>
-internal static class KiAusfuehrungsStatusAdapter
+internal static class AiExecutionStatusAdapter
 {
     /// <summary>
-    /// Klassifiziert <paramref name="value"/> (<see cref="Aufgabe"/> oder <see cref="AktiveAufgabePanelItem"/>)
-    /// in einen <see cref="KiAusfuehrungsZustand"/>; liefert <c>null</c> für nicht unterstützte Eingaben.
-    /// Im Zustand <see cref="KiAusfuehrungsZustand.Pausiert"/> enthält <paramref name="pausiertRestzeit"/>
+    /// Klassifiziert <paramref name="value"/> (<see cref="WorkItem"/> oder <see cref="ActiveWorkItemPanelItem"/>)
+    /// in einen <see cref="AiExecutionState"/>; liefert <c>null</c> für nicht unterstützte Eingaben.
+    /// Im Zustand <see cref="AiExecutionState.Paused"/> enthält <paramref name="pauseRemaining"/>
     /// die verbleibende Pausenzeit.
     /// </summary>
-    public static KiAusfuehrungsZustand? Klassifiziere(object value, out TimeSpan pausiertRestzeit)
+    public static AiExecutionState? Classify(object value, out TimeSpan pauseRemaining)
     {
-        pausiertRestzeit = default;
+        pauseRemaining = default;
 
         var status = value switch
         {
-            Aufgabe aufgabe => KiAusfuehrungsStatusDaten.VonAufgabe(aufgabe, liveLaufStatus: null, hasScheduledPrompt: false),
-            AktiveAufgabePanelItem item => new KiAusfuehrungsStatusDaten(item.Status, item.AusfuehrungsStatus, item.AktiveRunId, item.LastHeartbeatUtc, item.LaufStatus, item.LiveLaufStatus, item.HasScheduledPrompt, item.PausiertBisUtc),
+            WorkItem workItem => AiExecutionStatusData.FromWorkItem(workItem, liveRunStatus: null, hasScheduledPrompt: false),
+            ActiveWorkItemPanelItem item => new AiExecutionStatusData(item.Status, item.ExecutionStatus, item.ActiveRunId, item.LastHeartbeatUtc, item.RunStatus, item.LiveRunStatus, item.HasScheduledPrompt, item.PausedUntilUtc),
             _ => null
         };
 
@@ -144,26 +144,26 @@ internal static class KiAusfuehrungsStatusAdapter
             return null;
         }
 
-        return Softwareschmiede.Application.Services.KiAusfuehrungsStatusKlassifikation
-            .Klassifiziere(status, out pausiertRestzeit);
+        return Softwareschmiede.Application.Services.AiExecutionStatusClassification
+            .Classify(status, out pauseRemaining);
     }
 }
 
 /// <summary>Konvertiert eine Aufgabe oder ein Aufgabenpanel-Item in einen KI-Ausführungsstatus-String.</summary>
 [ValueConversion(typeof(object), typeof(string))]
-public sealed class KiAusfuehrungsStatusConverter : IValueConverter
+public sealed class AiExecutionStatusConverter : IValueConverter
 {
     /// <inheritdoc/>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        var zustand = KiAusfuehrungsStatusAdapter.Klassifiziere(value, out var pausiertRestzeit);
-        return zustand switch
+        var state = AiExecutionStatusAdapter.Classify(value, out var pauseRemaining);
+        return state switch
         {
             null => string.Empty,
-            KiAusfuehrungsZustand.Pausiert => $"⏸ Pausiert (noch {FormatiereRestzeit(pausiertRestzeit)})",
-            KiAusfuehrungsZustand.PromptInWartestellung => "⏳ Prompt in Wartestellung",
-            KiAusfuehrungsZustand.Laeuft => "▶ Läuft",
-            KiAusfuehrungsZustand.Wartet => "⏸ Wartet",
+            AiExecutionState.Paused => $"⏸ Pausiert (noch {FormatRemainingTime(pauseRemaining)})",
+            AiExecutionState.PromptQueued => "⏳ Prompt in Wartestellung",
+            AiExecutionState.Running => "▶ Läuft",
+            AiExecutionState.Waiting => "⏸ Wartet",
             _ => "✓ Bereit"
         };
     }
@@ -172,10 +172,10 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotSupportedException();
 
-    private static string FormatiereRestzeit(TimeSpan restzeit)
-        => restzeit >= TimeSpan.FromDays(1)
-            ? restzeit.ToString(@"d\.hh\:mm\:ss", CultureInfo.InvariantCulture)
-            : restzeit.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
+    private static string FormatRemainingTime(TimeSpan remaining)
+        => remaining >= TimeSpan.FromDays(1)
+            ? remaining.ToString(@"d\.hh\:mm\:ss", CultureInfo.InvariantCulture)
+            : remaining.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
 }
 
 /// <summary>
@@ -183,19 +183,19 @@ public sealed class KiAusfuehrungsStatusConverter : IValueConverter
 /// (<c>⏸</c>/<c>⏳</c>/<c>▶</c>/<c>✓</c>) ohne Text oder Countdown — Symbolzeile der Aufgabenkachel.
 /// </summary>
 [ValueConversion(typeof(object), typeof(string))]
-public sealed class KiAusfuehrungsStatusSymbolConverter : IValueConverter
+public sealed class AiExecutionStatusSymbolConverter : IValueConverter
 {
     /// <inheritdoc/>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        var zustand = KiAusfuehrungsStatusAdapter.Klassifiziere(value, out _);
-        return zustand switch
+        var state = AiExecutionStatusAdapter.Classify(value, out _);
+        return state switch
         {
             null => string.Empty,
-            KiAusfuehrungsZustand.Pausiert => "⏸",
-            KiAusfuehrungsZustand.PromptInWartestellung => "⏳",
-            KiAusfuehrungsZustand.Laeuft => "▶",
-            KiAusfuehrungsZustand.Wartet => "⏸",
+            AiExecutionState.Paused => "⏸",
+            AiExecutionState.PromptQueued => "⏳",
+            AiExecutionState.Running => "▶",
+            AiExecutionState.Waiting => "⏸",
             _ => "✓"
         };
     }

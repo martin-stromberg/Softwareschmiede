@@ -65,7 +65,7 @@ Der Button „IDE öffnen" ist als Split-Button mit zwei Teilen umgesetzt: einem
 
 Falls beim Repository ein **Arbeitsunterverzeichnis** konfiguriert wurde (z. B. über die Projekt-Einstellungen):
 
-1. **„Arbeitsverzeichnis öffnen"** öffnet das konfigurierte Unterverzeichnis (z. B. `Projekt\src\backend`), nicht den Repository-Root.
+1. **„Arbeitsverzeichnis öffnen"** öffnet das konfigurierte Unterverzeichnis (z. B. `Project\src\backend`), nicht den Repository-Root.
 2. **„IDE öffnen"** sucht nach Solutions nur im konfigurierten Unterverzeichnis. Solutions im Repository-Root werden nicht berücksichtigt.
 3. Das **Fallback-Plugin** (standardmäßig Visual Studio Code) startet mit dem konfigurierten Unterverzeichnis als Arbeitsverzeichnis.
 

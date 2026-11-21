@@ -24,7 +24,7 @@ public partial class End2EndTest
     /// wechselt auf "Beendet").
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    protected void Todo_ErstellenAbhakenLoeschenUndAbschlussValidierung_E2E(Window mainWindow)
+    protected void Todo_CreateCheckoffDeleteAndCompletionValidation_E2E(Window mainWindow)
     {
         var projectList = new ProjectListView(mainWindow).ForceShow();
         projectList.CreateProject("Todo-Test");
@@ -65,7 +65,7 @@ public partial class End2EndTest
 
         // Aufgabe direkt in der Test-Datenbank auf Status "Gestartet" setzen, um "Beenden" zu ermöglichen,
         // ohne einen echten CLI-/Klon-Vorgang durchführen zu müssen (nicht Gegenstand dieses Szenarios).
-        SetzeAufgabeStatusGestartet("Todo-Testaufgabe");
+        SetWorkItemStatusStarted("Todo-Testaufgabe");
 
         taskDetail.GoBack();
         var projectDetailReloaded = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
@@ -91,11 +91,11 @@ public partial class End2EndTest
         projectDetailFinal.DeleteProject();
     }
 
-    private void SetzeAufgabeStatusGestartet(string aufgabeTitel)
+    private void SetWorkItemStatusStarted(string workItemTitle)
     {
         using var db = OpenTestDbContext();
-        var aufgabe = db.Aufgaben.Single(a => a.Titel == aufgabeTitel);
-        aufgabe.Status = AufgabeStatus.Gestartet;
+        var workItem = db.WorkItems.Single(a => a.Title == workItemTitle);
+        workItem.Status = WorkItemStatus.Started;
         db.SaveChanges();
     }
 }

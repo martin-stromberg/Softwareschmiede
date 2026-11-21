@@ -27,22 +27,22 @@ public partial class End2EndTest
     /// Phasen im selben App-Lifecycle aus.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    protected void IdePluginSettings_AktivierungValidierungUndReihenfolge_E2E(Window mainWindow)
+    protected void IdePluginSettings_ActivationValidationAndOrder_E2E(Window mainWindow)
     {
-        IdePluginAktivierung_LetztesPluginBlockiertUndPersistiertStatus_E2E(mainWindow);
-        IdePluginReihenfolge_UpDownButtonsAendernUndPersistierenReihenfolge_E2E(mainWindow);
+        IdePluginActivation_LastPluginBlocksAndPersistedStatus_E2E(mainWindow);
+        IdePluginOrder_UpDownButtonsChangeAndPersistOrder_E2E(mainWindow);
     }
 
     /// <summary>
     /// Szenario: Visual Studio Code wird über den Listeneintrag ausgewählt und im Inhaltsbereich über die
-    /// Checkbox "IdePluginAktiviert" deaktiviert, dann gespeichert - Persistenz wird über ein erneutes
+    /// Checkbox "IdePluginEnabled" deaktiviert, dann gespeichert - Persistenz wird über ein erneutes
     /// Öffnen der Einstellungen geprüft. Anschließend wird versucht, auch Visual Studio (das letzte noch
     /// aktive IDE-Plugin) zu deaktivieren: die Checkbox springt zurück auf aktiviert und eine
     /// Fehlermeldung erscheint. Am Ende wird Visual Studio Code wieder aktiviert, damit Phase 2 mit
     /// beiden Plugins aktiv startet.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    private void IdePluginAktivierung_LetztesPluginBlockiertUndPersistiertStatus_E2E(Window mainWindow)
+    private void IdePluginActivation_LastPluginBlocksAndPersistedStatus_E2E(Window mainWindow)
     {
         var settings = new SettingsView(mainWindow).ForceShow();
         settings.SwitchTab("Plugins");
@@ -70,7 +70,7 @@ public partial class End2EndTest
     /// Öffnen der Einstellungen erhalten (Persistenz in <c>plugins.ide.order</c>).
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster, aktuell im Plugins-Register der Einstellungen.</param>
-    private void IdePluginReihenfolge_UpDownButtonsAendernUndPersistierenReihenfolge_E2E(Window mainWindow)
+    private void IdePluginOrder_UpDownButtonsChangeAndPersistOrder_E2E(Window mainWindow)
     {
         var settings = Assert.IsType<SettingsView>(mainWindow.CurrentView());
 

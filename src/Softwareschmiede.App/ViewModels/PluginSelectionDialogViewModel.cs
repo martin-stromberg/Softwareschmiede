@@ -13,7 +13,7 @@ public sealed class PluginSelectionDialogViewModel : ViewModelBase
     public event EventHandler<bool>? CloseRequested;
 
     /// <summary>Verfügbare Plugin-Prefixe zur Auswahl.</summary>
-    public ObservableCollection<string> VerfuegbarePlugins { get; } = new();
+    public ObservableCollection<string> AvailablePlugins { get; } = new();
 
     /// <summary>Vom Benutzer gewähltes Plugin-Prefix.</summary>
     public string? SelectedPluginPrefix
@@ -22,7 +22,7 @@ public sealed class PluginSelectionDialogViewModel : ViewModelBase
         set
         {
             SetProperty(ref _selectedPluginPrefix, value);
-            OnPropertyChanged(nameof(KannBestaetigen));
+            OnPropertyChanged(nameof(CanConfirm));
         }
     }
 
@@ -34,27 +34,27 @@ public sealed class PluginSelectionDialogViewModel : ViewModelBase
     }
 
     /// <summary>CanExecute für BestaetigenCommand: ein Plugin muss gewählt sein.</summary>
-    public bool KannBestaetigen => !string.IsNullOrEmpty(_selectedPluginPrefix);
+    public bool CanConfirm => !string.IsNullOrEmpty(_selectedPluginPrefix);
 
     /// <summary>Bestätigt die Auswahl und schließt den Dialog.</summary>
-    public ICommand BestaetigenCommand { get; }
+    public ICommand ConfirmCommand { get; }
 
     /// <summary>Bricht die Auswahl ab und schließt den Dialog.</summary>
-    public ICommand AbbrechenCommand { get; }
+    public ICommand CancelCommand { get; }
 
     /// <inheritdoc cref="PluginSelectionDialogViewModel"/>
     public PluginSelectionDialogViewModel(IEnumerable<string> availablePlugins, string? currentSelection)
     {
         foreach (var plugin in availablePlugins)
-            VerfuegbarePlugins.Add(plugin);
+            AvailablePlugins.Add(plugin);
 
-        SelectedPluginPrefix = !string.IsNullOrEmpty(currentSelection) && VerfuegbarePlugins.Contains(currentSelection)
+        SelectedPluginPrefix = !string.IsNullOrEmpty(currentSelection) && AvailablePlugins.Contains(currentSelection)
             ? currentSelection
-            : VerfuegbarePlugins.FirstOrDefault();
+            : AvailablePlugins.FirstOrDefault();
 
-        BestaetigenCommand = new RelayCommand(
+        ConfirmCommand = new RelayCommand(
             () => CloseRequested?.Invoke(this, true),
-            () => KannBestaetigen);
-        AbbrechenCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false));
+            () => CanConfirm);
+        CancelCommand = new RelayCommand(() => CloseRequested?.Invoke(this, false));
     }
 }

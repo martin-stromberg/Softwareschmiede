@@ -25,7 +25,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
     /// <summary>Creates an isolated effective CLI workspace.</summary>
     public ScmEventCliExchangeAccessTests() => Directory.CreateDirectory(_root);
 
-    /// <summary>A read-only simulator remains identifiable and ready while its independent channel contract denies dispatch.</summary>
+    /// <summary>Ein Read-only-Simulator bleibt erkennbar und bereit, während sein unabhängiger Kanalvertrag die Zustellung verweigert.</summary>
     [Fact]
     public async Task ReadOnlySimulator_ReportsChannelDenialWithoutLosingPromptRecognition()
     {
@@ -85,7 +85,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         document.RootElement.TryGetProperty("request", out _).Should().BeFalse("no SCM content may be processed before access proof");
     }
 
-    /// <summary>A recognized but out-of-range version is named honestly; no probe or event prompt is sent.</summary>
+    /// <summary>Eine erkannte, aber ausserhalb des Bereichs liegende Version wird ehrlich benannt; es wird weder eine Probe noch ein Ereignis-Prompt gesendet.</summary>
     [Theory]
     [InlineData("Codex", "--sandbox workspace-write", "OpenAI Codex (v0.115.0)", "›", "v0.115.0")]
     [InlineData("ClaudeCli", "--permission-mode acceptEdits", "Claude Code v2.2.0", "❯", "v2.2.0")]
@@ -108,7 +108,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         mock.Verify(session => session.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary>A banner without a parseable version token reports honestly instead of guessing.</summary>
+    /// <summary>Ein Banner ohne parsebares Versionstoken meldet ehrlich nicht ermittelt statt zu raten.</summary>
     [Fact]
     public async Task UnparseableVersion_ReportsVersionNotDetermined()
     {
@@ -123,8 +123,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         mock.Verify(session => session.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary>A later screen can show the bare anchor without its version line (scrollback edge of the
-    /// two-line banner or a repeated name-only print); a once-classified recognition never downgrades.</summary>
+    /// <summary>Ein späterer Bildschirm kann den nackten Anker ohne seine Versionszeile zeigen (Scrollback-Rand des zweizeiligen Banners oder ein wiederholter Nur-Name-Druck); eine einmal klassifizierte Erkennung wird nie zurückgestuft.</summary>
     [Theory]
     [InlineData("Codex", "--sandbox workspace-write", "OpenAI Codex (v0.114.0)", "OpenAI Codex", "›", ScmCliRecognitionState.Supported)]
     [InlineData("ClaudeCli", "--permission-mode acceptEdits", "Claude Code v2.1.0", "Claude Code", "❯", ScmCliRecognitionState.Supported)]
@@ -144,8 +143,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         adapter.CliRecognition.Version.Should().Be(version);
     }
 
-    /// <summary>A bare anchor stays honest while the version line is missing; a later versioned
-    /// screen classifies the run instead of leaving it stuck at a guessed state.</summary>
+    /// <summary>Ein nackter Anker bleibt ehrlich, solange die Versionszeile fehlt; ein späterer Bildschirm mit Version klassifiziert den Lauf, statt ihn in einem geratenen Zustand hängen zu lassen.</summary>
     [Fact]
     public async Task TokenlessAnchor_UpgradesWhenVersionAppears()
     {
@@ -159,8 +157,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         adapter.CliRecognition.Version.Should().Be(new Version(3000, 11, 92));
     }
 
-    /// <summary>A simulator banner without a bound SCM channel reports the start-contract reason
-    /// (a shell without SCM mode) instead of claiming a missing version banner.</summary>
+    /// <summary>Ein Simulator-Banner ohne gebundenen SCM-Kanal meldet den Startvertrags-Grund (eine Shell ohne SCM-Modus), statt ein fehlendes Versionsbanner zu behaupten.</summary>
     [Fact]
     public async Task SimulatorShell_ReportsMissingChannelInsteadOfMissingBanner()
     {
@@ -176,7 +173,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         access.Status.Should().Be(ScmExchangeAccessStatus.Unknown);
     }
 
-    /// <summary>A prefix without a prompt-format profile stays honestly unknown and cannot be confirmed.</summary>
+    /// <summary>Ein Präfix ohne Prompt-Format-Profil bleibt ehrlich unbekannt und kann nicht bestätigt werden.</summary>
     [Fact]
     public async Task UnknownCli_ReportsHonestReason()
     {
@@ -195,7 +192,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         mock.Verify(session => session.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary>Arguments that can change effective rights are never accepted via a generic positive default.</summary>
+    /// <summary>Argumente, die effektive Rechte ändern können, werden nie über einen generischen positiven Standard akzeptiert.</summary>
     [Theory]
     [InlineData("Codex", "--sandbox read-only", ScmExchangeAccessStatus.Denied)]
     [InlineData("Codex", "--sandbox workspace-write --cd elsewhere", ScmExchangeAccessStatus.Unknown)]
@@ -283,8 +280,8 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         var current = true;
         var run = Guid.NewGuid();
         var session = Session(banner, prompt);
-        // This test checks configuration invalidation; the separate restricted-child test proves
-        // the real security boundary. Here a deterministic regular tool executes the same probe.
+        // Dieser Test prüft die Konfigurations-Invalidierung; der separate Restricted-Child-Test beweist
+        // die echte Sicherheitsgrenze. Hier führt ein deterministisches reguläres Tool dieselbe Probe aus.
         session.Setup(value => value.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns((string text, CancellationToken token) => ScmDispatchFixture.CompleteProbeAsync(text, token));
         using var adapter = new ScmPromptSessionAdapter(Guid.NewGuid(), run, prefix, spec, session.Object, [new(path, content)], () => current);
@@ -307,7 +304,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         var credentials = new Mock<ICredentialStore>(MockBehavior.Strict);
         credentials.Setup(value => value.GetCredential(It.IsAny<string>())).Returns((string?)null);
         credentials.Setup(value => value.GetCredential("Softwareschmiede." + provider + ".CommandLineParameters")).Returns(arguments);
-        IKiPlugin plugin = provider switch
+        IAiPlugin plugin = provider switch
         {
             "Codex" => new CodexPlugin(credentials.Object, NullLogger<CodexPlugin>.Instance),
             "Devin" => new DevinPlugin(credentials.Object, NullLogger<DevinPlugin>.Instance),
@@ -329,7 +326,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         return session;
     }
 
-    /// <summary>Removes only the isolated fixture workspace; laufende Kindprozesse werden
+    /// <summary>Entfernt nur den isolierten Fixture-Workspace; laufende Kindprozesse werden
     /// zuerst beendet und Restfehler nur diagnostisch gemeldet statt den Assert zu ueberdecken.</summary>
     public void Dispose() => TempDirectoryCleanup.DeleteBestEffort(_root, _restrictedChildren);
 }

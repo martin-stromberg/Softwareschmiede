@@ -9,25 +9,25 @@ public sealed class WorkdirMigrationTests
 {
     private const string WorkdirMigration = "20260509200234_202605090001_Add_AppEinstellung_Workdir";
     private const string PreviousMigration = "20260507051631_202507_Fix_DateTimeOffset_SQLiteOrdering";
-    private const string AddKiPluginPrefixMigration = "20260524151645_202605241703_AddKiPluginPrefix";
-    private const string PreviousBeforeKiPluginPrefixMigration = "20260523113807_AddKiTaskNotifications";
-    private const string AddAufgabeAusfuehrungsStatusMigration = "20260816193940_AddAufgabeAusfuehrungsStatus";
-    private const string PreviousBeforeAusfuehrungsStatusMigration = "20260805163701_AddTodoEntity";
-    private const string AddIssueReferenzSourceKeyMigration = "20261017195348_AddIssueReferenzSourceKey";
-    private const string PreviousBeforeIssueReferenzSourceKeyMigration = "20261011045239_AddScmEventInbox";
+    private const string AddAiPluginPrefixMigration = "20260524151645_202605241703_AddKiPluginPrefix";
+    private const string PreviousBeforeAiPluginPrefixMigration = "20260523113807_AddKiTaskNotifications";
+    private const string AddWorkItemExecutionStatusMigration = "20260816193940_AddAufgabeAusfuehrungsStatus";
+    private const string PreviousBeforeExecutionStatusMigration = "20260805163701_AddTodoEntity";
+    private const string AddIssueReferenceSourceKeyMigration = "20261017195348_AddIssueReferenzSourceKey";
+    private const string PreviousBeforeIssueReferenceSourceKeyMigration = "20261011045239_AddScmEventInbox";
 
     /// <summary>Prüft, dass die SourceKey-Spalte nullable hinzugefügt und wieder entfernt werden kann.</summary>
     [Fact]
-    public async Task MigrateAsync_ShouldApplyAndRollbackIssueReferenzSourceKeyMigration()
+    public async Task MigrateAsync_ShouldApplyAndRollbackIssueReferenceSourceKeyMigration()
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
 
         (await ColumnInfoAsync(db, "IssueReferenzen", "SourceKey")).Should().NotBeNull();
 
-        await db.Context.Database.MigrateAsync(PreviousBeforeIssueReferenzSourceKeyMigration, cancellationToken: TestContext.Current.CancellationToken);
+        await db.Context.Database.MigrateAsync(PreviousBeforeIssueReferenceSourceKeyMigration, cancellationToken: TestContext.Current.CancellationToken);
         (await ColumnInfoAsync(db, "IssueReferenzen", "SourceKey")).Should().BeNull();
 
-        await db.Context.Database.MigrateAsync(AddIssueReferenzSourceKeyMigration, cancellationToken: TestContext.Current.CancellationToken);
+        await db.Context.Database.MigrateAsync(AddIssueReferenceSourceKeyMigration, cancellationToken: TestContext.Current.CancellationToken);
         var column = await ColumnInfoAsync(db, "IssueReferenzen", "SourceKey");
         column.Should().NotBeNull();
         column!.NotNull.Should().BeFalse("Migration muss rückwärtskompatibel als nullable sein.");
@@ -50,16 +50,16 @@ public sealed class WorkdirMigrationTests
 
     /// <summary>Prüft, dass die KiPluginPrefix-Spalte als nullable hinzugefügt und entfernt werden kann.</summary>
     [Fact]
-    public async Task MigrateAsync_ShouldApplyAndRollbackKiPluginPrefixMigration_AsNullableColumn()
+    public async Task MigrateAsync_ShouldApplyAndRollbackAiPluginPrefixMigration_AsNullableColumn()
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
 
         (await ColumnInfoAsync(db, "Aufgaben", "KiPluginPrefix")).Should().NotBeNull();
 
-        await db.Context.Database.MigrateAsync(PreviousBeforeKiPluginPrefixMigration, cancellationToken: TestContext.Current.CancellationToken);
+        await db.Context.Database.MigrateAsync(PreviousBeforeAiPluginPrefixMigration, cancellationToken: TestContext.Current.CancellationToken);
         (await ColumnInfoAsync(db, "Aufgaben", "KiPluginPrefix")).Should().BeNull();
 
-        await db.Context.Database.MigrateAsync(AddKiPluginPrefixMigration, cancellationToken: TestContext.Current.CancellationToken);
+        await db.Context.Database.MigrateAsync(AddAiPluginPrefixMigration, cancellationToken: TestContext.Current.CancellationToken);
         var column = await ColumnInfoAsync(db, "Aufgaben", "KiPluginPrefix");
         column.Should().NotBeNull();
         column!.NotNull.Should().BeFalse("Migration muss rückwärtskompatibel als nullable sein.");
@@ -67,43 +67,43 @@ public sealed class WorkdirMigrationTests
 
     /// <summary>Prüft den Backfill der Ausführungsstatus-Migration für bestehende Aufgaben.</summary>
     [Fact]
-    public async Task MigrateAsync_AddAufgabeAusfuehrungsStatus_BackfilledAlleAltStatus()
+    public async Task MigrateAsync_AddWorkItemExecutionStatus_BackfilledAllAltStatus()
     {
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
 
-        await db.Context.Database.MigrateAsync(PreviousBeforeAusfuehrungsStatusMigration, cancellationToken: TestContext.Current.CancellationToken);
+        await db.Context.Database.MigrateAsync(PreviousBeforeExecutionStatusMigration, cancellationToken: TestContext.Current.CancellationToken);
         (await ColumnInfoAsync(db, "Aufgaben", "AusfuehrungsStatus")).Should().BeNull();
 
-        var projektId = Guid.NewGuid().ToString();
+        var projectId = Guid.NewGuid().ToString();
         await ExecuteNonQueryAsync(
             db,
             "INSERT INTO Projekte (Id, Name, Beschreibung, ErstellungsDatum, Status) VALUES ($id, $name, NULL, $erstellt, $status);",
-            ("$id", projektId),
+            ("$id", projectId),
             ("$name", "Backfill-Projekt"),
             ("$erstellt", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
             ("$status", "Aktiv"));
 
-        var neuId = await InsertLegacyAufgabeAsync(db, projektId, "Neu", null);
-        var aktivId = await InsertLegacyAufgabeAsync(db, projektId, "Gestartet", "lauf-aktiv");
-        var aktivTrimId = await InsertLegacyAufgabeAsync(db, projektId, "Wartend", "  ");
-        var gestartetOhneRunId = await InsertLegacyAufgabeAsync(db, projektId, "Gestartet", null);
-        var wartendOhneRunId = await InsertLegacyAufgabeAsync(db, projektId, "Wartend", null);
-        var beendetId = await InsertLegacyAufgabeAsync(db, projektId, "Beendet", null);
-        var archiviertId = await InsertLegacyAufgabeAsync(db, projektId, "Archiviert", "lauf-alt");
+        var newId = await InsertLegacyWorkItemAsync(db, projectId, "Neu", null);
+        var activeId = await InsertLegacyWorkItemAsync(db, projectId, "Gestartet", "lauf-aktiv");
+        var activeTrimId = await InsertLegacyWorkItemAsync(db, projectId, "Wartend", "  ");
+        var startedWithoutRunId = await InsertLegacyWorkItemAsync(db, projectId, "Gestartet", null);
+        var waitingWithoutRunId = await InsertLegacyWorkItemAsync(db, projectId, "Wartend", null);
+        var completedId = await InsertLegacyWorkItemAsync(db, projectId, "Beendet", null);
+        var archivedId = await InsertLegacyWorkItemAsync(db, projectId, "Archiviert", "lauf-alt");
 
-        await db.Context.Database.MigrateAsync(AddAufgabeAusfuehrungsStatusMigration, cancellationToken: TestContext.Current.CancellationToken);
+        await db.Context.Database.MigrateAsync(AddWorkItemExecutionStatusMigration, cancellationToken: TestContext.Current.CancellationToken);
 
         var column = await ColumnInfoAsync(db, "Aufgaben", "AusfuehrungsStatus");
         column.Should().NotBeNull();
         column!.NotNull.Should().BeTrue();
 
-        (await GetAufgabeAusfuehrungsStatusAsync(db, neuId)).Should().Be("NichtGestartet");
-        (await GetAufgabeAusfuehrungsStatusAsync(db, aktivId)).Should().Be("Aktiv");
-        (await GetAufgabeAusfuehrungsStatusAsync(db, aktivTrimId)).Should().Be("Beendet");
-        (await GetAufgabeAusfuehrungsStatusAsync(db, gestartetOhneRunId)).Should().Be("Beendet");
-        (await GetAufgabeAusfuehrungsStatusAsync(db, wartendOhneRunId)).Should().Be("Beendet");
-        (await GetAufgabeAusfuehrungsStatusAsync(db, beendetId)).Should().Be("Beendet");
-        (await GetAufgabeAusfuehrungsStatusAsync(db, archiviertId)).Should().Be("Beendet");
+        (await GetWorkItemExecutionStatusAsync(db, newId)).Should().Be("NichtGestartet");
+        (await GetWorkItemExecutionStatusAsync(db, activeId)).Should().Be("Aktiv");
+        (await GetWorkItemExecutionStatusAsync(db, activeTrimId)).Should().Be("Beendet");
+        (await GetWorkItemExecutionStatusAsync(db, startedWithoutRunId)).Should().Be("Beendet");
+        (await GetWorkItemExecutionStatusAsync(db, waitingWithoutRunId)).Should().Be("Beendet");
+        (await GetWorkItemExecutionStatusAsync(db, completedId)).Should().Be("Beendet");
+        (await GetWorkItemExecutionStatusAsync(db, archivedId)).Should().Be("Beendet");
     }
 
     private static async Task<TableColumnInfo?> ColumnInfoAsync(DatabaseFixture db, string tableName, string columnName)
@@ -131,7 +131,7 @@ public sealed class WorkdirMigrationTests
         return null;
     }
 
-    private static async Task<string> InsertLegacyAufgabeAsync(DatabaseFixture db, string projektId, string status, string? aktiveRunId)
+    private static async Task<string> InsertLegacyWorkItemAsync(DatabaseFixture db, string projectId, string status, string? activeRunId)
     {
         var id = Guid.NewGuid().ToString();
         await ExecuteNonQueryAsync(
@@ -149,19 +149,19 @@ public sealed class WorkdirMigrationTests
                  NULL, NULL, NULL);
             """,
             ("$id", id),
-            ("$projektId", projektId),
+            ("$projektId", projectId),
             ("$titel", $"Alt-{status}-{id[..6]}"),
             ("$status", status),
             ("$erstellt", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
-            ("$aktiveRunId", aktiveRunId));
+            ("$aktiveRunId", activeRunId));
         return id;
     }
 
-    private static async Task<string?> GetAufgabeAusfuehrungsStatusAsync(DatabaseFixture db, string aufgabeId)
+    private static async Task<string?> GetWorkItemExecutionStatusAsync(DatabaseFixture db, string workItemId)
         => (string?)await ExecuteScalarAsync(
             db,
             "SELECT AusfuehrungsStatus FROM Aufgaben WHERE Id = $id;",
-            ("$id", aufgabeId));
+            ("$id", workItemId));
 
     private sealed record TableColumnInfo(string Name, bool NotNull);
 }

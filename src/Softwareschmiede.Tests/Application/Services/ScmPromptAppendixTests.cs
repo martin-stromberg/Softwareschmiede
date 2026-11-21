@@ -13,12 +13,12 @@ public sealed class ScmPromptAppendixTests
     /// <summary>Referenztexte (Description) wählen den Ereignis-Anhang; Kommentare und jede Form von
     /// PR-Review (Zeilenkommentare und veröffentlichte Reviews) wählen den Kommentar-Anhang der Referenzart.</summary>
     [Theory]
-    [InlineData(ScmReferenceKind.Issue, ScmContentKind.Description, AppEinstellungService.ScmPromptAppendIssueKey)]
-    [InlineData(ScmReferenceKind.Issue, ScmContentKind.IssueComment, AppEinstellungService.ScmPromptAppendIssueCommentKey)]
-    [InlineData(ScmReferenceKind.PullRequest, ScmContentKind.Description, AppEinstellungService.ScmPromptAppendPullRequestKey)]
-    [InlineData(ScmReferenceKind.PullRequest, ScmContentKind.IssueComment, AppEinstellungService.ScmPromptAppendPullRequestCommentKey)]
-    [InlineData(ScmReferenceKind.PullRequest, ScmContentKind.ReviewComment, AppEinstellungService.ScmPromptAppendPullRequestCommentKey)]
-    [InlineData(ScmReferenceKind.PullRequest, ScmContentKind.PullRequestReview, AppEinstellungService.ScmPromptAppendPullRequestCommentKey)]
+    [InlineData(ScmReferenceKind.Issue, ScmContentKind.Description, AppSettingService.ScmPromptAppendIssueKey)]
+    [InlineData(ScmReferenceKind.Issue, ScmContentKind.IssueComment, AppSettingService.ScmPromptAppendIssueCommentKey)]
+    [InlineData(ScmReferenceKind.PullRequest, ScmContentKind.Description, AppSettingService.ScmPromptAppendPullRequestKey)]
+    [InlineData(ScmReferenceKind.PullRequest, ScmContentKind.IssueComment, AppSettingService.ScmPromptAppendPullRequestCommentKey)]
+    [InlineData(ScmReferenceKind.PullRequest, ScmContentKind.ReviewComment, AppSettingService.ScmPromptAppendPullRequestCommentKey)]
+    [InlineData(ScmReferenceKind.PullRequest, ScmContentKind.PullRequestReview, AppSettingService.ScmPromptAppendPullRequestCommentKey)]
     public void SpecificKeyFor_MapsReferenceAndContentKind(ScmReferenceKind kind, ScmContentKind contentKind, string expected)
         => ScmPromptAppendix.SpecificKeyFor(Observation(kind, contentKind)).Should().Be(expected);
 
@@ -54,11 +54,11 @@ public sealed class ScmPromptAppendixTests
     {
         var values = new Dictionary<string, string?>
         {
-            [AppEinstellungService.ScmPromptAppendGeneralKey] = "allgemein",
-            [AppEinstellungService.ScmPromptAppendIssueKey] = "issue",
-            [AppEinstellungService.ScmPromptAppendIssueCommentKey] = "issue-kommentar",
-            [AppEinstellungService.ScmPromptAppendPullRequestKey] = "pr",
-            [AppEinstellungService.ScmPromptAppendPullRequestCommentKey] = "pr-kommentar",
+            [AppSettingService.ScmPromptAppendGeneralKey] = "allgemein",
+            [AppSettingService.ScmPromptAppendIssueKey] = "issue",
+            [AppSettingService.ScmPromptAppendIssueCommentKey] = "issue-kommentar",
+            [AppSettingService.ScmPromptAppendPullRequestKey] = "pr",
+            [AppSettingService.ScmPromptAppendPullRequestCommentKey] = "pr-kommentar",
         };
 
         ScmPromptAppendix.Resolve(Observation(ScmReferenceKind.Issue, ScmContentKind.Description), values)
@@ -81,11 +81,11 @@ public sealed class ScmPromptAppendixTests
     [Fact]
     public void SettingKeys_ContainsAllFiveAppendixKeys()
         => ScmPromptAppendix.SettingKeys.Should().Equal(
-            AppEinstellungService.ScmPromptAppendGeneralKey,
-            AppEinstellungService.ScmPromptAppendIssueKey,
-            AppEinstellungService.ScmPromptAppendIssueCommentKey,
-            AppEinstellungService.ScmPromptAppendPullRequestKey,
-            AppEinstellungService.ScmPromptAppendPullRequestCommentKey);
+            AppSettingService.ScmPromptAppendGeneralKey,
+            AppSettingService.ScmPromptAppendIssueKey,
+            AppSettingService.ScmPromptAppendIssueCommentKey,
+            AppSettingService.ScmPromptAppendPullRequestKey,
+            AppSettingService.ScmPromptAppendPullRequestCommentKey);
 
     private static ScmEventObservation Observation(ScmReferenceKind kind, ScmContentKind contentKind)
     {

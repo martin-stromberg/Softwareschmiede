@@ -10,7 +10,7 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
 {
     private readonly object _lock = new();
     private readonly List<CliOutputChunkRecord> _chunks = [];
-    private readonly Guid _aufgabeId;
+    private readonly Guid _workItemId;
     private readonly string _pluginName;
     private readonly int _cols;
     private readonly int _rows;
@@ -19,11 +19,11 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
     private readonly ILogger _logger;
     private readonly DateTimeOffset _startUtc;
     private int _bufferedBytes;
-    private bool _istVollstaendig = true;
+    private bool _isComplete = true;
     private DateTimeOffset? _endeUtc;
 
     /// <summary>Erstellt einen neuen Recorder.</summary>
-    /// <param name="aufgabeId">ID der aufgezeichneten Aufgabe.</param>
+    /// <param name="workItemId">ID der aufgezeichneten Aufgabe.</param>
     /// <param name="pluginName">Anzeigename des aufgezeichneten KI-Plugins.</param>
     /// <param name="cols">Initiale Spaltenanzahl der Session.</param>
     /// <param name="rows">Initiale Zeilenanzahl der Session.</param>
@@ -31,7 +31,7 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
     /// <param name="timeProvider">Zeitquelle für die Chunk-Zeitstempel (Test-Hook).</param>
     /// <param name="logger">Logger für Diagnosemeldungen (optional).</param>
     public CliOutputRecorder(
-        Guid aufgabeId,
+        Guid workItemId,
         string pluginName,
         int cols,
         int rows,
@@ -39,7 +39,7 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
         TimeProvider timeProvider,
         ILogger? logger = null)
     {
-        _aufgabeId = aufgabeId;
+        _workItemId = workItemId;
         _pluginName = pluginName;
         _cols = cols;
         _rows = rows;
@@ -60,14 +60,14 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
         {
             // Bei Budget-Überschreitung wird das intakte Präfix behalten (ein Replay ab Position 0
             // braucht den Anfang für den Parser-Zustand) — statt älteste Chunks zu verwerfen.
-            if (!_istVollstaendig || _bufferedBytes + bytes.Length > _byteBudget)
+            if (!_isComplete || _bufferedBytes + bytes.Length > _byteBudget)
             {
-                if (_istVollstaendig)
+                if (_isComplete)
                 {
-                    _istVollstaendig = false;
+                    _isComplete = false;
                     _logger.LogInformation(
                         "CLI-Aufzeichnung für Aufgabe {AufgabeId} gestoppt: Byte-Budget {ByteBudget} überschritten (vollständiges Präfix von {BufferedBytes} Bytes bleibt erhalten).",
-                        _aufgabeId, _byteBudget, _bufferedBytes);
+                        _workItemId, _byteBudget, _bufferedBytes);
                 }
                 return;
             }
@@ -94,20 +94,20 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
     }
 
     /// <summary>Liefert eine Momentaufnahme der Aufzeichnung (auch nach dem Session-Ende abrufbar).</summary>
-    /// <returns>Die <see cref="CliOutputAufzeichnung"/> mit den bis dahin aufgezeichneten Chunks.</returns>
-    public CliOutputAufzeichnung GetAufzeichnung()
+    /// <returns>Die <see cref="CliOutputRecording"/> mit den bis dahin aufgezeichneten Chunks.</returns>
+    public CliOutputRecording GetRecording()
     {
         lock (_lock)
         {
-            return new CliOutputAufzeichnung
+            return new CliOutputRecording
             {
-                AufgabeId = _aufgabeId,
+                WorkItemId = _workItemId,
                 PluginName = _pluginName,
                 StartUtc = _startUtc,
                 Cols = _cols,
                 Rows = _rows,
-                IstVollstaendig = _istVollstaendig,
-                EndeUtc = _endeUtc,
+                IsComplete = _isComplete,
+                EndUtc = _endeUtc,
                 Chunks = _chunks.ToArray(),
             };
         }

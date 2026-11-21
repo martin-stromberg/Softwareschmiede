@@ -4,11 +4,11 @@ namespace Softwareschmiede.Domain.Enums;
 public enum TestStatus
 {
     /// <summary>Test wurde erfolgreich bestanden.</summary>
-    Bestanden,
+    Passed,
 
     /// <summary>Test ist fehlgeschlagen.</summary>
-    Fehlgeschlagen,
+    Failed,
 
     /// <summary>Test wurde übersprungen.</summary>
-    Uebersprungen
+    Skipped
 }

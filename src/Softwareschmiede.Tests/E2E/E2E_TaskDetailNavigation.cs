@@ -22,7 +22,7 @@ public partial class End2EndTest
     /// (ProjectDetailView nicht mehr sichtbar).
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    protected void TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E(Window mainWindow)
+    protected void TaskDetail_ShowsData_Back_AndOpenWindowspanning_E2E(Window mainWindow)
     {
         var projectList = new ProjectListView(mainWindow).ForceShow();
         projectList.CreateProject("TaskNav-Test");
@@ -44,7 +44,7 @@ public partial class End2EndTest
         // TaskDetailView zeigt eigenes Ribbon mit "Speichern"-Button (Edit-Panel bei Status Neu)
         Assert.True(taskDetailReopened.IsVisible);
 
-        // ProjectDetailView (u. a. "ProjektName") ist nicht mehr sichtbar - fensterumfassend
+        // ProjectDetailView (u. a. "ProjectName") ist nicht mehr sichtbar - fensterumfassend
         Assert.False(new ProjectDetailView(mainWindow).IsVisible);
     }
 }

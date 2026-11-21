@@ -13,7 +13,7 @@ public sealed partial class DashboardView : UserControl
         Loaded += (_, _) =>
         {
             if (DataContext is DashboardViewModel vm)
-                vm.LadenCommand.Execute(null);
+                vm.LoadCommand.Execute(null);
         };
     }
 }

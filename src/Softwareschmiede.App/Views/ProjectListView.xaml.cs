@@ -13,7 +13,7 @@ public sealed partial class ProjectListView : UserControl
         Loaded += (_, _) =>
         {
             if (DataContext is ProjectListViewModel vm)
-                vm.LadenCommand.Execute(null);
+                vm.LoadCommand.Execute(null);
         };
     }
 }

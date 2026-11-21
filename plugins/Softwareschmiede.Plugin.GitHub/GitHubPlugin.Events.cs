@@ -30,7 +30,7 @@ public sealed partial class GitHubPlugin
     {
         if (!repository.PluginPrefix.Equals(PluginPrefix, StringComparison.OrdinalIgnoreCase))
             throw Permanent("Der Repository-Provider stimmt nicht überein.");
-        var client = ClientFor(repository.Konto);
+        var client = ClientFor(repository.Account);
         var (host, owner, name) = ParseEventRepository(repository.RepositoryId);
         var viewer = await EventApiAsync(client, host, "GET", "user", null, false, ct);
         var metadata = await EventApiAsync(client, host, "GET", $"repos/{owner}/{name}", null, false, ct);
@@ -43,7 +43,7 @@ public sealed partial class GitHubPlugin
         return new(PluginPrefix, host, Required(metadata, "node_id"), canonicalOwner, canonicalName,
             String(remoteOwner, "node_id"), Required(viewer, "node_id"), Required(viewer, "login"),
             Boolean(permissions, "push") || Boolean(permissions, "admin") || Boolean(permissions, "maintain"),
-            repository.Konto, String(metadata, "id"));
+            repository.Account, String(metadata, "id"));
     }
 
     /// <inheritdoc />
@@ -51,7 +51,7 @@ public sealed partial class GitHubPlugin
     {
         ValidateReference(request.Reference);
         var repository = request.Reference.Repository;
-        var client = ClientFor(repository.Konto);
+        var client = ClientFor(repository.Account);
         var observations = new List<ScmEventObservation>();
         var field = request.Reference.Kind == ScmReferenceKind.Issue ? "issue" : "pullRequest";
         var variables = new Dictionary<string, object?>
@@ -120,7 +120,7 @@ public sealed partial class GitHubPlugin
                 .Equals(repository.Host, StringComparison.OrdinalIgnoreCase))
             throw Permanent("Ungültiger GitHub-Ereignisursprung.");
         var references = new List<ScmEventReference>();
-        var client = ClientFor(repository.Konto);
+        var client = ClientFor(repository.Account);
         await CollectReferencesAsync(client, repository, ScmReferenceKind.Issue, "issues", "[OPEN]", null, references, ct);
         await CollectReferencesAsync(client, repository, ScmReferenceKind.PullRequest, "pullRequests", "[OPEN]", null, references, ct);
         if (sinceUtc is { } since)
@@ -137,7 +137,7 @@ public sealed partial class GitHubPlugin
         ValidateReference(reference);
         if (reference.Kind != ScmReferenceKind.Issue) throw Permanent("Issue-Anlagedaten benötigen eine Issue-Referenz.");
         var repository = reference.Repository;
-        var element = await EventApiAsync(ClientFor(repository.Konto), repository.Host, "GET", $"{RepositoryEndpoint(repository)}/issues/{reference.Number}", null, false, ct);
+        var element = await EventApiAsync(ClientFor(repository.Account), repository.Host, "GET", $"{RepositoryEndpoint(repository)}/issues/{reference.Number}", null, false, ct);
         if (element.ValueKind != JsonValueKind.Object) throw Permanent("Unvollständige GitHub-Antwort.");
         // Der Issues-Endpunkt liefert auch Pull Requests; eine fremde Referenzart ist nicht anlegbar.
         if (Object(element, "pull_request").ValueKind == JsonValueKind.Object) return null;
@@ -149,7 +149,7 @@ public sealed partial class GitHubPlugin
             String(element, "title") ?? string.Empty, String(element, "body"), labels,
             String(Object(element, "milestone"), "title"), String(element, "html_url") ?? String(element, "url"))
         {
-            IstGeschlossen = string.Equals(String(element, "state"), "closed", StringComparison.OrdinalIgnoreCase)
+            IsClosed = string.Equals(String(element, "state"), "closed", StringComparison.OrdinalIgnoreCase)
         };
     }
 
@@ -160,10 +160,10 @@ public sealed partial class GitHubPlugin
         if (reference.Kind != ScmReferenceKind.PullRequest) throw Permanent("Pull-Request-Anlagedaten benötigen eine Pull-Request-Referenz.");
         var repository = reference.Repository;
         var repositoryId = PullRequestRepositoryId.Normalize(PullRequestProvider.GitHub, $"{repository.Owner}/{repository.Name}");
-        var element = await EventApiAsync(ClientFor(repository.Konto), repository.Host, "GET", $"{RepositoryEndpoint(repository)}/pulls/{reference.Number}", null, false, ct);
+        var element = await EventApiAsync(ClientFor(repository.Account), repository.Host, "GET", $"{RepositoryEndpoint(repository)}/pulls/{reference.Number}", null, false, ct);
         if (element.ValueKind != JsonValueKind.Object) throw Permanent("Unvollständige GitHub-Antwort.");
         var pullRequest = ParsePullRequest(element, repositoryId);
-        return pullRequest is not null && pullRequest.Nummer == reference.Number ? pullRequest : null;
+        return pullRequest is not null && pullRequest.Number == reference.Number ? pullRequest : null;
     }
 
     /// <inheritdoc />
@@ -174,7 +174,7 @@ public sealed partial class GitHubPlugin
         var endpoint = "notifications?all=true&participating=true&per_page=100";
         if (sinceUtc is { } since)
             endpoint += SinceParameter(since);
-        var threads = await RestPagesAsync(ClientFor(ScmKontoModus.SeparatesKonto), host, endpoint, ct);
+        var threads = await RestPagesAsync(ClientFor(ScmAccountMode.SeparateAccount), host, endpoint, ct);
         var notifications = new List<ScmNotification>();
         foreach (var thread in threads)
         {
@@ -331,19 +331,19 @@ public sealed partial class GitHubPlugin
     /// gh-/git-Schreib- und Arbeitskopien-Pfade (<c>issue create</c>, <c>pr create</c>, <c>pr merge</c>,
     /// Clone/Push/Pull, <c>git ls-remote</c>) laufen bewusst weiter unter dem Benutzer-Token —
     /// siehe <c>_eventApiClient</c>/<c>GetGhEnvironment</c>/<c>GetGitEnvironment</c>.</summary>
-    private IGitHubEventApiClient ClientFor(ScmKontoModus konto)
+    private IGitHubEventApiClient ClientFor(ScmAccountMode account)
     {
-        if (konto == ScmKontoModus.SeparatesKonto
+        if (account == ScmAccountMode.SeparateAccount
             && string.IsNullOrEmpty(_credentialStore.GetCredential(GitHubAgentTokenCredentialKey)))
             throw new ScmProviderException(ScmProviderFailureKind.Authentication,
                 "Für den Kontomodus „Separates Konto“ fehlt der Personal Access Token des separaten Kontos. Öffnen Sie Einstellungen → Plugins → GitHub → Authentifizierung und tragen Sie den Token ein. Bis dahin werden keine Benachrichtigungen eingelesen.");
-        return konto == ScmKontoModus.SeparatesKonto ? _agentEventApiClient : _eventApiClient;
+        return account == ScmAccountMode.SeparateAccount ? _agentEventApiClient : _eventApiClient;
     }
 
     /// <summary>Wählt den Credential-Key zum Konto; dieselbe Token-Grenze wie bei
     /// <see cref="ClientFor"/> — Nicht-Ereignis-Pfade nutzen weiterhin <c>GitHubTokenCredentialKey</c>.</summary>
-    private static string CredentialKeyFor(ScmKontoModus konto)
-        => konto == ScmKontoModus.SeparatesKonto ? GitHubAgentTokenCredentialKey : GitHubTokenCredentialKey;
+    private static string CredentialKeyFor(ScmAccountMode account)
+        => account == ScmAccountMode.SeparateAccount ? GitHubAgentTokenCredentialKey : GitHubTokenCredentialKey;
 
     private async Task<GitHubEventApiResponse> SendEventApiAsync(IGitHubEventApiClient client, GitHubEventApiRequest request, bool mutation, CancellationToken ct)
     {

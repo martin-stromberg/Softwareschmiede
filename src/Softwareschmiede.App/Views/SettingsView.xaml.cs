@@ -18,7 +18,7 @@ public sealed partial class SettingsView : UserControl
         Loaded += (_, _) =>
         {
             if (DataContext is SettingsViewModel vm)
-                vm.LadenCommand.Execute(null);
+                vm.LoadCommand.Execute(null);
         };
     }
 
@@ -39,8 +39,8 @@ public sealed partial class SettingsView : UserControl
             case IGitPlugin gitPlugin:
                 vm.ScmPluginSelectedCommand.Execute(gitPlugin);
                 break;
-            case IKiPlugin kiPlugin:
-                vm.KiPluginSelectedCommand.Execute(kiPlugin);
+            case IAiPlugin aiPlugin:
+                vm.AiPluginSelectedCommand.Execute(aiPlugin);
                 break;
             case PluginActivationEntry entry:
                 vm.PluginSelectedCommand.Execute(entry);
@@ -89,10 +89,10 @@ public sealed partial class SettingsView : UserControl
     private void OnPasswordChanged(object sender, RoutedEventArgs e)
         => PluginSettingEntryEditHelper.OnPasswordChanged(sender, e);
 
-    private void OnDateiAuswaehlenClick(object sender, RoutedEventArgs e)
-        => PluginSettingEntryEditHelper.OnDateiAuswaehlenClick(sender, e);
+    private void OnFileSelectClick(object sender, RoutedEventArgs e)
+        => PluginSettingEntryEditHelper.OnFileSelectClick(sender, e);
 
-    private async void OnHilfeButtonClick(object sender, RoutedEventArgs e)
+    private async void OnHelpButtonClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not SettingsViewModel vm) return;
         var cliPlugin = ResolveCliPluginForHelp(vm);
@@ -118,10 +118,10 @@ public sealed partial class SettingsView : UserControl
         }
     }
 
-    internal static CliKiPluginBase? ResolveCliPluginForHelp(SettingsViewModel vm)
+    internal static CliAiPluginBase? ResolveCliPluginForHelp(SettingsViewModel vm)
     {
-        var plugin = vm.SelectedPlugin?.Plugin as IKiPlugin
-            ?? vm.KiPlugins.FirstOrDefault(p => p.PluginName == vm.DefaultKiPlugin);
-        return plugin as CliKiPluginBase;
+        var plugin = vm.SelectedPlugin?.Plugin as IAiPlugin
+            ?? vm.AiPlugins.FirstOrDefault(p => p.PluginName == vm.DefaultAiPlugin);
+        return plugin as CliAiPluginBase;
     }
 }

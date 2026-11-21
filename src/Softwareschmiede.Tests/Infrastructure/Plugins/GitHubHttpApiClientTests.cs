@@ -124,7 +124,7 @@ public sealed class GitHubHttpApiClientTests
 
     /// <summary>Response- und Content-Header werden für Pagination und Backoff weitergereicht.</summary>
     [Fact]
-    public async Task SendAsync_PassesResponseHeadersThrough()
+    public async Task SendAsync_AdjustResponseHeadersThrough()
     {
         var client = Client(_ =>
         {

@@ -770,8 +770,8 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
 
         var issueUrl = $"{jiraUrl.TrimEnd('/')}/browse/{key}";
         return IssueCreateResult.Success(new Issue(
-            Nummer: 0,
-            Titel: $"{key}: {request.Title.Trim()}",
+            Number: 0,
+            Title: $"{key}: {request.Title.Trim()}",
             Body: request.Body,
             Labels: [],
             Milestone: null,
@@ -803,8 +803,8 @@ public sealed class BitbucketPlugin : GitPluginBase<BitbucketPlugin>
                 : new List<string>();
 
             list.Add(new Issue(
-                Nummer: 0,
-                Titel: $"{key}: {summary}",
+                Number: 0,
+                Title: $"{key}: {summary}",
                 Body: description,
                 Labels: labels,
                 Milestone: null,

@@ -27,7 +27,7 @@ public sealed class UpdateProgressViewModelTests
     {
         var sut = new UpdateProgressViewModel();
 
-        sut.Apply(new UpdatePreparationProgress(UpdatePreparationPhase.Verifizieren, null, "Update-Paket wird verifiziert."));
+        sut.Apply(new UpdatePreparationProgress(UpdatePreparationPhase.Verify, null, "Update-Paket wird verifiziert."));
 
         sut.PhaseText.Should().Be("Verifikation");
         sut.IsIndeterminate.Should().BeTrue();
@@ -47,7 +47,7 @@ public sealed class UpdateProgressViewModelTests
         sut.Message.Should().Be("Fehler");
     }
 
-    /// <summary>Der Abbrechen-Command triggert die angebundene Cancellation und deaktiviert sich.</summary>
+    /// <summary>Der Cancel-Command triggert die angebundene Cancellation und deaktiviert sich.</summary>
     [Fact]
     public void CancelCommand_ShouldInvokeCancellationAndDisableCancel()
     {

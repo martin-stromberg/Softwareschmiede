@@ -32,16 +32,16 @@ internal sealed class ScmE2EFixture
         Hold("complete", true);
         await using var db = OpenDatabase();
         await db.Database.MigrateAsync();
-        var settings = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        await settings.SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.Aus, UpdatePfadKanalResolver.ProduktivversionenPfad));
-        await settings.SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, null);
-        await settings.SetSettingAsync(ArbeitsverzeichnisSettingsService.RepositoriesWorkdirKey, Configuration.TestRoot);
+        var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        await settings.SetUpdateSettingsAsync(new UpdateSettings(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath));
+        await settings.SetSettingAsync(AppSettingService.DefaultAiPluginKey, null);
+        await settings.SetSettingAsync(WorkingDirectorySettingsService.RepositoriesWorkdirKey, Configuration.TestRoot);
         var origin = Path.Combine(Configuration.TestRoot, "origin");
         Directory.CreateDirectory(origin);
         await GitAsync(origin, "init", "--initial-branch=main");
         await GitAsync(origin, "-c", "user.name=SCM E2E", "-c", "user.email=scm-e2e@example.invalid", "commit", "--allow-empty", "-m", "fixture origin");
-        var project = new Projekt { Id = Guid.NewGuid(), Name = "SCM E2E", Status = ProjektStatus.Aktiv, ErstellungsDatum = DateTimeOffset.UtcNow };
-        var repository = new GitRepository { Id = Guid.NewGuid(), Projekt = project, PluginTyp = "Softwareschmiede.GitHub", RepositoryName = "scm-e2e", RepositoryUrl = "https://github.com/scm-owner/scm-e2e" };
+        var project = new Project { Id = Guid.NewGuid(), Name = "SCM E2E", Status = ProjectStatus.Active, CreatedAt = DateTimeOffset.UtcNow };
+        var repository = new GitRepository { Id = Guid.NewGuid(), Project = project, PluginType = "Softwareschmiede.GitHub", RepositoryName = "scm-e2e", RepositoryUrl = "https://github.com/scm-owner/scm-e2e" };
         db.Add(repository);
         for (var number = 1; number <= 17; number++)
         {
@@ -49,40 +49,40 @@ internal sealed class ScmE2EFixture
             Directory.CreateDirectory(directory);
             await GitAsync(directory, "init", "--initial-branch=main");
             await GitAsync(directory, "-c", "user.name=SCM E2E", "-c", "user.email=scm-e2e@example.invalid", "commit", "--allow-empty", "-m", "fixture");
-            var task = new Aufgabe
+            var task = new WorkItem
             {
                 Id = Guid.NewGuid(),
-                Projekt = project,
+                Project = project,
                 GitRepository = repository,
-                Titel = "SCM Aufgabe " + number,
-                Status = number switch { 3 => AufgabeStatus.Beendet, 4 => AufgabeStatus.Archiviert, 6 => AufgabeStatus.Gestartet, _ => AufgabeStatus.Neu },
-                LokalerKlonPfad = number == 13 ? null : directory,
+                Title = "SCM Aufgabe " + number,
+                Status = number switch { 3 => WorkItemStatus.Completed, 4 => WorkItemStatus.Archived, 6 => WorkItemStatus.Started, _ => WorkItemStatus.New },
+                LocalClonePath = number == 13 ? null : directory,
                 BranchName = number == 13 ? null : "main",
-                BasisBranchName = "main",
-                ErstellungsDatum = DateTimeOffset.UtcNow,
-                PausiertBisUtc = number == 5 ? DateTimeOffset.UtcNow.AddHours(2) : null
+                BaseBranchName = "main",
+                CreatedAt = DateTimeOffset.UtcNow,
+                PausedUntilUtc = number == 5 ? DateTimeOffset.UtcNow.AddHours(2) : null
             };
             TaskIds[number] = task.Id;
             if (number is 7 or 9)
-                task.PullRequests.Add(new PullRequestReferenz
+                task.PullRequests.Add(new PullRequestReference
                 {
                     Id = Guid.NewGuid(),
-                    Aufgabe = task,
+                    WorkItem = task,
                     Provider = PullRequestProvider.GitHub,
                     RepositoryId = repository.RepositoryUrl,
                     PullRequestNumber = number,
                     Url = $"https://github.com/scm-owner/scm-e2e/pull/{number}",
-                    Titel = task.Titel,
+                    Title = task.Title,
                     CreatedUtc = DateTimeOffset.UtcNow,
                     MonitoringPhase = PullRequestMonitoringPhase.NotMonitored
                 });
             else
-                task.IssueReferenz = new IssueReferenz
+                task.IssueReference = new IssueReference
                 {
                     Id = Guid.NewGuid(),
-                    Aufgabe = task,
-                    IssueNummer = number,
-                    Titel = task.Titel,
+                    WorkItem = task,
+                    IssueNumber = number,
+                    Title = task.Title,
                     IssueUrl = $"https://github.com/scm-owner/scm-e2e/issues/{number}"
                 };
             db.Add(task);
@@ -98,7 +98,7 @@ internal sealed class ScmE2EFixture
 
     public void AddText(int number, long id, string body, string kind = "IssueComment", IEnumerable<string>? viewerReactions = null)
     {
-        Scenario.Texts.Add(new ScmE2EText { Number = number, Id = id, Body = body, Kind = kind, PullRequest = number is 7 or 9, ViewerReactions = viewerReactions?.ToList() ?? [] });
+        Scenario.Text.Add(new ScmE2EText { Number = number, Id = id, Body = body, Kind = kind, PullRequest = number is 7 or 9, ViewerReactions = viewerReactions?.ToList() ?? [] });
         SaveScenario();
     }
 
@@ -108,11 +108,11 @@ internal sealed class ScmE2EFixture
         SaveScenario();
     }
 
-    public async Task SetKontoModus(ScmKontoModus modus)
+    public async Task SetAccountMode(ScmAccountMode mode)
     {
         await using var db = OpenDatabase();
-        var settings = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        await settings.SetScmKontoModusAsync(modus);
+        var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        await settings.SetScmAccountModeAsync(mode);
     }
 
     public void SaveScenario()
@@ -136,7 +136,7 @@ internal sealed class ScmE2EFixture
         else File.Delete(path);
     }
 
-    public SoftwareschmiededDbContext OpenDatabase() => new(new DbContextOptionsBuilder<SoftwareschmiededDbContext>().UseSqlite($"Data Source={DatabasePath}").Options);
+    public SoftwareschmiedeDbContext OpenDatabase() => new(new DbContextOptionsBuilder<SoftwareschmiedeDbContext>().UseSqlite($"Data Source={DatabasePath}").Options);
 
     public Task<ScmIncomingEvent> WaitEventAsync(int number, string status, long? remoteId = null)
         => WaitEventCoreAsync(TaskIds[number], status, remoteId, "SCM Aufgabe " + number);
@@ -151,7 +151,7 @@ internal sealed class ScmE2EFixture
         while (DateTime.UtcNow < deadline)
         {
             await using var db = OpenDatabase();
-            var events = await db.ScmIncomingEvents.AsNoTracking().Where(x => x.AufgabeId == taskId).OrderBy(x => x.Sequence).ToListAsync();
+            var events = await db.ScmIncomingEvents.AsNoTracking().Where(x => x.WorkItemId == taskId).OrderBy(x => x.Sequence).ToListAsync();
             last = remoteId is null ? events.LastOrDefault() : events.SingleOrDefault(x => ScmEventStore.Observation(x).RemoteNodeId.EndsWith("_" + remoteId, StringComparison.Ordinal));
             if (last?.Status == status) return last;
             await Task.Delay(100);
@@ -188,7 +188,7 @@ internal sealed class ScmE2EFixture
     /// <summary>Wiederholt eine Datenbankprüfung, bis die Bedingung erfüllt ist; bei Ablauf
     /// TimeoutException mit Beschreibung und Fixture-Pfad.</summary>
     public async Task WaitForDatabaseAsync(
-        Func<SoftwareschmiededDbContext, Task<bool>> condition,
+        Func<SoftwareschmiedeDbContext, Task<bool>> condition,
         string description,
         TimeSpan? timeout = null)
     {
@@ -244,7 +244,7 @@ internal sealed class ScmE2EFixture
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var reader = new StreamReader(stream);
         var text = reader.ReadToEnd();
-        // Writer publishes one JSONL record at a time; a trailing partial record is not yet evidence.
+        // Der Writer veröffentlicht einen JSONL-Datensatz pro Vorgang; ein anhängender Teildatensatz ist noch kein Beleg
         return text.Split('\n').SkipLast(1).Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
     }
 

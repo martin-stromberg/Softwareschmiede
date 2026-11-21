@@ -14,18 +14,18 @@ public sealed class FileExplorerViewModelTests_LazyLoading
 
     /// <summary>Das Aufklappen eines Grenztiefen-Verzeichnisses lädt dessen Kinder nach, ersetzt den Platzhalter durch echte Kinder und setzt ChildrenLoaded.</summary>
     [Fact]
-    public async Task LadeKinderAsync_LaedtKinderUndSetztChildrenLoaded()
+    public async Task LoadChildrenAsync_LoadsChildrenAndSetsChildrenLoaded()
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var node = new WorkspaceFileNode { Name = "src", RelativePath = "src", IsDirectory = true, Depth = 1, ChildrenLoaded = false };
         node.Children.Add(new WorkspaceFileNode { IsPlaceholder = true });
-        var kinder = new List<WorkspaceFileNode> { new() { Name = "Program.cs", RelativePath = Path.Combine("src", "Program.cs"), Depth = 2 } };
-        gitMock.Setup(g => g.LoadSubtreeAsync(RepositoryPath, "src", 2, It.IsAny<CancellationToken>())).ReturnsAsync(kinder);
+        var children = new List<WorkspaceFileNode> { new() { Name = "Program.cs", RelativePath = Path.Combine("src", "Program.cs"), Depth = 2 } };
+        gitMock.Setup(g => g.LoadSubtreeAsync(RepositoryPath, "src", 2, It.IsAny<CancellationToken>())).ReturnsAsync(children);
 
-        await sut.LadeKinderAsync(node, TestContext.Current.CancellationToken);
+        await sut.LoadChildrenAsync(node, TestContext.Current.CancellationToken);
 
         node.ChildrenLoaded.Should().BeTrue();
         node.Children.Should().ContainSingle(n => n.Name == "Program.cs");
@@ -33,48 +33,48 @@ public sealed class FileExplorerViewModelTests_LazyLoading
 
     /// <summary>Ist ChildrenLoaded bereits true, erfolgt kein Service-Aufruf.</summary>
     [Fact]
-    public async Task LadeKinderAsync_BereitsGeladen_LaedtNichtErneut()
+    public async Task LoadChildrenAsync_ReadyLoaded_LoadsNotAgain()
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var node = new WorkspaceFileNode { Name = "src", RelativePath = "src", IsDirectory = true, Depth = 1, ChildrenLoaded = true };
 
-        await sut.LadeKinderAsync(node, TestContext.Current.CancellationToken);
+        await sut.LoadChildrenAsync(node, TestContext.Current.CancellationToken);
 
         gitMock.Verify(g => g.LoadSubtreeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>Für einen Datei-Knoten erfolgt kein Service-Aufruf.</summary>
     [Fact]
-    public async Task LadeKinderAsync_KeinVerzeichnis_TutNichts()
+    public async Task LoadChildrenAsync_NoDirectory_DoesNothing()
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var node = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt", IsDirectory = false };
 
-        await sut.LadeKinderAsync(node, TestContext.Current.CancellationToken);
+        await sut.LoadChildrenAsync(node, TestContext.Current.CancellationToken);
 
         gitMock.Verify(g => g.LoadSubtreeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     /// <summary>Wirft der Service beim Nachladen, wird der Fehler geloggt und ChildrenLoaded bleibt false (erneutes Laden möglich).</summary>
     [Fact]
-    public async Task LadeKinderAsync_Fehler_LaesstChildrenLoadedFalse()
+    public async Task LoadChildrenAsync_Error_LetsChildrenLoadedFalse()
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var node = new WorkspaceFileNode { Name = "src", RelativePath = "src", IsDirectory = true, Depth = 1, ChildrenLoaded = false };
         node.Children.Add(new WorkspaceFileNode { IsPlaceholder = true });
         gitMock.Setup(g => g.LoadSubtreeAsync(RepositoryPath, "src", 2, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("boom"));
 
-        await sut.LadeKinderAsync(node, TestContext.Current.CancellationToken);
+        await sut.LoadChildrenAsync(node, TestContext.Current.CancellationToken);
 
         node.ChildrenLoaded.Should().BeFalse();
         node.Children.Should().ContainSingle(n => n.IsPlaceholder);
@@ -82,7 +82,7 @@ public sealed class FileExplorerViewModelTests_LazyLoading
 
     /// <summary>Beim Zuklappen werden Groß-Enkel-Knoten (Depth > node.Depth + 1) entfernt; die betroffenen Kinder erhalten wieder ChildrenLoaded = false und einen Platzhalter.</summary>
     [Fact]
-    public void BeraeumeKnoten_EntferntGrossEnkel()
+    public void CleanNode_RemovesLargeGrandchild()
     {
         var (sut, _, _) = CreateSut();
 
@@ -91,7 +91,7 @@ public sealed class FileExplorerViewModelTests_LazyLoading
         kind.Children.Add(new WorkspaceFileNode { Name = "Deep.cs", RelativePath = Path.Combine("src", "nested", "Deep.cs"), Depth = 2 });
         node.Children.Add(kind);
 
-        sut.BeraeumeKnoten(node);
+        sut.CleanNode(node);
 
         kind.ChildrenLoaded.Should().BeFalse();
         kind.Children.Should().ContainSingle(n => n.IsPlaceholder);
@@ -99,7 +99,7 @@ public sealed class FileExplorerViewModelTests_LazyLoading
 
     /// <summary>Nach dem Zuklappen bleiben der Knoten selbst und seine direkten Kinder erhalten - pro Verzeichnis ist stets genau eine Ebene mehr geladen als sichtbar.</summary>
     [Fact]
-    public void BeraeumeKnoten_BehaeltDirekteKinderUndPlatzhalterInvariante()
+    public void CleanNode_KeepsDirectChildrenAndPlaceholderInvariant()
     {
         var (sut, _, _) = CreateSut();
 
@@ -108,7 +108,7 @@ public sealed class FileExplorerViewModelTests_LazyLoading
         kind.Children.Add(new WorkspaceFileNode { Name = "Deep.cs", RelativePath = Path.Combine("src", "nested", "Deep.cs"), Depth = 2 });
         node.Children.Add(kind);
 
-        sut.BeraeumeKnoten(node);
+        sut.CleanNode(node);
 
         node.Depth.Should().Be(0);
         node.Children.Should().ContainSingle(n => n.Name == "nested");
@@ -117,17 +117,17 @@ public sealed class FileExplorerViewModelTests_LazyLoading
 
     /// <summary>Die Auswahl eines Platzhalterknotens lädt keine Vorschau.</summary>
     [Fact]
-    public async Task Platzhalterknoten_WirdNichtAlsAuswahlBehandelt()
+    public async Task Placeholdernode_WillNotAsSelectionHandles()
     {
         var (sut, gitMock, _) = CreateSut();
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath, TestContext.Current.CancellationToken);
+        await sut.InitializeAsync(RepositoryPath, TestContext.Current.CancellationToken);
 
         var placeholder = new WorkspaceFileNode { IsPlaceholder = true };
 
-        sut.AusgewaehlterKnoten = placeholder;
+        sut.SelectedNode = placeholder;
 
-        sut.DateiInhalt.Should().BeNull();
+        sut.FileContent.Should().BeNull();
         gitMock.Verify(g => g.LoadPreviewAsync(It.IsAny<string>(), It.IsAny<WorkspaceFileNode>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

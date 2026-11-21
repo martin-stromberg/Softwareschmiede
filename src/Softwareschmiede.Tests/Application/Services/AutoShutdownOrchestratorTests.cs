@@ -14,49 +14,49 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// </summary>
 public sealed class AutoShutdownOrchestratorTests
 {
-    private static AutoShutdownOrchestrator ErstelleOrchestrator(
+    private static AutoShutdownOrchestrator CreateOrchestrator(
         FakeRunningAutomationStatusSource runningSource,
-        FakeLaufendeAutomatisierungenZaehlung zaehlung,
+        FakeRunningAutomationsCount count,
         FakeSystemShutdownService shutdownService,
         FakeTimeProvider timeProvider,
-        AufgabeLaufdatenChangedNotifier? notifier = null)
+        WorkItemRunDataChangedNotifier? notifier = null)
         => new(
             runningSource,
-            notifier ?? new AufgabeLaufdatenChangedNotifier(),
-            zaehlung,
+            notifier ?? new WorkItemRunDataChangedNotifier(),
+            count,
             shutdownService,
             timeProvider,
             NullLogger<AutoShutdownOrchestrator>.Instance);
 
     /// <summary>Bei Aktivierung und Anzahl 0 wird der Countdown mit dem Ende now+Toleranz armiert.</summary>
     [Fact]
-    public void SetEnabled_ArmiertCountdown_MitToleranzEndzeitpunkt()
+    public void SetEnabled_ArmedCountdown_WithToleranceEndtime()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranzMinuten: 5, erzwingen: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
 
-        sut.CountdownEndeUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
-        sut.IstAktiviert.Should().BeTrue();
+        sut.CountdownEndUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
+        sut.IsEnabled.Should().BeTrue();
         shutdownService.RequestCount.Should().Be(0);
     }
 
     /// <summary>Der Shutdown wird erst nach Ablauf der vollen Toleranzzeit angefordert.</summary>
     [Fact]
-    public void CountdownAblauf_LoestShutdownErstNachToleranzAus()
+    public void CountdownFlow_TriggersShutdownFirstAfterToleranceOut()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranzMinuten: 5, erzwingen: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
 
         timeProvider.Advance(TimeSpan.FromMinutes(4).Add(TimeSpan.FromSeconds(59)));
@@ -68,87 +68,87 @@ public sealed class AutoShutdownOrchestratorTests
 
     /// <summary>Das Erzwingen-Flag wird an den Shutdown-Service weitergereicht.</summary>
     [Fact]
-    public void CountdownAblauf_UebergibtErzwingenFlag()
+    public void CountdownFlow_PassesForceFlag()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranzMinuten: 2, erzwingen: true);
+        sut.SetOptions(toleranceMinutes: 2, force: true);
         sut.SetEnabled(true);
         timeProvider.Advance(TimeSpan.FromMinutes(2));
 
-        shutdownService.ErzwingenWerte.Should().Equal(true);
+        shutdownService.ForceValues.Should().Equal(true);
     }
 
     /// <summary>Statuswechsel bei unveraenderter Anzahl 0 setzen den Countdown nicht zurueck (kein Verhungern).</summary>
     [Fact]
-    public void StatuswechselBeiUnveraenderterAnzahl_LaesstCountdownEndeUnveraendert()
+    public void StatuschangeAtUnchangedCount_LetsCountdownEndUnchanged()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        var notifier = new AufgabeLaufdatenChangedNotifier();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider, notifier);
+        var notifier = new WorkItemRunDataChangedNotifier();
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider, notifier);
 
-        sut.SetOptionen(toleranzMinuten: 5, erzwingen: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
-        var urspruenglichesEnde = sut.CountdownEndeUtc;
+        var originalEnd = sut.CountdownEndUtc;
 
         timeProvider.Advance(TimeSpan.FromMinutes(2));
         runningSource.Raise(previous: 0, current: 0);
-        notifier.NotifyLaufdatenChanged(Guid.NewGuid());
+        notifier.NotifyRunDataChanged(Guid.NewGuid());
 
-        sut.CountdownEndeUtc.Should().Be(urspruenglichesEnde);
+        sut.CountdownEndUtc.Should().Be(originalEnd);
         shutdownService.RequestCount.Should().Be(0);
     }
 
     /// <summary>Eine positive fachliche Anzahl disarmiert den laufenden Countdown.</summary>
     [Fact]
-    public void StatuswechselMitPositiverAnzahl_DisarmiertCountdown()
+    public void StatuschangeWithPositiveCount_DisarmedCountdown()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranzMinuten: 5, erzwingen: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
         timeProvider.Advance(TimeSpan.FromMinutes(1));
 
-        zaehlung.Count = 1;
+        count.Count = 1;
         runningSource.Raise(previous: 0, current: 1);
 
-        sut.CountdownEndeUtc.Should().BeNull();
+        sut.CountdownEndUtc.Should().BeNull();
         timeProvider.Advance(TimeSpan.FromMinutes(10));
         shutdownService.RequestCount.Should().Be(0);
     }
 
     /// <summary>Nach Rueckkehr zur Anzahl 0 wird ein neuer Countdown ueber die volle Toleranz armiert.</summary>
     [Fact]
-    public void RueckkehrZuNull_ArmiertNeueVolleToleranz()
+    public void ReturnToNull_ArmedNewFullTolerance()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranzMinuten: 5, erzwingen: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
 
-        zaehlung.Count = 1;
+        count.Count = 1;
         runningSource.Raise(previous: 0, current: 1);
         timeProvider.Advance(TimeSpan.FromMinutes(1));
 
-        zaehlung.Count = 0;
+        count.Count = 0;
         runningSource.Raise(previous: 1, current: 0);
 
-        sut.CountdownEndeUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
+        sut.CountdownEndUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
 
         timeProvider.Advance(TimeSpan.FromMinutes(4).Add(TimeSpan.FromSeconds(59)));
         shutdownService.RequestCount.Should().Be(0);
@@ -158,20 +158,20 @@ public sealed class AutoShutdownOrchestratorTests
 
     /// <summary>Deaktivieren disarmiert den Countdown und verhindert den Shutdown.</summary>
     [Fact]
-    public void SetEnabledFalse_DisarmiertLaufendenCountdown()
+    public void SetEnabledFalse_DisarmedRunningCountdown()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranzMinuten: 5, erzwingen: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
         sut.SetEnabled(false);
 
-        sut.CountdownEndeUtc.Should().BeNull();
-        sut.IstAktiviert.Should().BeFalse();
+        sut.CountdownEndUtc.Should().BeNull();
+        sut.IsEnabled.Should().BeFalse();
         timeProvider.Advance(TimeSpan.FromMinutes(10));
         shutdownService.RequestCount.Should().Be(0);
     }
@@ -181,88 +181,88 @@ public sealed class AutoShutdownOrchestratorTests
     /// ist jede Auswertung wirkungslos — Trigger dürfen dann keine DB-Zählung auslösen.
     /// </summary>
     [Fact]
-    public async Task TriggerBeiDeaktiviertemRuhezustand_FuehrtKeineZaehlungAus()
+    public async Task TriggerAtDisabledIdlestate_RunsNoCountOut()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        var notifier = new AufgabeLaufdatenChangedNotifier();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider, notifier);
+        var notifier = new WorkItemRunDataChangedNotifier();
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider, notifier);
 
         runningSource.Raise(previous: 0, current: 1);
         runningSource.Raise(previous: 1, current: 0);
-        notifier.NotifyLaufdatenChanged(Guid.NewGuid());
+        notifier.NotifyRunDataChanged(Guid.NewGuid());
         timeProvider.Advance(TimeSpan.FromMinutes(10));
         await Task.Delay(100, TestContext.Current.CancellationToken);
 
-        zaehlung.ZaehleAufrufe.Should().Be(0,
+        count.CountCalls.Should().Be(0,
             "ohne aktiviertes Feature, armierten Countdown oder ausgelösten Shutdown ist die Zählung wirkungslos");
 
         // Gegenprobe: Dasselbe Fake zählt zuverlässig, sobald das Feature aktiviert ist.
         sut.SetEnabled(true);
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        while (zaehlung.ZaehleAufrufe < 1 && DateTime.UtcNow < deadline)
+        while (count.CountCalls < 1 && DateTime.UtcNow < deadline)
         {
             await Task.Delay(10, TestContext.Current.CancellationToken);
         }
 
-        zaehlung.ZaehleAufrufe.Should().BeGreaterThanOrEqualTo(1);
+        count.CountCalls.Should().BeGreaterThanOrEqualTo(1);
     }
 
     /// <summary>Eine Toleranzaenderung re-armiert den laufenden Countdown ab jetzt mit dem neuen Wert.</summary>
     [Fact]
-    public void ToleranzAenderung_ReArmiertLaufendenCountdownAbJetzt()
+    public void ToleranceChange_ReArmedRunningCountdownFromNow()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranzMinuten: 5, erzwingen: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
         timeProvider.Advance(TimeSpan.FromMinutes(4));
 
-        sut.SetOptionen(toleranzMinuten: 2, erzwingen: false);
+        sut.SetOptions(toleranceMinutes: 2, force: false);
 
-        sut.CountdownEndeUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(2));
+        sut.CountdownEndUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(2));
         timeProvider.Advance(TimeSpan.FromMinutes(2));
         shutdownService.RequestCount.Should().Be(1);
     }
 
     /// <summary>Der Final-Recheck bei Ablauf verhindert den Shutdown bei positiver Anzahl.</summary>
     [Fact]
-    public void PositiveAnzahlBeimCountdownAblauf_LoestKeinShutdownAus()
+    public void PositiveCountAtCountdownFlow_TriggersNoShutdownOut()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranzMinuten: 5, erzwingen: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
 
         // Anzahl wird erst unmittelbar vor dem Ablauf positiv (Final-Recheck / Sicherheits-Tick).
-        zaehlung.Count = 1;
+        count.Count = 1;
         timeProvider.Advance(TimeSpan.FromMinutes(5));
 
         shutdownService.RequestCount.Should().Be(0);
-        sut.CountdownEndeUtc.Should().BeNull();
+        sut.CountdownEndUtc.Should().BeNull();
     }
 
     /// <summary>Der Shutdown wird pro Null-Phase hoechstens einmal angefordert.</summary>
     [Fact]
-    public void Shutdown_WirdProNullPhaseNurEinmalAusgeloest()
+    public void Shutdown_WillPerNullPhaseOnlyOnceTriggered()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranzMinuten: 1, erzwingen: false);
+        sut.SetOptions(toleranceMinutes: 1, force: false);
         sut.SetEnabled(true);
         timeProvider.Advance(TimeSpan.FromMinutes(1));
         shutdownService.RequestCount.Should().Be(1);
@@ -276,22 +276,22 @@ public sealed class AutoShutdownOrchestratorTests
 
     /// <summary>Nach einer positiven Zwischenphase kann bei neuer Null-Phase erneut ausgeloest werden.</summary>
     [Fact]
-    public void AusgeloesterShutdown_LoestNachZwischenphaseErneutAus()
+    public void TriggeredShutdown_TriggersAfterInterimphaseAgainOut()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranzMinuten: 1, erzwingen: false);
+        sut.SetOptions(toleranceMinutes: 1, force: false);
         sut.SetEnabled(true);
         timeProvider.Advance(TimeSpan.FromMinutes(1));
         shutdownService.RequestCount.Should().Be(1);
 
-        zaehlung.Count = 1;
+        count.Count = 1;
         runningSource.Raise(previous: 0, current: 1);
-        zaehlung.Count = 0;
+        count.Count = 0;
         runningSource.Raise(previous: 1, current: 0);
         timeProvider.Advance(TimeSpan.FromMinutes(1));
 
@@ -304,20 +304,20 @@ public sealed class AutoShutdownOrchestratorTests
     /// armiert einen neuen Countdown und der nächste Ablauf versucht die Anforderung erneut.
     /// </summary>
     [Fact]
-    public void AusnahmeBeimShutdownAufruf_ReArmiertCountdownFuerErneutenVersuch()
+    public void ExceptionAtShutdownCall_ReArmedCountdownForAgainAttempt()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService { ThrowOnRequest = true };
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranzMinuten: 5, erzwingen: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
         timeProvider.Advance(TimeSpan.FromMinutes(5));
 
         shutdownService.RequestCount.Should().Be(1);
-        sut.CountdownEndeUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5),
+        sut.CountdownEndUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5),
             "ein fehlgeschlagener Shutdown-Aufruf darf das Feature nicht für den Rest der Null-Phase blockieren");
 
         shutdownService.ThrowOnRequest = false;
@@ -327,17 +327,17 @@ public sealed class AutoShutdownOrchestratorTests
 
     /// <summary>Eine Exception der Zaehlung aendert den Orchestrator-Zustand nicht.</summary>
     [Fact]
-    public void AusnahmeBeimZaehlen_LaesstZustandUnveraendert()
+    public void ExceptionAtCount_LetsStateUnchanged()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0, ThrowOnZaehlen = true };
+        var count = new FakeRunningAutomationsCount { Count = 0, ThrowOnCount = true };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
         var act = () => sut.SetEnabled(true);
         act.Should().NotThrow();
-        sut.CountdownEndeUtc.Should().BeNull();
+        sut.CountdownEndUtc.Should().BeNull();
         shutdownService.RequestCount.Should().Be(0);
     }
 
@@ -346,27 +346,27 @@ public sealed class AutoShutdownOrchestratorTests
     /// Der Endzeitpunkt wird zurückgesetzt und der nächste Sicherheitstick armiert erneut.
     /// </summary>
     [Fact]
-    public void AusnahmeImFinalRecheck_ReArmiertUeberSicherheitstick()
+    public void ExceptionInFinalRecheck_ReArmedOverSecuritytick()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        sut.SetOptionen(toleranzMinuten: 5, erzwingen: false);
+        sut.SetOptions(toleranceMinutes: 5, force: false);
         sut.SetEnabled(true);
 
-        zaehlung.ThrowOnZaehlen = true;
+        count.ThrowOnCount = true;
         timeProvider.Advance(TimeSpan.FromMinutes(5));
 
-        sut.CountdownEndeUtc.Should().BeNull("der abgelaufene One-Shot-Timer darf keinen toten Countdown hinterlassen");
+        sut.CountdownEndUtc.Should().BeNull("der abgelaufene One-Shot-Timer darf keinen toten Countdown hinterlassen");
         shutdownService.RequestCount.Should().Be(0);
 
-        zaehlung.ThrowOnZaehlen = false;
+        count.ThrowOnCount = false;
         timeProvider.Advance(TimeSpan.FromSeconds(5));
 
-        sut.CountdownEndeUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
+        sut.CountdownEndUtc.Should().Be(timeProvider.GetUtcNow() + TimeSpan.FromMinutes(5));
 
         timeProvider.Advance(TimeSpan.FromMinutes(5));
         shutdownService.RequestCount.Should().Be(1);
@@ -377,77 +377,77 @@ public sealed class AutoShutdownOrchestratorTests
     /// Nachlauf koalesziert — kein verlorener Auftrag, kein Sturm einzelner Auswertungen.
     /// </summary>
     [Fact]
-    public async Task TriggerWaehrendLaufenderAuswertung_WerdenAufEinenNachlaufKoalesziert()
+    public async Task TriggerWhileRunningEvaluation_BeOnATailCoalesced()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
-        zaehlung.BlockiereNaechsteAufrufe(1);
+        count.BlockNextCalls(1);
         sut.SetEnabled(true);
 
         // Warten, bis die erste Auswertung im blockierten Zaehlaufruf angekommen ist.
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        while (zaehlung.ZaehleAufrufe < 1 && DateTime.UtcNow < deadline)
+        while (count.CountCalls < 1 && DateTime.UtcNow < deadline)
         {
             await Task.Delay(10, TestContext.Current.CancellationToken);
         }
 
-        zaehlung.ZaehleAufrufe.Should().Be(1);
+        count.CountCalls.Should().Be(1);
 
         runningSource.Raise(previous: 0, current: 0);
         runningSource.Raise(previous: 0, current: 0);
-        zaehlung.GibBlockierungFrei();
+        count.GetBlockingFree();
 
         deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        while (zaehlung.ZaehleAufrufe < 2 && DateTime.UtcNow < deadline)
+        while (count.CountCalls < 2 && DateTime.UtcNow < deadline)
         {
             await Task.Delay(10, TestContext.Current.CancellationToken);
         }
 
         await Task.Delay(100, TestContext.Current.CancellationToken);
 
-        zaehlung.ZaehleAufrufe.Should().Be(2, "zwei Trigger während der Blockade ergeben genau einen koaleszierten Nachlauf");
-        sut.CountdownEndeUtc.Should().NotBeNull();
+        count.CountCalls.Should().Be(2, "zwei Trigger während der Blockade ergeben genau einen koaleszierten Nachlauf");
+        sut.CountdownEndUtc.Should().NotBeNull();
     }
 
     /// <summary>ZustandGeaendert feuert bei Optionswechsel, Armierung und Disarmierung.</summary>
     [Fact]
-    public void ZustandGeaendert_WirdBeiArmierungDisarmierungUndOptionenAusgeloest()
+    public void StateChanged_WillAtArmingDisarmingAndOptionsTriggered()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        using var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        using var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
         var eventCount = 0;
-        sut.ZustandGeaendert += () => eventCount++;
+        sut.StateChanged += () => eventCount++;
 
-        sut.SetOptionen(toleranzMinuten: 7, erzwingen: true);
+        sut.SetOptions(toleranceMinutes: 7, force: true);
         eventCount.Should().BeGreaterThanOrEqualTo(1);
 
-        var vorher = eventCount;
+        var before = eventCount;
         sut.SetEnabled(true);
-        eventCount.Should().BeGreaterThan(vorher);
+        eventCount.Should().BeGreaterThan(before);
 
-        vorher = eventCount;
+        before = eventCount;
         sut.SetEnabled(false);
-        eventCount.Should().BeGreaterThan(vorher);
+        eventCount.Should().BeGreaterThan(before);
     }
 
     /// <summary>Dispose meldet beide Events ab und stoppt beide Timer.</summary>
     [Fact]
-    public void Dispose_MeldetAlleEreignisseAbUndStopptTimer()
+    public void Dispose_ReportsAllEventsFromAndStopsTimer()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        var notifier = new AufgabeLaufdatenChangedNotifier();
-        var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider, notifier);
+        var notifier = new WorkItemRunDataChangedNotifier();
+        var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider, notifier);
 
         sut.SetEnabled(true);
         runningSource.SubscriberCount.Should().Be(1);
@@ -456,7 +456,7 @@ public sealed class AutoShutdownOrchestratorTests
 
         runningSource.SubscriberCount.Should().Be(0);
         runningSource.Raise(previous: 1, current: 0);
-        notifier.NotifyLaufdatenChanged(Guid.NewGuid());
+        notifier.NotifyRunDataChanged(Guid.NewGuid());
         timeProvider.Advance(TimeSpan.FromMinutes(10));
         shutdownService.RequestCount.Should().Be(0);
     }
@@ -467,23 +467,23 @@ public sealed class AutoShutdownOrchestratorTests
     /// Risiko für späte Aufrufer).
     /// </summary>
     [Fact]
-    public void MutationenNachDispose_SindNoOpsOhneAusnahme()
+    public void MutationsAfterDispose_AreNoOpsWithoutException()
     {
         var runningSource = new FakeRunningAutomationStatusSource();
-        var zaehlung = new FakeLaufendeAutomatisierungenZaehlung { Count = 0 };
+        var count = new FakeRunningAutomationsCount { Count = 0 };
         var shutdownService = new FakeSystemShutdownService();
         var timeProvider = new FakeTimeProvider();
-        var sut = ErstelleOrchestrator(runningSource, zaehlung, shutdownService, timeProvider);
+        var sut = CreateOrchestrator(runningSource, count, shutdownService, timeProvider);
 
         sut.SetEnabled(true);
         sut.Dispose();
 
         var actEnabled = () => sut.SetEnabled(false);
-        var actOptionen = () => sut.SetOptionen(3, true);
+        var actOptions = () => sut.SetOptions(3, true);
 
         actEnabled.Should().NotThrow();
-        actOptionen.Should().NotThrow();
-        sut.IstAktiviert.Should().BeTrue("der Zustand wird nach Dispose nicht mehr verändert");
+        actOptions.Should().NotThrow();
+        sut.IsEnabled.Should().BeTrue("der Zustand wird nach Dispose nicht mehr verändert");
         shutdownService.RequestCount.Should().Be(0);
     }
 
@@ -494,9 +494,9 @@ public sealed class AutoShutdownOrchestratorTests
         public int SubscriberCount => RunningCountChanged?.GetInvocationList().Length ?? 0;
 
         public int GetRunningCount() => _runningCount;
-        public bool IsRunning(Guid aufgabeId) => _runningCount > 0;
-        public AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId)
-            => _runningCount > 0 ? AufgabeLaufStatus.Laeuft : null;
+        public bool IsRunning(Guid workItemId) => _runningCount > 0;
+        public WorkItemRunStatus? GetLiveRunStatus(Guid workItemId)
+            => _runningCount > 0 ? WorkItemRunStatus.Running : null;
 
         public void Raise(int previous, int current)
         {
@@ -505,33 +505,33 @@ public sealed class AutoShutdownOrchestratorTests
         }
     }
 
-    private sealed class FakeLaufendeAutomatisierungenZaehlung : ILaufendeAutomatisierungenZaehlung
+    private sealed class FakeRunningAutomationsCount : IRunningAutomationsCount
     {
         private readonly SemaphoreSlim _blockierGatter = new(0);
-        private int _blockierteAufrufe;
-        private int _zaehleAufrufe;
+        private int _blockedCalls;
+        private int _countCalls;
 
         public int Count { get; set; }
-        public bool ThrowOnZaehlen { get; set; }
-        public int ZaehleAufrufe => _zaehleAufrufe;
+        public bool ThrowOnCount { get; set; }
+        public int CountCalls => _countCalls;
 
-        /// <summary>Lässt die nächsten <paramref name="anzahl"/> Zählaufrufe an einem Gatter hängen (bis <see cref="GibBlockierungFrei"/>).</summary>
-        public void BlockiereNaechsteAufrufe(int anzahl) => _blockierteAufrufe = anzahl;
+        /// <summary>Lässt die nächsten <paramref name="count"/> Zählaufrufe an einem Gatter hängen (bis <see cref="GetBlockingFree"/>).</summary>
+        public void BlockNextCalls(int count) => _blockedCalls = count;
 
         /// <summary>Lässt alle am Gatter wartenden Zählaufrufe weiterlaufen.</summary>
-        public void GibBlockierungFrei() => _blockierGatter.Release(int.MaxValue - _blockierGatter.CurrentCount);
+        public void GetBlockingFree() => _blockierGatter.Release(int.MaxValue - _blockierGatter.CurrentCount);
 
-        public async Task<int> ZaehleAsync(CancellationToken ct = default)
+        public async Task<int> CountAsync(CancellationToken ct = default)
         {
-            Interlocked.Increment(ref _zaehleAufrufe);
-            if (ThrowOnZaehlen)
+            Interlocked.Increment(ref _countCalls);
+            if (ThrowOnCount)
             {
                 throw new InvalidOperationException("Test exception from zaehlung.");
             }
 
-            if (_blockierteAufrufe > 0)
+            if (_blockedCalls > 0)
             {
-                _blockierteAufrufe--;
+                _blockedCalls--;
                 await _blockierGatter.WaitAsync(ct);
             }
 
@@ -544,7 +544,7 @@ public sealed class AutoShutdownOrchestratorTests
         private readonly Lock _syncLock = new();
         private int _requestCount;
         public bool ThrowOnRequest { get; set; }
-        public List<bool> ErzwingenWerte { get; } = new();
+        public List<bool> ForceValues { get; } = new();
 
         public int RequestCount
         {
@@ -557,12 +557,12 @@ public sealed class AutoShutdownOrchestratorTests
             }
         }
 
-        public Task RequestShutdownAsync(bool erzwingen, CancellationToken cancellationToken = default)
+        public Task RequestShutdownAsync(bool force, CancellationToken cancellationToken = default)
         {
             lock (_syncLock)
             {
                 _requestCount++;
-                ErzwingenWerte.Add(erzwingen);
+                ForceValues.Add(force);
             }
 
             if (ThrowOnRequest)

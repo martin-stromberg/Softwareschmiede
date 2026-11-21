@@ -10,7 +10,7 @@ using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Migrations
 {
-    [DbContext(typeof(SoftwareschmiededDbContext))]
+    [DbContext(typeof(SoftwareschmiedeDbContext))]
     [Migration("20260616112522_202606160001_SimplifyAufgabeStatusEnum")]
     partial class _202606160001_SimplifyAufgabeStatusEnum
     {

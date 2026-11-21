@@ -21,17 +21,17 @@ public partial class End2EndTest
     /// Szenario: Aufgabe starten, CLI läuft, CLI manuell stoppen (AusfuehrungsStatus wechselt auf
     /// "Beendet", Aufgabenstatus bleibt "Gestartet"). Prüft: Das CLI-Panel (CliViewButton, gebunden an
     /// ShowCliPanel) bleibt nach dem Stoppen sichtbar, die letzte CLI-Ausgabe (TerminalConsole) bleibt
-    /// einsehbar, und der Button "CLI starten" (KannCliNeuStarten) erscheint, sodass die CLI manuell
+    /// einsehbar, und der Button "CLI starten" (CanStartCli) erscheint, sodass die CLI manuell
     /// neu gestartet werden kann.
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster der Anwendung.</param>
-    protected void CliPanel_BleibtSichtbarNachBeendigung_E2E(Window mainWindow)
+    protected void CliPanel_RemainsVisibleAfterTermination_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        SetupProjectMitNeuerAufgabe(mainWindow, "CliPanelVisibility-Repo", "CliPanelVisibility-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "CliPanelVisibility-Repo", "CliPanelVisibility-Projekt");
 
-        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
 
         // CLI läuft: Stoppen-Button sichtbar, CLI-Panel-Tab sichtbar (ShowCliPanel==true, AusfuehrungsStatus==Aktiv)
         taskDetail.WaitForCliRunning();
@@ -46,7 +46,7 @@ public partial class End2EndTest
         // Letzte CLI-Ausgabe bleibt einsehbar
         Assert.True(taskDetail.HasTerminalOutput());
 
-        // "CLI starten" (KannCliNeuStarten) ist verfügbar, damit die CLI manuell neu gestartet werden kann
+        // "CLI starten" (CanStartCli) ist verfügbar, damit die CLI manuell neu gestartet werden kann
         Assert.True(taskDetail.CanRestartCli());
 
         // Statusleiste zeigt weiterhin "Gestartet" (Aufgabenstatus unverändert)

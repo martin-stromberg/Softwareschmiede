@@ -50,9 +50,9 @@ public sealed partial class TaskDetailView : UserControl
 
         if (e.NewValue is TaskDetailViewModel vm)
         {
-            vm.TerminalSessionGestartet += OnTerminalSessionGestartet;
-            vm.CliGestoppt += OnCliGestoppt;
-            vm.PromptVorlageGesendet += OnPromptVorlageGesendet;
+            vm.TerminalSessionStarted += OnTerminalSessionStarted;
+            vm.CliStopped += OnCliStopped;
+            vm.PromptTemplateSent += OnPromptTemplateSent;
             _subscribedViewModel = vm;
 
             SetTerminalSession(vm.GetTerminalSession());
@@ -68,13 +68,13 @@ public sealed partial class TaskDetailView : UserControl
         if (vm is null)
             return;
 
-        vm.TerminalSessionGestartet -= OnTerminalSessionGestartet;
-        vm.CliGestoppt -= OnCliGestoppt;
-        vm.PromptVorlageGesendet -= OnPromptVorlageGesendet;
+        vm.TerminalSessionStarted -= OnTerminalSessionStarted;
+        vm.CliStopped -= OnCliStopped;
+        vm.PromptTemplateSent -= OnPromptTemplateSent;
         vm.Dispose();
     }
 
-    private void OnTerminalSessionGestartet(ITerminalSession session)
+    private void OnTerminalSessionStarted(ITerminalSession session)
     {
         // Ein bereits eingeplantes Ereignis einer vorherigen Detailansicht kann noch nach
         // dem DataContext-Wechsel eintreffen. Die mitgelieferte Sitzung darf dann nicht
@@ -83,14 +83,14 @@ public sealed partial class TaskDetailView : UserControl
         SetTerminalSession(_subscribedViewModel?.GetTerminalSession());
     }
 
-    private void OnCliGestoppt()
+    private void OnCliStopped()
     {
         // Analog zum Start-Ereignis darf ein verspätetes Stopp-Ereignis einer alten Aufgabe
         // die sichtbare Sitzung der aktuell gewählten Aufgabe nicht entfernen.
         SetTerminalSession(_subscribedViewModel?.GetTerminalSession());
     }
 
-    private void OnPromptVorlageGesendet()
+    private void OnPromptTemplateSent()
     {
         _ = Dispatcher.InvokeAsync(() =>
         {
@@ -166,9 +166,9 @@ public sealed partial class TaskDetailView : UserControl
     /// <returns>Die Aufgaben-ID als String, oder ein leerer String, wenn keine Sitzung oder Aufgabe vorhanden ist.</returns>
     private string GetTerminalTaskId(ITerminalSession? session)
     {
-        if (session is null || _subscribedViewModel?.AufgabeId is not { } aufgabeId || aufgabeId == Guid.Empty)
+        if (session is null || _subscribedViewModel?.WorkItemId is not { } workItemId || workItemId == Guid.Empty)
             return string.Empty;
 
-        return aufgabeId.ToString("D");
+        return workItemId.ToString("D");
     }
 }

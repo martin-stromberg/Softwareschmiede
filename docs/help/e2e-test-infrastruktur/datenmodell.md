@@ -58,7 +58,7 @@ Projektdetail-Ansicht mit Aufgabenliste und Eigenschaften.
 
 | Eigenschaft / Methode | Typ | Beschreibung |
 |----------------------|-----|-------------|
-| `IsVisible` | bool | True: "ProjektName"-Feld und "AufgabeNeu"-Button sichtbar |
+| `IsVisible` | bool | True: "ProjectName"-Feld und "AufgabeNeu"-Button sichtbar |
 | `ForceShow()` | BaseWindowView | Öffnet Projekt aus Projektliste |
 | `CreateTask()` | void | Klick auf "AufgabeNeu"-Button |
 | `DeleteProject()` | void | Projekt-Löschung mit Bestätigung |
@@ -110,7 +110,7 @@ Fehlerbanner-View (zeigt Fehler der Anwendung).
 
 | Eigenschaft / Methode | Typ | Beschreibung |
 |----------------------|-----|-------------|
-| `IsVisible` | bool | True: "FehlerMeldung"-TextBlock sichtbar |
+| `IsVisible` | bool | True: "ErrorMessage"-TextBlock sichtbar |
 | `GetErrorMessage()` | string | Fehlertext lesen |
 
 ### DialogView : BaseWindowView
@@ -186,21 +186,21 @@ Nicht-modales Konsolentestfenster (`DialogTitle = "Konsolentest"`) für das CLI-
 
 | Methode | Rückgabe | Beschreibung |
 |---------|----------|-------------|
-| `ForceShow()` | `KonsolenTestDialogView` | Wartet auf das Dialogfenster |
-| `OeffneAufzeichnung(pfad)` | `KonsolenTestDialogView` | Klickt „Aufzeichnung öffnen…" und bedient den nativen Öffnen-Dialog (Tastatur-only wegen Autocomplete-Liste; eigene `OpenDialogCondition` auf „Öffnen"/„Open"/„CLI-Aufzeichnung öffnen") |
-| `OeffneAufzeichnungAbbrechen()` | `KonsolenTestDialogView` | Öffnet den Datei-Dialog und bricht ihn per ESC ab |
-| `StartWiedergabe()` | `KonsolenTestDialogView` | Klickt „Abspielen" (wartet auf CanExecute-Aktivierung) |
-| `NeustartWiedergabe()` | `KonsolenTestDialogView` | Klickt „Neu starten" (wartet auf Aktivierung) |
-| `PausierenToggle()` | `KonsolenTestDialogView` | Klickt „Pausieren/Fortsetzen" (wartet auf Aktivierung) |
-| `SchrittVor()` / `SchrittZurueck()` | `KonsolenTestDialogView` | Klickt „Schritt vor"/„Schritt zurück" (wartet auf CanExecute-Aktivierung — nur bei geladener Aufzeichnung, nicht unpausiert laufender Wiedergabe und innerhalb der Positionsgrenzen) |
-| `IstSchaltflaecheAktiviert(automationName)` | bool | Element per Automation-Name suchen und `IsEnabled` lesen — Nachweis der Rand-Deaktivierung (z. B. „Schritt zurück" an Position 0) |
-| `SetZeitrafferSchwelle(text)` | `KonsolenTestDialogView` | Setzt die Zeitraffer-Schwelle (Sekunden-Text) |
-| `GetStatusText()` / `GetPositionsText()` | string | Status- bzw. Positionstext (aus `HelpText` gelesen) |
-| `GetSelektierterQuellEintragIndex()` | int | 0-basierter Index der selektierten Zeile der `QuellChunkListe` (Selektion = zuletzt angewendeter Chunk) über das SelectionItem-Pattern, `-1` bei leerer Selektion |
-| `WarteAufStatus(...)` / `WarteAufPosition(...)` / `WarteAufQuellEintraege(...)` / `WarteAufFehlerSichtbar(...)` | `KonsolenTestDialogView` | Polling-Warten auf async Status-/Positions-/Listen-/Fehlerzustände |
-| `GetQuellEintraegeCount()` / `GetQuellEintragText(index)` | int / string | Quell-Chunk-Liste: Zeilenzahl und Quelltext-Zelle |
-| `IstFehlerSichtbar()` / `GetFehlerMeldung()` | bool / string? | Fehlerbanner auf dem **Dialogfenster** suchen (nicht auf `Window` — `ErrorView` durchsucht nur das Hauptfenster) |
-| `Schliessen()` | `KonsolenTestDialogView` | „Schließen" per Invoke-Pattern + `WaitUntilGone` |
+| `ForceShow()` | `ConsoleTestDialogView` | Wartet auf das Dialogfenster |
+| `OpenRecording(pfad)` | `ConsoleTestDialogView` | Klickt „Aufzeichnung öffnen…" und bedient den nativen Öffnen-Dialog (Tastatur-only wegen Autocomplete-Liste; eigene `OpenDialogCondition` auf „Öffnen"/„Open"/„CLI-Aufzeichnung öffnen") |
+| `OpenRecordingCancel()` | `ConsoleTestDialogView` | Öffnet den Datei-Dialog und bricht ihn per ESC ab |
+| `StartReplay()` | `ConsoleTestDialogView` | Klickt „Abspielen" (wartet auf CanExecute-Aktivierung) |
+| `RestartReplay()` | `ConsoleTestDialogView` | Klickt „Neu starten" (wartet auf Aktivierung) |
+| `PauseToggle()` | `ConsoleTestDialogView` | Klickt „Pausieren/Fortsetzen" (wartet auf Aktivierung) |
+| `StepForward()` / `StepBack()` | `ConsoleTestDialogView` | Klickt „Schritt vor"/„Schritt zurück" (wartet auf CanExecute-Aktivierung — nur bei geladener Aufzeichnung, nicht unpausiert laufender Wiedergabe und innerhalb der Positionsgrenzen) |
+| `IsButtonEnabled(automationName)` | bool | Element per Automation-Name suchen und `IsEnabled` lesen — Nachweis der Rand-Deaktivierung (z. B. „Schritt zurück" an Position 0) |
+| `SetTimelapseThreshold(text)` | `ConsoleTestDialogView` | Setzt die Zeitraffer-Schwelle (Sekunden-Text) |
+| `GetStatusText()` / `GetPositionText()` | string | Status- bzw. Positionstext (aus `HelpText` gelesen) |
+| `GetSelectsSourceEntryIndex()` | int | 0-basierter Index der selektierten Zeile der `SourceChunkList` (Selektion = zuletzt angewendeter Chunk) über das SelectionItem-Pattern, `-1` bei leerer Selektion |
+| `WaitOnStatus(...)` / `WaitOnPosition(...)` / `WaitOnSourceEntries(...)` / `WaitOnErrorVisible(...)` | `ConsoleTestDialogView` | Polling-Warten auf async Status-/Positions-/Listen-/Fehlerzustände |
+| `GetSourceEntriesCount()` / `GetSourceEntryText(index)` | int / string | Quell-Chunk-Liste: Zeilenzahl und Quelltext-Zelle |
+| `IsErrorVisible()` / `GetErrorMessage()` | bool / string? | Fehlerbanner auf dem **Dialogfenster** suchen (nicht auf `Window` — `ErrorView` durchsucht nur das Hauptfenster) |
+| `Schliessen()` | `ConsoleTestDialogView` | „Schließen" per Invoke-Pattern + `WaitUntilGone` |
 
 ## Klassenhierarchie-Diagramm
 
@@ -261,11 +261,11 @@ src/Softwareschmiede.Tests/E2E/Views/
     ├── PluginSelectionDialogView.cs
     ├── IssueSelectionDialogView.cs
     ├── IssueCreateDialogView.cs
-    ├── ArbeitsverzeichnisBearbeitenDialogView.cs
+    ├── WorkingDirectoryEditDialogView.cs
     ├── OpenTodosDialogView.cs
     ├── HelpTextDialogView.cs
     ├── SolutionSelectionDialogView.cs
     ├── UpdateProgressDialogView.cs
     ├── DeleteConfirmationDialogView.cs
-    └── KonsolenTestDialogView.cs
+    └── ConsoleTestDialogView.cs
 ```

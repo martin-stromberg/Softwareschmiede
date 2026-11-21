@@ -9,7 +9,7 @@ public sealed class PullRequestWorkflowRun
     public Guid Id { get; set; }
 
     /// <summary>ID der Pull-Request-Referenz.</summary>
-    public Guid PullRequestReferenzId { get; set; }
+    public Guid PullRequestReferenceId { get; set; }
 
     /// <summary>Run-ID beim Provider.</summary>
     public string ProviderRunId { get; set; } = string.Empty;
@@ -45,5 +45,5 @@ public sealed class PullRequestWorkflowRun
     public DateTimeOffset UpdatedUtc { get; set; }
 
     /// <summary>Navigation zur Pull-Request-Referenz.</summary>
-    public PullRequestReferenz PullRequestReferenz { get; set; } = null!;
+    public PullRequestReference PullRequestReference { get; set; } = null!;
 }

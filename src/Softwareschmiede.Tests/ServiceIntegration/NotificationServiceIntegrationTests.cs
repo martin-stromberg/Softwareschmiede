@@ -12,97 +12,97 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 /// <summary>E2E-Test: Status-Wechsel triggert Banner/Audio basierend auf Modus.</summary>
 public sealed class NotificationServiceIntegrationTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
-    private readonly BenachrichtigungsEinstellungenService _einstellungenService;
-    private readonly BenachrichtigungsAuditService _auditService;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
+    private readonly NotificationSettingsService _settingsService;
+    private readonly NotificationAuditService _auditService;
 
     /// <summary>NotificationServiceIntegrationTests.</summary>
     public NotificationServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
-        _einstellungenService = new BenachrichtigungsEinstellungenService(_db);
-        _auditService = new BenachrichtigungsAuditService(_db, NullLogger<BenachrichtigungsAuditService>.Instance);
+        _settingsService = new NotificationSettingsService(_db);
+        _auditService = new NotificationAuditService(_db, NullLogger<NotificationAuditService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    /// <summary><summary>BenachrichtigungsModus_Banner_IstVorhanden.</summary>.</summary>
+    /// <summary>BenachrichtigungsModus_Banner_IstVorhanden.</summary>
     [Fact]
-    public void BenachrichtigungsModus_Banner_IstVorhanden()
+    public void NotificationMode_Banner_IsExisting()
     {
-        Enum.GetValues<BenachrichtigungsModus>().Should().Contain(BenachrichtigungsModus.Banner);
+        Enum.GetValues<NotificationMode>().Should().Contain(NotificationMode.Banner);
     }
 
-    /// <summary><summary>BenachrichtigungsModus_Ton_IstVorhanden.</summary>.</summary>
+    /// <summary>BenachrichtigungsModus_Ton_IstVorhanden.</summary>
     [Fact]
-    public void BenachrichtigungsModus_Ton_IstVorhanden()
+    public void NotificationMode_Sound_IsExisting()
     {
-        Enum.GetValues<BenachrichtigungsModus>().Should().Contain(BenachrichtigungsModus.Ton);
+        Enum.GetValues<NotificationMode>().Should().Contain(NotificationMode.Sound);
     }
 
-    /// <summary><summary>BenachrichtigungsModus_Deaktiviert_IstVorhanden.</summary>.</summary>
+    /// <summary>BenachrichtigungsModus_Deaktiviert_IstVorhanden.</summary>
     [Fact]
-    public void BenachrichtigungsModus_Deaktiviert_IstVorhanden()
+    public void NotificationMode_Disabled_IsExisting()
     {
-        Enum.GetValues<BenachrichtigungsModus>().Should().Contain(BenachrichtigungsModus.Deaktiviert);
+        Enum.GetValues<NotificationMode>().Should().Contain(NotificationMode.Disabled);
     }
 
-    /// <summary><summary>BenachrichtigungsEinstellungen_WerdenGespeichert_UndGeladen.</summary>.</summary>
+    /// <summary>BenachrichtigungsEinstellungen_WerdenGespeichert_UndGeladen.</summary>
     [Fact]
-    public async Task BenachrichtigungsEinstellungen_WerdenGespeichert_UndGeladen()
+    public async Task NotificationSettings_BeSaved_AndLoaded()
     {
-        var benutzerId = "test-user";
-        var dto = new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Banner, BenachrichtigungsModus.Ton);
+        var userId = "test-user";
+        var dto = new NotificationSettingsDto(NotificationMode.Banner, NotificationMode.Sound);
 
-        await _einstellungenService.SaveAsync(benutzerId, dto, TestContext.Current.CancellationToken);
-        var geladen = await _einstellungenService.GetAsync(benutzerId, TestContext.Current.CancellationToken);
+        await _settingsService.SaveAsync(userId, dto, TestContext.Current.CancellationToken);
+        var loaded = await _settingsService.GetAsync(userId, TestContext.Current.CancellationToken);
 
-        geladen.BannerModus.Should().Be(BenachrichtigungsModus.Banner);
-        geladen.TonModus.Should().Be(BenachrichtigungsModus.Ton);
+        loaded.BannerMode.Should().Be(NotificationMode.Banner);
+        loaded.SoundMode.Should().Be(NotificationMode.Sound);
     }
 
-    /// <summary><summary>BenachrichtigungsDispatch_WirdAuditiert_BeiDeaktiviertemModus.</summary>.</summary>
+    /// <summary>BenachrichtigungsDispatch_WirdAuditiert_BeiDeaktiviertemModus.</summary>
     [Fact]
-    public async Task BenachrichtigungsDispatch_WirdAuditiert_BeiDeaktiviertemModus()
+    public async Task NotificationDispatch_WillAudited_AtDisabledMode()
     {
-        var benutzerId = "audit-user";
-        var aufgabeId = Guid.NewGuid();
+        var userId = "audit-user";
+        var workItemId = Guid.NewGuid();
 
-        var benutzerService = new Mock<IBenutzerkontextService>();
-        benutzerService.Setup(s => s.GetBenutzerId()).Returns(benutzerId);
+        var userService = new Mock<IUserContextService>();
+        userService.Setup(s => s.GetUserId()).Returns(userId);
 
-        var projekt = new Projekt
+        var project = new Project
         {
             Id = Guid.NewGuid(),
             Name = "Notification-Projekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         };
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
-            Id = aufgabeId,
-            ProjektId = projekt.Id,
-            Titel = "Notification-Aufgabe",
-            Status = AufgabeStatus.Neu,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            Id = workItemId,
+            ProjectId = project.Id,
+            Title = "Notification-Aufgabe",
+            Status = WorkItemStatus.New,
+            CreatedAt = DateTimeOffset.UtcNow
         };
-        _db.Projekte.Add(projekt);
-        _db.Aufgaben.Add(aufgabe);
+        _db.Projects.Add(project);
+        _db.WorkItems.Add(workItem);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        await _einstellungenService.SaveAsync(benutzerId, new BenachrichtigungsEinstellungenDto(BenachrichtigungsModus.Deaktiviert, BenachrichtigungsModus.Deaktiviert), TestContext.Current.CancellationToken);
+        await _settingsService.SaveAsync(userId, new NotificationSettingsDto(NotificationMode.Disabled, NotificationMode.Disabled), TestContext.Current.CancellationToken);
 
-        var sut = new BenachrichtigungsService(
-            _einstellungenService,
+        var sut = new NotificationService(
+            _settingsService,
             _auditService,
-            benutzerService.Object,
-            NullLogger<BenachrichtigungsService>.Instance);
+            userService.Object,
+            NullLogger<NotificationService>.Instance);
 
-        await sut.DispatchAsync(aufgabeId, AufgabeStatus.Gestartet, TestContext.Current.CancellationToken);
+        await sut.DispatchAsync(workItemId, WorkItemStatus.Started, TestContext.Current.CancellationToken);
 
-        var logs = _db.BenachrichtigungsDispatchLogs.Where(l => l.AufgabeId == aufgabeId).ToList();
+        var logs = _db.NotificationDispatchLogs.Where(l => l.WorkItemId == workItemId).ToList();
         logs.Should().NotBeEmpty();
-        logs.All(l => l.Entscheidung == BenachrichtigungsEntscheidung.Unterdrueckt).Should().BeTrue();
+        logs.All(l => l.Decision == NotificationDecision.Suppressed).Should().BeTrue();
     }
 }

@@ -14,58 +14,58 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>Unit-Tests für den CLI-Rohausgabe-Export von TaskDetailViewModel.</summary>
 public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
-    private readonly AufgabeService _aufgabeService;
-    private readonly ProtokollService _protokollService;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
+    private readonly WorkItemService _workItemService;
+    private readonly LogService _logService;
     private readonly TodoService _todoService;
-    private readonly KiAusfuehrungsService _kiService;
-    private readonly EntwicklungsprozessService _entwicklungsprozessService;
+    private readonly AiExecutionService _aiService;
+    private readonly DevelopmentProcessService _developmentprocessService;
     private readonly PluginSelectionService _pluginSelectionService;
-    private readonly PromptVorlagenService _promptVorlagenService;
-    private readonly PromptVorlagenPlatzhalterService _promptVorlagenPlatzhalterService = new();
-    private readonly PromptZeitVersandService _promptZeitVersandService;
-    private readonly AppEinstellungService _appEinstellungService;
+    private readonly PromptTemplateService _promptTemplatesService;
+    private readonly PromptTemplatePlaceholderService _promptTemplatesPlaceholderService = new();
+    private readonly PromptScheduleDispatchService _promptScheduleDispatchService;
+    private readonly AppSettingService _appSettingService;
     private readonly Mock<IDialogService> _dialogServiceMock;
-    private readonly Guid _projektId = Guid.NewGuid();
+    private readonly Guid _projectId = Guid.NewGuid();
 
     /// <summary>Initialisiert die Testinfrastruktur für CLI-Raw-Export-Tests.</summary>
     public TaskDetailViewModelTests_CliRawExport()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
-        _protokollService = new ProtokollService(_db, NullLogger<ProtokollService>.Instance);
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _logService = new LogService(_db, NullLogger<LogService>.Instance);
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
+        _aiService = TestAiExecutionServiceFactory.Create();
 
         var pluginManagerMock = new Mock<IPluginManager>();
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
         pluginManagerMock.Setup(p => p.GetSourceCodeManagementPlugins()).Returns([]);
-        _appEinstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        _appSettingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
         var pluginDefaultSettingsService = new PluginDefaultSettingsService(_db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var pluginActivationService = new PluginActivationService(_appEinstellungService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
+        var pluginActivationService = new PluginActivationService(_appSettingService, pluginManagerMock.Object, NullLogger<PluginActivationService>.Instance);
         _pluginSelectionService = new PluginSelectionService(pluginManagerMock.Object, pluginDefaultSettingsService, pluginActivationService, NullLogger<PluginSelectionService>.Instance);
-        _promptVorlagenService = new PromptVorlagenService(_db, NullLogger<PromptVorlagenService>.Instance);
-        _promptZeitVersandService = new PromptZeitVersandService(_kiService, TimeProvider.System, NullLogger<PromptZeitVersandService>.Instance);
+        _promptTemplatesService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
+        _promptScheduleDispatchService = new PromptScheduleDispatchService(_aiService, TimeProvider.System, NullLogger<PromptScheduleDispatchService>.Instance);
 
         var gitPluginMock = new Mock<IGitPlugin>();
-        var arbeitsverzeichnisMock = new Mock<IArbeitsverzeichnisResolver>();
-        _entwicklungsprozessService = new EntwicklungsprozessService(
-            _aufgabeService,
-            _protokollService,
+        var workingDirectoryMock = new Mock<IWorkingDirectoryResolver>();
+        _developmentprocessService = new DevelopmentProcessService(
+            _workItemService,
+            _logService,
             gitPluginMock.Object,
             _pluginSelectionService,
-            arbeitsverzeichnisMock.Object,
-            new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: _kiService),
-            NullLogger<EntwicklungsprozessService>.Instance);
+            workingDirectoryMock.Object,
+            new DevelopmentProcessServiceOptions(AiExecutionService: _aiService),
+            NullLogger<DevelopmentProcessService>.Instance);
 
         _dialogServiceMock = new Mock<IDialogService>();
 
-        _db.Projekte.Add(new Projekt
+        _db.Projects.Add(new Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
         _db.SaveChanges();
     }
@@ -73,7 +73,7 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
     /// <summary>Räumt Testressourcen und Hintergrunddienste auf.</summary>
     public void Dispose()
     {
-        _kiService.Dispose();
+        _aiService.Dispose();
         _db.Dispose();
     }
 
@@ -84,18 +84,18 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
         pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([]);
 
         var fileExplorerViewModel = TaskDetailViewModelTestFactory.CreateStub();
-        var arbeitsverzeichnisOeffnenService = TaskDetailViewModelTestFactory.CreateArbeitsverzeichnisOeffnenService();
+        var workingDirectoryOpenService = TaskDetailViewModelTestFactory.CreateWorkingDirectoryOpenService();
         var serviceProvider = new Mock<IServiceProvider>().Object;
 
         return new TaskDetailViewModel(
-            _aufgabeService,
-            _protokollService,
-            _kiService,
-            _entwicklungsprozessService,
+            _workItemService,
+            _logService,
+            _aiService,
+            _developmentprocessService,
             _pluginSelectionService,
-            _promptVorlagenService,
-            _promptVorlagenPlatzhalterService,
-            _promptZeitVersandService,
+            _promptTemplatesService,
+            _promptTemplatesPlaceholderService,
+            _promptScheduleDispatchService,
             _dialogServiceMock.Object,
             pluginManagerMock.Object,
             serviceProvider,
@@ -103,28 +103,28 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
             TimeProvider.System,
             fileExplorerViewModel,
             new TodoListViewModel(_todoService, NullLogger<TodoListViewModel>.Instance),
-            arbeitsverzeichnisOeffnenService);
+            workingDirectoryOpenService);
     }
 
-    private async Task<Aufgabe> ErstelleAufgabeAsync(AufgabeStatus status = AufgabeStatus.Neu)
+    private async Task<WorkItem> CreateWorkItemAsync(WorkItemStatus status = WorkItemStatus.New)
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, "Exportaufgabe", "Beschreibung");
-        if (status != AufgabeStatus.Neu)
-            await _aufgabeService.StatusSetzenAsync(aufgabe.Id, status);
-        return await _aufgabeService.GetByIdAsync(aufgabe.Id) ?? aufgabe;
+        var workItem = await _workItemService.CreateAsync(_projectId, "Exportaufgabe", "Beschreibung");
+        if (status != WorkItemStatus.New)
+            await _workItemService.SetStatusUncheckedAsync(workItem.Id, status);
+        return await _workItemService.GetByIdAsync(workItem.Id) ?? workItem;
     }
 
     /// <summary>Der Export-Command ist ausführbar, sobald eine Aufgabe geladen wurde.</summary>
     [Fact]
-    public async Task ExportCliRawCommand_CanExecute_WhenAufgabeGeladen()
+    public async Task ExportCliRawCommand_CanExecute_WhenWorkItemLoaded()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
+        sut.WorkItemId = workItem.Id;
 
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.KannCliRawExportieren.Should().BeTrue();
+        sut.ExportCanCliRaw.Should().BeTrue();
         sut.ExportCliRawCommand.CanExecute(null).Should().BeTrue();
     }
 
@@ -132,11 +132,11 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
     [Fact]
     public async Task ExportCliRawAsync_ShouldAbort_WhenDialogCancelled()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-output-1", TestContext.Current.CancellationToken);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        await _logService.AddCliOutputAsync(workItem.Id, "cli-output-1", TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.WorkItemId = workItem.Id;
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowSaveFileDialogAsync(
@@ -149,26 +149,26 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
 
         await ((AsyncRelayCommand)sut.ExportCliRawCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
     }
 
     /// <summary>Der Export enthält ausschließlich <c>CliOutput</c>-Zeilen in chronologischer Reihenfolge.</summary>
     [Fact]
     public async Task ExportCliRawAsync_ShouldWriteOnlyCliOutput_InChronologicalOrder()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.Prompt, "prompt-1", ct: TestContext.Current.CancellationToken);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        await _logService.AddEntryAsync(workItem.Id, LogEntryType.Prompt, "prompt-1", ct: TestContext.Current.CancellationToken);
         await Task.Delay(5, TestContext.Current.CancellationToken);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-1", TestContext.Current.CancellationToken);
+        await _logService.AddCliOutputAsync(workItem.Id, "cli-1", TestContext.Current.CancellationToken);
         await Task.Delay(5, TestContext.Current.CancellationToken);
-        await _protokollService.AddEintragAsync(aufgabe.Id, ProtokollTyp.SystemMeldung, "sys-1", ct: TestContext.Current.CancellationToken);
+        await _logService.AddEntryAsync(workItem.Id, LogEntryType.SystemMessage, "sys-1", ct: TestContext.Current.CancellationToken);
         await Task.Delay(5, TestContext.Current.CancellationToken);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-2", TestContext.Current.CancellationToken);
+        await _logService.AddCliOutputAsync(workItem.Id, "cli-2", TestContext.Current.CancellationToken);
 
-        var exportPfad = Path.Combine(Path.GetTempPath(), $"cli-raw-export-{Guid.NewGuid():N}.raw");
+        var exportPath = Path.Combine(Path.GetTempPath(), $"cli-raw-export-{Guid.NewGuid():N}.raw");
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.WorkItemId = workItem.Id;
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowSaveFileDialogAsync(
@@ -177,32 +177,32 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(exportPfad);
+            .ReturnsAsync(exportPath);
 
         try
         {
             await ((AsyncRelayCommand)sut.ExportCliRawCommand).ExecuteAsync();
 
-            File.Exists(exportPfad).Should().BeTrue();
-            var inhalt = await File.ReadAllTextAsync(exportPfad, TestContext.Current.CancellationToken);
-            inhalt.Should().Be($"cli-1{Environment.NewLine}cli-2");
+            File.Exists(exportPath).Should().BeTrue();
+            var content = await File.ReadAllTextAsync(exportPath, TestContext.Current.CancellationToken);
+            content.Should().Be($"cli-1{Environment.NewLine}cli-2");
         }
         finally
         {
-            if (File.Exists(exportPfad))
-                File.Delete(exportPfad);
+            if (File.Exists(exportPath))
+                File.Delete(exportPath);
         }
     }
 
     /// <summary>Ein ungültiger Exportpfad endet mit .raw darf nicht verarbeitet werden.</summary>
     [Fact]
-    public async Task ExportCliRawAsync_ShouldSetFehlerMeldung_WhenTargetPathIsNotRaw()
+    public async Task ExportCliRawAsync_ShouldSetErrorMessage_WhenTargetPathIsNotRaw()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-1", TestContext.Current.CancellationToken);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        await _logService.AddCliOutputAsync(workItem.Id, "cli-1", TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.WorkItemId = workItem.Id;
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
         _dialogServiceMock
             .Setup(d => d.ShowSaveFileDialogAsync(
@@ -215,21 +215,21 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
 
         await ((AsyncRelayCommand)sut.ExportCliRawCommand).ExecuteAsync();
 
-        sut.FehlerMeldung.Should().Be("Export-Zielpfad muss auf .raw enden.");
+        sut.ErrorMessage.Should().Be("Export-Zielpfad muss auf .raw enden.");
     }
 
     /// <summary>Schlägt das Dateischreiben fehl, wird eine benutzerseitige Fehlermeldung gesetzt.</summary>
     [Fact]
-    public async Task ExportCliRawAsync_ShouldSetFehlerMeldung_WhenFileWriteFails()
+    public async Task ExportCliRawAsync_ShouldSetErrorMessage_WhenFileWriteFails()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        await _protokollService.AddCliOutputAsync(aufgabe.Id, "cli-1", TestContext.Current.CancellationToken);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        await _logService.AddCliOutputAsync(workItem.Id, "cli-1", TestContext.Current.CancellationToken);
         var sut = CreateSut();
-        sut.AufgabeId = aufgabe.Id;
-        await ((AsyncRelayCommand)sut.LadenCommand).ExecuteAsync();
+        sut.WorkItemId = workItem.Id;
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        var verzeichnisPfad = Path.Combine(Path.GetTempPath(), $"cli-raw-export-dir-{Guid.NewGuid():N}.raw");
-        Directory.CreateDirectory(verzeichnisPfad);
+        var directoryPath = Path.Combine(Path.GetTempPath(), $"cli-raw-export-dir-{Guid.NewGuid():N}.raw");
+        Directory.CreateDirectory(directoryPath);
 
         _dialogServiceMock
             .Setup(d => d.ShowSaveFileDialogAsync(
@@ -238,19 +238,19 @@ public sealed class TaskDetailViewModelTests_CliRawExport : IDisposable
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(verzeichnisPfad);
+            .ReturnsAsync(directoryPath);
 
         try
         {
             await ((AsyncRelayCommand)sut.ExportCliRawCommand).ExecuteAsync();
 
-            sut.FehlerMeldung.Should().NotBeNullOrWhiteSpace();
-            sut.FehlerMeldung.Should().Contain("CLI-Rohausgabe konnte nicht exportiert werden");
+            sut.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+            sut.ErrorMessage.Should().Contain("CLI-Rohausgabe konnte nicht exportiert werden");
         }
         finally
         {
-            if (Directory.Exists(verzeichnisPfad))
-                Directory.Delete(verzeichnisPfad, recursive: true);
+            if (Directory.Exists(directoryPath))
+                Directory.Delete(directoryPath, recursive: true);
         }
     }
 }

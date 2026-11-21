@@ -25,22 +25,22 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
         ConfigureObservations(fixture);
         fixture.ConfigureIssue(9);
-        var projectId = (await RepositoriesAsync(fixture))[0].ProjektId;
+        var projectId = (await RepositoriesAsync(fixture))[0].ProjectId;
 
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var task = Assert.Single(await db.Aufgaben.Include(x => x.IssueReferenz).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal("Issue Titel 9", task.Titel);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var task = Assert.Single(await db.WorkItems.Include(x => x.IssueReference).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal("Issue Titel 9", task.Title);
         Assert.Equal(repositoryId, task.GitRepositoryId);
-        Assert.Equal(projectId, task.ProjektId);
-        Assert.Equal(AufgabeStatus.Gestartet, task.Status);
-        Assert.Equal(9, task.IssueReferenz?.IssueNummer);
-        Assert.Contains("$Softwareschmiede test", task.AnforderungsBeschreibung);
-        Assert.Contains("https://github.com/owner/repo/issues/9", task.AnforderungsBeschreibung);
+        Assert.Equal(projectId, task.ProjectId);
+        Assert.Equal(WorkItemStatus.Started, task.Status);
+        Assert.Equal(9, task.IssueReference?.IssueNumber);
+        Assert.Contains("$Softwareschmiede test", task.RequirementDescription);
+        Assert.Contains("https://github.com/owner/repo/issues/9", task.RequirementDescription);
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(task.Id, item.AufgabeId);
+        Assert.Equal(task.Id, item.WorkItemId);
     }
 
     /// <summary>Ein qualifiziertes Ereignis zu einem Pull Request legt eine Aufgabe mit
@@ -58,17 +58,17 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var task = Assert.Single(await db.Aufgaben.Include(x => x.PullRequests).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal("PR Titel 5", task.Titel);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var task = Assert.Single(await db.WorkItems.Include(x => x.PullRequests).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal("PR Titel 5", task.Title);
         Assert.Equal(repositoryId, task.GitRepositoryId);
         var reference = Assert.Single(task.PullRequests);
-        Assert.Equal(PullRequestReferenzRolle.ReviewSource, reference.Rolle);
+        Assert.Equal(PullRequestReferenceRole.ReviewSource, reference.Role);
         Assert.Equal(PullRequestProvider.GitHub, reference.Provider);
         Assert.Equal("owner/repo", reference.RepositoryId);
         Assert.Equal(5, reference.PullRequestNumber);
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(task.Id, item.AufgabeId);
+        Assert.Equal(task.Id, item.WorkItemId);
     }
 
     /// <summary>Wiederholte Läufe und Folgebatches derselben Referenz erzeugen keine zweite Aufgabe.</summary>
@@ -88,11 +88,11 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Single(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Single(await db.IssueReferenzen.Where(x => x.IssueNummer == 9).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Single(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Single(await db.IssueReferences.Where(x => x.IssueNumber == 9).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(2, await db.ScmIncomingEvents.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Single((await db.ScmIncomingEvents.Select(x => x.AufgabeId).Distinct().ToListAsync(cancellationToken: TestContext.Current.CancellationToken)));
+        Assert.Single((await db.ScmIncomingEvents.Select(x => x.WorkItemId).Distinct().ToListAsync(cancellationToken: TestContext.Current.CancellationToken)));
     }
 
     /// <summary>Ein Ereignis ohne Trigger erzeugt weder Aufgabe noch Inbox-Eintrag; der
@@ -109,8 +109,8 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Empty(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Empty(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.All(await db.ScmContentSnapshots.ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
             x => Assert.Equal(ScmEventStore.UnassignedDiagnostic, x.Diagnostic));
@@ -134,8 +134,8 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Empty(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Empty(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.All(await db.ScmContentSnapshots.ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
             x => Assert.Equal(ScmEventStore.UnassignedDiagnostic, x.Diagnostic));
@@ -156,8 +156,8 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Empty(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Empty(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.All(await db.ScmContentSnapshots.ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
             x => Assert.Equal(ScmEventStore.UnassignedDiagnostic, x.Diagnostic));
@@ -179,8 +179,8 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Empty(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Empty(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         var checkpoint = Assert.Single(await db.ScmObservationCheckpoints
             .Where(x => x.SourceKey.Contains("/IssueComment")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal("Temporary", checkpoint.ErrorCode);
@@ -205,8 +205,8 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
 
         Assert.Equal(taskId, (await TasksAsync(fixture)).Single());
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.All(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => Assert.Equal(taskId, x.AufgabeId));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.All(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => Assert.Equal(taskId, x.WorkItemId));
     }
 
     /// <summary>Ein Ereignis auf einem Pull Request, dessen Head-Branch dem Branch einer aktiven
@@ -218,7 +218,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var repositoryId = await AddRepositoryAsync(fixture);
-        var taskId = await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet, branchName: "feature/branch");
+        var taskId = await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started, branchName: "feature/branch");
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5);
@@ -226,11 +226,11 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Equal(taskId, Assert.Single(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken)).Id);
-        Assert.Empty(await db.PullRequestReferenzen.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Equal(taskId, Assert.Single(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken)).Id);
+        Assert.Empty(await db.PullRequestReferences.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(taskId, item.AufgabeId);
+        Assert.Equal(taskId, item.WorkItemId);
     }
 
     /// <summary>Ein nur in der Groß-/Kleinschreibung abweichender PR-Head-Branch trifft die aktive
@@ -244,7 +244,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var repositoryId = await AddRepositoryAsync(fixture);
-        var taskId = await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet, branchName: "Feature/Branch");
+        var taskId = await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started, branchName: "Feature/Branch");
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5);
@@ -252,11 +252,11 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Equal(taskId, Assert.Single(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken)).Id);
-        Assert.Empty(await db.PullRequestReferenzen.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Equal(taskId, Assert.Single(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken)).Id);
+        Assert.Empty(await db.PullRequestReferences.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(taskId, item.AufgabeId);
+        Assert.Equal(taskId, item.WorkItemId);
     }
 
     /// <summary>Eine Closing-Direktive im PR-Body ordnet das Ereignis der aktiven Aufgabe mit der
@@ -267,7 +267,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var repositoryId = await AddRepositoryAsync(fixture);
-        var taskId = await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet, issueNummer: 9);
+        var taskId = await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started, issueNumber: 9);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5, body: "PR Beschreibung\n\nCloses #9");
@@ -275,11 +275,11 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Equal(taskId, Assert.Single(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken)).Id);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Equal(taskId, Assert.Single(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken)).Id);
         var events = await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Contains(events, x => ScmEventStore.Observation(x).Reference.Kind == ScmReferenceKind.PullRequest);
-        Assert.All(events, x => Assert.Equal(taskId, x.AufgabeId));
+        Assert.All(events, x => Assert.Equal(taskId, x.WorkItemId));
     }
 
     /// <summary>Der Branch-Match greift nur bei aktiven Aufgaben; trifft der Kontext ausschließlich
@@ -290,7 +290,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var repositoryId = await AddRepositoryAsync(fixture);
-        var endedTaskId = await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Beendet, branchName: "feature/branch");
+        var endedTaskId = await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Completed, branchName: "feature/branch");
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5);
@@ -298,26 +298,26 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var tasks = await db.Aufgaben.Include(x => x.PullRequests).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var tasks = await db.WorkItems.Include(x => x.PullRequests).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(2, tasks.Count);
         var created = Assert.Single(tasks, x => x.Id != endedTaskId);
         var reference = Assert.Single(created.PullRequests);
-        Assert.Equal(PullRequestReferenzRolle.ReviewSource, reference.Rolle);
+        Assert.Equal(PullRequestReferenceRole.ReviewSource, reference.Role);
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(created.Id, item.AufgabeId);
+        Assert.Equal(created.Id, item.WorkItemId);
     }
 
     /// <summary>Zeigen Branch- und Issue-Signal auf unterschiedliche aktive Aufgaben, bleibt das
     /// Ereignis mit Mehrdeutigkeitsdiagnose unzugeordnet; es entsteht weder Aufgabe noch Inbox-Eintrag.</summary>
     [Fact]
-    public async Task Monitor_PullRequestConflictingContextSignals_ReportsAmbiguityWithoutTask()
+    public async Task Monitor_PullRequestConflictingContextSignal_ReportsAmbiguityWithoutTask()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var repositoryId = await AddRepositoryAsync(fixture);
-        await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet, branchName: "feature/branch");
-        await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet, issueNummer: 9);
+        await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started, branchName: "feature/branch");
+        await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started, issueNumber: 9);
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5, body: "PR Beschreibung\n\nCloses #9");
@@ -325,13 +325,13 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Equal(2, await db.Aufgaben.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Equal(2, await db.WorkItems.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
         var events = await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.DoesNotContain(events, x => ScmEventStore.Observation(x).Reference.Kind == ScmReferenceKind.PullRequest);
-        var snapshots = await db.ScmContentSnapshots.Where(x => x.ContentKey.Contains("/PullRequest/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
-        Assert.NotEmpty(snapshots);
-        Assert.All(snapshots, x => Assert.Equal(ScmEventStore.AmbiguousAssignmentDiagnostic, x.Diagnostic));
+        var snapshot = await db.ScmContentSnapshots.Where(x => x.ContentKey.Contains("/PullRequest/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.NotEmpty(snapshot);
+        Assert.All(snapshot, x => Assert.Equal(ScmEventStore.AmbiguousAssignmentDiagnostic, x.Diagnostic));
     }
 
     /// <summary>Ein Fork-PR mit gleichem Branchnamen ist kein Kontexttreffer; es entsteht eine
@@ -342,7 +342,7 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var repositoryId = await AddRepositoryAsync(fixture);
-        var taskId = await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet, branchName: "feature/branch");
+        var taskId = await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started, branchName: "feature/branch");
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5, sourceRepositoryId: "fork/repo");
@@ -350,14 +350,14 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var tasks = await db.Aufgaben.Include(x => x.PullRequests).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var tasks = await db.WorkItems.Include(x => x.PullRequests).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(2, tasks.Count);
         var created = Assert.Single(tasks, x => x.Id != taskId);
         var reference = Assert.Single(created.PullRequests);
-        Assert.Equal(PullRequestReferenzRolle.ReviewSource, reference.Rolle);
+        Assert.Equal(PullRequestReferenceRole.ReviewSource, reference.Role);
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(created.Id, item.AufgabeId);
+        Assert.Equal(created.Id, item.WorkItemId);
     }
 
     /// <summary>Eine pausierte Aufgabe ist ein gültiger Kontexttreffer: Das Ereignis wird zugeordnet
@@ -368,8 +368,8 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var repositoryId = await AddRepositoryAsync(fixture);
-        var taskId = await AddTaskAsync(fixture, repositoryId, AufgabeStatus.Gestartet,
-            branchName: "feature/branch", pausiertBisUtc: DateTimeOffset.UtcNow.AddHours(1));
+        var taskId = await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started,
+            branchName: "feature/branch", pausedUntilUtc: DateTimeOffset.UtcNow.AddHours(1));
         ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
         ConfigureObservations(fixture);
         ConfigurePullRequest(fixture, 5);
@@ -377,10 +377,10 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        Assert.Equal(taskId, Assert.Single(await db.Aufgaben.ToListAsync(cancellationToken: TestContext.Current.CancellationToken)).Id);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Equal(taskId, Assert.Single(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken)).Id);
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(taskId, item.AufgabeId);
+        Assert.Equal(taskId, item.WorkItemId);
         Assert.Equal("Wartend", item.Status);
         Assert.Contains("pausiert", item.Reason);
         Assert.Empty(fixture.Sessions);
@@ -390,28 +390,28 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
     private static async Task<List<Guid>> TasksAsync(ScmDispatchFixture fixture)
     {
         using var scope = fixture.Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>()
-            .Aufgaben.Select(x => x.Id).ToListAsync();
+        return await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>()
+            .WorkItems.Select(x => x.Id).ToListAsync();
     }
 
     private static async Task<List<GitRepository>> RepositoriesAsync(ScmDispatchFixture fixture)
     {
         using var scope = fixture.Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().GitRepositories.ToListAsync();
+        return await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().GitRepositories.ToListAsync();
     }
 
     private static async Task<Guid> AddRepositoryAsync(ScmDispatchFixture fixture)
     {
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var project = new Projekt { Id = Guid.NewGuid(), Name = "TaskAssignment" };
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var project = new Project { Id = Guid.NewGuid(), Name = "TaskAssignment" };
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            Projekt = project,
+            Project = project,
             RepositoryUrl = "https://github.com/owner/repo",
             RepositoryName = "repo",
-            PluginTyp = fixture.Repository.ProviderPrefix
+            PluginType = fixture.Repository.ProviderPrefix
         };
         db.AddRange(project, repository);
         await db.SaveChangesAsync();
@@ -419,25 +419,25 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
     }
 
     private static async Task<Guid> AddTaskAsync(ScmDispatchFixture fixture, Guid repositoryId,
-        AufgabeStatus status, string? branchName = null, DateTimeOffset? pausiertBisUtc = null, int? issueNummer = null)
+        WorkItemStatus status, string? branchName = null, DateTimeOffset? pausedUntilUtc = null, int? issueNumber = null)
     {
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var projektId = await db.GitRepositories.Where(x => x.Id == repositoryId).Select(x => x.ProjektId).SingleAsync();
-        var task = new Aufgabe
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var projectId = await db.GitRepositories.Where(x => x.Id == repositoryId).Select(x => x.ProjectId).SingleAsync();
+        var task = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = projektId,
+            ProjectId = projectId,
             GitRepositoryId = repositoryId,
-            Titel = "Kontextaufgabe",
+            Title = "Kontextaufgabe",
             Status = status,
             BranchName = branchName,
-            PausiertBisUtc = pausiertBisUtc,
-            IssueReferenz = issueNummer is null ? null : new IssueReferenz
+            PausedUntilUtc = pausedUntilUtc,
+            IssueReference = issueNumber is null ? null : new IssueReference
             {
                 Id = Guid.NewGuid(),
-                IssueNummer = issueNummer,
-                Titel = "Issue " + issueNummer
+                IssueNumber = issueNumber,
+                Title = "Issue " + issueNumber
             }
         };
         db.Add(task);

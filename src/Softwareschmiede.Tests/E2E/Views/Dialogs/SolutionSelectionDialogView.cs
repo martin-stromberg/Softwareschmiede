@@ -13,22 +13,22 @@ public sealed class SolutionSelectionDialogView : DialogView
     /// <inheritdoc/>
     protected override string DialogTitle => "Solution auswählen";
 
-    /// <summary>Bricht den Dialog über den "Abbrechen"-Button ab, ohne eine Solution zu öffnen.</summary>
+    /// <summary>Bricht den Dialog über den "Cancel"-Button ab, ohne eine Solution zu öffnen.</summary>
     public void Cancel()
     {
         var dialog = GetDialogWindow();
-        WaitForElement(dialog, cf => cf.ByName("Abbrechen"), Short).AsButton().ClickInForeground();
+        WaitForElement(dialog, cf => cf.ByName("Cancel"), Short).AsButton().ClickInForeground();
         ElementWaitHelper.WaitUntilProcessWindowGone(Window, DialogWindowCondition, Short);
     }
 
-    /// <summary>Wählt einen Eintrag in der "SolutionAuswahl"-Liste anhand seines (plugin-qualifizierten) Anzeigetexts aus.</summary>
+    /// <summary>Wählt einen Eintrag in der "SolutionSelection"-Liste anhand seines (plugin-qualifizierten) Anzeigetexts aus.</summary>
     /// <param name="displayName">Der Anzeigetext, z. B. "Visual Studio: Zweite.slnx".</param>
     /// <returns>Diese Instanz.</returns>
     public SolutionSelectionDialogView SelectSolution(string displayName)
     {
         var dialog = GetDialogWindow();
-        var liste = WaitForElement(dialog, cf => cf.ByName("SolutionAuswahl"), Short);
-        WaitForElement(liste, cf => cf.ByName(displayName), Short).ClickInForeground();
+        var list = WaitForElement(dialog, cf => cf.ByName("SolutionSelection"), Short);
+        WaitForElement(list, cf => cf.ByName(displayName), Short).ClickInForeground();
         return this;
     }
 

@@ -13,7 +13,7 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>Eigenständiger Prüfzyklus der Backmerge-Automatisierung („Prozessabläufe"): enumeriert
 /// repository-weit alle Referenzen aktiver Projekt-Repositories und bewertet Pull Requests auf das
 /// Backmerge-Muster. Läuft unabhängig von der SCM-Ereignisüberwachung und immer unter dem
-/// Benutzerkonto (<see cref="ScmKontoModus.Benutzerkonto"/>), damit die Entdeckung auch im
+/// Benutzerkonto (<see cref="ScmAccountMode.UserAccount"/>), damit die Entdeckung auch im
 /// SeparatesKonto-Modus der Ereignisüberwachung repository-weit funktioniert.</summary>
 /// <remarks>
 /// Repository-Auflösungen werden je Alias unter <c>backmerge-repository/{prefix}/{alias}</c> und die
@@ -33,17 +33,17 @@ public sealed class ScmBackmergeMonitoringService(
     {
         await startup.WaitAsync(ct);
         using var scope = scopes.CreateScope();
-        var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+        var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
         // Laufzeit-Schalter (Einstellungen → Automatisierung → Prozessabläufe): Bei deaktiviertem
         // Backmerge-Modus wird nicht enumeriert. Die Ereignisüberwachung ist davon unabhängig.
-        if (await einstellungen.GetScmBackmergeModusAsync(ct) == ScmBackmergeModus.Deaktiviert)
+        if (await settings.GetScmBackmergeModeAsync(ct) == ScmBackmergeMode.Disabled)
         {
             logger.LogDebug("Backmerge-Automatisierung ist deaktiviert; Durchlauf wird übersprungen.");
             return;
         }
 
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var repositories = await db.GitRepositories.AsNoTracking().Where(x => x.Aktiv).ToListAsync(ct);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var repositories = await db.GitRepositories.AsNoTracking().Where(x => x.Active).ToListAsync(ct);
         var plugins = scope.ServiceProvider.GetRequiredService<IPluginManager>().GetSourceCodeManagementPlugins();
         foreach (var plugin in plugins)
         {
@@ -58,7 +58,7 @@ public sealed class ScmBackmergeMonitoringService(
             foreach (var (alias, aliasGroup) in aliasGroups)
             {
                 using var resolutionScope = scopes.CreateScope();
-                var resolutionDb = resolutionScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+                var resolutionDb = resolutionScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
                 var resolutionKey = $"backmerge-repository/{plugin.PluginPrefix.ToLowerInvariant()}/{Uri.EscapeDataString(alias.ToLowerInvariant())}";
                 var checkpoint = await resolutionDb.ScmObservationCheckpoints.FindAsync([resolutionKey], ct);
                 if (checkpoint?.NextAttemptUtc > _time.GetUtcNow().ToUnixTimeMilliseconds())
@@ -68,7 +68,7 @@ public sealed class ScmBackmergeMonitoringService(
                     // Die Backmerge-Prüfung läuft immer unter dem Benutzerkonto — unabhängig vom
                     // konfigurierten Überwachungsmodus der Ereignisüberwachung.
                     var repository = await source.GetEventRepositoryAsync(
-                        new ScmRepositoryContext(aliasGroup[0].Id, plugin.PluginPrefix, alias, ScmKontoModus.Benutzerkonto), ct);
+                        new ScmRepositoryContext(aliasGroup[0].Id, plugin.PluginPrefix, alias, ScmAccountMode.UserAccount), ct);
                     if (!localRepositories.TryGetValue(repository, out var candidates))
                         localRepositories[repository] = candidates = [];
                     foreach (var lokal in aliasGroup)
@@ -100,7 +100,7 @@ public sealed class ScmBackmergeMonitoringService(
             {
                 using var enumerationScope = scopes.CreateScope();
                 var backmerge = enumerationScope.ServiceProvider.GetRequiredService<ScmBackmergeService>();
-                var lokale = localRepositories.TryGetValue(repository, out var kandidaten) ? kandidaten : new List<GitRepository>();
+                var lokale = localRepositories.TryGetValue(repository, out var candidates) ? candidates : new List<GitRepository>();
                 await ScmCheckpointSupport.EnumerateRepositoryAsync(
                     scopes, _time, options.Value.PollInterval, source, repository,
                     "backmerge-enumeration", enumerated,

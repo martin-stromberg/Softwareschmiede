@@ -7,10 +7,10 @@ public sealed class GitRepository
     public Guid Id { get; set; }
 
     /// <summary>ID des zugehörigen Projekts.</summary>
-    public Guid ProjektId { get; set; }
+    public Guid ProjectId { get; set; }
 
     /// <summary>Plugin-Typ, z.B. "GitHub".</summary>
-    public string PluginTyp { get; set; } = string.Empty;
+    public string PluginType { get; set; } = string.Empty;
 
     /// <summary>URL des Repositories.</summary>
     public string RepositoryUrl { get; set; } = string.Empty;
@@ -19,24 +19,24 @@ public sealed class GitRepository
     public string RepositoryName { get; set; } = string.Empty;
 
     /// <summary>Gibt an, ob das Repository aktiv ist.</summary>
-    public bool Aktiv { get; set; } = true;
+    public bool Active { get; set; } = true;
 
     /// <summary>Gibt an, ob neu angelegte Issues dieses Repositorys für die Issue-Aufbereitung
     /// überwacht werden (wirkt nur gemeinsam mit dem globalen Funktionsschalter
     /// <c>scm.issueaufbereitung.enabled</c>).</summary>
-    public bool IssueAufbereitungAktiv { get; set; }
+    public bool IssuePreparationEnabled { get; set; }
 
     /// <summary>Konfigurierter Basis-Branch, von dem neue Feature-Branches abgezweigt werden. <c>null</c> bedeutet: Remote-Standard-Branch wird verwendet.</summary>
     public string? DefaultSourceBranchName { get; set; }
 
     /// <summary>Optionale Startkonfiguration für Repository-Startskripte.</summary>
-    public RepositoryStartKonfiguration? StartKonfiguration { get; set; }
+    public RepositoryStartConfiguration? StartConfiguration { get; set; }
 
     /// <summary>Optionale Konfiguration für ein nach dem Klonen automatisch ausgeführtes Initialisierungsskript.</summary>
-    public RepositoryInitialisierungKonfiguration? InitialisierungKonfiguration { get; set; }
+    public RepositoryInitializationConfiguration? InitializationConfiguration { get; set; }
 
     /// <summary>Navigationseigenschaft zum übergeordneten Projekt.</summary>
-    public Projekt Projekt { get; set; } = null!;
+    public Project Project { get; set; } = null!;
 
     /// <summary>Diff-Ergebnisse für dieses Repository (optionale Zuordnung für Kontext).</summary>
     public List<DiffResult> DiffResults { get; set; } = [];

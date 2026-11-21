@@ -12,7 +12,7 @@ namespace Softwareschmiede.Infrastructure.Terminal;
 public sealed record TerminalPreflightCheck(string Name, bool Ok, string? Detail = null);
 
 /// <summary>Empfohlenes Backend aus dem Preflight-Ergebnis.</summary>
-public enum TerminalBackendEmpfehlung
+public enum TerminalBackendRecommendation
 {
     /// <summary>PTY-/ConPTY-Backend.</summary>
     Pty,
@@ -21,17 +21,17 @@ public enum TerminalBackendEmpfehlung
     Pipe,
 
     /// <summary>Start nicht möglich (harter Fehler).</summary>
-    Fehler
+    Error
 }
 
 /// <summary>Aggregiertes Ergebnis der Preflight-Diagnose eines Terminal-Session-Starts.</summary>
 /// <param name="Checks">Die durchgeführten Einzelprüfungen.</param>
-/// <param name="PtyVerfuegbar">Gibt an, ob ein Pseudo-Terminal (ConPTY) verfügbar ist.</param>
-/// <param name="BackendEmpfehlung">Die abgeleitete Backend-Empfehlung.</param>
+/// <param name="PtyAvailable">Gibt an, ob ein Pseudo-Terminal (ConPTY) verfügbar ist.</param>
+/// <param name="BackendRecommendation">Die abgeleitete Backend-Empfehlung.</param>
 public sealed record TerminalPreflightResult(
     IReadOnlyList<TerminalPreflightCheck> Checks,
-    bool PtyVerfuegbar,
-    TerminalBackendEmpfehlung BackendEmpfehlung);
+    bool PtyAvailable,
+    TerminalBackendRecommendation BackendRecommendation);
 
 /// <summary>Führt die Preflight-Diagnose vor einem Terminal-Session-Start aus und protokolliert jeden
 /// Einzelcheck. Bewusst frei von Datenbankzugriffen — ein Test-Override wird über den Parameter
@@ -55,7 +55,7 @@ public sealed class TerminalSessionDiagnostics
     /// <summary>Führt alle Preflight-Prüfungen aus.</summary>
     /// <param name="spec">Die vom Plugin gelieferte (bereits normalisierte) Startbeschreibung.</param>
     /// <param name="resolution">Das Ergebnis der Executable-Auflösung.</param>
-    /// <param name="healthCheck">Optionale Plugin-Health-Probe (<c>IKiPlugin.CheckHealthAsync</c> als
+    /// <param name="healthCheck">Optionale Plugin-Health-Probe (<c>IAiPlugin.CheckHealthAsync</c> als
     /// Delegate); wird nur bei erfolgreicher Executable-Auflösung aufgerufen und ist nicht fatal.</param>
     /// <param name="forcePtyUnavailable">Erzwingt einen Fehlschlag des PTY-Verfügbarkeits-Checks (Debug-/Test-Hook).</param>
     /// <param name="ct">Abbruch-Token.</param>
@@ -69,12 +69,12 @@ public sealed class TerminalSessionDiagnostics
     {
         var checks = new List<TerminalPreflightCheck>();
 
-        var ptyVerfuegbar = !forcePtyUnavailable
+        var ptyAvailable = !forcePtyUnavailable
             && OperatingSystem.IsWindows()
             && Environment.OSVersion.Version >= MinimumConPtyBuild;
         checks.Add(new TerminalPreflightCheck(
             "ConPTY-Verfügbarkeit",
-            ptyVerfuegbar,
+            ptyAvailable,
             forcePtyUnavailable
                 ? "Fehlschlag durch Test-Override erzwungen (Terminal.ForcePtyUnavailable)"
                 : $"OS-Build {Environment.OSVersion.Version} (Minimum: {MinimumConPtyBuild})"));
@@ -127,14 +127,14 @@ public sealed class TerminalSessionDiagnostics
         // Einzige Backend-Entscheidungslogik (TerminalSessionService.SelectBackend konsumiert sie):
         // Fehler bei nicht startbarer Executable oder RequiresPty ohne verfügbare PTY; Pipe, wenn das
         // Plugin keine PTY-Unterstützung deklariert oder keine PTY verfügbar ist; sonst Pty.
-        var backendEmpfehlung = !executableCheck.Ok
-            ? TerminalBackendEmpfehlung.Fehler
-            : spec.Capabilities.HasFlag(TerminalProviderCapabilities.RequiresPty) && !ptyVerfuegbar
-                ? TerminalBackendEmpfehlung.Fehler
-                : ptyVerfuegbar && spec.Capabilities.HasFlag(TerminalProviderCapabilities.SupportsPty)
-                    ? TerminalBackendEmpfehlung.Pty
-                    : TerminalBackendEmpfehlung.Pipe;
+        var backendRecommendation = !executableCheck.Ok
+            ? TerminalBackendRecommendation.Error
+            : spec.Capabilities.HasFlag(TerminalProviderCapabilities.RequiresPty) && !ptyAvailable
+                ? TerminalBackendRecommendation.Error
+                : ptyAvailable && spec.Capabilities.HasFlag(TerminalProviderCapabilities.SupportsPty)
+                    ? TerminalBackendRecommendation.Pty
+                    : TerminalBackendRecommendation.Pipe;
 
-        return new TerminalPreflightResult(checks, ptyVerfuegbar, backendEmpfehlung);
+        return new TerminalPreflightResult(checks, ptyAvailable, backendRecommendation);
     }
 }

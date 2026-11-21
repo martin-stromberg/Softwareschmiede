@@ -6,7 +6,7 @@ using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.ViewModels;
 
-/// <summary>Gemeinsame Lade-Logik für die Arbeitsverzeichnis-Auswahl, genutzt von <see cref="RepositoryAssignViewModel"/> und <see cref="ArbeitsverzeichnisBearbeitenViewModel"/>.</summary>
+/// <summary>Gemeinsame Lade-Logik für die Arbeitsverzeichnis-Auswahl, genutzt von <see cref="RepositoryAssignViewModel"/> und <see cref="WorkingDirectoryEditViewModel"/>.</summary>
 internal static class DirectoryStructureLoadHelper
 {
     /// <summary>Ruft die Verzeichnisstruktur eines Repositories ab und liefert das Ergebnis für Auswahl- oder manuellen Eingabemodus.</summary>

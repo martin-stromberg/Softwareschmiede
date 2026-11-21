@@ -20,30 +20,30 @@ public sealed class UnassignedRepositoriesConverter : IValueConverter
 
         if (diff.TotalMinutes < 60)
         {
-            var minuten = (int)diff.TotalMinutes;
-            return minuten == 1 ? "vor 1 Minute" : $"vor {minuten} Minuten";
+            var minutes = (int)diff.TotalMinutes;
+            return minutes == 1 ? "vor 1 Minute" : $"vor {minutes} Minuten";
         }
 
         if (diff.TotalHours < 24)
         {
-            var stunden = (int)diff.TotalHours;
-            return stunden == 1 ? "vor 1 Stunde" : $"vor {stunden} Stunden";
+            var hours = (int)diff.TotalHours;
+            return hours == 1 ? "vor 1 Stunde" : $"vor {hours} Stunden";
         }
 
         if (diff.TotalDays < 30)
         {
-            var tage = (int)diff.TotalDays;
-            return tage == 1 ? "vor 1 Tag" : $"vor {tage} Tagen";
+            var day = (int)diff.TotalDays;
+            return day == 1 ? "vor 1 Tag" : $"vor {day} Tagen";
         }
 
         if (diff.TotalDays < 365)
         {
-            var monate = (int)(diff.TotalDays / 30);
-            return monate == 1 ? "vor 1 Monat" : $"vor {monate} Monaten";
+            var month = (int)(diff.TotalDays / 30);
+            return month == 1 ? "vor 1 Monat" : $"vor {month} Monaten";
         }
 
-        var jahre = (int)(diff.TotalDays / 365);
-        return jahre == 1 ? "vor 1 Jahr" : $"vor {jahre} Jahren";
+        var year = (int)(diff.TotalDays / 365);
+        return year == 1 ? "vor 1 Jahr" : $"vor {year} Jahren";
     }
 
     /// <inheritdoc/>

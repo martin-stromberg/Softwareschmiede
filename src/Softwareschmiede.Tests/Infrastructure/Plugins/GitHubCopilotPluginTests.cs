@@ -27,7 +27,7 @@ public sealed class GitHubCopilotPluginTests
     {
         _sut.PluginName.Should().Be("GitHub Copilot");
         _sut.PluginPrefix.Should().Be("Softwareschmiede.GitHubCopilot");
-        _sut.ProviderDateiPraefix.Should().Be("copilot");
+        _sut.ProviderFilePrefix.Should().Be("copilot");
         _sut.GetSettingGroups().Should().HaveCount(3);
         _sut.GetSettingGroups().SelectMany(g => g.Fields).Should().Contain(f => f.Key == "Token");
         _sut.GetSettingGroups().Should().Contain(g => g.GroupName == "CLI-Konfiguration");
@@ -67,14 +67,14 @@ public sealed class GitHubCopilotPluginTests
 
     /// <summary>StartCliAsync passes optional parameters as arguments.</summary>
     [Fact]
-    public async Task StartCliAsync_ShouldPassParameters_AsArguments()
+    public async Task StartCliAsync_ShouldPassParameter_AsArguments()
     {
         var psi = await _sut.StartCliAsync("/repo", "--continue", TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Be("--continue");
     }
 
-    /// <summary>StartCliAsync sets GH_TOKEN when credential is stored.</summary>
+    /// <summary>StartCliAsync setzt GH_TOKEN, wenn Anmeldedaten gespeichert sind.</summary>
     [Fact]
     public async Task StartCliAsync_ShouldSetGhTokenEnvironmentVariable_WhenTokenIsStored()
     {
@@ -88,7 +88,7 @@ public sealed class GitHubCopilotPluginTests
 
     /// <summary>StartCliAsync appends CommandLineParameters from credential store to arguments.</summary>
     [Fact]
-    public async Task StartCliAsync_ShouldIncludeCommandLineParameters_InProcessStartInfo()
+    public async Task StartCliAsync_ShouldIncludeCommandLineParameter_InProcessStartInfo()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHubCopilot.CommandLineParameters"))
             .Returns("--model gpt-4o");
@@ -142,7 +142,7 @@ public sealed class GitHubCopilotPluginTests
 
     /// <summary>BuildIssueTemplateFillInvocation haengt gespeicherte CommandLineParameters als einzelne Argumente an.</summary>
     [Fact]
-    public void BuildIssueTemplateFillInvocation_ShouldAppendCommandLineParameters()
+    public void BuildIssueTemplateFillInvocation_ShouldAppendCommandLineParameter()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHubCopilot.CommandLineParameters"))
             .Returns("--model gpt-4o");

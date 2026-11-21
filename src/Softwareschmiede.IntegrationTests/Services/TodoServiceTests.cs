@@ -8,11 +8,11 @@ namespace Softwareschmiede.IntegrationTests.Services;
 /// <summary>Integrationstests für <see cref="TodoService"/> mit echter SQLite-Datenbank.</summary>
 public sealed class TodoServiceTests
 {
-    private static async Task<Guid> CreateTestProjektAsync(DatabaseFixture db)
+    private static async Task<Guid> CreateTestProjectAsync(DatabaseFixture db)
     {
-        var service = new ProjektService(db.Context, NullLogger<ProjektService>.Instance);
-        var projekt = await service.CreateAsync("Todo-Integrationstestprojekt", null);
-        return projekt.Id;
+        var service = new ProjectService(db.Context, NullLogger<ProjectService>.Instance);
+        var project = await service.CreateAsync("Todo-Integrationstestprojekt", null);
+        return project.Id;
     }
 
     /// <summary>Todos werden in der Datenbank gespeichert und können über einen neuen Context gelesen werden.</summary>
@@ -21,22 +21,22 @@ public sealed class TodoServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var projektId = await CreateTestProjektAsync(db);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var projectId = await CreateTestProjectAsync(db);
+        var workItemService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var todoService = new TodoService(db.Context, NullLogger<TodoService>.Instance);
-        var aufgabe = await aufgabeService.CreateAsync(projektId, "Aufgabe mit Todo", null, ct: TestContext.Current.CancellationToken);
+        var workItem = await workItemService.CreateAsync(projectId, "Aufgabe mit Todo", null, ct: TestContext.Current.CancellationToken);
 
         // Act
-        var created = await todoService.CreateTodoAsync(aufgabe.Id, "Persistiertes Todo", TestContext.Current.CancellationToken);
+        var created = await todoService.CreateTodoAsync(workItem.Id, "Persistiertes Todo", TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
         var loaded = await db2.Todos.FindAsync(new object?[] { created.Id }, TestContext.Current.CancellationToken);
 
         loaded.Should().NotBeNull();
-        loaded!.Beschreibung.Should().Be("Persistiertes Todo");
-        loaded.AufgabeId.Should().Be(aufgabe.Id);
-        loaded.ErledigtAm.Should().BeNull();
+        loaded!.Description.Should().Be("Persistiertes Todo");
+        loaded.WorkItemId.Should().Be(workItem.Id);
+        loaded.CompletedAt.Should().BeNull();
     }
 
     /// <summary>Cascade-Delete: Löschen der Aufgabe entfernt alle zugehörigen Todos.</summary>
@@ -45,20 +45,20 @@ public sealed class TodoServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var projektId = await CreateTestProjektAsync(db);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var projectId = await CreateTestProjectAsync(db);
+        var workItemService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var todoService = new TodoService(db.Context, NullLogger<TodoService>.Instance);
-        var aufgabe = await aufgabeService.CreateAsync(projektId, "Aufgabe mit Todos", null, ct: TestContext.Current.CancellationToken);
-        await todoService.CreateTodoAsync(aufgabe.Id, "Todo 1", TestContext.Current.CancellationToken);
-        await todoService.CreateTodoAsync(aufgabe.Id, "Todo 2", TestContext.Current.CancellationToken);
+        var workItem = await workItemService.CreateAsync(projectId, "Aufgabe mit Todos", null, ct: TestContext.Current.CancellationToken);
+        await todoService.CreateTodoAsync(workItem.Id, "Todo 1", TestContext.Current.CancellationToken);
+        await todoService.CreateTodoAsync(workItem.Id, "Todo 2", TestContext.Current.CancellationToken);
 
         // Act
-        await aufgabeService.DeleteAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        await workItemService.DeleteAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         // Assert
         await using var db2 = db.CreateNewContext();
-        var verbleibendeTodos = db2.Todos.Where(t => t.AufgabeId == aufgabe.Id).ToList();
-        verbleibendeTodos.Should().BeEmpty();
+        var remainingTodos = db2.Todos.Where(t => t.WorkItemId == workItem.Id).ToList();
+        remainingTodos.Should().BeEmpty();
     }
 
     /// <summary>Die Beziehung zwischen Aufgabe und Todo ist über die Navigationseigenschaft korrekt geladen.</summary>
@@ -67,32 +67,32 @@ public sealed class TodoServiceTests
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var projektId = await CreateTestProjektAsync(db);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var projectId = await CreateTestProjectAsync(db);
+        var workItemService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var todoService = new TodoService(db.Context, NullLogger<TodoService>.Instance);
-        var aufgabe = await aufgabeService.CreateAsync(projektId, "Aufgabe mit verknüpften Todos", null, ct: TestContext.Current.CancellationToken);
-        await todoService.CreateTodoAsync(aufgabe.Id, "Verknüpftes Todo", TestContext.Current.CancellationToken);
+        var workItem = await workItemService.CreateAsync(projectId, "Aufgabe mit verknüpften Todos", null, ct: TestContext.Current.CancellationToken);
+        await todoService.CreateTodoAsync(workItem.Id, "Verknüpftes Todo", TestContext.Current.CancellationToken);
 
         // Act
-        var detail = await aufgabeService.GetDetailAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        var detail = await workItemService.GetDetailAsync(workItem.Id, TestContext.Current.CancellationToken);
 
         // Assert
         detail.Should().NotBeNull();
-        detail!.Todos.Should().ContainSingle(t => t.Beschreibung == "Verknüpftes Todo");
+        detail!.Todos.Should().ContainSingle(t => t.Description == "Verknüpftes Todo");
     }
 
     /// <summary>ErledigtAm wird korrekt gespeichert und beim erneuten Laden abgerufen.</summary>
     [Fact]
-    public async Task MarkTodoAsCompletedAsync_ShouldPersistErledigtAm_WhenTodoExists()
+    public async Task MarkTodoAsCompletedAsync_ShouldPersistCompletedAt_WhenTodoExists()
     {
         // Arrange
         await using var db = await DatabaseFixture.CreateAsync(TestContext.Current.CancellationToken);
-        var projektId = await CreateTestProjektAsync(db);
-        var aufgabeService = new AufgabeService(db.Context, NullLogger<AufgabeService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
+        var projectId = await CreateTestProjectAsync(db);
+        var workItemService = new WorkItemService(db.Context, NullLogger<WorkItemService>.Instance, new TodoService(db.Context, NullLogger<TodoService>.Instance));
         var todoService = new TodoService(db.Context, NullLogger<TodoService>.Instance);
-        var aufgabe = await aufgabeService.CreateAsync(projektId, "Aufgabe mit erledigtem Todo", null, ct: TestContext.Current.CancellationToken);
-        var todo = await todoService.CreateTodoAsync(aufgabe.Id, "Zu erledigendes Todo", TestContext.Current.CancellationToken);
-        var vorMarkierung = DateTimeOffset.UtcNow.AddSeconds(-1);
+        var workItem = await workItemService.CreateAsync(projectId, "Aufgabe mit erledigtem Todo", null, ct: TestContext.Current.CancellationToken);
+        var todo = await todoService.CreateTodoAsync(workItem.Id, "Zu erledigendes Todo", TestContext.Current.CancellationToken);
+        var beforeHighlight = DateTimeOffset.UtcNow.AddSeconds(-1);
 
         // Act
         await todoService.MarkTodoAsCompletedAsync(todo.Id, TestContext.Current.CancellationToken);
@@ -101,8 +101,8 @@ public sealed class TodoServiceTests
         await using var db2 = db.CreateNewContext();
         var loaded = await db2.Todos.FindAsync(new object?[] { todo.Id }, TestContext.Current.CancellationToken);
 
-        loaded!.ErledigtAm.Should().NotBeNull();
-        loaded.ErledigtAm!.Value.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(3));
-        loaded.ErledigtAm!.Value.Should().BeOnOrAfter(vorMarkierung);
+        loaded!.CompletedAt.Should().NotBeNull();
+        loaded.CompletedAt!.Value.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(3));
+        loaded.CompletedAt!.Value.Should().BeOnOrAfter(beforeHighlight);
     }
 }

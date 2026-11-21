@@ -5,10 +5,10 @@ using Softwareschmiede.Domain.ValueObjects;
 namespace Softwareschmiede.Domain.PluginImpl;
 
 /// <summary>IDE-Plugin für Visual Studio Code. Dient als universeller Rückfall für beliebige Repositories.</summary>
-/// <param name="prozessStarter">Startet den Öffnen-Befehl für das Repository-Verzeichnis.</param>
+/// <param name="processStarter">Startet den Öffnen-Befehl für das Repository-Verzeichnis.</param>
 /// <param name="visualStudioCodeLocator">Ermittelt den startbaren Visual-Studio-Code-Befehl.</param>
 public sealed class VisualStudioCodeIdePlugin(
-    IProzessStarter prozessStarter,
+    IProcessStarter processStarter,
     IVisualStudioCodeLocator visualStudioCodeLocator) : IIdePlugin
 {
     /// <inheritdoc/>
@@ -32,19 +32,19 @@ public sealed class VisualStudioCodeIdePlugin(
     }
 
     /// <summary>Öffnet das übergebene Verzeichnis in Visual Studio Code.</summary>
-    /// <param name="prozessStarter">Startet den Öffnen-Befehl für das Verzeichnis.</param>
+    /// <param name="processStarter">Startet den Öffnen-Befehl für das Verzeichnis.</param>
     /// <param name="visualStudioCodeLocator">Ermittelt den startbaren Visual-Studio-Code-Befehl.</param>
     /// <param name="path">Der zu öffnende Ordner.</param>
-    internal static void OpenDirectory(IProzessStarter prozessStarter, IVisualStudioCodeLocator visualStudioCodeLocator, string path)
+    internal static void OpenDirectory(IProcessStarter processStarter, IVisualStudioCodeLocator visualStudioCodeLocator, string path)
     {
         var availability = visualStudioCodeLocator.Locate();
         if (!availability.IsAvailable || string.IsNullOrWhiteSpace(availability.ExecutablePath))
             throw new InvalidOperationException("Visual Studio Code wurde nicht gefunden.");
 
-        prozessStarter.Starten(new ProzessStartAnfrage(
+        processStarter.Start(new ProcessStartRequest(
             availability.ExecutablePath,
             QuoteArgument(path),
-            ShellAusfuehren: false));
+            UseShellExecute: false));
     }
 
     private static string QuoteArgument(string argument)
@@ -65,7 +65,7 @@ public sealed class VisualStudioCodeIdePlugin(
     {
         ArgumentNullException.ThrowIfNull(entryPoint);
 
-        OpenDirectory(prozessStarter, visualStudioCodeLocator, entryPoint.Path);
+        OpenDirectory(processStarter, visualStudioCodeLocator, entryPoint.Path);
 
         return Task.CompletedTask;
     }

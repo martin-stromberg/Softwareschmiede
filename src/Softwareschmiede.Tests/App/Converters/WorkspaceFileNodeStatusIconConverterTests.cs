@@ -12,7 +12,7 @@ public sealed class WorkspaceFileNodeStatusIconConverterTests
 
     /// <summary>Für gelöschte Dateien (IsDeleted-Flag) wird das Löschsymbol geliefert.</summary>
     [Fact]
-    public void Convert_IsDeletedFlag_LiefertLoeschSymbol()
+    public void Convert_IsDeletedFlag_ReturnsDeleteSymbol()
     {
         var node = new WorkspaceFileNode { Name = "a.txt", IsDeleted = true };
 
@@ -23,7 +23,7 @@ public sealed class WorkspaceFileNodeStatusIconConverterTests
 
     /// <summary>Für Git-Status "gelöscht" wird das Löschsymbol geliefert.</summary>
     [Fact]
-    public void Convert_GitStatusGeloescht_LiefertLoeschSymbol()
+    public void Convert_GitStatusDeleted_ReturnsDeleteSymbol()
     {
         var node = new WorkspaceFileNode { Name = "a.txt", Status = WorkspaceFileStatus.Parse(" D") };
 
@@ -34,7 +34,7 @@ public sealed class WorkspaceFileNodeStatusIconConverterTests
 
     /// <summary>Für nicht versionierte (neue) Dateien wird das "Neu"-Symbol geliefert.</summary>
     [Fact]
-    public void Convert_Untracked_LiefertNeuSymbol()
+    public void Convert_Untracked_ReturnsNewSymbol()
     {
         var node = new WorkspaceFileNode { Name = "a.txt", Status = WorkspaceFileStatus.Parse("??") };
 
@@ -45,7 +45,7 @@ public sealed class WorkspaceFileNodeStatusIconConverterTests
 
     /// <summary>Für im Index hinzugefügte Dateien wird das "Neu"-Symbol geliefert.</summary>
     [Fact]
-    public void Convert_IndexAdded_LiefertNeuSymbol()
+    public void Convert_IndexAdded_ReturnsNewSymbol()
     {
         var node = new WorkspaceFileNode { Name = "a.txt", Status = WorkspaceFileStatus.Parse("A ") };
 
@@ -56,7 +56,7 @@ public sealed class WorkspaceFileNodeStatusIconConverterTests
 
     /// <summary>Für geänderte Dateien wird das Änderungssymbol geliefert.</summary>
     [Fact]
-    public void Convert_Geaendert_LiefertAenderungsSymbol()
+    public void Convert_Changed_ReturnsChangeSymbol()
     {
         var node = new WorkspaceFileNode { Name = "a.txt", Status = WorkspaceFileStatus.Parse(" M") };
 
@@ -67,7 +67,7 @@ public sealed class WorkspaceFileNodeStatusIconConverterTests
 
     /// <summary>Für unveränderte Dateien (kein Status) wird kein Symbol geliefert.</summary>
     [Fact]
-    public void Convert_KeinStatus_LiefertLeerenString()
+    public void Convert_NoStatus_ReturnsEmptyString()
     {
         var node = new WorkspaceFileNode { Name = "a.txt" };
 
@@ -78,7 +78,7 @@ public sealed class WorkspaceFileNodeStatusIconConverterTests
 
     /// <summary>Für Verzeichnisknoten wird nie ein Status-Symbol geliefert.</summary>
     [Fact]
-    public void Convert_Verzeichnis_LiefertLeerenString()
+    public void Convert_Directory_ReturnsEmptyString()
     {
         var node = new WorkspaceFileNode { Name = "src", IsDirectory = true, Status = WorkspaceFileStatus.Parse(" M") };
 

@@ -23,12 +23,12 @@ public sealed class TestTerminalSessionFactory : ITerminalSessionFactory
 
     /// <inheritdoc/>
     public Task<TerminalSessionStartResult> StartAsync(
-        Guid aufgabeId,
+        Guid workItemId,
         TerminalSessionStartSpec spec,
         ITerminalOutputSink? outputSink,
         Func<CancellationToken, Task<bool>>? healthCheck,
         CancellationToken ct)
-        => Task.FromResult(_launcher.Start(aufgabeId, spec, outputSink));
+        => Task.FromResult(_launcher.Start(workItemId, spec, outputSink));
 
     /// <summary>Deterministischer In-Memory-Launcher: kein echter Prozessstart, Session auf
     /// MemoryStreams mit <c>TerminalSessionOptions</c>-Defaults.</summary>
@@ -36,7 +36,7 @@ public sealed class TestTerminalSessionFactory : ITerminalSessionFactory
     {
         public bool IsPseudoTerminal => false;
 
-        public TerminalSessionStartResult Start(Guid aufgabeId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null)
+        public TerminalSessionStartResult Start(Guid workItemId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null)
         {
             var process = Process.GetCurrentProcess();
             var session = new PseudoConsoleSession(
@@ -74,7 +74,7 @@ public sealed class TestTerminalSessionFactory : ITerminalSessionFactory
 
         public bool IsPseudoTerminal => false;
 
-        public TerminalSessionStartResult Start(Guid aufgabeId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null)
+        public TerminalSessionStartResult Start(Guid workItemId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null)
         {
             if (outputSink is not null)
                 foreach (var chunk in _chunks)

@@ -15,7 +15,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Dispatch guards and run-bound confirmations against persisted events and real session adapters.</summary>
 public sealed class ScmEventOrchestratorTests
 {
-    /// <summary>A token lacking repository write access leaves an actionable settings path without starting the CLI.</summary>
+    /// <summary>Ein Token ohne Repository-Schreibzugriff hinterlässt einen umsetzbaren Einstellungspfad, ohne die CLI zu starten.</summary>
     [Fact]
     public async Task MissingWriteAccess_ExplainsTokenSettingsBeforeCliStart()
     {
@@ -36,8 +36,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Empty(fixture.Prompts);
     }
 
-    /// <summary>A stored observation carrying a viewer reaction (legacy data or manual inserts)
-    /// is never delivered: the dispatch revalidation parks it with a dedicated reason.</summary>
+    /// <summary>Eine gespeicherte Beobachtung mit Viewer-Reaktion (Altdaten oder manuelle Inserts) wird niemals zugestellt: die Dispatch-Revalidierung parkt sie mit eigenem Grund.</summary>
     [Fact]
     public async Task Dispatch_ReactedStoredObservation_Waits()
     {
@@ -46,17 +45,17 @@ public sealed class ScmEventOrchestratorTests
         Guid eventId;
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var project = new Projekt { Id = Guid.NewGuid(), Name = "SCM" };
-            var repository = new GitRepository { Id = Guid.NewGuid(), ProjektId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginTyp = fixture.Repository.ProviderPrefix, RepositoryName = "repo" };
-            var task = new Aufgabe { Id = Guid.NewGuid(), Titel = "SCM task", ProjektId = project.Id, GitRepositoryId = repository.Id, Status = AufgabeStatus.Gestartet, KiPluginPrefix = ScmDispatchFixture.KiPrefix };
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            var project = new Project { Id = Guid.NewGuid(), Name = "SCM" };
+            var repository = new GitRepository { Id = Guid.NewGuid(), ProjectId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginType = fixture.Repository.ProviderPrefix, RepositoryName = "repo" };
+            var task = new WorkItem { Id = Guid.NewGuid(), Title = "SCM task", ProjectId = project.Id, GitRepositoryId = repository.Id, Status = WorkItemStatus.Started, AiPluginPrefix = ScmDispatchFixture.AiPrefix };
             var time = DateTimeOffset.UtcNow;
             var observation = new ScmEventObservation(new(fixture.Repository, ScmReferenceKind.Issue, 7), ScmContentKind.IssueComment,
                 Guid.NewGuid().ToString(), "42", time, time, null, "U_1", "owner", null, null,
                 "$Softwareschmiede test", "https://github.com/owner/repo/issues/7", time, ["EYES"]);
             var incomingEvent = new ScmIncomingEvent
             {
-                AufgabeId = task.Id,
+                WorkItemId = task.Id,
                 EventKey = observation.EventKey,
                 ObservationJson = JsonSerializer.Serialize(observation, ScmEventStore.JsonOptions),
                 ReceivedUtc = time.ToUnixTimeMilliseconds()
@@ -75,7 +74,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Empty(fixture.Prompts);
     }
 
-    /// <summary>A valid reception activates a new task even while CLI selection is still required.</summary>
+    /// <summary>Ein gültiger Empfang aktiviert eine neue Aufgabe, auch solange noch eine CLI-Auswahl nötig ist.</summary>
     [Fact]
     public async Task NoDefault_ActivatesTaskBeforeWaitingForSelection()
     {
@@ -84,15 +83,14 @@ public sealed class ScmEventOrchestratorTests
         var (taskId, eventId) = await fixture.AddAsync();
         await fixture.DispatchAsync(eventId);
         using var scope = fixture.Services.CreateScope();
-        var task = await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
-        Assert.Equal(AufgabeStatus.Gestartet, task!.Status);
+        var task = await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
+        Assert.Equal(WorkItemStatus.Started, task!.Status);
         Assert.Contains("Keine Standard-CLI", (await fixture.EventAsync(eventId)).Reason);
         Assert.Empty(fixture.Sessions);
         Assert.Equal(2, fixture.Responses.Count);
     }
 
-    /// <summary>A task without a plugin uses the settings-configured default CLI (ki.plugin.default)
-    /// and the start persists the resolved prefix on the task.</summary>
+    /// <summary>Eine Aufgabe ohne Plugin nutzt die in den Einstellungen konfigurierte Standard-CLI (ki.plugin.default), und der Start persistiert das aufgelöste Präfix an der Aufgabe.</summary>
     [Fact]
     public async Task SettingsDefaultCli_StartsTaskAndDelivers()
     {
@@ -100,8 +98,8 @@ public sealed class ScmEventOrchestratorTests
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync();
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Simulator", TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Simulator", TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Zugestellt", item.Status);
@@ -109,12 +107,11 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);
         using var verification = fixture.Services.CreateScope();
-        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
-        Assert.Equal(ScmDispatchFixture.KiPrefix, task!.KiPluginPrefix);
+        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
+        Assert.Equal(ScmDispatchFixture.AiPrefix, task!.AiPluginPrefix);
     }
 
-    /// <summary>A settings default that names no installed plugin is not guessed around:
-    /// the event keeps an actionable waiting state that names the ignored assignment.</summary>
+    /// <summary>Ein Einstellungs-Standard, der kein installiertes Plugin nennt, wird nicht umrissen: das Ereignis behält einen umsetzbaren Wartezustand, der die ignorierte Zuordnung nennt.</summary>
     [Fact]
     public async Task UnresolvableSettingsDefaultCli_KeepsWaitingState()
     {
@@ -122,8 +119,8 @@ public sealed class ScmEventOrchestratorTests
         await fixture.InitializeAsync();
         var (_, eventId) = await fixture.AddAsync();
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetSettingAsync(AppEinstellungService.DefaultKiPluginKey, "Nicht installiert", TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Nicht installiert", TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Wartend", item.Status);
@@ -133,25 +130,24 @@ public sealed class ScmEventOrchestratorTests
         Assert.Empty(fixture.Prompts);
     }
 
-    /// <summary>A deactivated task plugin assignment is ignored: the dispatch falls back to the
-    /// activated global default plugin, delivers the event and persists the used prefix.</summary>
+    /// <summary>Eine deaktivierte Aufgaben-Plugin-Zuordnung wird ignoriert: der Dispatch fällt auf das aktivierte globale Standard-Plugin zurück, stellt das Ereignis zu und persistiert das genutzte Präfix.</summary>
     [Fact]
-    public async Task DisabledTaskPlugin_FallsBackToGlobalDefault_Delivers()
+    public async Task DisabledTaskPlugin_IfBackToGlobalDefault_Delivers()
     {
-        var second = new ScmKiProfile("Softwareschmiede.OtherKi", string.Empty, "OTHER", "OTHER>",
+        var second = new ScmAiProfile("Softwareschmiede.OtherKi", string.Empty, "OTHER", "OTHER>",
             new Dictionary<string, string?>());
         await using var fixture = new ScmDispatchFixture(ki2: second);
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            (await db.Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.KiPluginPrefix = second.Prefix;
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            (await db.WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.AiPluginPrefix = second.Prefix;
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
                 .SetPluginEnabledAsync(second.Prefix, false, TestContext.Current.CancellationToken);
             await scope.ServiceProvider.GetRequiredService<PluginDefaultSettingsService>()
-                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
+                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.AiPrefix, TestContext.Current.CancellationToken);
         }
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
@@ -160,13 +156,11 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);
         using var verification = fixture.Services.CreateScope();
-        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
-        Assert.Equal(ScmDispatchFixture.KiPrefix, task!.KiPluginPrefix);
+        var task = await verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken);
+        Assert.Equal(ScmDispatchFixture.AiPrefix, task!.AiPluginPrefix);
     }
 
-    /// <summary>With no executable plugin configured the event waits honestly: an understandable
-    /// reason and a protocol entry are recorded, no hard NextAttemptUtc lock is applied, and the
-    /// delivery proceeds once the plugin is activated again.</summary>
+    /// <summary>Ohne konfiguriertes ausführbares Plugin wartet das Ereignis ehrlich: ein verständlicher Grund und ein Protokolleintrag werden aufgezeichnet, kein harter NextAttemptUtc-Lock wird gesetzt, und die Zustellung geht weiter, sobald das Plugin wieder aktiviert wird.</summary>
     [Fact]
     public async Task UnavailablePlugins_EventWaitsWithoutHardLock_ResumesAfterFix()
     {
@@ -175,24 +169,24 @@ public sealed class ScmEventOrchestratorTests
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
-                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, false, TestContext.Current.CancellationToken);
+                .SetPluginEnabledAsync(ScmDispatchFixture.AiPrefix, false, TestContext.Current.CancellationToken);
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Wartend", item.Status);
         Assert.Null(item.NextAttemptUtc);
         Assert.Contains("nicht mehr installiert oder aktiviert", item.Reason);
-        Assert.Contains(ScmDispatchFixture.KiPrefix, item.Reason);
+        Assert.Contains(ScmDispatchFixture.AiPrefix, item.Reason);
         Assert.Empty(fixture.Sessions);
         Assert.Empty(fixture.Prompts);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            var entries = await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
-            Assert.Contains(entries, x => x.Typ == ProtokollTyp.SystemMeldung && x.Inhalt.Contains(ScmDispatchFixture.KiPrefix));
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            var entries = await db.LogEntries.Where(x => x.WorkItemId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+            Assert.Contains(entries, x => x.Type == LogEntryType.SystemMessage && x.Content.Contains(ScmDispatchFixture.AiPrefix));
         }
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
-                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, true, TestContext.Current.CancellationToken);
+                .SetPluginEnabledAsync(ScmDispatchFixture.AiPrefix, true, TestContext.Current.CancellationToken);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
         item = await fixture.EventAsync(eventId);
@@ -202,8 +196,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Prompts);
     }
 
-    /// <summary>An explicit user selection stays strict: a deactivated explicit prefix keeps the
-    /// existing failure path with a hard NextAttemptUtc lock instead of a silent fallback.</summary>
+    /// <summary>Eine explizite Benutzerauswahl bleibt strikt: ein deaktiviertes explizites Präfix behält den bestehenden Fehlerpfad mit hartem NextAttemptUtc-Lock statt eines stillen Fallbacks.</summary>
     [Fact]
     public async Task ExplicitPluginPrefix_RemainsStrict_LocksOnUnavailable()
     {
@@ -212,9 +205,9 @@ public sealed class ScmEventOrchestratorTests
         var (_, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<PluginActivationService>()
-                .SetPluginEnabledAsync(ScmDispatchFixture.KiPrefix, false, TestContext.Current.CancellationToken);
+                .SetPluginEnabledAsync(ScmDispatchFixture.AiPrefix, false, TestContext.Current.CancellationToken);
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(eventId, ScmDispatchFixture.KiPrefix, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(eventId, ScmDispatchFixture.AiPrefix, TestContext.Current.CancellationToken);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Wartend", item.Status);
         Assert.Equal(long.MaxValue, item.NextAttemptUtc);
@@ -225,27 +218,27 @@ public sealed class ScmEventOrchestratorTests
 
     /// <summary>Terminal absence does not override completion, archive or pause guards.</summary>
     [Theory]
-    [InlineData(AufgabeStatus.Beendet, false)]
-    [InlineData(AufgabeStatus.Archiviert, false)]
-    [InlineData(AufgabeStatus.Neu, true)]
-    public async Task BlockedTask_IsNeverActivated(AufgabeStatus status, bool paused)
+    [InlineData(WorkItemStatus.Completed, false)]
+    [InlineData(WorkItemStatus.Archived, false)]
+    [InlineData(WorkItemStatus.New, true)]
+    public async Task BlockedTask_IsNeverActivated(WorkItemStatus status, bool paused)
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(status, configured: true);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            if (paused) { (await db.Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.PausiertBisUtc = DateTimeOffset.UtcNow.AddHours(1); await db.SaveChangesAsync(TestContext.Current.CancellationToken); }
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            if (paused) { (await db.WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.PausedUntilUtc = DateTimeOffset.UtcNow.AddHours(1); await db.SaveChangesAsync(TestContext.Current.CancellationToken); }
         }
         await fixture.DispatchAsync(eventId);
         using var verification = fixture.Services.CreateScope();
-        Assert.Equal(status, (await verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.Status);
+        Assert.Equal(status, (await verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.Status);
         Assert.Empty(fixture.Sessions);
         Assert.Equal("Wartend", (await fixture.EventAsync(eventId)).Status);
     }
 
-    /// <summary>A failed channel check cannot reuse an old user confirmation after another input in the same run.</summary>
+    /// <summary>Eine fehlgeschlagene Kanalprüfung kann nach einer weiteren Eingabe im selben Lauf keine alte Benutzerbestätigung wiederverwenden.</summary>
     [Fact]
     public async Task Confirmation_ChannelFailureThenManualInput_DoesNotAuthorizeLaterUnknownPrompt()
     {
@@ -253,7 +246,7 @@ public sealed class ScmEventOrchestratorTests
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         await fixture.DispatchAsync(eventId);
-        var cli = fixture.Services.GetRequiredService<KiAusfuehrungsService>();
+        var cli = fixture.Services.GetRequiredService<AiExecutionService>();
         var adapter = cli.GetScmPromptSession(taskId)!;
         var channel = Path.Combine(adapter.WorkingDirectory, ScmEventExchangeProtocol.DirectoryName);
         Directory.CreateDirectory(channel);
@@ -278,8 +271,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Equal(adapter.CliRunId.ToString("D"), item.CliRunId);
     }
 
-    /// <summary>A workspace trust dialog is its own wait state: no prompt is sent, the confirm action stays
-    /// unavailable, and delivery resumes automatically once the user answers in the terminal.</summary>
+    /// <summary>Ein Workspace-Vertrauensdialog ist ein eigener Wartezustand: es wird kein Prompt gesendet, die Bestätigungsaktion bleibt unverfügbar, und die Zustellung läuft automatisch weiter, sobald der Benutzer im Terminal antwortet.</summary>
     [Fact]
     public async Task TrustDialog_BlocksUntilAnswered_ThenDeliversAutomatically()
     {
@@ -287,7 +279,7 @@ public sealed class ScmEventOrchestratorTests
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         await fixture.DispatchAsync(eventId);
-        var cli = fixture.Services.GetRequiredService<KiAusfuehrungsService>();
+        var cli = fixture.Services.GetRequiredService<AiExecutionService>();
         var adapter = cli.GetScmPromptSession(taskId)!;
         Assert.Equal(ScmPromptReadyStatus.TrustPrompt, adapter.ReadyStatus);
         var item = await fixture.EventAsync(eventId);
@@ -308,7 +300,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Prompts);
     }
 
-    /// <summary>A deliberate ready confirmation is an explicit retry and lifts an earlier hard stop.</summary>
+    /// <summary>Eine bewusste Bereit-Bestätigung ist eine explizite Wiederholung und hebt einen früheren harten Stopp auf.</summary>
     [Fact]
     public async Task ConfirmReady_LiftsNextAttemptLock()
     {
@@ -316,11 +308,11 @@ public sealed class ScmEventOrchestratorTests
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
         await fixture.DispatchAsync(eventId);
-        var cli = fixture.Services.GetRequiredService<KiAusfuehrungsService>();
+        var cli = fixture.Services.GetRequiredService<AiExecutionService>();
         var adapter = cli.GetScmPromptSession(taskId)!;
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             await db.ScmIncomingEvents.ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)long.MaxValue), cancellationToken: TestContext.Current.CancellationToken);
         }
         using (var scope = fixture.Services.CreateScope())
@@ -331,11 +323,11 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Prompts);
     }
 
-    /// <summary>A CLI without a prompt-format profile waits honestly without offering a confirmation.</summary>
+    /// <summary>Eine CLI ohne Prompt-Format-Profil wartet ehrlich, ohne eine Bestätigung anzubieten.</summary>
     [Fact]
     public async Task UnknownCliFormat_WaitsWithoutConfirmOption()
     {
-        await using var fixture = new ScmDispatchFixture(ki: new ScmKiProfile("Softwareschmiede.GitHubCopilot", string.Empty,
+        await using var fixture = new ScmDispatchFixture(ai: new ScmAiProfile("Softwareschmiede.GitHubCopilot", string.Empty,
             "GitHub Copilot CLI", ">", new Dictionary<string, string?>()));
         await fixture.InitializeAsync();
         var (taskId, eventId) = await fixture.AddAsync(configured: true);
@@ -345,7 +337,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Contains("Promptformat", item.Reason);
         Assert.Contains("unbekannt", item.Reason);
         Assert.False(ScmCliWaitReason.IsConfirmable(item.Reason));
-        var adapter = fixture.Services.GetRequiredService<KiAusfuehrungsService>().GetScmPromptSession(taskId)!;
+        var adapter = fixture.Services.GetRequiredService<AiExecutionService>().GetScmPromptSession(taskId)!;
         Assert.Equal(ScmCliRecognitionState.Unknown, adapter.CliRecognition.State);
         using var scope = fixture.Services.CreateScope();
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -354,13 +346,13 @@ public sealed class ScmEventOrchestratorTests
         Assert.Empty(fixture.Prompts);
     }
 
-    /// <summary>An explicit confirmation of an out-of-range version lets the file-tool channel probe prove access.</summary>
+    /// <summary>Eine explizite Bestätigung einer ausserhalb des Bereichs liegenden Version lässt die Datei-Tool-Kanal-Probe den Zugriff beweisen.</summary>
     [Fact]
     public async Task ConfirmReady_UnsupportedVersion_DeliversAfterChannelProbe()
     {
         var prompts = new List<string>();
         var fixture = default(ScmDispatchFixture);
-        fixture = new ScmDispatchFixture(ki: ScmKiProfile.Devin(banner: "Devin CLI\nv3001.0.0",
+        fixture = new ScmDispatchFixture(ai: ScmAiProfile.Devin(banner: "Devin CLI\nv3001.0.0",
             onWritePrompt: async prompt =>
             {
                 if (prompt.Contains("challengePath", StringComparison.Ordinal)) await ScmDispatchFixture.CompleteProbeAsync(prompt);
@@ -377,7 +369,7 @@ public sealed class ScmEventOrchestratorTests
             Assert.Contains("Devin CLI", waiting.Reason);
             Assert.Contains("v3001.0.0", waiting.Reason);
             Assert.Contains("nicht unterstützt", waiting.Reason);
-            var adapter = fixture.Services.GetRequiredService<KiAusfuehrungsService>().GetScmPromptSession(taskId)!;
+            var adapter = fixture.Services.GetRequiredService<AiExecutionService>().GetScmPromptSession(taskId)!;
             Assert.Equal(ScmCliRecognitionState.Unsupported, adapter.CliRecognition.State);
             using (var scope = fixture.Services.CreateScope())
                 await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D"), TestContext.Current.CancellationToken);

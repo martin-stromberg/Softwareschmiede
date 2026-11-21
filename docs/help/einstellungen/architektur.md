@@ -10,9 +10,9 @@
 | `SettingsViewModel` | ViewModel (MVVM) | Geschäftslogik; lädt Plugin-Listen, verwaltet Einstellungswerte, validiert und speichert |
 | `IPluginManager` | Service-Interface | Liefert verfügbare SCM- und KI-Plugins zur Laufzeit |
 | `PluginSettingsService` | Service | CRUD-Zugriff auf Plugin-Einstellungswerte im Windows Credential Store |
-| `AppEinstellungService` | Service | Speichert Anwendungseinstellungen (Standard-Plugins, Design-Modus, etc.) in SQLite |
+| `AppSettingService` | Service | Speichert Anwendungseinstellungen (Standard-Plugins, Design-Modus, etc.) in SQLite |
 | `DarkModeService` | Service | Wechselt WPF-Theme zwischen `DarkTheme.xaml` und `LightTheme.xaml` |
-| `ArbeitsverzeichnisSettingsService` | Service | Verwaltet das lokale Arbeitsverzeichnis für Repository-Klone |
+| `WorkingDirectorySettingsService` | Service | Verwaltet das lokale Arbeitsverzeichnis für Repository-Klone |
 | `IPlugin` / `IGitPlugin` / `IKiPlugin` | Interfaces | Abstraktion für alle Plugins; jedes Plugin definiert `GetSettingGroups()` |
 | `PluginSettingGroup` | ValueObject | Enthält Gruppe von zusammenhängenden Einstellungsfeldern (z. B. "Authentifizierung") |
 | `PluginSettingField` | ValueObject | Metadaten eines einzelnen Einstellungsfeldes (Label, Typ, Beschreibung, Validierungsregeln) |
@@ -27,8 +27,8 @@ Die Einstellungsansicht integriert mehrere spezialisierte Services und Plugins:
 
 ```
 SettingsViewModel
-├── AppEinstellungService (Standard-Plugins, Design-Modus)
-├── ArbeitsverzeichnisSettingsService (Arbeitsverzeichnis)
+├── AppSettingService (Standard-Plugins, Design-Modus)
+├── WorkingDirectorySettingsService (WorkingDirectory)
 ├── DarkModeService (Theme-Wechsel)
 ├── IPluginManager (Plugin-Discovery)
 │   ├── GetSourceCodeManagementPlugins() → IGitPlugin[] 
@@ -44,8 +44,8 @@ SettingsViewModel
 1. **Plugin-Discovery:** `SettingsViewModel` fragt `IPluginManager` nach allen verfügbaren Plugins ab
 2. **Einstellungswert-Abfrage:** `SettingsViewModel` ruft `PluginSettingsService.GetValue()` auf, der wiederum im Windows Credential Store nachschaut
 3. **Einstellungswert-Speicherung:** `PluginSettingsViewModel` ruft `PluginSettingsService.SetValue()` auf, der den Wert verschlüsselt speichert
-4. **Standard-Plugin-Speicherung:** `AppEinstellungService` speichert Plugin-Namen als String in SQLite `AppEinstellung`-Tabelle
-5. **Theme-Wechsel:** `DarkModeService` wechselt WPF-`ResourceDictionary` zwischen zwei Themes und speichert die Wahl in `AppEinstellungService`
+4. **Standard-Plugin-Speicherung:** `AppSettingService` speichert Plugin-Namen als String in SQLite `AppSetting`-Tabelle
+5. **Theme-Wechsel:** `DarkModeService` wechselt WPF-`ResourceDictionary` zwischen zwei Themes und speichert die Wahl in `AppSettingService`
 
 ## Datenfluss
 
@@ -54,13 +54,13 @@ SettingsViewModel
 ```
 SettingsView geöffnet
     ↓
-SettingsViewModel.LadenCommand triggert LadenAsync()
+SettingsViewModel.LoadCommand triggert LoadAsync()
     ↓
 Plugins laden: IPluginManager.GetSourceCodeManagementPlugins()
                 IPluginManager.GetDevelopmentAutomationPlugins()
     ↓
-Standard-Plugin-Namen abrufen: AppEinstellungService.GetSetting(DefaultScmPluginKey)
-                                AppEinstellungService.GetSetting(DefaultKiPluginKey)
+Standard-Plugin-Namen abrufen: AppSettingService.GetSetting(DefaultScmPluginKey)
+                                AppSettingService.GetSetting(DefaultKiPluginKey)
     ↓
 Plugin-Objekt rekonstruieren: Abgleich des Namens mit verfügbaren Plugins
     ↓
@@ -80,23 +80,23 @@ XAML rendert Eingabefelder basierend auf FieldType
 ```
 Anwender klickt "Speichern"
     ↓
-SpeichernAsync() startet
+SaveAsync() startet
     ↓
 ValidierePflichtfelder() durchführen
     ↓
 Wenn Validierung erfolgreich:
-    ├─ AppEinstellungService.SetSetting(DefaultScmPluginKey, plugin.PluginName)
-    ├─ AppEinstellungService.SetSetting(DefaultKiPluginKey, pluginName)
+    ├─ AppSettingService.SetSetting(DefaultScmPluginKey, plugin.PluginName)
+    ├─ AppSettingService.SetSetting(DefaultKiPluginKey, pluginName)
     ├─ Für jedes Feld: PluginSettingsService.SetValue(plugin, field, value)
     │   └─ Wert wird verschlüsselt im Credential Store gespeichert
-    ├─ ArbeitsverzeichnisSettingsService.SaveArbeitsverzeichnis()
+    ├─ WorkingDirectorySettingsService.SaveWorkingDirectory()
     └─ DarkModeService.SetMode() (Theme anwenden)
     ↓
-ErfolgsMeldung anzeigen
+SuccessMessage anzeigen
 
 Wenn Validierung fehlgeschlagen:
     ↓
-FehlerMeldung anzeigen
+ErrorMessage anzeigen
     ↓
 Speichern abgebrochen, keine Daten persistiert
 ```
@@ -161,6 +161,6 @@ Das Design der Einstellungsseite ist plugin-centric und erweiterbar:
    - Eine neue DataTemplate in `SettingsView.xaml` hinzugefügt werden
    - Der `PluginSettingFieldTemplateSelector` angepasst werden
 
-3. **Validierungsregeln erweitern:** Die Validierungsmethode `ValidierePflichtfelderFuerSettings()` kann um neue Regeln erweitert werden (z. B. reguläre Ausdrücke für Email-Felder).
+3. **Validierungsregeln erweitern:** Die Validierungsmethode `ValidateRequiredFieldsForSettings()` kann um neue Regeln erweitert werden (z. B. reguläre Ausdrücke für Email-Felder).
 
 4. **Theme-Anpassungen:** Alle Eingabekomponenten nutzen `DynamicResource` Bindings auf zentrale Farb-Brushes in `DarkTheme.xaml` / `LightTheme.xaml`. Farbänderungen an einer Stelle wirken sich auf alle Komponenten aus.

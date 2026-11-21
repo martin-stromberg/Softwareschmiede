@@ -4,7 +4,7 @@
 
 ## Plugin-Vertrag
 
-`DevinPlugin` ist ein `DevelopmentAutomation`-Plugin und nutzt die gemeinsame `CliKiPluginBase`-Infrastruktur. Der Standardaufruf lautet `devin`; falls `Softwareschmiede.Devin.ExecutablePath` gesetzt ist, verwendet das Plugin diesen absoluten Pfad.
+`DevinPlugin` ist ein `DevelopmentAutomation`-Plugin und nutzt die gemeinsame `CliAiPluginBase`-Infrastruktur. Der Standardaufruf lautet `devin`; falls `Softwareschmiede.Devin.ExecutablePath` gesetzt ist, verwendet das Plugin diesen absoluten Pfad.
 
 Der Prozess wird im lokalen Aufgaben-Repository gestartet. `UseShellExecute` ist deaktiviert und `CreateNoWindow` bleibt `false`, damit die vorhandene Terminal- und ConPTY-Ausfuehrung die interaktive Sitzung anzeigen und Eingaben annehmen kann.
 

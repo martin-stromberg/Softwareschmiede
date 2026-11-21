@@ -13,12 +13,12 @@ public sealed class PluginActivationServiceTests
 {
     /// <summary>Fehlender Eintrag bedeutet, dass das Plugin als aktiviert gilt.</summary>
     [Fact]
-    public async Task IsPluginEnabled_LiefertTrue_WennKeinEintragVorhanden()
+    public async Task IsPluginEnabled_ReturnsTrue_WhenNoEntryExisting()
     {
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var pluginManager = new Mock<IPluginManager>();
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
 
         // Act
         var enabled = await sut.IsPluginEnabledAsync("Softwareschmiede.Unbekannt", TestContext.Current.CancellationToken);
@@ -29,12 +29,12 @@ public sealed class PluginActivationServiceTests
 
     /// <summary>Ein gespeicherter Status wird beim erneuten Lesen unverändert zurückgegeben.</summary>
     [Fact]
-    public async Task SetPluginEnabled_PersistiertUndLiestZurueck()
+    public async Task SetPluginEnabled_PersistedAndReadsBack()
     {
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var pluginManager = new Mock<IPluginManager>();
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
 
         // Act
         await sut.SetPluginEnabledAsync("Softwareschmiede.GitHub", false, TestContext.Current.CancellationToken);
@@ -46,65 +46,65 @@ public sealed class PluginActivationServiceTests
 
     /// <summary>Deaktivierte SCM-Plugins werden aus der Liste der aktiven Plugins entfernt.</summary>
     [Fact]
-    public async Task GetEnabledSourceCodeManagementPlugins_FiltertDeaktivierte()
+    public async Task GetEnabledSourceCodeManagementPlugins_FiltersDisabled()
     {
         // Arrange
         await using var db = TestDbContextFactory.Create();
-        var aktivesPlugin = CreateGitPlugin("GitHub", "Softwareschmiede.GitHub");
-        var deaktiviertesPlugin = CreateGitPlugin("GitLab", "Softwareschmiede.GitLab");
+        var activePlugin = CreateGitPlugin("GitHub", "Softwareschmiede.GitHub");
+        var disabledPlugin = CreateGitPlugin("GitLab", "Softwareschmiede.GitLab");
         var pluginManager = new Mock<IPluginManager>();
-        pluginManager.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([aktivesPlugin, deaktiviertesPlugin]);
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        pluginManager.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([activePlugin, disabledPlugin]);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
         await sut.SetPluginEnabledAsync("Softwareschmiede.GitLab", false, TestContext.Current.CancellationToken);
 
         // Act
-        var aktivePlugins = await sut.GetEnabledSourceCodeManagementPluginsAsync(TestContext.Current.CancellationToken);
+        var activePlugins = await sut.GetEnabledSourceCodeManagementPluginsAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        aktivePlugins.Should().ContainSingle();
-        aktivePlugins[0].PluginPrefix.Should().Be("Softwareschmiede.GitHub");
+        activePlugins.Should().ContainSingle();
+        activePlugins[0].PluginPrefix.Should().Be("Softwareschmiede.GitHub");
     }
 
     /// <summary>Deaktivierte KI-Plugins werden aus der Liste der aktiven Plugins entfernt.</summary>
     [Fact]
-    public async Task GetEnabledDevelopmentAutomationPlugins_FiltertDeaktivierte()
+    public async Task GetEnabledDevelopmentAutomationPlugins_FiltersDisabled()
     {
         // Arrange
         await using var db = TestDbContextFactory.Create();
-        var aktivesPlugin = CreateKiPlugin("Claude", "Softwareschmiede.Claude");
-        var deaktiviertesPlugin = CreateKiPlugin("Copilot", "Softwareschmiede.Copilot");
+        var activePlugin = CreateAiPlugin("Claude", "Softwareschmiede.Claude");
+        var disabledPlugin = CreateAiPlugin("Copilot", "Softwareschmiede.Copilot");
         var pluginManager = new Mock<IPluginManager>();
-        pluginManager.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([aktivesPlugin, deaktiviertesPlugin]);
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        pluginManager.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([activePlugin, disabledPlugin]);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
         await sut.SetPluginEnabledAsync("Softwareschmiede.Copilot", false, TestContext.Current.CancellationToken);
 
         // Act
-        var aktivePlugins = await sut.GetEnabledDevelopmentAutomationPluginsAsync(TestContext.Current.CancellationToken);
+        var activePlugins = await sut.GetEnabledDevelopmentAutomationPluginsAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        aktivePlugins.Should().ContainSingle();
-        aktivePlugins[0].PluginPrefix.Should().Be("Softwareschmiede.Claude");
+        activePlugins.Should().ContainSingle();
+        activePlugins[0].PluginPrefix.Should().Be("Softwareschmiede.Claude");
     }
 
     /// <summary>Aktivierte IDE-Plugins werden zurückgegeben, deaktivierte herausgefiltert.</summary>
     [Fact]
-    public async Task GetEnabledIdePlugins_FiltertDeaktivierte()
+    public async Task GetEnabledIdePlugins_FiltersDisabled()
     {
         // Arrange
         await using var db = TestDbContextFactory.Create();
-        var aktivesPlugin = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio");
-        var deaktiviertesPlugin = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode");
+        var activePlugin = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio");
+        var disabledPlugin = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode");
         var pluginManager = new Mock<IPluginManager>();
-        pluginManager.Setup(m => m.GetIdePlugins()).Returns([aktivesPlugin, deaktiviertesPlugin]);
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        pluginManager.Setup(m => m.GetIdePlugins()).Returns([activePlugin, disabledPlugin]);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
         await sut.SetPluginEnabledAsync("Softwareschmiede.VisualStudioCode", false, TestContext.Current.CancellationToken);
 
         // Act
-        var aktivePlugins = await sut.GetEnabledIdePluginsAsync(TestContext.Current.CancellationToken);
+        var activePlugins = await sut.GetEnabledIdePluginsAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        aktivePlugins.Should().ContainSingle();
-        aktivePlugins[0].PluginPrefix.Should().Be("Softwareschmiede.VisualStudio");
+        activePlugins.Should().ContainSingle();
+        activePlugins[0].PluginPrefix.Should().Be("Softwareschmiede.VisualStudio");
     }
 
     /// <summary>Ein neues IDE-Plugin ohne gespeicherten Eintrag gilt standardmäßig als aktiviert.</summary>
@@ -114,7 +114,7 @@ public sealed class PluginActivationServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var pluginManager = new Mock<IPluginManager>();
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
 
         // Act
         var enabled = await sut.IsPluginEnabledAsync("Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
@@ -130,7 +130,7 @@ public sealed class PluginActivationServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var pluginManager = new Mock<IPluginManager>();
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
 
         // Act
         await sut.SetPluginEnabledAsync("Softwareschmiede.VisualStudio", false, TestContext.Current.CancellationToken);
@@ -149,14 +149,14 @@ public sealed class PluginActivationServiceTests
         var plugin = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio");
         var pluginManager = new Mock<IPluginManager>();
         pluginManager.Setup(m => m.GetIdePlugins()).Returns([plugin]);
-        var sut = new PluginActivationService(new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginActivationService(new AppSettingService(db, NullLogger<AppSettingService>.Instance), pluginManager.Object, NullLogger<PluginActivationService>.Instance);
         await sut.SetPluginEnabledAsync("Softwareschmiede.VisualStudio", false, TestContext.Current.CancellationToken);
 
         // Act
-        var aktivePlugins = await sut.GetEnabledIdePluginsAsync(TestContext.Current.CancellationToken);
+        var activePlugins = await sut.GetEnabledIdePluginsAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        aktivePlugins.Should().BeEmpty();
+        activePlugins.Should().BeEmpty();
     }
 
     private static IGitPlugin CreateGitPlugin(string name, string prefix)
@@ -169,9 +169,9 @@ public sealed class PluginActivationServiceTests
         return plugin.Object;
     }
 
-    private static IKiPlugin CreateKiPlugin(string name, string prefix)
+    private static IAiPlugin CreateAiPlugin(string name, string prefix)
     {
-        var plugin = new Mock<IKiPlugin>();
+        var plugin = new Mock<IAiPlugin>();
         plugin.SetupGet(p => p.PluginName).Returns(name);
         plugin.SetupGet(p => p.PluginPrefix).Returns(prefix);
         plugin.SetupGet(p => p.PluginType).Returns(PluginType.DevelopmentAutomation);

@@ -8,29 +8,29 @@ namespace Softwareschmiede.Application.Services;
 internal static class PullRequestBodyBuilder
 {
     /// <summary>Ergaenzt bei gueltiger Issue-Referenz eine GitHub-Closing-Direktive, ohne sie zu duplizieren.</summary>
-    public static string Build(Aufgabe aufgabe, string? body)
+    public static string Build(WorkItem workItem, string? body)
     {
-        var prBody = body ?? $"Automatisch erstellt für Aufgabe: {aufgabe.Titel}";
-        var issueNummer = aufgabe.IssueReferenz?.IssueNummer;
+        var prBody = body ?? $"Automatisch erstellt für Aufgabe: {workItem.Title}";
+        var issueNumber = workItem.IssueReference?.IssueNumber;
 
-        if (issueNummer is not > 0)
+        if (issueNumber is not > 0)
         {
             return prBody;
         }
 
-        if (ContainsClosingDirectiveForIssue(prBody, issueNummer.Value))
+        if (ContainsClosingDirectiveForIssue(prBody, issueNumber.Value))
         {
             return prBody;
         }
 
         var trimmedBody = prBody.TrimEnd();
         return string.IsNullOrWhiteSpace(trimmedBody)
-            ? $"Closes #{issueNummer.Value}"
-            : $"{trimmedBody}{Environment.NewLine}{Environment.NewLine}Closes #{issueNummer.Value}";
+            ? $"Closes #{issueNumber.Value}"
+            : $"{trimmedBody}{Environment.NewLine}{Environment.NewLine}Closes #{issueNumber.Value}";
     }
 
     /// <summary>Baut einen Pull-Request-Body aus den Commits des Aufgabenbranches.</summary>
-    public static string BuildFromCommits(Aufgabe aufgabe, IReadOnlyList<BranchCommit> commits)
+    public static string BuildFromCommits(WorkItem workItem, IReadOnlyList<BranchCommit> commits)
     {
         var body = commits.Count == 0
             ? "Keine Commits gegenüber dem Zielbranch ermittelt."
@@ -38,7 +38,7 @@ internal static class PullRequestBodyBuilder
                 Environment.NewLine,
                 commits.Select(commit => $"- `{ResolveShortSha(commit)}` {commit.Subject}".TrimEnd()));
 
-        return Build(aufgabe, $"## Commits{Environment.NewLine}{Environment.NewLine}{body}");
+        return Build(workItem, $"## Commits{Environment.NewLine}{Environment.NewLine}{body}");
     }
 
     /// <summary>Extrahiert die Issue-Nummern aller Closing-Direktiven im Text. Mit gesetztem
@@ -70,8 +70,8 @@ internal static class PullRequestBodyBuilder
         return numbers;
     }
 
-    private static bool ContainsClosingDirectiveForIssue(string body, int issueNummer)
-        => ExtractClosingIssueNumbers(body).Contains(issueNummer);
+    private static bool ContainsClosingDirectiveForIssue(string body, int issueNumber)
+        => ExtractClosingIssueNumbers(body).Contains(issueNumber);
 
     private static string ResolveShortSha(BranchCommit commit)
     {

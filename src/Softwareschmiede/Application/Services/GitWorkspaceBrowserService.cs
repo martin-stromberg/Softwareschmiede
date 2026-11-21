@@ -13,8 +13,8 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
     private const int MaxWorkingTreeNodeCount = 100_000;
     private const string GitDirectoryName = ".git";
     private const int MaxLazyLoadDepth = 64;
-    private const string VerzeichnisVorschauHinweis = "Verzeichnisse können nicht direkt in der Vorschau angezeigt werden.";
-    private const string BinaerdateiHinweis = "Binärdatei – Vorschau nicht verfügbar.";
+    private const string DirectoryPreviewHint = "Verzeichnisse können nicht direkt in der Vorschau angezeigt werden.";
+    private const string BinaryFileHint = "Binärdatei – Vorschau nicht verfügbar.";
 
     private readonly ICliRunner _cliRunner;
     private readonly ILogger<GitWorkspaceBrowserService> _logger;
@@ -83,7 +83,7 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
                 IsTooBig: false,
                 CurrentContent: null,
                 OriginalContent: null,
-                Hint: VerzeichnisVorschauHinweis);
+                Hint: DirectoryPreviewHint);
         }
 
         var relativePath = NormalizeRelativePath(node.RelativePath);
@@ -145,7 +145,7 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
                 IsTooBig: false,
                 CurrentContent: null,
                 OriginalContent: null,
-                Hint: BinaerdateiHinweis);
+                Hint: BinaryFileHint);
         }
 
         var currentContent = DecodeText(fileBytes);
@@ -202,7 +202,7 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
                 IsTooBig: false,
                 CurrentContent: null,
                 OriginalContent: null,
-                Hint: VerzeichnisVorschauHinweis);
+                Hint: DirectoryPreviewHint);
         }
 
         var relativePath = NormalizeRelativePath(node.RelativePath);
@@ -229,7 +229,7 @@ public sealed class GitWorkspaceBrowserService : IGitWorkspaceBrowserService
                 IsTooBig: false,
                 CurrentContent: null,
                 OriginalContent: null,
-                Hint: BinaerdateiHinweis);
+                Hint: BinaryFileHint);
         }
 
         var currentByteCount = currentContent is null ? 0L : Encoding.UTF8.GetByteCount(currentContent);

@@ -39,7 +39,7 @@ public sealed class BitbucketPluginTests
 
     /// <summary>GetSettingGroups gibt Gruppen mit korrekten Namen zurück.</summary>
     [Fact]
-    public void GetSettingGroups_ShouldHaveCorrectGroupNames()
+    public void GetSettingGroups_ShouldHaveCorrectGroupName()
     {
         var groups = _sut.GetSettingGroups();
 
@@ -443,7 +443,7 @@ public sealed class BitbucketPluginTests
         var issues = (await _sut.GetIssuesAsync("any", TestContext.Current.CancellationToken)).ToList();
 
         issues.Should().HaveCount(1);
-        issues[0].Titel.Should().Be("PROJ-1: Ein Issue ohne Beschreibung");
+        issues[0].Title.Should().Be("PROJ-1: Ein Issue ohne Beschreibung");
         issues[0].Body.Should().BeNull();
     }
 
@@ -478,7 +478,7 @@ public sealed class BitbucketPluginTests
         var result = await _sut.CreateIssueAsync("workspace/repo", new IssueCreateRequest("Titel", "Zeile 1\nZeile 2"), TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeTrue();
-        result.Issue!.Titel.Should().Be("PROJ-42: Titel");
+        result.Issue!.Title.Should().Be("PROJ-42: Titel");
         result.Issue.IssueUrl.Should().Be("https://jira.example.test/browse/PROJ-42");
         capturedArgs.Should().NotBeNull();
         capturedArgs!.Should().Contain("POST");
@@ -670,7 +670,7 @@ public sealed class BitbucketPluginTests
     /// umgewandelt und mit den konfigurierten Credentials authentifiziert; die Umgebung
     /// enthält kein GIT_SSH_COMMAND.</summary>
     [Fact]
-    public async Task CloneRepositoryAsync_SshUrl_WirdZuHttpsGeklont()
+    public async Task CloneRepositoryAsync_SshUrl_WillToHttpsCloned()
     {
         SetupCredentials();
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -693,7 +693,7 @@ public sealed class BitbucketPluginTests
 
     /// <summary>Eine ssh://-Repository-URL wird beim Klon in die HTTPS-Form umgewandelt.</summary>
     [Fact]
-    public async Task CloneRepositoryAsync_SshSchemeUrl_WirdZuHttpsGeklont()
+    public async Task CloneRepositoryAsync_SshSchemeUrl_WillToHttpsCloned()
     {
         SetupCredentials();
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -717,7 +717,7 @@ public sealed class BitbucketPluginTests
     /// <summary>Im SelfHosted-Modus wird eine SCP-SSH-URL zunächst zu HTTPS konvertiert und dann
     /// über ResolveGitCloneUrl in die SCM-Clone-URL überführt.</summary>
     [Fact]
-    public async Task CloneRepositoryAsync_SelfHostedSshUrl_WirdZuScmHttpsUrlGeklont()
+    public async Task CloneRepositoryAsync_SelfHostedSshUrl_WillToScmHttpsUrlCloned()
     {
         SetupCredentials();
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode")).Returns("SelfHosted");
@@ -744,7 +744,7 @@ public sealed class BitbucketPluginTests
     [Theory]
     [InlineData("http://bitbucket.org/ws/repo")]
     [InlineData("git://bitbucket.org/ws/repo")]
-    public async Task CloneRepositoryAsync_NichtHttpsSchema_WirdAbgelehnt(string repositoryUrl)
+    public async Task CloneRepositoryAsync_NotHttpsSchema_WillRejected(string repositoryUrl)
     {
         SetupCredentials();
 
@@ -763,7 +763,7 @@ public sealed class BitbucketPluginTests
     /// <summary>Bitbucket-Server-SSH-URLs mit Nicht-Standard-Port werden nicht geraten,
     /// sondern vor jedem CLI-Aufruf abgelehnt.</summary>
     [Fact]
-    public async Task CloneRepositoryAsync_SshUrlMitFremdPort_WirdAbgelehnt()
+    public async Task CloneRepositoryAsync_SshUrlWithForeignPort_WillRejected()
     {
         SetupCredentials();
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.Bitbucket.HostingMode")).Returns("SelfHosted");
@@ -784,7 +784,7 @@ public sealed class BitbucketPluginTests
     /// <summary>Ohne Username/AppPassword greift der bestehende Credential-Fail-Fast
     /// vor jedem CLI-Aufruf.</summary>
     [Fact]
-    public async Task CloneRepositoryAsync_OhneCredentials_WirftInvalidOperationException()
+    public async Task CloneRepositoryAsync_WithoutCredentials_ThrowsInvalidOperationException()
     {
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
 
@@ -803,7 +803,7 @@ public sealed class BitbucketPluginTests
     /// <summary>Eine noch im SCP-SSH-Format vorliegende remote.origin.url wird vor dem Push
     /// auf die HTTPS-Form mit eingebetteten Credentials umgeschrieben.</summary>
     [Fact]
-    public async Task PushBranchAsync_SshRemoteUrl_WirdZuHttpsNormalisiert()
+    public async Task PushBranchAsync_SshRemoteUrl_WillToHttpsNormalizes()
     {
         SetupCredentials();
         var calls = new List<string>();
@@ -837,7 +837,7 @@ public sealed class BitbucketPluginTests
     /// <summary>Eine noch im SCP-SSH-Format vorliegende remote.origin.url wird vor dem Pull
     /// auf die HTTPS-Form mit eingebetteten Credentials umgeschrieben.</summary>
     [Fact]
-    public async Task PullAsync_SshRemoteUrl_WirdZuHttpsNormalisiert()
+    public async Task PullAsync_SshRemoteUrl_WillToHttpsNormalizes()
     {
         SetupCredentials();
         var calls = new List<string>();
@@ -871,7 +871,7 @@ public sealed class BitbucketPluginTests
     /// <summary>Eine bereits HTTPS-förmige remote.origin.url (inkl. eingebetteter Credentials)
     /// bleibt unverändert — kein set-url, der Push läuft normal.</summary>
     [Fact]
-    public async Task PushBranchAsync_HttpsRemoteUrl_KeinSetUrl()
+    public async Task PushBranchAsync_HttpsRemoteUrl_NoSetUrl()
     {
         SetupCredentials();
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -908,7 +908,7 @@ public sealed class BitbucketPluginTests
     /// <summary>Schlägt das Lesen der remote.origin.url fehl, läuft der Pull in seinem
     /// normalen Pfad weiter (Fehlertoleranz der Normalisierung).</summary>
     [Fact]
-    public async Task PullAsync_RemoteUrlReadFehler_LaeuftWeiter()
+    public async Task PullAsync_RemoteUrlReadError_RunsFurther()
     {
         SetupCredentials();
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -945,7 +945,7 @@ public sealed class BitbucketPluginTests
     /// <summary>GetRemoteBranchesAsync fragt SCP-SSH-Repository-URLs über die konvertierte
     /// HTTPS-Remote-URL ab.</summary>
     [Fact]
-    public async Task GetRemoteBranchesAsync_SshUrl_NutztHttpsRemote()
+    public async Task GetRemoteBranchesAsync_SshUrl_UsesHttpsRemote()
     {
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
@@ -969,7 +969,7 @@ public sealed class BitbucketPluginTests
     /// <summary>GetDefaultBranchAsync fragt SCP-SSH-Repository-URLs über die konvertierte
     /// HTTPS-Remote-URL ab.</summary>
     [Fact]
-    public async Task GetDefaultBranchAsync_SshUrl_NutztHttpsRemote()
+    public async Task GetDefaultBranchAsync_SshUrl_UsesHttpsRemote()
     {
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
@@ -993,7 +993,7 @@ public sealed class BitbucketPluginTests
     /// <summary>Eine SSH-SourceRepositoryUrl eines Fork-PRs wird vor dem Fetch in die
     /// HTTPS-Form umgewandelt.</summary>
     [Fact]
-    public async Task CheckoutPullRequestSourceAsync_SshForkUrl_WirdZuHttpsGefetcht()
+    public async Task CheckoutPullRequestSourceAsync_SshForkUrl_WillToHttpsFetched()
     {
         SetupCredentials();
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -1033,7 +1033,7 @@ public sealed class BitbucketPluginTests
     /// <summary>Der PR-Checkout übergibt erstmals die git-Umgebung (GIT_TERMINAL_PROMPT=0,
     /// kein GIT_SSH_COMMAND) an git fetch/checkout und normalisiert vorab die remote.origin.url.</summary>
     [Fact]
-    public async Task CheckoutPullRequestSourceAsync_UebergibtGitEnvironment()
+    public async Task CheckoutPullRequestSourceAsync_PassesGitEnvironment()
     {
         SetupCredentials();
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -1085,7 +1085,7 @@ public sealed class BitbucketPluginTests
     /// <summary>Beim Same-Repo-PR-Checkout (Fetch gegen origin) wird eine noch im SCP-SSH-Format
     /// vorliegende remote.origin.url vor dem Fetch auf HTTPS mit Credentials normalisiert.</summary>
     [Fact]
-    public async Task CheckoutPullRequestSourceAsync_SshOriginUrl_WirdVorFetchNormalisiert()
+    public async Task CheckoutPullRequestSourceAsync_SshOriginUrl_WillBeforeFetchNormalizes()
     {
         SetupCredentials();
         var calls = new List<string>();
@@ -1128,7 +1128,7 @@ public sealed class BitbucketPluginTests
     /// <summary>Eine null-CheckoutSpec wird mit ArgumentNullException abgelehnt, bevor irgendein
     /// git-Aufruf auf der Arbeitskopie stattfindet.</summary>
     [Fact]
-    public async Task CheckoutPullRequestSourceAsync_NullSpec_WirftArgumentNullException()
+    public async Task CheckoutPullRequestSourceAsync_NullSpec_ThrowsArgumentNullException()
     {
         var act = () => _sut.CheckoutPullRequestSourceAsync("/repo", null!);
 
@@ -1144,7 +1144,7 @@ public sealed class BitbucketPluginTests
     /// <summary>Ohne Credentials wird eine SSH-remote.origin.url auf die nackte HTTPS-Form
     /// umgeschrieben — die _netrc-Pflege übernimmt die Authentifizierung zur Laufzeit.</summary>
     [Fact]
-    public async Task PushBranchAsync_SshRemoteUrlOhneCredentials_WirdZuNacktemHttpsNormalisiert()
+    public async Task PushBranchAsync_SshRemoteUrlWithoutCredentials_WillToBareHttpsNormalizes()
     {
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -1177,7 +1177,7 @@ public sealed class BitbucketPluginTests
     [Theory]
     [InlineData("ssh://git@bitbucket.example.com:7999/scm/KEY/slug.git")]
     [InlineData("ssh://user:pass@bitbucket.org/ws/repo.git")]
-    public async Task PushBranchAsync_NichtKonvertierbareRemoteUrl_KeinSetUrl(string remoteUrl)
+    public async Task PushBranchAsync_NotConvertibleRemoteUrl_NoSetUrl(string remoteUrl)
     {
         SetupCredentials();
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -1214,7 +1214,7 @@ public sealed class BitbucketPluginTests
     /// <summary>Die _netrc-Pflege schreibt in den per Konstruktorparameter übergebenen
     /// netrcPath — die echte Benutzer-_netrc bleibt unangetastet.</summary>
     [Fact]
-    public async Task NetrcPfad_AusKonstruktorParameter_WirdGenutzt()
+    public async Task NetrcPath_OutConstructorParameter_WillUsed()
     {
         SetupCredentials();
         _cliRunnerMock.Setup(c => c.RunAsync(

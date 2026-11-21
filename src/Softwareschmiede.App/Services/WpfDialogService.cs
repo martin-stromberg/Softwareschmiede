@@ -18,15 +18,15 @@ public sealed class WpfDialogService : IDialogService
     }
 
     /// <inheritdoc/>
-    public bool BestaetigenDialog(string nachricht, string titel)
+    public bool ConfirmDialog(string message, string title)
         => MessageBox.Show(
-            nachricht,
-            titel,
+            message,
+            title,
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning) == MessageBoxResult.Yes;
 
     /// <inheritdoc/>
-    public bool RepositoryZuweisenDialog(RepositoryAssignViewModel viewModel)
+    public bool RepositoryAssignDialog(RepositoryAssignViewModel viewModel)
         => System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
             var dialog = new RepositoryAssignDialog(viewModel)
@@ -37,10 +37,10 @@ public sealed class WpfDialogService : IDialogService
         });
 
     /// <inheritdoc/>
-    public bool ArbeitsverzeichnisBearbeitenDialog(ArbeitsverzeichnisBearbeitenViewModel viewModel)
+    public bool WorkingDirectoryEditDialog(WorkingDirectoryEditViewModel viewModel)
         => System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
-            var dialog = new ArbeitsverzeichnisBearbeitenDialog(viewModel)
+            var dialog = new WorkingDirectoryEditDialog(viewModel)
             {
                 Owner = System.Windows.Application.Current.MainWindow
             };
@@ -110,12 +110,12 @@ public sealed class WpfDialogService : IDialogService
 
     /// <inheritdoc/>
     public Task<string?> ShowSolutionSelectionDialogAsync(
-        IReadOnlyList<string> solutionPfade,
+        IReadOnlyList<string> solutionPath,
         CancellationToken ct = default)
     {
         return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
-            var viewModel = new SolutionSelectionDialogViewModel(solutionPfade);
+            var viewModel = new SolutionSelectionDialogViewModel(solutionPath);
             var dialog = new SolutionSelectionDialog(viewModel)
             {
                 Owner = System.Windows.Application.Current.MainWindow
@@ -126,14 +126,14 @@ public sealed class WpfDialogService : IDialogService
     }
 
     /// <inheritdoc/>
-    public Task<AufgabePausierenErgebnis?> ShowAufgabePausierenDialogAsync(
-        AufgabePausierenDialogViewModel viewModel,
+    public Task<PauseWorkItemResult?> ShowWorkItemPauseDialogAsync(
+        PauseWorkItemDialogViewModel viewModel,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         return ShowDialogAsync(
-            () => new AufgabePausierenDialog(viewModel),
-            () => viewModel.Ergebnis);
+            () => new PauseWorkItemDialog(viewModel),
+            () => viewModel.Result);
     }
 
     /// <inheritdoc/>
@@ -160,7 +160,7 @@ public sealed class WpfDialogService : IDialogService
             if (!string.IsNullOrWhiteSpace(initialDirectory))
                 dialog.InitialDirectory = initialDirectory;
 
-            var result = dialog.ShowDialog(AktivesDialogOwnerFenster());
+            var result = dialog.ShowDialog(ActiveDialogOwnerWindow());
             return result == true ? dialog.FileName : null;
         }).Task;
     }
@@ -187,14 +187,14 @@ public sealed class WpfDialogService : IDialogService
             if (!string.IsNullOrWhiteSpace(initialDirectory))
                 dialog.InitialDirectory = initialDirectory;
 
-            var result = dialog.ShowDialog(AktivesDialogOwnerFenster());
+            var result = dialog.ShowDialog(ActiveDialogOwnerWindow());
             return result == true ? dialog.FileName : null;
         }).Task;
     }
 
     /// <inheritdoc/>
-    public Task ShowKonsolenTestDialogAsync(
-        KonsolenTestViewModel viewModel,
+    public Task ShowConsoleTestDialogAsync(
+        ConsoleTestViewModel viewModel,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -204,7 +204,7 @@ public sealed class WpfDialogService : IDialogService
             // Nicht-modal: das Diagnose-Fenster bleibt parallel zur Live-Ansicht nutzbar
             // (Vergleich Replay ↔ laufende Ausgabe). Der Lebenszyklus des ViewModels wird
             // über den Closed-Handler des Fensters disponiert.
-            var dialog = new KonsolenTestDialog(viewModel)
+            var dialog = new ConsoleTestDialog(viewModel)
             {
                 Owner = System.Windows.Application.Current.MainWindow
             };
@@ -216,7 +216,7 @@ public sealed class WpfDialogService : IDialogService
     /// nicht-modalen Fenster (z. B. dem Konsolentestfenster) ist das modal geöffnete
     /// Datei-Dialogfenster sonst falsch zugeordnet (Owner=MainWindow liegt hinter dem
     /// geöffneten Owned-Window) und erhält keinen zuverlässigen Fokus.</summary>
-    private static Window AktivesDialogOwnerFenster()
+    private static Window ActiveDialogOwnerWindow()
         => System.Windows.Application.Current.Windows
             .OfType<Window>()
             .FirstOrDefault(w => w.IsActive)

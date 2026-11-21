@@ -157,7 +157,7 @@ public sealed class ScmEventDispatchTests_IssueBodyUpdate
     private static async Task<ScmOutgoingAction> EnqueueIssueBodyAsync(ScmDispatchFixture fixture, Guid eventId)
     {
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId);
         var request = new ScmResponseRequest(ScmEventStore.Observation(item).Reference,
             ScmEventStore.ActionId(item.Id, "issuebody").ToString("D"), ScmResponseKind.IssueBodyUpdate,
@@ -168,7 +168,7 @@ public sealed class ScmEventDispatchTests_IssueBodyUpdate
     private static async Task<ScmOutgoingAction> ActionAsync(ScmDispatchFixture fixture, Guid actionId)
     {
         using var scope = fixture.Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>()
+        return await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>()
             .ScmOutgoingActions.AsNoTracking().SingleAsync(x => x.Id == actionId);
     }
 

@@ -21,18 +21,18 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
     public async Task ScmEvents_QueueReceptionDispatchAndReplies_UseRealPipeline()
     {
         // Früh überspringen, bevor die Fixture ihre Git-Workspaces/DB aufbaut.
-        SkipWennWpfE2ENichtVerfuegbar();
+        SkipWhenWpfE2ENotAvailable();
 
         var fixture = new ScmE2EFixture();
         await fixture.InitializeAsync();
         output.WriteLine("SCM fixture and evidence: " + fixture.Configuration.TestRoot);
-        var window = WarteAufEchtesHauptfenster(LaunchApp(false, fixture.EnvironmentVariables()));
+        var window = WaitOnRealMainwindow(LaunchApp(false, fixture.EnvironmentVariables()));
         NavigateQueue(window);
         const string original = "$sOfTwArEsChMiEdE Prüfe \"Original\"\nzweite Zeile\u001b\u0000";
         fixture.AddText(1, 101, original);
         var first = await fixture.WaitEventAsync(1, "Wartend");
         SelectEvent(window, 1);
-        // Windows UI Automation terminates a text value at NUL; storage and request assertions below retain it.
+        // Windows UI Automation schneidet einen Textwert am NUL-Zeichen ab; die Speicher- und Request-Asserts darunter behalten ihn bei.
         Assert.Equal(original.TrimEnd('\0'), Element(window, "ScmEventBody").AsTextBox().Text);
         Assert.Equal(original, ScmEventStore.Observation(first).Body);
         Assert.Equal("https://github.com/scm-owner/scm-e2e/issues/1#issuecomment-101", Element(window, "ScmEventOrigin").AsTextBox().Text);
@@ -44,14 +44,14 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         await using (var db = fixture.OpenDatabase())
         {
             Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-            Assert.Equal(AufgabeStatus.Gestartet, (await db.Aufgaben.FindAsync(new object?[] { fixture.TaskIds[1] }, TestContext.Current.CancellationToken))!.Status);
+            Assert.Equal(WorkItemStatus.Started, (await db.WorkItems.FindAsync(new object?[] { fixture.TaskIds[1] }, TestContext.Current.CancellationToken))!.Status);
         }
         Click(window, "ScmEventBack");
         NavigateQueue(window);
         SelectEvent(window, 1);
         output.WriteLine("E1: real reception, original body/origin, one receipt/waiting comment, replay and back navigation passed.");
 
-        // E5 uses the sole second app start, before any simulator is launched.
+        // E5 nutzt den einzigen zweiten App-Start, bevor ein Simulator gestartet wird.
         window = RestartAppPreservingDatabase();
         NavigateQueue(window);
         SelectEvent(window, 1);
@@ -62,7 +62,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
 
         Click(window, "ScmEventOpen");
         ChoosePlugin(window, confirm: false);
-        await using (var db = fixture.OpenDatabase()) Assert.Equal(AufgabeStatus.Gestartet, (await db.Aufgaben.FindAsync(new object?[] { fixture.TaskIds[1] }, TestContext.Current.CancellationToken))!.Status);
+        await using (var db = fixture.OpenDatabase()) Assert.Equal(WorkItemStatus.Started, (await db.WorkItems.FindAsync(new object?[] { fixture.TaskIds[1] }, TestContext.Current.CancellationToken))!.Status);
         Assert.Empty(fixture.Prompts());
         await fixture.WaitEventAsync(1, "Wartend");
         SelectEvent(window, 1);
@@ -84,9 +84,9 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         await fixture.WaitEventAsync(1, "Verarbeitet");
         await using (var db = fixture.OpenDatabase())
         {
-            var task = (await db.Aufgaben.FindAsync(new object?[] { fixture.TaskIds[1] }, TestContext.Current.CancellationToken))!;
-            Assert.Equal(AufgabeStatus.Gestartet, task.Status);
-            Assert.NotNull(task.AktiveRunId);
+            var task = (await db.WorkItems.FindAsync(new object?[] { fixture.TaskIds[1] }, TestContext.Current.CancellationToken))!;
+            Assert.Equal(WorkItemStatus.Started, task.Status);
+            Assert.NotNull(task.ActiveRunId);
         }
         fixture.AddText(1, 102, "$Softwareschmiede Folgeereignis");
         var followUp = await fixture.WaitEventAsync(1, "Verarbeitet", 102);
@@ -121,16 +121,16 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.Equal(promptCount, fixture.Prompts().Count);
         SelectEvent(window, 5);
         Click(window, "ScmEventTask");
-        new AufgabePausierenDialogView(window).ForceShow().Aufheben();
+        new WorkItemPauseDialogView(window).ForceShow().Lift();
         NavigateQueue(window);
         SelectEvent(window, 5);
         StartSelected(window);
         await fixture.WaitEventAsync(5, "Verarbeitet");
         await using (var db = fixture.OpenDatabase())
         {
-            Assert.Equal(AufgabeStatus.Beendet, (await db.Aufgaben.FindAsync(new object?[] { fixture.TaskIds[3] }, TestContext.Current.CancellationToken))!.Status);
-            Assert.Equal(AufgabeStatus.Archiviert, (await db.Aufgaben.FindAsync(new object?[] { fixture.TaskIds[4] }, TestContext.Current.CancellationToken))!.Status);
-            Assert.Null((await db.Aufgaben.FindAsync(new object?[] { fixture.TaskIds[5] }, TestContext.Current.CancellationToken))!.PausiertBisUtc);
+            Assert.Equal(WorkItemStatus.Completed, (await db.WorkItems.FindAsync(new object?[] { fixture.TaskIds[3] }, TestContext.Current.CancellationToken))!.Status);
+            Assert.Equal(WorkItemStatus.Archived, (await db.WorkItems.FindAsync(new object?[] { fixture.TaskIds[4] }, TestContext.Current.CancellationToken))!.Status);
+            Assert.Null((await db.WorkItems.FindAsync(new object?[] { fixture.TaskIds[5] }, TestContext.Current.CancellationToken))!.PausedUntilUtc);
         }
         output.WriteLine("E4: completed/archived/paused remain blocked; regular pause removal permits processing.");
 
@@ -182,7 +182,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.Equal(promptCount, fixture.Prompts().Count);
         output.WriteLine("E6-Wiederaufnahme (403 after acceptance): pending remote reply retried without new event prompt/attempt.");
 
-        // A living, identified CLI can be explicitly confirmed without inventing readiness from I/O silence.
+        // Eine lebende, identifizierte CLI kann explizit bestätigt werden, ohne Bereitschaft aus I/O
         fixture.Control("unknown-ready", true);
         fixture.AddText(10, 1001, "$Softwareschmiede Bereitschaft ausdrücklich bestätigen");
         await fixture.WaitEventAsync(10, "Wartend");
@@ -282,8 +282,8 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.AddText(1, 105, "$Softwareschmiede Verspäteten aktuellen Versuch prüfen");
         var current = await fixture.WaitEventAsync(1, "ZustellungUngewiss", 105);
         await WaitPromptCountAsync(fixture, promptCount + 2, current.DeliveryAttemptId);
-        // Prove the explicit status action while the current attempt is still uncertain.
-        // Once completion is released, background reconciliation may finish it and hide the action.
+        // Beweist die explizite Status-Aktion, solange der aktuelle Versuch noch unsicher ist.
+        // Sobald die Fertigstellung freigegeben ist, kann die Hintergrund-Abstimmung sie abschließen und die Aktion verbergen.
         SelectEvent(window, 1);
         Click(window, "ScmEventCheckStatus");
         Assert.Equal(current.DeliveryAttemptId, (await fixture.WaitEventAsync(1, "ZustellungUngewiss", 105)).DeliveryAttemptId);
@@ -296,25 +296,25 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         output.WriteLine("E3-Ungewissheit: late valid completion of still-current attempt resolves without any resend.");
 
         fixture.AddText(20, 2001, "$Softwareschmiede Aufgabe anlegen");
-        Aufgabe? created = null;
+        WorkItem? created = null;
         await fixture.WaitForDatabaseAsync(async db =>
         {
-            created = await db.Aufgaben.Include(x => x.IssueReferenz)
-                .SingleOrDefaultAsync(x => x.IssueReferenz != null && x.IssueReferenz.IssueNummer == 20);
+            created = await db.WorkItems.Include(x => x.IssueReference)
+                .SingleOrDefaultAsync(x => x.IssueReference != null && x.IssueReference.IssueNumber == 20);
             return created is not null;
         }, "Aufgabe für Issue 20 nicht angelegt");
         Assert.NotNull(created);
-        Assert.Equal("SCM Referenz 20", created!.Titel);
-        Assert.Contains("$Softwareschmiede Aufgabe anlegen", created.AnforderungsBeschreibung);
+        Assert.Equal("SCM Referenz 20", created!.Title);
+        Assert.Contains("$Softwareschmiede Aufgabe anlegen", created.RequirementDescription);
         await using (var db = fixture.OpenDatabase())
         {
-            Assert.Equal(18, await db.Aufgaben.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
-            var item = Assert.Single(await db.ScmIncomingEvents.Where(x => x.AufgabeId == created.Id).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+            Assert.Equal(18, await db.WorkItems.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
+            var item = Assert.Single(await db.ScmIncomingEvents.Where(x => x.WorkItemId == created.Id).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             Assert.Equal(20, ScmEventStore.Observation(item).Reference.Number);
         }
         output.WriteLine("E7-Anlage: qualified event on unassigned reference creates exactly one task with issue reference and inbox entry.");
 
-        // The auto-created task has no default CLI, so its event waits with an actionable reason.
+        // Die automatisch erstellte Aufgabe hat keine Standard-CLI, ihr Ereignis wartet also mit umsetzbarem Grund.
         var waiting = await fixture.WaitEventForTaskAsync(created.Id, "Wartend");
         Assert.Contains("Keine Standard-CLI", waiting.Reason);
         promptCount = fixture.Prompts().Count;
@@ -324,13 +324,13 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         await fixture.WaitEventForTaskAsync(created.Id, "Verarbeitet");
         await using (var db = fixture.OpenDatabase())
         {
-            var deliveredTask = (await db.Aufgaben.FindAsync(new object?[] { created.Id }, TestContext.Current.CancellationToken))!;
-            Assert.Equal(AufgabeStatus.Gestartet, deliveredTask.Status);
-            Assert.NotNull(deliveredTask.LokalerKlonPfad);
-            Assert.StartsWith(fixture.Configuration.TestRoot, deliveredTask.LokalerKlonPfad);
-            Assert.True(System.IO.Directory.Exists(System.IO.Path.Combine(deliveredTask.LokalerKlonPfad, ".git")));
+            var deliveredTask = (await db.WorkItems.FindAsync(new object?[] { created.Id }, TestContext.Current.CancellationToken))!;
+            Assert.Equal(WorkItemStatus.Started, deliveredTask.Status);
+            Assert.NotNull(deliveredTask.LocalClonePath);
+            Assert.StartsWith(fixture.Configuration.TestRoot, deliveredTask.LocalClonePath);
+            Assert.True(System.IO.Directory.Exists(System.IO.Path.Combine(deliveredTask.LocalClonePath, ".git")));
             Assert.StartsWith("task/issue-20-", deliveredTask.BranchName);
-            Assert.Equal("Softwareschmiede.KiSimulator", deliveredTask.KiPluginPrefix);
+            Assert.Equal("Softwareschmiede.KiSimulator", deliveredTask.AiPluginPrefix);
         }
         Assert.Equal(promptCount + 1, fixture.Prompts().Count);
         Assert.Equal("$Softwareschmiede Aufgabe anlegen",
@@ -343,7 +343,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         var task6 = fixture.TaskIds[6];
         var events6Before = 0;
         await using (var db = fixture.OpenDatabase())
-            events6Before = await db.ScmIncomingEvents.CountAsync(x => x.AufgabeId == task6, cancellationToken: TestContext.Current.CancellationToken);
+            events6Before = await db.ScmIncomingEvents.CountAsync(x => x.WorkItemId == task6, cancellationToken: TestContext.Current.CancellationToken);
         var eyesBefore = fixture.Responses().Count(x => x.Content == "eyes");
         var promptsBefore = fixture.Prompts().Count;
         fixture.AddText(6, 602, "$Softwareschmiede Von anderer Instanz quittiert", viewerReactions: ["EYES"]);
@@ -352,19 +352,19 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         await fixture.WaitEventAsync(6, "Verarbeitet", 603);
         await fixture.WaitForDatabaseAsync(async db =>
             await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_602")
-                    && x.Diagnostic == ScmEventValidationService.BereitsReagiertRejection)
+                    && x.Diagnostic == ScmEventValidationService.AlreadyReactedRejection)
                 && await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_2201")
                     && x.Diagnostic == ScmEventStore.UnassignedDiagnostic),
             "Snapshot-Diagnosen für Kommentare 602/2201 fehlen", TimeSpan.FromSeconds(90));
         await using (var db = fixture.OpenDatabase())
         {
             Assert.True(await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_602")
-                && x.Diagnostic == ScmEventValidationService.BereitsReagiertRejection, cancellationToken: TestContext.Current.CancellationToken));
+                && x.Diagnostic == ScmEventValidationService.AlreadyReactedRejection, cancellationToken: TestContext.Current.CancellationToken));
             Assert.True(await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_2201")
                 && x.Diagnostic == ScmEventStore.UnassignedDiagnostic, cancellationToken: TestContext.Current.CancellationToken));
-            Assert.Equal(events6Before + 1, await db.ScmIncomingEvents.CountAsync(x => x.AufgabeId == task6, cancellationToken: TestContext.Current.CancellationToken));
-            Assert.False(await db.Aufgaben.Include(x => x.IssueReferenz)
-                .AnyAsync(x => x.IssueReferenz != null && x.IssueReferenz.IssueNummer == 22, cancellationToken: TestContext.Current.CancellationToken));
+            Assert.Equal(events6Before + 1, await db.ScmIncomingEvents.CountAsync(x => x.WorkItemId == task6, cancellationToken: TestContext.Current.CancellationToken));
+            Assert.False(await db.WorkItems.Include(x => x.IssueReference)
+                .AnyAsync(x => x.IssueReference != null && x.IssueReference.IssueNumber == 22, cancellationToken: TestContext.Current.CancellationToken));
         }
         Assert.Equal(eyesBefore + 1, fixture.Responses().Count(x => x.Content == "eyes"));
         Assert.Equal(promptsBefore + 1, fixture.Prompts().Count);
@@ -383,18 +383,18 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         // Fehlerfall zuerst: Separates Konto ohne AgentToken wird mit sichtbarer
         // Fehlermeldung abgelehnt; DiscardChanges setzt Banner und Modus zurück.
         var settings = new SettingsView(window).ForceShow();
-        settings.OpenAufgabenAusfuehren();
-        settings.SetKontoModus("Separates Konto");
+        settings.ExecuteOpenWorkItems();
+        settings.SetAccountMode("Separates Konto");
         var rejected = Assert.Throws<InvalidOperationException>(() => settings.SaveSettings());
         Assert.Contains("Personal Access Token", rejected.Message);
         settings.DiscardChanges();
-        settings.WaitForKontoModus("Benutzerkonto", Medium);
+        settings.WaitForAccountMode("Benutzerkonto", Medium);
 
         settings.SwitchTab("Plugins");
-        WaitForElement(window, cf => cf.ByName("Softwareschmiede.GitHub.Eintrag"), Long).ClickInForeground();
+        WaitForElement(window, cf => cf.ByName("Softwareschmiede.GitHub.Entry"), Long).ClickInForeground();
         settings.SetPluginSecretField("AgentToken", "fixture-agent-token");
-        settings.OpenAufgabenAusfuehren();
-        settings.SetKontoModus("Separates Konto");
+        settings.ExecuteOpenWorkItems();
+        settings.SetAccountMode("Separates Konto");
         settings.SaveSettings();
         output.WriteLine("Bot: Separates Konto ohne Token abgelehnt; AgentToken per Tastatur eingetragen und gemeinsam gespeichert.");
 
@@ -406,16 +406,16 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         var eyesBefore = fixture.Responses().Count(x => x.Content == "eyes");
         fixture.AddText(18, 1801, "@scm-bot Aufgabe aus Benachrichtigung anlegen");
         fixture.AddNotification(18);
-        Aufgabe? botTask = null;
+        WorkItem? botTask = null;
         await fixture.WaitForDatabaseAsync(async db =>
         {
-            botTask = await db.Aufgaben.Include(x => x.IssueReferenz)
-                .SingleOrDefaultAsync(x => x.IssueReferenz != null && x.IssueReferenz.IssueNummer == 18);
+            botTask = await db.WorkItems.Include(x => x.IssueReference)
+                .SingleOrDefaultAsync(x => x.IssueReference != null && x.IssueReference.IssueNumber == 18);
             return botTask is not null;
         }, "Aufgabe für Issue 18 nicht angelegt");
         Assert.NotNull(botTask);
         var waiting = await fixture.WaitEventForTaskAsync(botTask!.Id, "Wartend");
-        Assert.Equal(ScmKontoModus.SeparatesKonto, ScmEventStore.Observation(waiting).Reference.Repository.Konto);
+        Assert.Equal(ScmAccountMode.SeparateAccount, ScmEventStore.Observation(waiting).Reference.Repository.Account);
         SelectEventByTitle(window, "SCM Referenz 18", "/issues/18");
         StartSelected(window);
         await fixture.WaitEventForTaskAsync(botTask.Id, "Verarbeitet");
@@ -429,18 +429,18 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         // zweites Ereignis auf derselben Aufgabe.
         var botEventsBefore = 0;
         await using (var db = fixture.OpenDatabase())
-            botEventsBefore = await db.ScmIncomingEvents.CountAsync(x => x.AufgabeId == botTask.Id);
+            botEventsBefore = await db.ScmIncomingEvents.CountAsync(x => x.WorkItemId == botTask.Id);
         fixture.AddText(18, 1802, "@scm-bot Bereits vom Bot quittiert", viewerReactions: ["EYES"]);
         fixture.AddNotification(18);
         await fixture.WaitForDatabaseAsync(async db =>
             await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_1802")
-                && x.Diagnostic == ScmEventValidationService.BereitsReagiertRejection),
+                && x.Diagnostic == ScmEventValidationService.AlreadyReactedRejection),
             "Snapshot-Diagnose für Kommentar 1802 fehlt");
         await using (var db = fixture.OpenDatabase())
         {
             Assert.True(await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_1802")
-                && x.Diagnostic == ScmEventValidationService.BereitsReagiertRejection));
-            Assert.Equal(botEventsBefore, await db.ScmIncomingEvents.CountAsync(x => x.AufgabeId == botTask.Id));
+                && x.Diagnostic == ScmEventValidationService.AlreadyReactedRejection));
+            Assert.Equal(botEventsBefore, await db.ScmIncomingEvents.CountAsync(x => x.WorkItemId == botTask.Id));
         }
         output.WriteLine("Bot: reagierter Mention-Kommentar erzeugt kein Inbox-Ereignis, Snapshot-Diagnose gesetzt.");
 
@@ -460,8 +460,8 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.Contains("1 verworfen", diagnostic);
         await using (var db = fixture.OpenDatabase())
         {
-            Assert.False(await db.Aufgaben.Include(x => x.IssueReferenz)
-                .AnyAsync(x => x.IssueReferenz != null && (x.IssueReferenz.IssueNummer == 19 || x.IssueReferenz.IssueNummer == 21)));
+            Assert.False(await db.WorkItems.Include(x => x.IssueReference)
+                .AnyAsync(x => x.IssueReference != null && (x.IssueReference.IssueNumber == 19 || x.IssueReference.IssueNumber == 21)));
         }
         WaitForElement(window, cf => cf.ByName("Integrationshinweise"), Long)
             .Patterns.ExpandCollapse.Pattern.Expand();
@@ -473,7 +473,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
 
         // Rückschaltung: der nächste Poll enumeriert wieder repository-weit, der Keyword-
         // Trigger läuft wie bisher.
-        await fixture.SetKontoModus(ScmKontoModus.Benutzerkonto);
+        await fixture.SetAccountMode(ScmAccountMode.UserAccount);
         fixture.AddText(1, 106, "$Softwareschmiede Zurück im Benutzerkonto");
         await fixture.WaitEventAsync(1, "Verarbeitet", 106);
         output.WriteLine("Bot: Rückschaltung auf Benutzerkonto — Enumeration und Keyword-Pfad laufen wieder.");
@@ -485,15 +485,15 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.AddText(13, 1301, "$Softwareschmiede Arbeitsbereich erst erstellen");
         await fixture.WaitEventAsync(13, "Wartend");
         SelectEvent(window, 13);
-        await using (var db = fixture.OpenDatabase()) Assert.Null((await db.Aufgaben.FindAsync(fixture.TaskIds[13]))!.LokalerKlonPfad);
+        await using (var db = fixture.OpenDatabase()) Assert.Null((await db.WorkItems.FindAsync(fixture.TaskIds[13]))!.LocalClonePath);
         StartSelected(window);
         await fixture.WaitEventAsync(13, "Verarbeitet");
         await using (var db = fixture.OpenDatabase())
         {
-            var task = (await db.Aufgaben.FindAsync(fixture.TaskIds[13]))!;
-            Assert.True(System.IO.Directory.Exists(System.IO.Path.Combine(task.LokalerKlonPfad!, ".git")));
-            Assert.StartsWith(fixture.Configuration.TestRoot, task.LokalerKlonPfad);
-            Assert.NotNull(task.AktiveRunId);
+            var task = (await db.WorkItems.FindAsync(fixture.TaskIds[13]))!;
+            Assert.True(System.IO.Directory.Exists(System.IO.Path.Combine(task.LocalClonePath!, ".git")));
+            Assert.StartsWith(fixture.Configuration.TestRoot, task.LocalClonePath);
+            Assert.NotNull(task.ActiveRunId);
         }
         Assert.Equal(count + 1, fixture.Prompts().Count);
         output.WriteLine("E2-Clone: unprepared task creates real clone/branch under isolated workdir, starts CLI and dispatches once.");
@@ -513,7 +513,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         SelectEvent(window, 14);
         Assert.Equal(missing.Id, (await fixture.WaitEventAsync(14, "Wartend")).Id);
         Click(window, "ScmEventOpen");
-        _ = WaitForElement(window, cf => cf.ByName("PluginAuswahl"), Long);
+        _ = WaitForElement(window, cf => cf.ByName("PluginSelection"), Long);
         var concurrent = fixture.BeginRuntimeCommand(14);
         await ScmE2EFixture.WaitFileAsync(concurrent + ".received");
         ChoosePlugin(window);
@@ -526,7 +526,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.AddText(15, 1501, "$Softwareschmiede Neue Sitzung ausdrücklich bestätigen");
         await fixture.WaitEventAsync(15, "Wartend");
         SelectEvent(window, 15);
-        // A real double click is followed by a monitor cycle while the dialog is open.
+        // Auf einen echten Doppelklick folgt ein Monitor-Zyklus, während der Dialog offen ist.
         EventRow(window, 15).DoubleClick();
         ChoosePlugin(window);
         await WaitReasonAsync(fixture, 15, "Eingabebereitschaft unbekannt");
@@ -584,8 +584,8 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         var readOnly = await fixture.WaitEventAsync(17, "Wartend");
         Assert.NotNull(readOnly.CliRunId);
         Assert.Equal(count + 4, fixture.Prompts().Count);
-        // Keep dispatch blocked at the remote boundary while proving the manual stop/restart.
-        // Otherwise normal polling may restart the stopped task before the UI click reaches it.
+        // Hält den Dispatch an der Remote-Grenze blockiert, während der manuelle Stopp/Neustart bewiesen wird.
+        // Sonst kann normales Polling die gestoppte Aufgabe neu starten, bevor der UI-Klick sie erreicht.
         fixture.Scenario.CanWrite = false;
         fixture.SaveScenario();
         SelectEvent(window, 17);
@@ -595,7 +595,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Click(window, "ScmEventTask");
         new TaskDetailView(window).StopCli();
         fixture.Control("read-only", false);
-        WaitForElement(window, cf => cf.ByName("CliNeustarten"), Long).AsButton().Invoke();
+        WaitForElement(window, cf => cf.ByName("RestartCli"), Long).AsButton().Invoke();
         new TaskDetailView(window).WaitForCliRunning();
         NavigateQueue(window);
         SelectEvent(window, 17);
@@ -609,9 +609,9 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.DoesNotContain(fixture.Prompts(), p => p.GetProperty("request").GetProperty("cliRunId").GetString() == readOnly.CliRunId);
         output.WriteLine("E6-Read-only: regular task stop/restart replaces denied run; only new supported run receives one event.");
 
-        // A simulator started without its protocol banner stays honestly unrecognized: the wait
-        // reason names the missing banner instead of unknown readiness, no confirm button is
-        // offered, and a regular restart with the banner delivers the same event.
+        // Ein Simulator, der ohne sein Protokoll-Banner gestartet wurde, bleibt ehrlich unerkannt: der
+        // Wartegrund benennt das fehlende Banner statt einer unbekannten Bereitschaft, kein Bestätigen-Button wird
+        // angeboten, und ein regulärer Neustart mit Banner liefert dasselbe Ereignis.
         fixture.Control("unknown-banner", true);
         SelectEvent(window, 2);
         StartSelected(window);
@@ -624,7 +624,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         var unrecognized = await fixture.WaitEventAsync(2, "Wartend");
         Assert.NotNull(unrecognized.CliRunId);
         Assert.Equal(count + 5, fixture.Prompts().Count);
-        // Keep dispatch blocked at the remote boundary while proving the manual stop/restart.
+        // Hält den Dispatch an der Remote-Grenze blockiert, während der manuelle Stopp/Neustart bewiesen wird.
         fixture.Scenario.CanWrite = false;
         fixture.SaveScenario();
         SelectEvent(window, 2);
@@ -634,7 +634,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Click(window, "ScmEventTask");
         new TaskDetailView(window).StopCli();
         fixture.Control("unknown-banner", false);
-        WaitForElement(window, cf => cf.ByName("CliNeustarten"), Long).AsButton().Invoke();
+        WaitForElement(window, cf => cf.ByName("RestartCli"), Long).AsButton().Invoke();
         new TaskDetailView(window).WaitForCliRunning();
         NavigateQueue(window);
         SelectEvent(window, 2);
@@ -724,13 +724,13 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
     {
         var dialog = WaitForElement(window, cf => cf.ByName("KI-Plugin auswählen")
             .And(cf.ByControlType(FlaUI.Core.Definitions.ControlType.Window)), Long);
-        var choices = WaitForElement(dialog, cf => cf.ByName("PluginAuswahl"), Long).AsComboBox();
-        // The dialog is published to UIA before WPF has necessarily realized its items.
+        var choices = WaitForElement(dialog, cf => cf.ByName("PluginSelection"), Long).AsComboBox();
+        // Der Dialog wird an UIA veröffentlicht, bevor WPF seine Items zwingend realisiert hat.
         var deadline = DateTime.UtcNow + Long;
         while (choices.Items.Length == 0 && DateTime.UtcNow < deadline) Thread.Sleep(100);
         Assert.Single(choices.Items);
         if (confirm) choices.Select(0);
-        WaitForElement(dialog, cf => cf.ByName(confirm ? "OK" : "Abbrechen"), Long).AsButton().Invoke();
+        WaitForElement(dialog, cf => cf.ByName(confirm ? "OK" : "Cancel"), Long).AsButton().Invoke();
     }
 
     private static void ConfirmResend(Window window, bool confirmed)

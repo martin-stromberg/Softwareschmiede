@@ -9,7 +9,7 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für <see cref="PluginSelectionService.ResolveIdePluginAsync"/> und <see cref="PluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync"/> (IDE-Plugin-Auflösung).</summary>
+/// <summary>Tests für <see cref="PluginSelectionService.ResolveIdePluginAsync"/> und <see cref="PluginSelectionService.ResolveAllCompatibleIdePluginsAsync"/> (IDE-Plugin-Auflösung).</summary>
 public sealed class PluginSelectionServiceTests_IdePlugin
 {
     /// <summary>Ein aktives Plugin mit Explicit-Kompatibilität wird zurückgegeben.</summary>
@@ -74,8 +74,8 @@ public sealed class PluginSelectionServiceTests_IdePlugin
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Fallback);
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Fallback);
         var pluginManager = CreatePluginManager([visualStudio, vsCode]);
-        var (sut, appEinstellungService) = CreateSut(pluginManager.Object);
-        await appEinstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.VisualStudioCode,Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
+        var (sut, appSettingService) = CreateSut(pluginManager.Object);
+        await appSettingService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.VisualStudioCode,Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
 
         var resolved = await sut.ResolveIdePluginAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
@@ -111,14 +111,14 @@ public sealed class PluginSelectionServiceTests_IdePlugin
 
     /// <summary>Ein Explicit- und ein Fallback-kompatibles Plugin sind beide in der Rückgabeliste enthalten.</summary>
     [Fact]
-    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldReturnExplicitAndFallbackPlugins_WhenBothCompatible()
+    public async Task ResolveAllCompatibleIdePluginsAsync_ShouldReturnExplicitAndFallbackPlugins_WhenBothCompatible()
     {
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Fallback);
         var pluginManager = CreatePluginManager([visualStudio, vsCode]);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
+        var resolved = await sut.ResolveAllCompatibleIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.Select(p => p.PluginPrefix).Should().BeEquivalentTo(
             ["Softwareschmiede.VisualStudio", "Softwareschmiede.VisualStudioCode"]);
@@ -126,14 +126,14 @@ public sealed class PluginSelectionServiceTests_IdePlugin
 
     /// <summary>Bei gemischter Kompatibilität stehen alle Explicit-Plugins vor allen Fallback-Plugins, unabhängig von der Entdeckungsreihenfolge.</summary>
     [Fact]
-    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldOrderExplicitPluginsBeforeFallbackPlugins()
+    public async Task ResolveAllCompatibleIdePluginsAsync_ShouldOrderExplicitPluginsBeforeFallbackPlugins()
     {
         var vsCode = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Fallback);
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var pluginManager = CreatePluginManager([vsCode, visualStudio]);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
+        var resolved = await sut.ResolveAllCompatibleIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.Select(p => p.PluginPrefix).Should().ContainInOrder(
             "Softwareschmiede.VisualStudio", "Softwareschmiede.VisualStudioCode");
@@ -141,15 +141,15 @@ public sealed class PluginSelectionServiceTests_IdePlugin
 
     /// <summary>Innerhalb der Explicit- bzw. Fallback-Gruppe wird die plugins.ide.order-Reihenfolge eingehalten.</summary>
     [Fact]
-    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldRespectPluginOrder_FromSetting_WithinEachGroup()
+    public async Task ResolveAllCompatibleIdePluginsAsync_ShouldRespectPluginOrder_FromSetting_WithinEachGroup()
     {
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var rider = CreateIdePlugin("Rider", "Softwareschmiede.Rider", IdePluginCompatibility.Explicit);
         var pluginManager = CreatePluginManager([visualStudio, rider]);
-        var (sut, appEinstellungService) = CreateSut(pluginManager.Object);
-        await appEinstellungService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.Rider,Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
+        var (sut, appSettingService) = CreateSut(pluginManager.Object);
+        await appSettingService.SetSettingAsync("plugins.ide.order", "Softwareschmiede.Rider,Softwareschmiede.VisualStudio", TestContext.Current.CancellationToken);
 
-        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
+        var resolved = await sut.ResolveAllCompatibleIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.Select(p => p.PluginPrefix).Should().ContainInOrder(
             "Softwareschmiede.Rider", "Softwareschmiede.VisualStudio");
@@ -157,61 +157,61 @@ public sealed class PluginSelectionServiceTests_IdePlugin
 
     /// <summary>Ein Incompatible-Plugin taucht nicht in der Rückgabeliste auf, auch wenn es aktiviert ist.</summary>
     [Fact]
-    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldExcludeIncompatiblePlugins()
+    public async Task ResolveAllCompatibleIdePluginsAsync_ShouldExcludeIncompatiblePlugins()
     {
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var incompatible = CreateIdePlugin("Incompatible IDE", "Softwareschmiede.Incompatible", IdePluginCompatibility.Incompatible);
         var pluginManager = CreatePluginManager([visualStudio, incompatible]);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
+        var resolved = await sut.ResolveAllCompatibleIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.Select(p => p.PluginPrefix).Should().BeEquivalentTo(["Softwareschmiede.VisualStudio"]);
     }
 
     /// <summary>Keine aktivierten Plugins → einelementige Liste mit dem Default-Plugin.</summary>
     [Fact]
-    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldReturnDefaultPlugin_WhenNoPluginActive()
+    public async Task ResolveAllCompatibleIdePluginsAsync_ShouldReturnDefaultPlugin_WhenNoPluginActive()
     {
         var defaultPlugin = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Explicit);
         var pluginManager = CreatePluginManager([], defaultPlugin);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
+        var resolved = await sut.ResolveAllCompatibleIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.Should().ContainSingle().Which.PluginPrefix.Should().Be("Softwareschmiede.VisualStudio");
     }
 
     /// <summary>Alle aktivierten Plugins Incompatible → einelementige Liste mit dem Default-Plugin.</summary>
     [Fact]
-    public async Task ResolveAlleKompatiblenIdePluginsAsync_ShouldReturnDefaultPlugin_WhenNoPluginCompatible()
+    public async Task ResolveAllCompatibleIdePluginsAsync_ShouldReturnDefaultPlugin_WhenNoPluginCompatible()
     {
         var visualStudio = CreateIdePlugin("Visual Studio", "Softwareschmiede.VisualStudio", IdePluginCompatibility.Incompatible);
         var defaultPlugin = CreateIdePlugin("Visual Studio Code", "Softwareschmiede.VisualStudioCode", IdePluginCompatibility.Incompatible);
         var pluginManager = CreatePluginManager([visualStudio], defaultPlugin);
         var (sut, _) = CreateSut(pluginManager.Object);
 
-        var resolved = await sut.ResolveAlleKompatiblenIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
+        var resolved = await sut.ResolveAllCompatibleIdePluginsAsync(@"C:\repos\projekt", TestContext.Current.CancellationToken);
 
         resolved.Should().ContainSingle().Which.PluginPrefix.Should().Be("Softwareschmiede.VisualStudioCode");
     }
 
     /// <summary>
     /// Erzeugt den SUT und konstruiert dabei <see cref="PluginDefaultSettingsService"/>, <see cref="PluginActivationService"/>
-    /// und <see cref="AppEinstellungService"/> aus demselben <see cref="SoftwareschmiededDbContext"/> — wie in der Produktion,
+    /// und <see cref="AppSettingService"/> aus demselben <see cref="SoftwareschmiedeDbContext"/> — wie in der Produktion,
     /// wo sich alle drei Dienste innerhalb eines <see cref="PluginSelectionService"/> denselben Scoped DbContext teilen.
     /// </summary>
-    private static (PluginSelectionService Sut, AppEinstellungService AppEinstellungService) CreateSut(IPluginManager pluginManager)
+    private static (PluginSelectionService Sut, AppSettingService AppSettingService) CreateSut(IPluginManager pluginManager)
     {
         var db = CreateDb();
-        var appEinstellungService = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
+        var appSettingService = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
         var defaultSettings = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var activationService = new PluginActivationService(appEinstellungService, pluginManager, NullLogger<PluginActivationService>.Instance);
-        var sut = new PluginSelectionService(pluginManager, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, appEinstellungService);
-        return (sut, appEinstellungService);
+        var activationService = new PluginActivationService(appSettingService, pluginManager, NullLogger<PluginActivationService>.Instance);
+        var sut = new PluginSelectionService(pluginManager, defaultSettings, activationService, NullLogger<PluginSelectionService>.Instance, appSettingService);
+        return (sut, appSettingService);
     }
 
-    private static SoftwareschmiededDbContext CreateDb() => TestDbContextFactory.Create();
+    private static SoftwareschmiedeDbContext CreateDb() => TestDbContextFactory.Create();
 
     private static Mock<IPluginManager> CreatePluginManager(IReadOnlyList<IIdePlugin> idePlugins, IIdePlugin? defaultIdePlugin = null)
     {

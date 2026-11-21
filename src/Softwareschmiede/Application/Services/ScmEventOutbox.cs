@@ -8,7 +8,7 @@ using Softwareschmiede.Infrastructure.Data;
 namespace Softwareschmiede.Application.Services;
 
 /// <summary>Bestätigt oder rekonstruiert Remoteaktionen unabhängig von der Promptzustellung.</summary>
-public sealed class ScmEventOutbox(SoftwareschmiededDbContext db, TimeProvider time)
+public sealed class ScmEventOutbox(SoftwareschmiedeDbContext db, TimeProvider time)
 {
     /// <summary>Persistiert eine Aktion vor dem ersten Remoteaufruf. Eine bereits belegte
     /// Aktions-ID wird nur bei identischem Ereignis, Zweck und Inhalt wiederverwendet —

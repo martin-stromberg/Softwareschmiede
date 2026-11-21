@@ -13,109 +13,109 @@ Die Projektdetailansicht ist das zentrale UI-Element für die Projektverwaltung.
 **Auslöser:** Benutzer klickt auf ein Projekt im Dashboard oder öffnet ein neues Projekt über „Neu".
 
 Beteiligte Komponenten:
-- `ProjectListViewModel.BearbeitenCommand` — löst Navigation aus
-- `NavigationViewModel` — wechselt zur Detailansicht
+- `ProjectListViewModel.SelectProjectCommand` — löst Navigation aus
+- `MainWindowViewModel` — wechselt zur Detailansicht
 - `ProjectDetailView.xaml` — wird angezeigt
 - `ProjectDetailViewModel` — wird instantiiert
 
 **Flow:**
-1. `ProjectListViewModel.BearbeitenCommand` wird ausgelöst mit Projekt-ID
-2. `NavigationViewModel` empfängt Navigation und setzt `CurrentViewModel` auf `ProjectDetailViewModel`
+1. `ProjectListViewModel.SelectProjectCommand` wird ausgelöst mit Projekt-ID
+2. `MainWindowViewModel` empfängt Navigation und setzt `CurrentViewModel` auf `ProjectDetailViewModel`
 3. `ProjectDetailView.xaml` wird geladen und mit `ProjectDetailViewModel` gebunden
-4. Setter `ProjectDetailViewModel.ProjektId` wird gesetzt
-5. Setter ruft `LadenAsync` auf → siehe Schritt „Projekt laden"
+4. Setter `ProjectDetailViewModel.ProjectId` wird gesetzt
+5. Setter ruft `LoadAsync` auf → siehe Schritt „Projekt laden"
 
 ### 2. Projekt laden
 
-**Auslöser:** `ProjektId` wird gesetzt (z.B. beim Öffnen der Ansicht oder bei Neuladen).
+**Auslöser:** `ProjectId` wird gesetzt (z.B. beim Öffnen der Ansicht oder bei Neuladen).
 
 Beteiligte Komponenten:
-- `ProjectDetailViewModel.LadenAsync` — Ladelogik
-- `ProjektService.GetDetailAsync` — lädt Projektdaten
-- `AufgabeService.GetByProjektAsync` — lädt Aufgaben
+- `ProjectDetailViewModel.LoadAsync` — Ladelogik
+- `ProjectService.GetDetailAsync` — lädt Projektdaten
+- `WorkItemService.GetByProjektAsync` — lädt Aufgaben
 - `ProjectDetailView.xaml` — zeigt Daten an
 
 **Flow:**
 1. `IsLoading` wird auf `true` gesetzt → UI zeigt Ladesymbol
-2. `ProjektService.GetDetailAsync(_projektId, ct)` wird aufgerufen
-3. `Projekt` wird gesetzt (Property triggert UI-Update)
-4. `ProjektName` und `ProjektBeschreibung` werden aus Projekt kopiert (für Bearbeitung)
-5. `AufgabeService.GetByProjektAsync(_projektId, ct)` wird aufgerufen
-6. `Aufgaben`-Collection wird geleert und mit neuen Aufgaben gefüllt (ObservableCollection triggert UI-Update)
+2. `ProjectService.GetDetailAsync(_projectId, ct)` wird aufgerufen
+3. `Project` wird gesetzt (Property triggert UI-Update)
+4. `ProjectName` und `ProjectDescription` werden aus Projekt kopiert (für Bearbeitung)
+5. `WorkItemService.GetByProjektAsync(_projectId, ct)` wird aufgerufen
+6. `WorkItems`-Collection wird geleert und mit neuen Aufgaben gefüllt (ObservableCollection triggert UI-Update)
 7. `SelectedRepository` wird auf erstes Repository gesetzt (falls vorhanden)
 8. `IsLoading` wird auf `false` gesetzt → UI zeigt Inhalte
 
 **Fehlerbehandlung:**
 - Bei `OperationCanceledException`: Exception wird weitergeleitet (CancellationToken wurde abgebrochen)
-- Bei `Exception`: `FehlerMeldung` wird gesetzt, `IsLoading` auf `false`
+- Bei `Exception`: `ErrorMessage` wird gesetzt, `IsLoading` auf `false`
 
 ### 3. Projekt speichern (Anlage oder Bearbeitung)
 
 **Auslöser:** Benutzer klickt „Speichern"-Button in Ribbon-Menü (Gruppe „Projekt").
 
 Beteiligte Komponenten:
-- `ProjectDetailViewModel.SpeichernCommand` — Command wird ausgelöst
-- `ProjectDetailViewModel.ProjektSpeichernAsync` — Speicherlogik
-- `ProjektService.CreateAsync` oder `UpdateAsync` — Datenbankoperation
+- `ProjectDetailViewModel.SaveCommand` — Command wird ausgelöst
+- `ProjectDetailViewModel.SaveProjectAsync` — Speicherlogik
+- `ProjectService.CreateAsync` oder `UpdateAsync` — Datenbankoperation
 - `ProjectDetailView.xaml` — zeigt Bearbeitungsfelder
 
-**Flow (Anlage, `_projektId == Guid.Empty`):**
-1. `ProjektName.Trim()` wird validiert (nicht leer)
-2. `ProjektService.CreateAsync(ProjektName, ProjektBeschreibung, ct)` wird aufgerufen
+**Flow (Anlage, `_projectId == Guid.Empty`):**
+1. `ProjectName.Trim()` wird validiert (nicht leer)
+2. `ProjectService.CreateAsync(ProjectName, ProjectDescription, ct)` wird aufgerufen
 3. Neues Projekt wird in DB angelegt mit Status „Neu"
-4. `_projektId` wird auf neue Projekt-ID gesetzt
-5. `ProjektListeAktualisierenCallback?.Invoke()` wird aufgerufen → ProjectListViewModel lädt Projektliste neu
+4. `_projectId` wird auf neue Projekt-ID gesetzt
+5. `RefreshProjectListCallback?.Invoke()` wird aufgerufen → ProjectListViewModel lädt Projektliste neu
 
-**Flow (Bearbeitung, `_projektId != Guid.Empty`):**
-1. `ProjektName.Trim()` wird validiert (nicht leer)
-2. `ProjektService.UpdateAsync(_projektId, ProjektName, ProjektBeschreibung, ct)` wird aufgerufen
+**Flow (Bearbeitung, `_projectId != Guid.Empty`):**
+1. `ProjectName.Trim()` wird validiert (nicht leer)
+2. `ProjectService.UpdateAsync(_projectId, ProjectName, ProjectDescription, ct)` wird aufgerufen
 3. Projekt wird in DB aktualisiert
-4. `LadenAsync` wird aufgerufen → Projekt wird neu geladen und UI aktualisiert
+4. `LoadAsync` wird aufgerufen → Projekt wird neu geladen und UI aktualisiert
 
 **Fehlerbehandlung:**
 - Bei `OperationCanceledException`: Exception wird weitergeleitet
-- Bei `Exception`: `FehlerMeldung` wird gesetzt, Speicheroperation bricht ab
+- Bei `Exception`: `ErrorMessage` wird gesetzt, Speicheroperation bricht ab
 
 ### 4. Projekt löschen
 
 **Auslöser:** Benutzer klickt „Löschen"-Button in Ribbon-Menü (Gruppe „Projekt").
 
 Beteiligte Komponenten:
-- `ProjectDetailViewModel.LoeschenCommand` — Command wird ausgelöst
-- `ProjectDetailViewModel.ProjektLoeschenAsync` — Löschlogik
-- `ProjectDetailViewModel.LoeschenBestaetigenFunc` — Bestätigungsdialog (MessageBox)
-- `ProjektService.DeleteAsync` — Datenbankoperation
+- `ProjectDetailViewModel.DeleteCommand` — Command wird ausgelöst
+- `ProjectDetailViewModel.DeleteProjectAsync` — Löschlogik
+- `ProjectDetailViewModel.ConfirmDialog` — Bestätigungsdialog (MessageBox)
+- `ProjectService.DeleteAsync` — Datenbankoperation
 - `ProjectListViewModel` — wird durch Callback benachrichtigt
 
 **Flow:**
-1. `LoeschenBestaetigenFunc()` wird aufgerufen → `MessageBox.Show(...)` wird angezeigt
+1. `ConfirmDialog()` wird aufgerufen → `MessageBox.Show(...)` wird angezeigt
    - Benutzer klickt „Yes": `true` wird zurückgegeben
    - Benutzer klickt „No": `false` wird zurückgegeben, Flow bricht ab
-2. `ProjektService.DeleteAsync(_projektId, ct)` wird aufgerufen
+2. `ProjectService.DeleteAsync(_projectId, ct)` wird aufgerufen
 3. Projekt wird aus DB gelöscht (Cascade: alle zugeordneten Aufgaben werden auch gelöscht)
-4. `ProjektListeAktualisierenCallback?.Invoke()` wird aufgerufen → ProjectListViewModel lädt Projektliste neu
-5. `ZurueckAction?.Invoke()` wird aufgerufen → Navigation zur Projektübersicht
+4. `RefreshProjectListCallback?.Invoke()` wird aufgerufen → ProjectListViewModel lädt Projektliste neu
+5. `BackAction?.Invoke()` wird aufgerufen → Navigation zur Projektübersicht
 
 **Fehlerbehandlung:**
 - Bei `OperationCanceledException`: Exception wird weitergeleitet
-- Bei `Exception`: `FehlerMeldung` wird gesetzt, Löschoperation bricht ab
+- Bei `Exception`: `ErrorMessage` wird gesetzt, Löschoperation bricht ab
 
 ### 5. Repository zuweisen
 
 **Auslöser:** Benutzer klickt „Zuweisen"-Button in Ribbon-Menü (Gruppe „Repository").
 
 Beteiligte Komponenten:
-- `ProjectDetailViewModel.RepositoryZuweisenCommand` — Command wird ausgelöst
+- `ProjectDetailViewModel.AssignRepositoryCommand` — Command wird ausgelöst
 - `ProjectDetailViewModel.RepositoryZuweisenAsync` — Dialog-Logik
 - `RepositoryAssignViewModel` — Dialog-ViewModel mit Plugin-Management
 - `RepositoryAssignDialog.xaml` — Dialog-Window mit ComboBox und Hilfe-Panel
 - `IPluginManager` — lädt verfügbare SCM-Plugins
-- `ProjektService.AddRepositoryAsync` — Datenbankoperation
-- `ProjektService.GetAllRepositoriesAsync` — lädt verfügbare Repositories
+- `ProjectService.AddRepositoryAsync` — Datenbankoperation
+- `ProjectService.GetAllRepositoriesAsync` — lädt verfügbare Repositories
 
 **Flow (Dialog-Öffnung und Plugin-Laden):**
 1. `RepositoryAssignViewModel` wird instantiiert mit `IPluginManager` injiziert
-2. `RepositoryAssignViewModel.LadenAsync` wird aufgerufen
+2. `RepositoryAssignViewModel.LoadAsync` wird aufgerufen
    - `IPluginManager.GetSourceCodeManagementPlugins()` wird aufgerufen
    - Verfügbare SCM-Plugins werden in `AvailableScmPlugins`-Collection geladen
    - `HasScmPlugins = (AvailableScmPlugins.Count > 0)` wird gesetzt
@@ -136,10 +136,10 @@ Beteiligte Komponenten:
 2. PropertyChanged-Handler triggert `ReloadRepositoriesForSelectedPlugin()` (Fire-and-Forget)
 3. `ReloadRepositoriesForSelectedPlugin()` wird asynchron ausgeführt:
    - `IsLoading = true` wird gesetzt
-   - `ProjektService.GetAllRepositoriesAsync(ct)` wird aufgerufen (lädt alle Repositories)
-   - Repositories werden gefiltert: `.Where(r => r.PluginTyp == SelectedScmPlugin.PluginType.ToString())`
+   - `ProjectService.GetAllRepositoriesAsync(ct)` wird aufgerufen (lädt alle Repositories)
+   - Repositories werden gefiltert: `.Where(r => r.PluginType == SelectedScmPlugin.PluginType.ToString())`
    - Gefilterte Repositories werden sortiert: `.OrderBy(r => r.RepositoryName)`
-   - `VerfuegbareRepositories` wird mit gefilterten Repositories gefüllt
+   - `AvailableRepositories` wird mit gefilterten Repositories gefüllt
    - `SelectedRepository` wird auf `null` zurückgesetzt
    - `IsLoading = false` wird gesetzt
 4. ListBox wird mit gefilterten Repositories aktualisiert (ObservableCollection triggert UI-Update)
@@ -151,23 +151,23 @@ Beteiligte Komponenten:
    - Bei „Zuweisen": `ShowDialog()` gibt `true` zurück
    - Bei „Abbrechen": `ShowDialog()` gibt `null` oder `false` zurück
 3. Bei erfolgreichem „Zuweisen":
-   - `ProjektService.AddRepositoryAsync(_projektId, repo.PluginTyp, repo.RepositoryUrl, repo.RepositoryName, ct)` wird aufgerufen
+   - `ProjectService.AddRepositoryAsync(_projectId, repo.PluginType, repo.RepositoryUrl, repo.RepositoryName, ct)` wird aufgerufen
    - Repository wird dem Projekt zugeordnet
-   - `LadenAsync` wird aufgerufen → Projekt wird neu geladen mit neuen Repositories
+   - `LoadAsync` wird aufgerufen → Projekt wird neu geladen mit neuen Repositories
 4. Bei „Abbrechen": Dialog schließt sich, nichts wird geändert
 
 **Fehlerbehandlung:**
 - Bei `OperationCanceledException`: Exception wird weitergeleitet
-- Bei Exception in `ReloadRepositoriesForSelectedPlugin()`: `Logger.LogError()` wird aufgerufen, `VerfuegbareRepositories` wird geleert, UI bleibt responsive
-- Bei Exception in `LadenAsync()` (Plugin-Laden): `Logger.LogError()` wird aufgerufen, `AvailableScmPlugins` bleibt leer, `HasScmPlugins = false`
+- Bei Exception in `ReloadRepositoriesForSelectedPlugin()`: `Logger.LogError()` wird aufgerufen, `AvailableRepositories` wird geleert, UI bleibt responsive
+- Bei Exception in `LoadAsync()` (Plugin-Laden): `Logger.LogError()` wird aufgerufen, `AvailableScmPlugins` bleibt leer, `HasScmPlugins = false`
 
 ### 6. Repository öffnen
 
 **Auslöser:** Benutzer klickt „Öffnen"-Button in Ribbon-Menü (Gruppe „Repository").
 
 Beteiligte Komponenten:
-- `ProjectDetailViewModel.RepositoryOeffnenCommand` — Command wird ausgelöst
-- `ProjectDetailViewModel.RepositoryOeffnenAsync` — Browser-Start-Logik
+- `ProjectDetailViewModel.OpenRepositoryCommand` — Command wird ausgelöst
+- `ProjectDetailViewModel.OpenRepository` — Browser-Start-Logik
 - `System.Diagnostics.Process.Start` — Windows Shell-Befehl
 - `SelectedRepository.RepositoryUrl` — URL aus Repository-Konfiguration
 
@@ -180,30 +180,30 @@ Beteiligte Komponenten:
 **Fehlerbehandlung:**
 - Bei ungültigem URL-Format: nichts wird geöffnet
 - Bei `OperationCanceledException`: Exception wird weitergeleitet
-- Bei `Exception`: `FehlerMeldung` wird gesetzt
+- Bei `Exception`: `ErrorMessage` wird gesetzt
 
 ### 7. Aufgabe erstellen
 
 **Auslöser:** Benutzer klickt „Neu"-Button in Ribbon-Menü (Gruppe „Aufgaben").
 
 Beteiligte Komponenten:
-- `ProjectDetailViewModel.AufgabeErstellenCommand` — Command wird ausgelöst
-- `ProjectDetailViewModel.AufgabeErstellenAsync` — Aufgaben-Erstellungslogik
-- `AufgabeService.CreateAsync` — Datenbankoperation
+- `ProjectDetailViewModel.CreateWorkItemCommand` — Command wird ausgelöst
+- `ProjectDetailViewModel.CreateWorkItemAsync` — Aufgaben-Erstellungslogik
+- `WorkItemService.CreateAsync` — Datenbankoperation
 - `TaskDetailViewModel` — wird instantiiert für die Detailansicht
 - `ProjectDetailView.xaml` — zeigt neue Aufgabe in Kachel an
 
 **Flow:**
-1. `AufgabeService.CreateAsync(_projektId, "Neue Aufgabe", "", null, ct)` wird aufgerufen
+1. `WorkItemService.CreateAsync(_projectId, "Neue WorkItem", "", null, ct)` wird aufgerufen
 2. Neue Aufgabe wird in DB angelegt mit Status „Neu" und leerem Titel
-3. Neue `Aufgabe` wird in `Aufgaben`-Collection hinzugefügt (ObservableCollection triggert UI-Update)
+3. Neue `WorkItem` wird in `WorkItems`-Collection hinzugefügt (ObservableCollection triggert UI-Update)
 4. `TaskDetailViewModel` wird instantiiert
-5. `TaskDetailViewModel.AufgabeId` wird auf neue Aufgaben-ID gesetzt
+5. `TaskDetailViewModel.WorkItemId` wird auf neue Aufgaben-ID gesetzt
 6. `SelectedTaskViewModel` wird gesetzt (UI zeigt Aufgabendetail-Ansicht neben Kacheln)
 
 **Fehlerbehandlung:**
 - Bei `OperationCanceledException`: Exception wird weitergeleitet
-- Bei `Exception`: `FehlerMeldung` wird gesetzt, Aufgabenerstellung bricht ab
+- Bei `Exception`: `ErrorMessage` wird gesetzt, Aufgabenerstellung bricht ab
 
 ### 8. Filter-Overlay öffnen/schließen
 
@@ -225,13 +225,13 @@ Beteiligte Komponenten:
 **Auslöser:** Benutzer klickt Radio-Button im Filter-Overlay-Panel.
 
 Beteiligte Komponenten:
-- `ProjectDetailViewModel.AufgabenFilter` — Enum-Property
+- `ProjectDetailViewModel.WorkItemsFilter` — Enum-Property
 - `ProjectDetailView.xaml` — enthält Radio-Buttons mit EnumToBoolConverter
 - Aufgaben-Kachel — wird durch Filter gefiltert (wenn implementiert)
 
 **Flow:**
 1. Radio-Button wird gekickt (z.B. „Alle", „Aktiv", „Archiviert")
-2. `AufgabenFilter`-Property wird gesetzt auf entsprechenden Enum-Wert (`AufgabenFilterTyp.Alle`, `AufgabenFilterTyp.Aktiv`, `AufgabenFilterTyp.Archiviert`)
+2. `WorkItemsFilter`-Property wird gesetzt auf entsprechenden Enum-Wert (`WorkItemFilterType.All`, `WorkItemFilterType.Active`, `WorkItemFilterType.Archived`)
 3. UI aktualisiert sich (wenn Filter-Logik in XAML oder ViewModel implementiert ist)
 
 > **Hinweis:** Der aktuelle Code lädt alle Aufgaben und speichert nur den Filter-Wert. Die Filterung der UI-Liste ist manuell zu implementieren (z.B. über `CollectionViewSource` oder in-code Filtering).
@@ -241,17 +241,17 @@ Beteiligte Komponenten:
 **Auslöser:** Benutzer doppelklickt auf Aufgabe in der Aufgaben-Kachel.
 
 Beteiligte Komponenten:
-- `ProjectDetailView.xaml.cs.AufgabeDoubleClick` — Event-Handler
-- `ProjectDetailViewModel.AufgabeOeffnenCommand` — Command wird ausgelöst mit Aufgaben-ID
+- `ProjectDetailView.xaml.cs.WorkItemDoubleClick` — Event-Handler
+- `ProjectDetailViewModel.OpenWorkItemCommand` — Command wird ausgelöst mit Aufgaben-ID
 - `TaskDetailViewModel` — wird instantiiert
 - `SelectedTaskViewModel` — wird gesetzt
 
 **Flow:**
-1. `AufgabeDoubleClick` Event wird ausgelöst (Event-Setter in ListBoxItem-Style)
-2. Event-Handler extrahiert `aufgabe.Id` aus DataContext
-3. `AufgabeOeffnenCommand.Execute(aufgabe.Id)` wird aufgerufen
+1. `WorkItemDoubleClick` Event wird ausgelöst (Event-Setter in ListBoxItem-Style)
+2. Event-Handler extrahiert `workItem.Id` aus DataContext
+3. `OpenWorkItemCommand.Execute(workItem.Id)` wird aufgerufen
 4. `TaskDetailViewModel` wird instantiiert
-5. `TaskDetailViewModel.AufgabeId` wird auf aufgaben-ID gesetzt
+5. `TaskDetailViewModel.WorkItemId` wird auf aufgaben-ID gesetzt
 6. `SelectedTaskViewModel` wird gesetzt (UI zeigt Aufgabendetail-Ansicht)
 
 ### 11. Projektübersicht laden (mit Repository-Suggestions)
@@ -260,32 +260,32 @@ Beteiligte Komponenten:
 
 Beteiligte Komponenten:
 - `ProjectListView.xaml` — UI mit Projektkacheln und Suggestions-Panel
-- `ProjectListViewModel.LadenCommand` — wird via `Loaded`-Event ausgelöst
-- `ProjectListViewModel.LadenAsync` — Ladelogik
-- `ProjektService.GetAllAsync` — lädt alle Projekte
-- `ProjektService.GetUnassignedRepositoriesAsync` — lädt unzugeordnete Repositories
+- `ProjectListViewModel.LoadCommand` — wird via `Loaded`-Event ausgelöst
+- `ProjectListViewModel.LoadAsync` — Ladelogik
+- `ProjectService.GetAllAsync` — lädt alle Projekte
+- `ProjectService.GetUnassignedRepositoriesAsync` — lädt unzugeordnete Repositories
 - `UnassignedRepositories`-Collection — hält Suggestions für UI
 - `UnassignedRepositoriesConverter` — formatiert Datumsangaben
 
 **Flow:**
 1. `ProjectListView` wird geladen; `Loaded`-Event wird ausgelöst
-2. `LadenCommand` wird ausgelöst (RelayCommand)
-3. `LadenAsync()` wird asynchron ausgeführt:
+2. `LoadCommand` wird ausgelöst (RelayCommand)
+3. `LoadAsync()` wird asynchron ausgeführt:
    - `IsLoading = true` wird gesetzt → UI zeigt Ladesymbol
-   - `FehlerMeldung = null` wird gesetzt (alte Fehlermeldung löschen)
-   - `projektTask = ProjektService.GetAllAsync(ct)` wird gestartet
-   - `suggestionsTask = LadenRepositorienSuggestionsAsync(ct)` wird gestartet (parallel)
-   - `Task.WhenAll(projektTask, suggestionsTask)` wartet auf beide Tasks
+   - `ErrorMessage = null` wird gesetzt (alte Fehlermeldung löschen)
+   - `projectTask = ProjectService.GetAllAsync(ct)` wird gestartet
+   - `suggestionsTask = LoadRepositoriesSuggestionsAsync(ct)` wird gestartet (parallel)
+   - `Task.WhenAll(projectTask, suggestionsTask)` wartet auf beide Tasks
 4. Nach Abschluss:
    - `Projekte`-Collection wird geleert
-   - Projekte aus `projektTask.Result` werden einzeln in Collection hinzugefügt (ObservableCollection triggert UI-Update)
+   - Projekte aus `projectTask.Result` werden einzeln in Collection hinzugefügt (ObservableCollection triggert UI-Update)
    - `IsLoading = false` wird gesetzt → UI zeigt Inhalte
 
 **Flow (UnassignedRepositories laden):**
-1. `LadenRepositorienSuggestionsAsync()` wird parallel ausgeführt:
+1. `LoadRepositoriesSuggestionsAsync()` wird parallel ausgeführt:
    - `IsLoadingRepositories = true` wird gesetzt → Loading-Indikator wird angezeigt
-   - `ProjektService.GetUnassignedRepositoriesAsync(ct)` wird aufgerufen
-2. In `ProjektService.GetUnassignedRepositoriesAsync()`:
+   - `ProjectService.GetUnassignedRepositoriesAsync(ct)` wird aufgerufen
+2. In `ProjectService.GetUnassignedRepositoriesAsync()`:
    - Hash-Set aller zugeordneten Repository-URLs wird erstellt: `assignedUrls = SELECT RepositoryUrl FROM GitRepositories`
    - Für jedes SCM-Plugin in `IPluginManager.GetSourceCodeManagementPlugins()`:
      - Try: `plugin.GetAvailableRepositoriesAsync(ct)` wird aufgerufen
@@ -296,14 +296,14 @@ Beteiligte Komponenten:
      - Primär: `OrderByDescending(r => r.UpdatedAt)` (neueste zuerst)
      - Sekundär: `ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)` (alphabetisch)
    - Gefilterte und sortierte Liste wird zurückgegeben
-3. Zurück in `LadenRepositorienSuggestionsAsync()`:
+3. Zurück in `LoadRepositoriesSuggestionsAsync()`:
    - `UnassignedRepositories`-Collection wird geleert
    - Repositories aus Ergebnis werden einzeln in Collection hinzugefügt (ObservableCollection triggert UI-Update)
    - `IsLoadingRepositories = false` wird gesetzt → Loading-Indikator wird verborgen
 
 **Fehlerbehandlung:**
 - Bei `OperationCanceledException`: Exception wird weitergeleitet
-- Bei Exception in `LadenRepositorienSuggestionsAsync()`: Fehler wird geloggt, `UnassignedRepositories` bleibt leer
+- Bei Exception in `LoadRepositoriesSuggestionsAsync()`: Fehler wird geloggt, `UnassignedRepositories` bleibt leer
 
 ### 12. Projekt aus unzugeordnetem Repository erstellen (Doppelklick)
 
@@ -312,17 +312,17 @@ Beteiligte Komponenten:
 Beteiligte Komponenten:
 - `ProjectListView.xaml` — ItemsControl mit MouseDoubleClick-Binding
 - `ProjectListViewModel.RepositoryDoubleclickCommand` — AsyncRelayCommand<AvailableRepository>
-- `ProjectListViewModel.ProjektAusRepositoryErstellen` — Projektierstellungslogik
-- `ProjektService.CreateAsync` — erstellt Projekt
-- `ProjektService.AddRepositoryAsync` — ordnet Repository zu
+- `ProjectListViewModel.CreateProjectFromRepository` — Projektierstellungslogik
+- `ProjectService.CreateAsync` — erstellt Projekt
+- `ProjectService.AddRepositoryAsync` — ordnet Repository zu
 - `IPluginManager` — findet Plugin für Repository
-- `ProjectListViewModel.LadenAsync` — wird aufgerufen zum Neuladen
+- `ProjectListViewModel.LoadAsync` — wird aufgerufen zum Neuladen
 
 **Flow:**
 1. Benutzer doppelklickt auf Repository-Eintrag
 2. `MouseDoubleClick`-Event wird ausgelöst
 3. `RepositoryDoubleclickCommand.Execute(avail ablerepo)` wird aufgerufen
-4. `ProjektAusRepositoryErstellen(avail ablerepo)` wird asynchron ausgeführt:
+4. `CreateProjectFromRepository(avail ablerepo)` wird asynchron ausgeführt:
    - `FindPluginPrefixForRepositoryAsync(repo.Url, ct)` wird aufgerufen:
      - Für jedes SCM-Plugin in `IPluginManager.GetSourceCodeManagementPlugins()`:
        - Try: `plugin.GetAvailableRepositoriesAsync(ct)` wird aufgerufen
@@ -330,58 +330,58 @@ Beteiligte Komponenten:
        - Wenn gefunden: `plugin.PluginPrefix` wird zurückgegeben
        - Catch: Plugin-Fehler wird geloggt, nächstes Plugin
      - Falls kein Plugin gefunden: leerer String wird zurückgegeben
-   - `ProjektService.CreateAsync(repo.Name, null, ct)` wird aufgerufen → neues Projekt wird erstellt
-   - `ProjektService.AddRepositoryAsync(projekt.Id, pluginPrefix, repo.Url, repo.Name, ct)` wird aufgerufen → Repository wird zugeordnet
-   - `NeuesProjektHinzufuegen()` wird aufgerufen:
-     - `LadenAsync()` wird erneut ausgeführt (Projekte und Suggestions werden neugeladen)
+   - `ProjectService.CreateAsync(repo.Name, null, ct)` wird aufgerufen → neues Projekt wird erstellt
+   - `ProjectService.AddRepositoryAsync(project.Id, pluginPrefix, repo.Url, repo.Name, ct)` wird aufgerufen → Repository wird zugeordnet
+   - `AddNewProject()` wird aufgerufen:
+     - `LoadAsync()` wird erneut ausgeführt (Projekte und Suggestions werden neugeladen)
      - Neues Projekt erscheint in Projektkacheln
      - Repository verschwindet aus Suggestions-Panel (weil es jetzt zugeordnet ist)
 
 **Fehlerbehandlung:**
 - Bei `OperationCanceledException`: Exception wird weitergeleitet
-- Bei Exception: `FehlerMeldung` wird gesetzt, Fehler wird geloggt
+- Bei Exception: `ErrorMessage` wird gesetzt, Fehler wird geloggt
 
 ### 13. Zurücknavigieren von Projektdetail (mit Suggestions-Update)
 
 **Auslöser:** Benutzer klickt „Zurück"-Button in `ProjectDetailViewModel` oder wählt neues Projekt.
 
 Beteiligte Komponenten:
-- `ProjectDetailViewModel.ZurueckCommand` — wird ausgelöst
+- `ProjectDetailViewModel.BackCommand` — wird ausgelöst
 - `ProjectDetailViewModel.NavigateBackToProjectCallback` — wird aufgerufen
-- `ProjectListViewModel.KehreZuProjectZurueck` — wird aufgerufen
-- `ProjectListViewModel.LadenRepositorienSuggestionsAsync` — lädt Suggestions neu
+- `ProjectListViewModel.NavigateBackToProject` — wird aufgerufen
+- `ProjectListViewModel.LoadRepositoriesSuggestionsAsync` — lädt Suggestions neu
 
 **Flow:**
-1. `ProjectDetailViewModel.ZurueckCommand` wird ausgelöst
+1. `ProjectDetailViewModel.BackCommand` wird ausgelöst
 2. `NavigateBackToProjectCallback?.Invoke()` wird aufgerufen
-3. In `ProjectListViewModel.KehreZuProjectZurueck()`:
+3. In `ProjectListViewModel.NavigateBackToProject()`:
    - `DetailViewModel = _currentProjectDetailViewModel` wird gesetzt → Detailansicht wird wieder angezeigt
-   - `LadenRepositorienSuggestionsAsync(CancellationToken.None)` wird aufgerufen → Suggestions werden aktualisiert (asynchron im Hintergrund)
+   - `LoadRepositoriesSuggestionsAsync(CancellationToken.None)` wird aufgerufen → Suggestions werden aktualisiert (asynchron im Hintergrund)
 4. Repository-Liste wird neu geladen (wie in Schritt 11, Flow-Punkt 2)
    - Repositories, die gerade zugeordnet wurden, verschwinden aus Panel
    - Neue oder aktualisierte Repositories erscheinen
 
 **Fehlerbehandlung:**
-- Bei Exception in `LadenRepositorienSuggestionsAsync()`: Fehler wird geloggt, `UnassignedRepositories` wird nicht aktualisiert (alte Liste bleibt sichtbar)
+- Bei Exception in `LoadRepositoriesSuggestionsAsync()`: Fehler wird geloggt, `UnassignedRepositories` wird nicht aktualisiert (alte Liste bleibt sichtbar)
 
 ## Diagramm
 
 ```mermaid
 flowchart TD
-    Start[Ansicht öffnen] --> Load["LadenAsync()"]
+    Start[Ansicht öffnen] --> Load["LoadAsync()"]
     Load --> LoadProj["ProjektService.GetDetailAsync()"]
     LoadProj --> LoadTasks["AufgabeService.GetByProjektAsync()"]
     LoadTasks --> ShowUI["Projekt-Kachel & Aufgaben-Kachel anzeigen"]
     
     ShowUI --> UserAction{Benutzeraktion?}
     
-    UserAction -->|Projekt speichern| SaveProj["SpeichernCommand"]
+    UserAction -->|Projekt speichern| SaveProj["SaveCommand"]
     SaveProj -->|Neue ID empty| CreateProj["ProjektService.CreateAsync()"]
     SaveProj -->|ID vorhanden| UpdateProj["ProjektService.UpdateAsync()"]
     CreateProj --> Load
     UpdateProj --> Load
     
-    UserAction -->|Projekt löschen| DelCmd["LoeschenCommand"]
+    UserAction -->|Projekt löschen| DelCmd["DeleteCommand"]
     DelCmd --> Confirm{"Bestätigung?"}
     Confirm -->|Nein| UserAction
     Confirm -->|Ja| DeleteProj["ProjektService.DeleteAsync()"]
@@ -401,10 +401,10 @@ flowchart TD
     AssignRepo --> Load
     ShowHelp --> BackDialog["Dialog schließen"]
     
-    UserAction -->|Repository öffnen| OpenCmd["RepositoryOeffnenCommand"]
+    UserAction -->|Repository öffnen| OpenCmd["OpenRepositoryCommand"]
     OpenCmd --> OpenBrowser["Process.Start(URL)"]
     
-    UserAction -->|Aufgabe erstellen| NewCmd["AufgabeErstellenCommand"]
+    UserAction -->|Aufgabe erstellen| NewCmd["CreateWorkItemCommand"]
     NewCmd --> CreateTask["AufgabeService.CreateAsync()"]
     CreateTask --> ShowDetail["TaskDetailViewModel anzeigen"]
     
@@ -412,10 +412,10 @@ flowchart TD
     FilterCmd --> ToggleOverlay["IsFilterOverlayVisible umschalten"]
     ToggleOverlay --> UserAction
     
-    UserAction -->|Aufgabe öffnen| OpenTask["AufgabeOeffnenCommand"]
+    UserAction -->|Aufgabe öffnen| OpenTask["OpenWorkItemCommand"]
     OpenTask --> ShowDetail
     
-    UserAction -->|Zurück| BackCmd["ZurueckCommand"]
+    UserAction -->|Zurück| BackCmd["BackCommand"]
     BackCmd --> Back
 ```
 
@@ -424,13 +424,13 @@ flowchart TD
 **Allgemein:**
 - Alle async Operationen sind mit `try-catch` umgeben
 - `OperationCanceledException` wird weitergeleitet (normale Cancellation)
-- Andere `Exception` werden geloggt und in `FehlerMeldung` angezeigt
+- Andere `Exception` werden geloggt und in `ErrorMessage` angezeigt
 
 **Validierung:**
-- `SpeichernCommand`: deaktiviert wenn `ProjektName` leer ist
-- `RepositoryOeffnenCommand`: deaktiviert wenn `SelectedRepository` null ist
-- `LoeschenCommand`: nur aktiv wenn `ProjektId != Guid.Empty`
+- `SaveCommand`: deaktiviert wenn `ProjectName` leer ist
+- `OpenRepositoryCommand`: deaktiviert wenn `SelectedRepository` null ist
+- `DeleteCommand`: nur aktiv wenn `ProjectId != Guid.Empty`
 
 **UI-Zustand:**
 - `IsLoading` wird während Datenbankoperationen gesetzt
-- Fehlermeldung wird mit `FehlerMeldung`-Property angezeigt
+- Fehlermeldung wird mit `ErrorMessage`-Property angezeigt
