@@ -50,6 +50,14 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
         var scenario = configuration.ReadScenario();
         if (!scenario.Authenticated) return new(401, "{}");
         var path = request.Endpoint.Split('?')[0];
+        // Erschöpftes REST-Kontingent: Nicht-GraphQL-Endpunkte liefern die Rate-Limit-403; die
+        // GraphQL-Auflösung/-Reads (eigenes Kontingent) bleiben bewusst erreichbar.
+        if (scenario.RateLimitRest && path != "graphql")
+            return new(403, "{}", new Dictionary<string, string>
+            {
+                ["X-RateLimit-Remaining"] = "0",
+                ["X-RateLimit-Reset"] = DateTimeOffset.UtcNow.AddSeconds(90).ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture)
+            });
         if (path == "user" && request.Method == "GET") return Json(new { node_id = viewerNodeId, login = viewerLogin });
         if (path == "notifications" && request.Method == "GET")
             return Json(scenario.Notifications.Select(notification => (object)new
@@ -72,6 +80,24 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
             using var document = JsonDocument.Parse(request.JsonBody!);
             var query = document.RootElement.GetProperty("query").GetString()!;
             var variables = document.RootElement.GetProperty("variables");
+            // Auflösungsabfrage (Viewer + Repository + viewerPermission in einem Call) — ersetzt das
+            // frühere REST-Paar GET user + GET repos/…; entspricht der bisherigen Fixture-Identität.
+            if (query.Contains("viewerPermission", StringComparison.Ordinal))
+                return Json(new
+                {
+                    data = new
+                    {
+                        viewer = new { id = viewerNodeId, login = viewerLogin },
+                        repository = new
+                        {
+                            id = "REPO",
+                            databaseId = 424242,
+                            name = "scm-e2e",
+                            owner = new { id = "OWNER", login = "scm-owner" },
+                            viewerPermission = scenario.CanWrite ? "WRITE" : "READ"
+                        }
+                    }
+                });
             if (variables.TryGetProperty("id", out var id))
             {
                 var text = scenario.Text.SingleOrDefault(x => x.NodeId == id.GetString());
