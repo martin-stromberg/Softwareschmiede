@@ -124,10 +124,11 @@ public sealed class ScmEventOrchestrator(
         using var renewalCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var renewal = RenewLeaseAsync(taskId, owner, renewalCancellation);
         ct = renewalCancellation.Token;
+        ScmIncomingEvent? item = null;
         try
         {
             db.ChangeTracker.Clear();
-            var item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, ct);
+            item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, ct);
             // Ein Abbruch ist endgültig: keine Hostaktionen, kein Abgleich und keine Zustellung mehr.
             if (item.Status == "Abgebrochen") return;
             // Interner Aufbereitungsauftrag: dedizierter Ausführungspfad; der generische
@@ -348,6 +349,11 @@ public sealed class ScmEventOrchestrator(
             renewalCancellation.Cancel();
             try { await renewal; } catch (OperationCanceledException) { }
             if (existingOwner is null) await store.ReleaseTaskAsync(taskId, owner, CancellationToken.None);
+            // Randfall „Sitzung bereits am verifizierten Prompt, letztes offenes Ereignis erreicht
+            // den Endstatus": Erst jetzt wird die Platzfreigabe der Ausführungsbegrenzung wirksam —
+            // die angeforderte Startprüfung füllt den Platz ereignisgesteuert statt erst beim Poll.
+            if (item?.Status is "Verarbeitet" or "Abgebrochen")
+                startCheckTrigger?.RequestStartCheck();
             notifier.Notify();
         }
     }

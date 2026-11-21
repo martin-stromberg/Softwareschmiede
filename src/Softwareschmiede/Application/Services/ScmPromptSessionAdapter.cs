@@ -37,6 +37,10 @@ public interface IScmPromptSessionAdapter
     bool IsBusy { get; }
     /// <summary>Aktueller Nachweis einer KI-Eingabe.</summary>
     ScmPromptReadyStatus ReadyStatus { get; }
+    /// <summary>Feuert bei jedem Wechsel des Bereitschaftsstands mit dem neuen Wert. Der Invoke
+    /// liegt unter dem internen Sperrobjekt — Handler müssen non-blocking sein; geworfene
+    /// Subscriber-Fehler werden isoliert und brechen den Zustandswechsel nicht ab.</summary>
+    event Action<ScmPromptReadyStatus>? ReadyStatusChanged;
     /// <summary>Erkannter CLI-Typ und Versionszustand des gebundenen Laufs.</summary>
     ScmCliRecognition CliRecognition { get; }
     /// <summary>Wartet auf ein echtes Promptsignal, nie allein auf I/O-Ruhe.</summary>
@@ -136,6 +140,8 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
     }
     /// <inheritdoc/>
     public bool IsBusy => ReadyStatus == ScmPromptReadyStatus.Busy;
+    /// <inheritdoc/>
+    public event Action<ScmPromptReadyStatus>? ReadyStatusChanged;
     /// <inheritdoc/>
     public ScmPromptReadyStatus ReadyStatus { get { if (!IsAlive) return ScmPromptReadyStatus.Exited; lock (_sync) return _ready; } }
     /// <inheritdoc/>
@@ -379,6 +385,10 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
         var previous = _changed;
         _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         previous.TrySetResult();
+        // Der Zustandswechsel ist an dieser Stelle bereits vollzogen: Ein werfender Subscriber
+        // darf weder die Session-Ereignisverarbeitung noch ConfirmReady/MarkInputStarted abbrechen.
+        try { ReadyStatusChanged?.Invoke(ready); }
+        catch (Exception) { }
     }
 
     private void OnBufferChanged(object? sender, EventArgs args) { lock (_sync) _outputRevision++; RefreshScreen(); }

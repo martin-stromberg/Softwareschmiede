@@ -425,4 +425,77 @@ public sealed class ScmEventDispatchTests_Limit
         Assert.Contains("globale Limit", second.Reason);
         Assert.Single(fixture.Sessions);
     }
+
+    /// <summary>Eine Aufgabe am verifizierten Eingabeprompt ohne offenes Ereignis gibt ihren
+    /// Platz frei: Der Übergang nach Ready löst die Startprüfung aus und das wartende Ereignis
+    /// startet ereignisgesteuert — ohne Poll und ohne dass der Prozess endet.</summary>
+    [Fact]
+    public async Task Dispatch_TaskReadyAtPrompt_SlotFreed_WaitingEventStarts()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await fixture.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
+        var (firstTask, firstId) = await fixture.AddAsync(configured: true);
+        var (_, secondId) = await fixture.AddAsync(configured: true);
+        await fixture.DispatchAsync(firstId);
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(firstId)).Status);
+        await fixture.DispatchAsync(secondId);
+        Assert.Equal("Wartend", (await fixture.EventAsync(secondId)).Status);
+        Assert.Single(fixture.Sessions);
+
+        // Das auslösende Ereignis ist fachlich abgeschlossen — erst jetzt kann der
+        // Prompt-Nachweis den Platz freigeben (Pending-Guard).
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            await db.ScmIncomingEvents.Where(x => x.Id == firstId)
+                .ExecuteUpdateAsync(x => x.SetProperty(p => p.Status, "Verarbeitet"),
+                    cancellationToken: TestContext.Current.CancellationToken);
+        }
+
+        await fixture.StartCheck.StartAsync(CancellationToken.None);
+        try
+        {
+            // Die CLI beendet ihren Turn und zeigt erneut ihren verifizierten Eingabeprompt.
+            fixture.SetPrompt(firstTask, "SCM_READY_V1");
+
+            await ScmDispatchFixture.WaitForAsync(async () => fixture.Sessions.Count == 2
+                    && (await fixture.EventAsync(secondId)).Status == "Zugestellt",
+                "Das wartende Ereignis wurde nach dem Prompt-Nachweis nicht ereignisgesteuert gestartet.");
+            Assert.True(fixture.Cli.IsRunning(firstTask));
+        }
+        finally
+        {
+            await fixture.StartCheck.StopAsync(CancellationToken.None);
+        }
+    }
+
+    /// <summary>Der Pending-Guard hält den Platz trotz sichtbarem Eingabeprompt belegt: Solange
+    /// ein Ereignis der Aufgabe nicht im Endstatus steht, startet auch die ereignisgesteuerte
+    /// Startprüfung keinen Folgelauf.</summary>
+    [Fact]
+    public async Task Dispatch_TaskReadyWithPendingEvent_SlotStaysOccupied()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await fixture.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
+        var (firstTask, firstId) = await fixture.AddAsync(configured: true);
+        var (_, secondId) = await fixture.AddAsync(configured: true);
+        await fixture.DispatchAsync(firstId);
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(firstId)).Status);
+        await fixture.DispatchAsync(secondId);
+        Assert.Equal("Wartend", (await fixture.EventAsync(secondId)).Status);
+        Assert.Single(fixture.Sessions);
+
+        // Die CLI zeigt ihren verifizierten Eingabeprompt, das zugestellte Ereignis ist aber
+        // noch offen — der Platz bleibt belegt.
+        fixture.SetPrompt(firstTask, "SCM_READY_V1");
+        await fixture.StartCheck.RunOnceAsync(TestContext.Current.CancellationToken);
+        await fixture.DispatchAsync(secondId);
+
+        var second = await fixture.EventAsync(secondId);
+        Assert.Equal("Wartend", second.Status);
+        Assert.Contains("globale Limit", second.Reason);
+        Assert.Single(fixture.Sessions);
+    }
 }
