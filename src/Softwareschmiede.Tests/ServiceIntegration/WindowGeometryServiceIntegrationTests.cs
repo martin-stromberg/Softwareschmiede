@@ -8,73 +8,73 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 /// <summary>E2E-Test: Fensterposition verschieben/skalieren und beim Neustart wiederherstellen.</summary>
 public sealed class WindowGeometryServiceIntegrationTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
-    private readonly AppEinstellungService _einstellungService;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
+    private readonly AppSettingService _settingService;
 
     /// <summary>WindowGeometryServiceIntegrationTests.</summary>
     public WindowGeometryServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
-        _einstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        _settingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    /// <summary><summary>Fenstergeometrie_WirdGespeichert_UndWiederhergestellt.</summary>.</summary>
+    /// <summary>Fenstergeometrie_WirdGespeichert_UndWiederhergestellt.</summary>
     [Fact]
-    public async Task Fenstergeometrie_WirdGespeichert_UndWiederhergestellt()
+    public async Task Windowgeometry_WillSaved_AndRestored()
     {
         var geometry = new WindowGeometrySettings(X: 200, Y: 150, Width: 1400, Height: 900);
 
-        await _einstellungService.SetWindowGeometryAsync(geometry, TestContext.Current.CancellationToken);
-        var geladen = await _einstellungService.GetWindowGeometryAsync(TestContext.Current.CancellationToken);
+        await _settingService.SetWindowGeometryAsync(geometry, TestContext.Current.CancellationToken);
+        var loaded = await _settingService.GetWindowGeometryAsync(TestContext.Current.CancellationToken);
 
-        geladen.X.Should().Be(200);
-        geladen.Y.Should().Be(150);
-        geladen.Width.Should().Be(1400);
-        geladen.Height.Should().Be(900);
+        loaded.X.Should().Be(200);
+        loaded.Y.Should().Be(150);
+        loaded.Width.Should().Be(1400);
+        loaded.Height.Should().Be(900);
     }
 
-    /// <summary><summary>Fenstergeometrie_OhneGespeicherteWerte_GibtNull_Zurueck.</summary>.</summary>
+    /// <summary>Fenstergeometrie_OhneGespeicherteWerte_GibtNull_Zurueck.</summary>
     [Fact]
-    public async Task Fenstergeometrie_OhneGespeicherteWerte_GibtNull_Zurueck()
+    public async Task Windowgeometry_WithoutSavedValues_ReturnsNull_Back()
     {
-        var geladen = await _einstellungService.GetWindowGeometryAsync(TestContext.Current.CancellationToken);
+        var loaded = await _settingService.GetWindowGeometryAsync(TestContext.Current.CancellationToken);
 
-        geladen.X.Should().BeNull();
-        geladen.Y.Should().BeNull();
-        geladen.Width.Should().BeNull();
-        geladen.Height.Should().BeNull();
+        loaded.X.Should().BeNull();
+        loaded.Y.Should().BeNull();
+        loaded.Width.Should().BeNull();
+        loaded.Height.Should().BeNull();
     }
 
-    /// <summary><summary>Fenstergeometrie_KannMehrmalsAktualisiert_Werden.</summary>.</summary>
+    /// <summary>Fenstergeometrie_KannMehrmalsAktualisiert_Werden.</summary>
     [Fact]
-    public async Task Fenstergeometrie_KannMehrmalsAktualisiert_Werden()
+    public async Task Windowgeometry_UpdatesCanRepeatedly_Be()
     {
-        await _einstellungService.SetWindowGeometryAsync(new WindowGeometrySettings(100, 100, 1200, 800), TestContext.Current.CancellationToken);
-        await _einstellungService.SetWindowGeometryAsync(new WindowGeometrySettings(300, 250, 1600, 1000), TestContext.Current.CancellationToken);
+        await _settingService.SetWindowGeometryAsync(new WindowGeometrySettings(100, 100, 1200, 800), TestContext.Current.CancellationToken);
+        await _settingService.SetWindowGeometryAsync(new WindowGeometrySettings(300, 250, 1600, 1000), TestContext.Current.CancellationToken);
 
-        var geladen = await _einstellungService.GetWindowGeometryAsync(TestContext.Current.CancellationToken);
+        var loaded = await _settingService.GetWindowGeometryAsync(TestContext.Current.CancellationToken);
 
-        geladen.X.Should().Be(300);
-        geladen.Y.Should().Be(250);
-        geladen.Width.Should().Be(1600);
-        geladen.Height.Should().Be(1000);
+        loaded.X.Should().Be(300);
+        loaded.Y.Should().Be(250);
+        loaded.Width.Should().Be(1600);
+        loaded.Height.Should().Be(1000);
     }
 
-    /// <summary><summary>Fenstergeometrie_BeimNeustart_WirdWiederhergestellt.</summary>.</summary>
+    /// <summary>Fenstergeometrie_BeimNeustart_WirdWiederhergestellt.</summary>
     [Fact]
-    public async Task Fenstergeometrie_BeimNeustart_WirdWiederhergestellt()
+    public async Task Windowgeometry_AtRestart_WillRestored()
     {
-        await _einstellungService.SetWindowGeometryAsync(new WindowGeometrySettings(50, 75, 1280, 720), TestContext.Current.CancellationToken);
+        await _settingService.SetWindowGeometryAsync(new WindowGeometrySettings(50, 75, 1280, 720), TestContext.Current.CancellationToken);
 
-        var neuerService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
-        var geladen = await neuerService.GetWindowGeometryAsync(TestContext.Current.CancellationToken);
+        var newService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
+        var loaded = await newService.GetWindowGeometryAsync(TestContext.Current.CancellationToken);
 
-        geladen.X.Should().Be(50);
-        geladen.Y.Should().Be(75);
-        geladen.Width.Should().Be(1280);
-        geladen.Height.Should().Be(720);
+        loaded.X.Should().Be(50);
+        loaded.Y.Should().Be(75);
+        loaded.Width.Should().Be(1280);
+        loaded.Height.Should().Be(720);
     }
 }

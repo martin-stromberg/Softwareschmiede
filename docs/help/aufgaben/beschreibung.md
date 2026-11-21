@@ -29,7 +29,7 @@ Die WPF-Desktopanwendung zeigt alle aktiven Aufgaben (Status `Gestartet` oder `W
 - **Dashboard-Integration:** Die Menü-Sektion wird automatisch verborgen, wenn das Dashboard aktiv ist. Das Dashboard zeigt stattdessen die gleiche Aufgabenliste ohne Höhenlimit an — einschließlich der kompakten Kacheln und der eigenen Modus-Buttons neben der Überschrift.
 - **Automatische Statusaktualisierung:** Der Aufgabenstatus wird ohne manuelles Neuladen aktualisiert:
   - **Sofortreaktion auf Prozess-Änderungen:** Wenn eine Aufgabe gestartet oder beendet wird, wird die Seitenleiste sofort aktualisiert.
-  - **Sofortreaktion auf persistierte Laufdaten:** Wenn eine aktive Run-ID, ein Heartbeat oder ein Laufstatus wie `Läuft` oder `WartetAufEingabe` gespeichert wurde, wird die sichtbare Aufgabenliste direkt neu geladen.
+  - **Sofortreaktion auf persistierte Laufdaten:** Wenn eine aktive Run-ID, ein Heartbeat oder ein Laufstatus wie `Running` oder `WaitingForInput` gespeichert wurde, wird die sichtbare Aufgabenliste direkt neu geladen.
   - **Periodische Überprüfung:** Alle 5 Sekunden wird der Status neu abgerufen, um Heartbeat-Ablauf (▶ Läuft → ✓ Bereit nach 5 Minuten ohne Aktivität) und andere verpasste Änderungen zu erkennen.
   - **Konsistenter Status in Kachel und Detailansicht:** Die Kachel folgt stets dem tatsächlichen Prozesszustand: Solange die KI-Ausführung nachweislich läuft, zeigt sie `▶ Läuft` bzw. `⏸ Wartet` — auch dann, wenn die gespeicherten Laufdaten kurzzeitig fehlen oder veralten (die Anwendung stellt sie selbstständig wieder her). `✓ Bereit` erscheint nur, wenn kein CLI-Prozess mehr läuft; Fußzeile der Detailansicht und Kachel können sich damit nicht widersprechen.
   - **Visuelle Übergangsanimation:** Wenn der Status einer Aufgabe sich ändert, wird ein dezenter Opacity-Fade (250 ms) auf dem Statussymbol angezeigt, um den Wechsel hervorzuheben.
@@ -39,7 +39,7 @@ Die WPF-Desktopanwendung zeigt alle aktiven Aufgaben (Status `Gestartet` oder `W
 Die Aufgabendetailansicht ist eine vollständige, fensterumfassende Ansicht, nicht mehr inline in die Projektdetailansicht eingebettet:
 
 - **Aufgabe öffnen:** Doppelklick auf eine Aufgabe in der Aufgaben-Kachel der Projektdetailansicht öffnet die Aufgabendetailansicht. Nicht beendete Aufgaben sind dort direkt sichtbar; beendete Aufgaben liegen im initial zugeklappten Register „Beendete Aufgaben". Die Projektdetailansicht wird ausgeblendet.
-- **Fenstertitel:** Beim Öffnen einer Aufgabe zeigt die Titelleiste zunächst `Softwareschmiede – Aufgabe` und nach dem Laden `Softwareschmiede – {Aufgabentitel}`. Beim Wechsel zurück zu Dashboard, Projekten oder Einstellungen wird der jeweilige Ansichtstitel gesetzt, damit kein alter Aufgabentitel stehen bleibt.
+- **Fenstertitel:** Beim Öffnen einer Aufgabe zeigt die Titelleiste zunächst `Softwareschmiede – WorkItem` und nach dem Laden `Softwareschmiede – {Aufgabentitel}`. Beim Wechsel zurück zu Dashboard, Projekten oder Einstellungen wird der jeweilige Ansichtstitel gesetzt, damit kein alter Aufgabentitel stehen bleibt.
 - **Zurück zur Projektansicht:** Der „Zurück"-Button im Ribbon navigiert zurück zur Projektdetailansicht. Alle Aufgabenänderungen bleiben erhalten.
 - **Neue Aufgabe:** Klick auf „Neue Aufgabe" im Ribbon der Projektdetailansicht erstellt eine neue Aufgabe mit Status „Neu" und öffnet sofort die Aufgabendetailansicht in der Info-Ansicht mit bearbeitbaren Stammdaten.
 - **Aufgabenlisten-Update:** Nach dem Speichern einer Aufgabe wird die Aufgabenliste in der Projektdetailansicht aktualisiert (nur das geänderte Element wird neu geladen, nicht die gesamte Liste).
@@ -53,13 +53,13 @@ Beim Start einer Aufgabe (Repository-Klon) werden automatisch zwei lokale Dateie
   - Aufgaben-ID (eindeutige Kennung)
   - Branch-Name
   - Erstellungsdatum
-  - **Optionaler Abschnitt „Verknüpftes Issue"** — erscheint nur, wenn die Aufgabe eine `IssueReferenz` mit gültiger Issue-Nummer (`> 0`) besitzt. Enthält die Kennung als `#<Nummer>` und den Titel des Issues.
+  - **Optionaler Abschnitt „Verknüpftes Issue"** — erscheint nur, wenn die Aufgabe eine `IssueReference` mit gültiger Issue-Nummer (`> 0`) besitzt. Enthält die Kennung als `#<Nummer>` und den Titel des Issues.
   - Vollständige Anforderungsbeschreibung
 
   Beispiel für eine Aufgabe mit Issue-Referenz:
 
   ```markdown
-  # Aufgabe: Anmeldung fehlerhaft beheben
+  # WorkItem: Anmeldung fehlerhaft beheben
 
   **Aufgaben-ID:** 3fa85f64-5717-4562-b3fc-2c963f66afa6
   **Branch:** task/issue-42-3fa85f64…-anmeldung-fehlerhaft-beheben
@@ -68,7 +68,7 @@ Beim Start einer Aufgabe (Repository-Klon) werden automatisch zwei lokale Dateie
   ## Verknüpftes Issue
 
   **Kennung:** #42
-  **Titel:** Anmeldung fehlerhaft
+  **Title:** Anmeldung fehlerhaft
 
   ## Anforderung
 
@@ -94,11 +94,11 @@ Eine Aufgabe durchläuft folgende Status:
 
 | Status | Bedeutung |
 |--------|-----------|
-| `Neu` | Angelegt, noch nicht gestartet |
+| `New` | Angelegt, noch nicht gestartet |
 | `Gestartet` | Repository geklont, Branch erstellt, CLI läuft oder sollte laufen |
 | `Wartend` | CLI hat Rate-Limit erreicht; wartet auf Wiederaufnahme |
-| `Beendet` | Abgeschlossen (erfolgreich oder mit Fehler) |
-| `Archiviert` | Dauerhaft archiviert |
+| `Completed` | Abgeschlossen (erfolgreich oder mit Fehler) |
+| `Archived` | Dauerhaft archiviert |
 
 ### Aufgabendetailansicht (WPF)
 
@@ -112,7 +112,7 @@ Zeigt das Terminalfenster des KI-Tools. Das Fenster wird via Win32 `SetParent` d
 
 Die CLI-Ansicht wird angeboten, wenn:
 - Die Aufgabe im Status `Gestartet` oder `Wartend` ist UND
-- Der Ausführungsstatus `Aktiv` (CLI läuft) oder `Beendet` (CLI wurde beendet) ist
+- Der Ausführungsstatus `Active` (CLI läuft) oder `Completed` (CLI wurde beendet) ist
 
 Das Panel bleibt auch nach Beendigung der Ausführung sichtbar, sodass der Benutzer die letzte CLI-Ausgabe anschauen und die CLI manuell neu starten kann. Beim Plugin-Wechsel wird die neue Session im selben Panel dargestellt.
 
@@ -166,23 +166,23 @@ Die Promptvorlagen-Auswahlbox im Ribbon wird durch zwei Eingabefelder (Stunde un
 
 ### CLI-Prozess-Management
 
-Der `KiAusfuehrungsService` läuft als Singleton. Er startet und stoppt CLI-Prozesse und gibt Statusänderungen über das `CliProcessStatusChanged`-Event weiter. Für jede Aufgabe kann nur ein CLI-Prozess gleichzeitig laufen.
+Der `AiExecutionService` läuft als Singleton. Er startet und stoppt CLI-Prozesse und gibt Statusänderungen über das `CliProcessStatusChanged`-Event weiter. Für jede Aufgabe kann nur ein CLI-Prozess gleichzeitig laufen.
 
 ### Automatisches CLI-Ausgabeprotokoll
 
-Für jeden Terminal-Session-Start (`KiAusfuehrungsService.StartTerminalSessionAsync` — ConPTY oder diagnostizierter Pipe-Fallback) erzeugt `KiAusfuehrungsService` einen `CliOutputProtokollWriter`, der an die `PseudoConsoleSession` angebunden wird. Die Session meldet gelesene Output-Bytes unabhängig von der UI an diese Senke. Der Writer dekodiert UTF-8 über Chunk-Grenzen, trennt Ausgabe auf `\n`, `\r\n` und einzelne `\r` und speichert jede abgeschlossene Zeile über `ProtokollService.AddCliOutputAsync` als `ProtokollTyp.CliOutput`.
+Für jeden Terminal-Session-Start (`AiExecutionService.StartTerminalSessionAsync` — ConPTY oder diagnostizierter Pipe-Fallback) erzeugt `AiExecutionService` einen `CliOutputLogWriter`, der an die `PseudoConsoleSession` angebunden wird. Die Session meldet gelesene Output-Bytes unabhängig von der UI an diese Senke. Der Writer dekodiert UTF-8 über Chunk-Grenzen, trennt Ausgabe auf `\n`, `\r\n` und einzelne `\r` und speichert jede abgeschlossene Zeile über `LogService.AddCliOutputAsync` als `LogEntryType.CliOutput`.
 
 Die Protokollierung hängt nicht davon ab, dass die CLI-Ansicht geöffnet ist. Persistenzfehler werden geloggt und unterbrechen den CLI-Prozess nicht. Bei sehr schneller Ausgabe ist die interne Queue begrenzt; wenn sie voll ist, wartet der Output-Reader auf freie Kapazität. Ein bekannter Abschluss-Race bei voller Queue und parallelem Cleanup ist noch als Nacharbeit offen.
 
 ### CLI-Rohausgabe exportieren
 
-In der Aufgabendetailansicht steht in der Ribbon-Gruppe **CLI** der Button **Rohausgabe exportieren** zur Verfügung. Der Benutzer wählt darüber über einen Speichern-Dialog den Zielpfad; vorgeschlagen wird ein Dateiname nach dem Muster `cli-output-<AufgabenId>.raw`.
+In der Aufgabendetailansicht steht in der Ribbon-Gruppe **CLI** der Button **Rohausgabe exportieren** zur Verfügung. Der Benutzer wählt darüber über einen Speichern-Dialog den Zielpfad; vorgeschlagen wird ein Dateiname nach dem Muster `cli-output-<WorkItemId>.raw`.
 
 Der Export schreibt nur die bereits protokollierten `CliOutput`-Zeilen der Aufgabe in ihrer gespeicherten Reihenfolge in eine `.raw`-Datei. Zusätzliche Metadaten, Formatierungen oder andere Protokolltypen werden nicht ergänzt. Wird der Dialog abgebrochen, bleibt die Aufgabe unverändert.
 
 ### CLI-Aufzeichnung exportieren
 
-Daneben steht in derselben Ribbon-Gruppe **CLI** der Button **Aufzeichnung exportieren** zur Verfügung. Er exportiert den automatisch mitgeschriebenen Rohbyte-Mitschnitt der letzten Terminal-Session der Aufgabe als `.clireplay`-Binärdatei (Vorschlagsname `cli-replay-<AufgabenId>.clireplay`) — inklusive Zeitstempel pro Ausgabe-Chunk, die der zeilenbasierte `.raw`-Export verliert.
+Daneben steht in derselben Ribbon-Gruppe **CLI** der Button **Aufzeichnung exportieren** zur Verfügung. Er exportiert den automatisch mitgeschriebenen Rohbyte-Mitschnitt der letzten Terminal-Session der Aufgabe als `.clireplay`-Binärdatei (Vorschlagsname `cli-replay-<WorkItemId>.clireplay`) — inklusive Zeitstempel pro Ausgabe-Chunk, die der zeilenbasierte `.raw`-Export verliert.
 
 Die Aufzeichnung läuft während jeder CLI-Ausführung automatisch mit und überlebt das Session-Ende; sie ist speicherbegrenzt (Standard 8 MB — bei Überschreitung bleibt nur der Anfang erhalten) und wird nur für die letzten 8 gestarteten Aufgaben vorgehalten. Liegt keine Aufzeichnung vor, erscheint statt des Speicherdialogs eine verständliche Meldung. Die Datei dient der Wiedergabe im Konsolentestfenster (Einstellungen → Allgemein → Diagnose); Details siehe [Terminal-Integration](../terminal/index.md).
 
@@ -211,7 +211,7 @@ Aufgaben mit einem bekannten, noch laufenden Session-Limit blockieren außerdem 
 
 ### Recovery-Mechanismus
 
-Der `AufgabeRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `Gestartet` oder `Wartend`, deren Heartbeat älter als 5 Minuten ist und für die kein aktiver Prozess läuft. Diese werden im `RecoveryBannerControl` angezeigt. Ein Klick auf „Wiederherstellen" setzt den Status auf `Gestartet` und inkrementiert `RecoveryVersion` (optimistic concurrency). Pausierte Aufgaben gelten nicht als „festhängend" und werden nicht als Recovery-Kandidaten angeboten; eine manuelle Wiederherstellung wird während einer aktiven Pause mit einem Hinweis abgelehnt.
+Der `WorkItemRecoveryService` findet beim Dashboard-Laden Aufgaben im Status `Gestartet` oder `Wartend`, deren Heartbeat älter als 5 Minuten ist und für die kein aktiver Prozess läuft. Diese werden im `RecoveryBannerControl` angezeigt. Ein Klick auf „Wiederherstellen" setzt den Status auf `Gestartet` und inkrementiert `RecoveryVersion` (optimistic concurrency). Pausierte Aufgaben gelten nicht als „festhängend" und werden nicht als Recovery-Kandidaten angeboten; eine manuelle Wiederherstellung wird während einer aktiven Pause mit einem Hinweis abgelehnt.
 
 ## Beispiele
 
@@ -262,13 +262,13 @@ Die Aufgabendetailansicht bietet eine dedizierte **Todos-Ansicht** mit einer To-
   - **Checkbox:** Abhaken zum Markieren als erledigt — beim Abhaken wird das To-Do sofort in die Datenbank gespeichert und das To-Do erhält durchgestrichenen Text mit reduzierter Opazität.
   - **Text:** Der To-Do-Beschreibungstext.
   - **Löschen-Button:** Entfernt das To-Do aus der Liste und der Datenbank.
-- **Validierung beim Aufgabenabschluss:** Die Aufgabe kann **nicht** beendet werden (Status: `Beendet`), solange noch offene To-Dos vorhanden sind. Ein Versuch, die Aufgabe zu beenden, zeigt eine Fehlermeldung wie „Diese Aufgabe kann nicht beendet werden, solange noch X offene To-Do(s) vorhanden sind."
+- **Validierung beim Aufgabenabschluss:** Die Aufgabe kann **nicht** beendet werden (Status: `Completed`), solange noch offene To-Dos vorhanden sind. Ein Versuch, die Aufgabe zu beenden, zeigt eine Fehlermeldung wie „Diese Aufgabe kann nicht beendet werden, solange noch X offene To-Do(s) vorhanden sind."
 - **Ribbon-Badge:** Im Ribbon-Menü wird in der Aufgaben-Gruppe eine Markierung angezeigt, falls offene To-Dos vorhanden sind (z. B. „⚠ 3 offen"). Das Badge wird verborgen wenn alle To-Dos erledigt sind.
-- **Aktive-Aufgaben-Label:** In der aktiven Aufgabenliste der Seitenleiste und im Dashboard wird die Anzahl offener Todos pro Aufgabe direkt an der Kachel angezeigt. Das Label bleibt auch bei `0 Todos` sichtbar und öffnet einen read-only Dialog mit den offenen Todos oder dem Leerzustand.
+- **Aktive-Aufgaben-Label:** In der aktiven WorkItemsList der Seitenleiste und im Dashboard wird die Anzahl offener Todos pro Aufgabe direkt an der Kachel angezeigt. Das Label bleibt auch bei `0 Todos` sichtbar und öffnet einen read-only Dialog mit den offenen Todos oder dem Leerzustand.
 
 ## Einschränkungen
 
-- Eine Pause kann nur für Aufgaben im Status `Neu`, `Gestartet` oder `Wartend` gesetzt werden. Beendete oder archivierte Aufgaben können nicht pausiert werden.
+- Eine Pause kann nur für Aufgaben im Status `New`, `Gestartet` oder `Wartend` gesetzt werden. Beendete oder archivierte Aufgaben können nicht pausiert werden.
 - Die Pause blockiert nur neu ausgelöste Aktionen (Start, CLI-Neustart, Wiederherstellung, Prompt-Versand). Ein laufender CLI-Prozess läuft auch während einer Pause weiter.
 - Nach Ablauf einer Pause erfolgt keine automatische Wiederaufnahme — der Anwender startet bei Bedarf manuell neu.
 - Die automatische Pause bei Session-Limit betrifft nur Aufgaben, deren Ausführung zum Erkennungszeitpunkt läuft. Eine später manuell gestartete Aufgabe mit demselben KI-Plugin wird nicht automatisch blockiert.

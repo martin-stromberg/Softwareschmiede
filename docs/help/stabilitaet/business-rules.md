@@ -30,7 +30,7 @@
 - Task abgebrochen (`IsCanceled`): `LogInformation(...)` mit dem übergebenen `operationName`.
 - In keinem Fall wird die Exception an den ursprünglichen Aufrufer zurückgegeben.
 
-**Umsetzung:** `AsyncTaskExtensions.SafeFireAndForget` (`src/Softwareschmiede/Application/Services/AsyncTaskExtensions.cs`), verwendet u. a. in `CliProcessManager.StartHeartbeat`, `KiAusfuehrungsService.HandleSessionEndedAsync`/`HandleSessionFailedAsync`, den Property-Settern von `MainWindowViewModel.CurrentView`, `ProjectDetailViewModel.ProjektId`, `TaskDetailViewModel.AufgabeId`, `TerminalControl.OnSessionChanged` und `ProjectDetailView.IssueDoubleClick`.
+**Umsetzung:** `AsyncTaskExtensions.SafeFireAndForget` (`src/Softwareschmiede/Application/Services/AsyncTaskExtensions.cs`), verwendet u. a. in `CliProcessManager.StartHeartbeat`, `AiExecutionService.HandleSessionEndedAsync`/`HandleSessionFailedAsync`, den Property-Settern von `MainWindowViewModel.CurrentView`, `ProjectDetailViewModel.ProjectId`, `TaskDetailViewModel.WorkItemId`, `TerminalControl.OnSessionChanged` und `ProjectDetailView.IssueDoubleClick`.
 
 ---
 
@@ -46,7 +46,7 @@
 - Tritt eine Exception auf (z. B. `ObjectDisposedException` bei `PseudoConsoleSession.Dispose()` durch parallelen Zugriff), wird sie geloggt; der Handler wird **nicht** erneut ausgeführt und die Exception wird **nicht** weitergeworfen.
 - `_handles.TryRemove` stellt sicher, dass jede Aufräum-Aktion pro Aufgabe genau einmal ausgeführt wird, auch wenn der Handler theoretisch mehrfach aufgerufen werden könnte; entfernt das Event einen zwischenzeitlich neu gestarteten Handle, wird dieser wieder eingetragen und das alte Exit-Event ignoriert.
 
-**Umsetzung:** `KiAusfuehrungsService.HandleExitedCoreAsync` (gemeinsame Implementierung; aufgerufen aus `HandleProcessExitedAsync` beim klassischen `StartCliAsync`-Pfad sowie aus `HandleSessionEndedAsync`/`HandleSessionFailedAsync` beim `StartTerminalSessionAsync`-Pfad).
+**Umsetzung:** `AiExecutionService.HandleExitedCoreAsync` (gemeinsame Implementierung; aufgerufen aus `HandleProcessExitedAsync` beim klassischen `StartCliAsync`-Pfad sowie aus `HandleSessionEndedAsync`/`HandleSessionFailedAsync` beim `StartTerminalSessionAsync`-Pfad).
 
 ---
 
@@ -55,7 +55,7 @@
 **Beschreibung:** `CliProcessStatusChanged` ist ein Multicast-Delegate mit mehreren Abonnenten (`CliProcessManager`, `TaskDetailViewModel`). Ein Fehler bei einem Abonnenten darf die Benachrichtigung der übrigen Abonnenten nicht verhindern.
 
 **Bedingungen:**
-- `CliProcessStatusChanged?.Invoke(aufgabeId, status)` wird ausgelöst.
+- `CliProcessStatusChanged?.Invoke(workItemId, status)` wird ausgelöst.
 
 **Verhalten:**
 - Jeder Abonnent kapselt seine eigene Verarbeitungslogik in try-catch statt sich auf den Aufrufer zu verlassen.
@@ -74,43 +74,43 @@
 
 **Verhalten:**
 - Jede Aufgabe erhält beim Start des Heartbeats ein eigenes `SemaphoreSlim(1, 1)`.
-- `AktualisierungAsync` wartet auf das Semaphore der jeweiligen Aufgabe, nicht auf ein globales Semaphore.
+- `UpdateAsync` wartet auf das Semaphore der jeweiligen Aufgabe, nicht auf ein globales Semaphore.
 - Beim Stoppen des Heartbeats (`StopHeartbeat`) wird das zugehörige Semaphore aus dem Dictionary entfernt und disposed; ein `Release()`-Aufruf danach wird über `catch (ObjectDisposedException)` abgefangen.
 
-**Umsetzung:** `CliProcessManager._updateSemaphores` (`ConcurrentDictionary<Guid, SemaphoreSlim>`), `CliProcessManager.AktualisierungAsync`.
+**Umsetzung:** `CliProcessManager._updateSemaphores` (`ConcurrentDictionary<Guid, SemaphoreSlim>`), `CliProcessManager.UpdateAsync`.
 
 ---
 
 ## Laufdaten-Mutationen laufen unter einer prozessweiten Aufgabensperre
 
-**Beschreibung:** Alle persistierten Laufdaten einer Aufgabe (`AktiveRunId`, `LastHeartbeatUtc`, `LetzterCliStartUtc`, `LaufStatus`, `AusfuehrungsStatus`) werden ausschließlich in `LaufGates`-serialisierten Schreibphasen verändert — unabhängig davon, aus welchem Pfad (Laufdaten-Selbstheilung, Prozess-Exit, ViewModel, Lebenszyklus) die Schreiboperation kommt.
+**Beschreibung:** Alle persistierten Laufdaten einer Aufgabe (`ActiveRunId`, `LastHeartbeatUtc`, `LastCliStartUtc`, `RunStatus`, `ExecutionStatus`) werden ausschließlich in `RunGates`-serialisierten Schreibphasen verändert — unabhängig davon, aus welchem Pfad (Laufdaten-Selbstheilung, Prozess-Exit, ViewModel, Lebenszyklus) die Schreiboperation kommt.
 
 **Bedingungen:**
-- Ein `AufgabeService`-Aufruf mutiert Laufdaten (`StartenAsync`, `AbschliessenAsync`, `StartZuruecksetzenAsync`, `AktivenLaufSetzenAsync`, `AktivenLaufBeendenAsync`, `AktivenLaufSicherstellenAsync`).
+- Ein `WorkItemService`-Aufruf mutiert Laufdaten (`StartAsync`, `CompleteAsync`, `ResetStartAsync`, `SetActiveRunAsync`, `EndActiveRunAsync`, `EnsureActiveRunAsync`).
 
 **Verhalten:**
-- Pro Aufgabe wird ein `SemaphoreSlim(1,1)` aus der statischen `ConcurrentDictionary` `LaufGates` gehalten — die Sperre gilt prozessweit über alle (scoped) `AufgabeService`-Instanzen und deren getrennte DbContexts hinweg.
-- Optionale Guards und Provider werden erst innerhalb der Sperre ausgewertet: Liefert `laeuftGuard` dort `false` (Prozess zwischen Aufruf und Sperreintritt beendet), wird nichts geschrieben — ein Phantom-Lauf nach einem bereits erfolgten `AktivenLaufBeendenAsync` kann nicht wiederbelebt werden (TOCTOU). `laufStatusProvider` liefert analog den frischesten Session-Stand statt eines vor dem Sperreintritt gelesenen, veralteten Werts (Stale-Write-Schutz).
+- Pro Aufgabe wird ein `SemaphoreSlim(1,1)` aus der statischen `ConcurrentDictionary` `RunGates` gehalten — die Sperre gilt prozessweit über alle (scoped) `WorkItemService`-Instanzen und deren getrennte DbContexts hinweg.
+- Optionale Guards und Provider werden erst innerhalb der Sperre ausgewertet: Liefert `runningGuard` dort `false` (Prozess zwischen Aufruf und Sperreintritt beendet), wird nichts geschrieben — ein Phantom-Lauf nach einem bereits erfolgten `EndActiveRunAsync` kann nicht wiederbelebt werden (TOCTOU). `runStatusProvider` liefert analog den frischesten Session-Stand statt eines vor dem Sperreintritt gelesenen, veralteten Werts (Stale-Write-Schutz).
 - Einträge werden bewusst nie entfernt — das Entfernen während wartender Aufrufer wäre selbst eine Race-Bedingung; der Speicherbedarf bleibt durch die Anzahl der Aufgaben begrenzt.
 
-**Umsetzung:** `AufgabeService.LaufGates` (`src/Softwareschmiede/Application/Services/AufgabeService.cs`), aufgerufen aus `CliProcessManager.LaufdatenSicherstellenAsync` und den übrigen Laufdaten-Pfaden.
+**Umsetzung:** `WorkItemService.RunGates` (`src/Softwareschmiede/Application/Services/WorkItemService.cs`), aufgerufen aus `CliProcessManager.EnsureRunDataAsync` und den übrigen Laufdaten-Pfaden.
 
 ---
 
 ## Laufdaten-Selbstheilung ist ereignis- UND periodengetrieben
 
-**Beschreibung:** Die Wiederherstellung fehlender Laufdaten bei nachweislich laufendem Prozess darf nicht von einer einzelnen Event-Zustellung abhängen — ein verpasstes `Gestartet`-Ereignis (Session-Wiederverwendung) oder ein geschluckter Persistenzfehler darf die Datenbasis nicht dauerhaft unvollständig lassen.
+**Beschreibung:** Die Wiederherstellung fehlender Laufdaten bei nachweislich laufendem Prozess darf nicht von einer einzelnen Event-Zustellung abhängen — ein verpasstes `Started`-Ereignis (Session-Wiederverwendung) oder ein geschluckter Persistenzfehler darf die Datenbasis nicht dauerhaft unvollständig lassen.
 
 **Bedingungen:**
-- Ein gehandelter CLI-Prozess läuft (`KiAusfuehrungsService.IsRunning` / `GetLaufendeAufgabenIds`).
+- Ein gehandelter CLI-Prozess läuft (`AiExecutionService.IsRunning` / `GetRunningWorkItemIds`).
 
 **Verhalten:**
-- `CliProcessManager.LaufdatenSicherstellenAsync` wird aus vier unabhängigen Pfaden aufgerufen: `CliLaufAktiv`-Signal, `RuntimeStatusChanged`, Heartbeat-Tick und dem 30-s-`AbgleichAsync` über `GetLaufendeAufgabenIds`.
-- Jeder Pfad ist in sich `IsRunning`-geschützt und idempotent — wiederholte Auslösung frischt nur Heartbeat/Substatus auf, ohne `AktiveRunId`/`LetzterCliStartUtc` zu überschreiben.
+- `CliProcessManager.EnsureRunDataAsync` wird aus vier unabhängigen Pfaden aufgerufen: `CliRunActive`-Signal, `RuntimeStatusChanged`, Heartbeat-Tick und dem 30-s-`ReconcileTickAsync` über `GetRunningWorkItemIds`.
+- Jeder Pfad ist in sich `IsRunning`-geschützt und idempotent — wiederholte Auslösung frischt nur Heartbeat/Substatus auf, ohne `ActiveRunId`/`LastCliStartUtc` zu überschreiben.
 - Der periodische Abgleich ist das letzte Sicherheitsnetz: Er garantiert „Prozess läuft ⇒ Laufdaten persistiert" auch bei vollständig ausgebliebener Event-Zustellung.
 - Fehler pro Aufgabe werden isoliert geloggt; ein einzelner Fehlschlag bricht weder den Abgleich-Durchlauf noch andere Aufgaben ab.
 
-**Umsetzung:** `CliProcessManager.LaufdatenSicherstellenAsync`/`AbgleichTickAsync`/`AbgleichAsync`, `AufgabeService.AktivenLaufSicherstellenAsync`, `KiAusfuehrungsService.CliLaufAktiv`/`NotifyLaufAktiv`/`GetLaufendeAufgabenIds` (`src/Softwareschmiede/Application/Services/`).
+**Umsetzung:** `CliProcessManager.EnsureRunDataAsync`/`AbgleichTickAsync`/`ReconcileTickAsync`, `WorkItemService.EnsureActiveRunAsync`, `AiExecutionService.CliRunActive`/`NotifyRunActive`/`GetRunningWorkItemIds` (`src/Softwareschmiede/Application/Services/`).
 
 ---
 

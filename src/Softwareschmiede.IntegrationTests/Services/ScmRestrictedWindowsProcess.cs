@@ -9,23 +9,23 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
-/// <summary>Starts only a genuinely write-restricted same-user test process; never falls back to normal execution.</summary>
+/// <summary>Startet nur einen echt schreib-eingeschränkten Testprozess desselben Benutzers; fällt niemals auf normale Ausführung zurück.</summary>
 [SupportedOSPlatform("windows")]
 internal static class ScmRestrictedWindowsProcess
 {
     internal static Process Start(string workspace, string command, string capabilitySid)
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("The mandatory restricted process evidence requires Windows.");
-        // The probe uses only language constructs and .NET APIs. Module discovery can
-        // access the runner's profile/cache before our file-tool script makes progress.
-        // Disable it instead of granting the restricted token access to that profile.
+        // Die Probe verwendet nur Sprachkonstrukte und .NET-APIs. Die Modul-Erkennung kann auf
+        // das Profil/den Cache des Runners zugreifen, bevor unser Datei-Tool-Skript Fortschritt macht.
+        // Sie wird deaktiviert, statt dem eingeschränkten Token Zugriff auf dieses Profil zu gewähren.
         command = "$PSModuleAutoLoadingPreference = 'None'\n" + command;
         if (!OpenProcessToken(Process.GetCurrentProcess().Handle, 0x0002 | 0x0008 | 0x0001 | 0x0080, out var original))
             throw new Win32Exception(Marshal.GetLastWin32Error());
         using (original)
         {
-            // Logon/Everyone are required by Windows process initialization, but neither is
-            // granted access to the private workspace/channel or the neighbouring app-data.
+            // Logon/Everyone werden von der Windows-Prozessinitialisierung benötigt, erhalten aber
+            // beide keinen Zugriff auf den privaten Workspace/Kanal oder die benachbarten App-Daten.
             var sids = new[] { new SecurityIdentifier(capabilitySid), GetLogonSid(original), new SecurityIdentifier(WellKnownSidType.WorldSid, null) };
             var buffers = new List<IntPtr>();
             try
@@ -75,8 +75,8 @@ internal static class ScmRestrictedWindowsProcess
 
     private static void SetDefaultDacl(SafeAccessTokenHandle token, SecurityIdentifier logonSid)
     {
-        // The child must be able to use its own kernel objects. Scope that access to the
-        // creating logon session; do not grant broad filesystem access to the user SID.
+        // Das Kind muss seine eigenen Kernel-Objekte nutzen können. Dieser Zugriff wird auf die
+        // erzeugende Anmeldesitzung begrenzt; der Benutzer-SID wird kein breiter Dateisystemzugriff gewährt.
         var acl = new RawAcl(2, 2);
         acl.InsertAce(0, new CommonAce(AceFlags.None, AceQualifier.AccessAllowed, 0x10000000, logonSid, false, null));
         acl.InsertAce(1, new CommonAce(AceFlags.None, AceQualifier.AccessAllowed, 0x00020000,

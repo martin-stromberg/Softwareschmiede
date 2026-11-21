@@ -10,7 +10,7 @@ public sealed class TerminalReplayBufferTests
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
-    public void ReplayBuffer_BudgetKleinerGleichNull_WirftArgumentOutOfRange(int budget)
+    public void ReplayBuffer_BudgetSmallSameNull_ThrowsArgumentOutOfRange(int budget)
     {
         var act = () => new TerminalReplayBuffer(budget);
 
@@ -19,7 +19,7 @@ public sealed class TerminalReplayBufferTests
 
     /// <summary>Angehängte Chunks werden in Eingangsreihenfolge zurückgegeben.</summary>
     [Fact]
-    public void Append_UndGetChunks_LiefernChunksInReihenfolge()
+    public void Append_AndGetChunks_ProvideChunksInOrder()
     {
         var sut = new TerminalReplayBuffer(1024);
 
@@ -34,7 +34,7 @@ public sealed class TerminalReplayBufferTests
 
     /// <summary>Bei Budget-Überschreitung werden die ältesten Chunks verworfen.</summary>
     [Fact]
-    public void Append_BudgetUeberschreitung_VerwirftAeltesteChunks()
+    public void Append_BudgetExceedance_DiscardsOldestChunks()
     {
         var sut = new TerminalReplayBuffer(4);
 
@@ -49,7 +49,7 @@ public sealed class TerminalReplayBufferTests
 
     /// <summary>Ein einzelner Chunk größer als das Budget wird auf die letzten Budget-Bytes gekürzt.</summary>
     [Fact]
-    public void Append_ChunkGroesserAlsBudget_BehaeltNurLetzteBytes()
+    public void Append_ChunkLargerAsBudget_KeepsOnlyLastBytes()
     {
         var sut = new TerminalReplayBuffer(4);
 
@@ -62,7 +62,7 @@ public sealed class TerminalReplayBufferTests
 
     /// <summary>Leere Chunks werden ignoriert.</summary>
     [Fact]
-    public void Append_LeererChunk_WirdIgnoriert()
+    public void Append_EmptyChunk_WillIgnores()
     {
         var sut = new TerminalReplayBuffer(8);
 

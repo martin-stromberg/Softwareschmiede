@@ -4,7 +4,7 @@ namespace Softwareschmiede.Domain.Entities;
 public sealed class ScmTaskLease
 {
     /// <summary>AufgabeId des Ereignisprozesses.</summary>
-    public Guid AufgabeId { get; set; }
+    public Guid WorkItemId { get; set; }
 
     /// <summary>Owner des Ereignisprozesses.</summary>
     public string Owner { get; set; } = "";

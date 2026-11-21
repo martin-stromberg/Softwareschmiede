@@ -24,7 +24,7 @@ Jedes Plugin implementiert `IPlugin` und gehört einem von zwei Typen an:
 | `GitHubCopilotPlugin` | KI | GitHub Copilot CLI – nutzt `copilot` CLI |
 | `CodexPlugin` | KI | Codex CLI – nutzt `codex` CLI aus der Anwendung heraus |
 | `DevinPlugin` | KI | Devin CLI – nutzt `devin` als lokalen interaktiven Coding-Agent ueber die eingebettete Terminaloberflaeche |
-| `KiSimulatorPlugin` | KI | Simulierter KI-Agent für Entwicklung und Tests |
+| `AiSimulatorPlugin` | KI | Simulierter KI-Agent für Entwicklung und Tests |
 
 ### Einstellungen
 

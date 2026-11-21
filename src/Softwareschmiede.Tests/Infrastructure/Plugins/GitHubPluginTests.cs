@@ -76,11 +76,11 @@ public sealed class GitHubPluginTests
 
         // Assert
         result.Should().HaveCount(2);
-        result[0].Nummer.Should().Be(1);
-        result[0].Titel.Should().Be("Bug Fix");
+        result[0].Number.Should().Be(1);
+        result[0].Title.Should().Be("Bug Fix");
         result[0].Labels.Should().BeEquivalentTo(new[] { "bug", "urgent" });
         result[0].Milestone.Should().Be("v1.0");
-        result[1].Nummer.Should().Be(2);
+        result[1].Number.Should().Be(2);
         result[1].Body.Should().BeNull();
     }
 
@@ -231,8 +231,8 @@ public sealed class GitHubPluginTests
         var result = await _sut.CreateIssueAsync("owner/repo", new IssueCreateRequest("Titel", "Body"), TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeTrue();
-        result.Issue!.Nummer.Should().Be(17);
-        result.Issue.Titel.Should().Be("Titel");
+        result.Issue!.Number.Should().Be(17);
+        result.Issue.Title.Should().Be("Titel");
         result.Issue.Body.Should().Be("Body");
         result.Issue.IssueUrl.Should().Be("https://github.com/owner/repo/issues/17");
     }
@@ -343,7 +343,7 @@ public sealed class GitHubPluginTests
 
         result.Should().ContainSingle();
         result[0].RepositoryId.Should().Be("owner/repo");
-        result[0].Nummer.Should().Be(42);
+        result[0].Number.Should().Be(42);
         result[0].BranchName.Should().Be("dependabot/nuget/package-1.0.1");
         result[0].TargetBranch.Should().Be("main");
         result[0].Body.Should().Be("Dependabot updates the package dependency.");
@@ -671,8 +671,8 @@ public sealed class GitHubPluginTests
         var result = await _sut.CreatePullRequestAsync("owner/repo", "feature/branch", null, title: "My PR", body: "Body", ct: TestContext.Current.CancellationToken);
 
         // Assert
-        result.Nummer.Should().Be(42);
-        result.Titel.Should().Be("My PR");
+        result.Number.Should().Be(42);
+        result.Title.Should().Be("My PR");
         result.Url.Should().Be(prUrl);
         result.BranchName.Should().Be("feature/branch");
     }
@@ -732,7 +732,7 @@ public sealed class GitHubPluginTests
         result.Should().BeFalse();
     }
 
-    /// <summary><summary>PluginMetadata_ShouldExposeExpectedValues.</summary>.</summary>
+    /// <summary>PluginMetadata_ShouldExposeExpectedValues.</summary>
     [Fact]
     public void PluginMetadata_ShouldExposeExpectedValues()
     {
@@ -1088,7 +1088,7 @@ public sealed class GitHubPluginTests
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary><summary>PushBranchAsync_ShouldThrow_WhenPushFails.</summary>.</summary>
+    /// <summary>PushBranchAsync_ShouldThrow_WhenPushFails.</summary>
     [Fact]
     public async Task PushBranchAsync_ShouldThrow_WhenPushFails()
     {
@@ -1239,7 +1239,7 @@ public sealed class GitHubPluginTests
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary><summary>PullAsync_ShouldThrow_WhenGitPullFails.</summary>.</summary>
+    /// <summary>PullAsync_ShouldThrow_WhenGitPullFails.</summary>
     [Fact]
     public async Task PullAsync_ShouldThrow_WhenGitPullFails()
     {
@@ -1327,7 +1327,7 @@ public sealed class GitHubPluginTests
         exception.Which.Message.Should().Contain("oauth2:***@");
     }
 
-    /// <summary><summary>ResetAsync_ShouldCallGitResetWithTargetRef_WhenProvided.</summary>.</summary>
+    /// <summary>ResetAsync_ShouldCallGitResetWithTargetRef_WhenProvided.</summary>
     [Fact]
     public async Task ResetAsync_ShouldCallGitResetWithTargetRef_WhenProvided()
     {
@@ -1344,7 +1344,7 @@ public sealed class GitHubPluginTests
         _cliRunnerMock.VerifyAll();
     }
 
-    /// <summary><summary>ResetAsync_ShouldCallGitResetWithoutTargetRef_WhenNotProvided.</summary>.</summary>
+    /// <summary>ResetAsync_ShouldCallGitResetWithoutTargetRef_WhenNotProvided.</summary>
     [Fact]
     public async Task ResetAsync_ShouldCallGitResetWithoutTargetRef_WhenNotProvided()
     {
@@ -1361,7 +1361,7 @@ public sealed class GitHubPluginTests
         _cliRunnerMock.VerifyAll();
     }
 
-    /// <summary><summary>GetRemoteBranchesAsync_ShouldParseAndSortBranches.</summary>.</summary>
+    /// <summary>GetRemoteBranchesAsync_ShouldParseAndSortBranches.</summary>
     [Fact]
     public async Task GetRemoteBranchesAsync_ShouldParseAndSortBranches()
     {
@@ -1384,7 +1384,7 @@ public sealed class GitHubPluginTests
         result.Should().Equal("feature/a", "feature/z", "main");
     }
 
-    /// <summary><summary>GetRemoteBranchesAsync_ShouldReturnEmpty_WhenCliFails.</summary>.</summary>
+    /// <summary>GetRemoteBranchesAsync_ShouldReturnEmpty_WhenCliFails.</summary>
     [Fact]
     public async Task GetRemoteBranchesAsync_ShouldReturnEmpty_WhenCliFails()
     {
@@ -1401,7 +1401,7 @@ public sealed class GitHubPluginTests
         result.Should().BeEmpty();
     }
 
-    /// <summary><summary>GetDefaultBranchAsync_ShouldReturnParsedBranch_WhenSymRefCanBeParsed.</summary>.</summary>
+    /// <summary>GetDefaultBranchAsync_ShouldReturnParsedBranch_WhenSymRefCanBeParsed.</summary>
     [Fact]
     public async Task GetDefaultBranchAsync_ShouldReturnParsedBranch_WhenSymRefCanBeParsed()
     {
@@ -1418,7 +1418,7 @@ public sealed class GitHubPluginTests
         result.Should().Be("master");
     }
 
-    /// <summary><summary>GetDefaultBranchAsync_ShouldFallbackToMain_WhenSymRefFails.</summary>.</summary>
+    /// <summary>GetDefaultBranchAsync_ShouldFallbackToMain_WhenSymRefFails.</summary>
     [Fact]
     public async Task GetDefaultBranchAsync_ShouldFallbackToMain_WhenSymRefFails()
     {
@@ -1435,7 +1435,7 @@ public sealed class GitHubPluginTests
         result.Should().Be("main");
     }
 
-    /// <summary><summary>CheckoutRemoteBranchAsync_ShouldThrow_WhenCheckoutFails.</summary>.</summary>
+    /// <summary>CheckoutRemoteBranchAsync_ShouldThrow_WhenCheckoutFails.</summary>
     [Fact]
     public async Task CheckoutRemoteBranchAsync_ShouldThrow_WhenCheckoutFails()
     {
@@ -1460,7 +1460,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
 
         environment["GH_TOKEN"].Should().Be("agent-token");
         environment["GIT_TERMINAL_PROMPT"].Should().Be("0");
@@ -1478,7 +1478,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://ghe.example.com/owner/repo.git", TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, "https://ghe.example.com/owner/repo.git", TestContext.Current.CancellationToken);
 
         environment["GH_TOKEN"].Should().Be("agent-token");
         environment["GIT_CONFIG_COUNT"].Should().Be("1");
@@ -1490,11 +1490,11 @@ public sealed class GitHubPluginTests
     [Theory]
     [InlineData("https://ghe.example.com:8443/owner/repo.git", "http.https://ghe.example.com:8443/.extraheader")]
     [InlineData("https://ghe.example.com:443/owner/repo.git", "http.https://ghe.example.com/.extraheader")]
-    public async Task GetAgentEnvironmentAsync_NonDefaultPort_NimmtPortInKeyAuf(string repositoryUrl, string expectedKey)
+    public async Task GetAgentEnvironmentAsync_NonDefaultPort_TakesPortInKeyOn(string repositoryUrl, string expectedKey)
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl, TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, repositoryUrl, TestContext.Current.CancellationToken);
 
         environment["GIT_CONFIG_COUNT"].Should().Be("1");
         environment["GIT_CONFIG_KEY_0"].Should().Be(expectedKey);
@@ -1503,11 +1503,11 @@ public sealed class GitHubPluginTests
     /// <summary>Userinfo/Credentials in der Repository-URL dürfen nicht in den extraheader-Key
     /// einfließen — der Key enthält ausschließlich den Host.</summary>
     [Fact]
-    public async Task GetAgentEnvironmentAsync_UserinfoInUrl_KeyEnthaeltNurHost()
+    public async Task GetAgentEnvironmentAsync_UserinfoInUrl_KeyContainsOnlyHost()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://oauth2:geheim@ghe.example.com/o/r.git", TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, "https://oauth2:geheim@ghe.example.com/o/r.git", TestContext.Current.CancellationToken);
 
         environment["GIT_CONFIG_COUNT"].Should().Be("1");
         environment["GIT_CONFIG_KEY_0"].Should().Be("http.https://ghe.example.com/.extraheader");
@@ -1523,7 +1523,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl, TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, repositoryUrl, TestContext.Current.CancellationToken);
 
         environment["GIT_CONFIG_COUNT"].Should().Be("1");
         environment["GIT_CONFIG_KEY_0"].Should().Be("http.https://ghe.example.com/.extraheader");
@@ -1536,11 +1536,11 @@ public sealed class GitHubPluginTests
     [InlineData("")]
     [InlineData("keine-url")]
     [InlineData("ssh://git@host:2222/x")]
-    public async Task GetAgentEnvironmentAsync_OhneBestimmbarenHost_KeinExtraHeader(string? repositoryUrl)
+    public async Task GetAgentEnvironmentAsync_WithoutDeterminableHost_NoExtraHeader(string? repositoryUrl)
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("agent-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, repositoryUrl, TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, repositoryUrl, TestContext.Current.CancellationToken);
 
         environment["GIT_TERMINAL_PROMPT"].Should().Be("0");
         environment["GH_TOKEN"].Should().Be("agent-token");
@@ -1556,7 +1556,7 @@ public sealed class GitHubPluginTests
     {
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.Benutzerkonto, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
 
         environment.Should().ContainKey("GIT_TERMINAL_PROMPT").WhoseValue.Should().Be("0");
         environment.Should().NotContainKey("GH_TOKEN");
@@ -1566,12 +1566,12 @@ public sealed class GitHubPluginTests
 
     /// <summary>Im SeparatesKonto liefert GetAgentEnvironmentAsync das AgentToken statt des Benutzer-Tokens.</summary>
     [Fact]
-    public async Task GetAgentEnvironmentAsync_SeparatesKonto_UsesAgentToken()
+    public async Task GetAgentEnvironmentAsync_SeparatesAccount_UsesAgentToken()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("user-token");
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.AgentToken")).Returns("bot-token");
 
-        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmKontoModus.SeparatesKonto, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.SeparateAccount, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
 
         environment["GH_TOKEN"].Should().Be("bot-token");
         var expected = "AUTHORIZATION: basic " + Convert.ToBase64String(
@@ -1614,10 +1614,10 @@ public sealed class GitHubPluginTests
 
     /// <summary>Im SeparatesKonto schlägt jeder geroutete Aufruf ohne AgentToken als Authentication-Fehler fehl.</summary>
     [Fact]
-    public async Task SeparatesKonto_WithoutAgentToken_ThrowsAuthenticationBeforeAnyCall()
+    public async Task SeparatesAccount_WithoutAgentToken_ThrowsAuthenticationBeforeAnyCall()
     {
         var repository = new ScmEventRepository("Softwareschmiede.GitHub", "github.com", "R_1", "owner", "repo",
-            "U_1", "BOT", "scm-bot", true, Softwareschmiede.Domain.Enums.ScmKontoModus.SeparatesKonto);
+            "U_1", "BOT", "scm-bot", true, Softwareschmiede.Domain.Enums.ScmAccountMode.SeparateAccount);
 
         var error = await Assert.ThrowsAsync<ScmProviderException>(
             () => _sut.ReadEventsAsync(new(new(repository, ScmReferenceKind.Issue, 1), ScmContentKind.Description,
@@ -1667,7 +1667,7 @@ public sealed class GitHubPluginTests
             .And.Contain("\"owner\":\"owner\"").And.Contain("\"name\":\"repo\"").And.Contain("\"number\":42");
         result.Status.Should().Be(PullRequestStatus.Open);
         result.MergeStatus.Should().Be(PullRequestMergeStatus.Mergeable);
-        result.Nummer.Should().Be(42);
+        result.Number.Should().Be(42);
         result.ProviderPullRequestId.Should().Be("PR_kw");
         result.SourceBranch.Should().Be("feature/pr");
         result.TargetBranch.Should().Be("main");
@@ -1692,7 +1692,7 @@ public sealed class GitHubPluginTests
     /// <summary>GetAvailableRepositoriesAsync ruft user/repos?affiliation=owner ab und mappt
     /// full_name/html_url/updated_at (Fallback created_at) korrekt.</summary>
     [Fact]
-    public async Task GetAvailableRepositoriesAsync_MapsRestFields()
+    public async Task GetAvailableRepositoriesAsync_MapsRemainderFields()
     {
         const string json = """
             [
@@ -1888,7 +1888,7 @@ public sealed class GitHubPluginTests
     /// <summary>Ohne gespeicherten Token schlägt der Klon einer SSH-URL — nach der automatischen
     /// HTTPS-Konvertierung — mit dem bestehenden Token-Fail-Fast fehl, bevor git gestartet wird.</summary>
     [Fact]
-    public async Task CloneRepositoryAsync_SshUrlOhneToken_WirftInvalidOperationException()
+    public async Task CloneRepositoryAsync_SshUrlWithoutToken_ThrowsInvalidOperationException()
     {
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns((string?)null);
 
@@ -1907,7 +1907,7 @@ public sealed class GitHubPluginTests
     /// <summary>GetDefaultBranchAsync nutzt die git-Umgebung mit http.extraheader-Auth,
     /// damit ls-remote --symref gegen private Repositories authentifiziert bleibt.</summary>
     [Fact]
-    public async Task GetDefaultBranchAsync_Env_EnthaeltGitAuth()
+    public async Task GetDefaultBranchAsync_Env_ContainsGitAuth()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token123");
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -1933,7 +1933,7 @@ public sealed class GitHubPluginTests
     /// <summary>Der PR-Checkout übergibt die git-Umgebung mit http.extraheader-Auth an
     /// git fetch/checkout — seit dem Wegfall der _netrc-Persistenz nötig für private Repositories.</summary>
     [Fact]
-    public async Task CheckoutPullRequestSourceAsync_UebergibtGitEnvironment()
+    public async Task CheckoutPullRequestSourceAsync_PassesGitEnvironment()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token123");
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -2001,7 +2001,7 @@ public sealed class GitHubPluginTests
     /// <summary>Eine SCP-SSH-Repository-URL (git@host:…) wird beim Klon in die HTTPS-Form
     /// umgewandelt; die Umgebung trägt GH_TOKEN + extraheader und kein GIT_SSH_COMMAND.</summary>
     [Fact]
-    public async Task CloneRepositoryAsync_SshUrl_WirdZuHttpsGeklont()
+    public async Task CloneRepositoryAsync_SshUrl_WillToHttpsCloned()
     {
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -2031,7 +2031,7 @@ public sealed class GitHubPluginTests
 
     /// <summary>Eine ssh://-Repository-URL wird beim Klon in die HTTPS-Form umgewandelt.</summary>
     [Fact]
-    public async Task CloneRepositoryAsync_SshSchemeUrl_WirdZuHttpsGeklont()
+    public async Task CloneRepositoryAsync_SshSchemeUrl_WillToHttpsCloned()
     {
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -2058,7 +2058,7 @@ public sealed class GitHubPluginTests
     [InlineData("http://github.com/owner/repo")]
     [InlineData("git://github.com/owner/repo")]
     [InlineData("ssh://git@github.com:2222/owner/repo.git")]
-    public async Task CloneRepositoryAsync_NichtHttpsSchema_WirdAbgelehnt(string repositoryUrl)
+    public async Task CloneRepositoryAsync_NotHttpsSchema_WillRejected(string repositoryUrl)
     {
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
 
@@ -2077,7 +2077,7 @@ public sealed class GitHubPluginTests
     /// <summary>Nach einem erfolgreichen Klon wird kein core.sshCommand in die Arbeitskopie
     /// geschrieben; user.name, user.email und die Remote-URL werden weiterhin konfiguriert.</summary>
     [Fact]
-    public async Task CloneRepositoryAsync_KonfiguriertKeinSshCommand()
+    public async Task CloneRepositoryAsync_ConfiguredNoSshCommand()
     {
         _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -2119,7 +2119,7 @@ public sealed class GitHubPluginTests
     /// <summary>Eine noch im SCP-SSH-Format vorliegende remote.origin.url wird vor dem Push
     /// auf die HTTPS-Form umgeschrieben.</summary>
     [Fact]
-    public async Task PushBranchAsync_SshRemoteUrl_WirdZuHttpsNormalisiert()
+    public async Task PushBranchAsync_SshRemoteUrl_WillToHttpsNormalizes()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
         var calls = new List<string>();
@@ -2153,7 +2153,7 @@ public sealed class GitHubPluginTests
     /// <summary>Eine noch im SCP-SSH-Format vorliegende remote.origin.url wird vor dem Pull
     /// auf die HTTPS-Form umgeschrieben.</summary>
     [Fact]
-    public async Task PullAsync_SshRemoteUrl_WirdZuHttpsNormalisiert()
+    public async Task PullAsync_SshRemoteUrl_WillToHttpsNormalizes()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
         var calls = new List<string>();
@@ -2188,7 +2188,7 @@ public sealed class GitHubPluginTests
     /// wird vor dem Push per git config --unset entfernt — das Unset muss vor dem Remote-Aufruf liegen,
     /// damit die unsichere Option während des Push nicht mehr aktiv ist.</summary>
     [Fact]
-    public async Task PushBranchAsync_LegacySshCommand_WirdEntfernt()
+    public async Task PushBranchAsync_LegacySshCommand_RemovesWill()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
         var calls = new List<string>();
@@ -2240,7 +2240,7 @@ public sealed class GitHubPluginTests
     /// <summary>Dasselbe gilt für den Pull: das unsichere core.sshCommand wird per --unset entfernt,
     /// bevor git pull gegen origin läuft.</summary>
     [Fact]
-    public async Task PullAsync_LegacySshCommand_WirdEntfernt()
+    public async Task PullAsync_LegacySshCommand_RemovesWill()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
         var calls = new List<string>();
@@ -2285,7 +2285,7 @@ public sealed class GitHubPluginTests
     /// (hier: zusätzliches -i-Flag), bleibt unverändert erhalten — nur der nachweisbar
     /// plugin-geschriebene Wert wird entfernt.</summary>
     [Fact]
-    public async Task PushBranchAsync_EigenesSshCommandMitOption_BleibtErhalten()
+    public async Task PushBranchAsync_OwnSshCommandWithOption_GetRemains()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -2329,7 +2329,7 @@ public sealed class GitHubPluginTests
     /// <summary>Ein fremd gesetztes core.sshCommand ohne die Plugin-Signatur
     /// (StrictHostKeyChecking=no) bleibt unverändert erhalten.</summary>
     [Fact]
-    public async Task PushBranchAsync_FremdesSshCommand_BleibtErhalten()
+    public async Task PushBranchAsync_ForeignSshCommand_GetRemains()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -2373,7 +2373,7 @@ public sealed class GitHubPluginTests
     /// <summary>Ist kein core.sshCommand gesetzt (git config --get schlägt fehl), wird kein
     /// --unset ausgeführt und der Pull läuft normal weiter.</summary>
     [Fact]
-    public async Task PullAsync_OhneSshCommand_KeinUnset()
+    public async Task PullAsync_WithoutSshCommand_NoUnset()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -2417,7 +2417,7 @@ public sealed class GitHubPluginTests
     /// <summary>Schlägt das Lesen von core.sshCommand fehl (z. B. kein git-Repository),
     /// wird nur gewarnt — der Pull läuft in seinen normalen Pfad weiter.</summary>
     [Fact]
-    public async Task PullAsync_SshCommandReadFehler_NurWarnung()
+    public async Task PullAsync_SshCommandReadError_OnlyWarning()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -2461,7 +2461,7 @@ public sealed class GitHubPluginTests
     /// <summary>Eine SSH-SourceRepositoryUrl eines Fork-PRs wird vor dem Fetch in die
     /// HTTPS-Form umgewandelt.</summary>
     [Fact]
-    public async Task CheckoutPullRequestSourceAsync_SshForkUrl_WirdZuHttpsGefetcht()
+    public async Task CheckoutPullRequestSourceAsync_SshForkUrl_WillToHttpsFetched()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -2508,7 +2508,7 @@ public sealed class GitHubPluginTests
     /// <summary>GetRemoteBranchesAsync fragt SCP-SSH-Repository-URLs über die konvertierte
     /// HTTPS-Remote-URL ab.</summary>
     [Fact]
-    public async Task GetRemoteBranchesAsync_SshUrl_NutztHttpsRemote()
+    public async Task GetRemoteBranchesAsync_SshUrl_UsesHttpsRemote()
     {
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
@@ -2532,7 +2532,7 @@ public sealed class GitHubPluginTests
     /// <summary>GetDefaultBranchAsync fragt SCP-SSH-Repository-URLs über die konvertierte
     /// HTTPS-Remote-URL ab.</summary>
     [Fact]
-    public async Task GetDefaultBranchAsync_SshUrl_NutztHttpsRemote()
+    public async Task GetDefaultBranchAsync_SshUrl_UsesHttpsRemote()
     {
         _cliRunnerMock.Setup(c => c.RunAsync(
                 "git",
@@ -2556,7 +2556,7 @@ public sealed class GitHubPluginTests
     /// <summary>Beim Same-Repo-PR-Checkout (Fetch gegen origin) wird eine noch im SCP-SSH-Format
     /// vorliegende remote.origin.url vor dem Fetch auf HTTPS normalisiert.</summary>
     [Fact]
-    public async Task CheckoutPullRequestSourceAsync_SshOriginUrl_WirdVorFetchNormalisiert()
+    public async Task CheckoutPullRequestSourceAsync_SshOriginUrl_WillBeforeFetchNormalizes()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
         var calls = new List<string>();
@@ -2599,7 +2599,7 @@ public sealed class GitHubPluginTests
     /// <summary>Beim PR-Checkout wird ein von einer Altversion geschriebenes unsicheres
     /// core.sshCommand vor dem Fetch per git config --unset entfernt.</summary>
     [Fact]
-    public async Task CheckoutPullRequestSourceAsync_LegacySshCommand_WirdEntfernt()
+    public async Task CheckoutPullRequestSourceAsync_LegacySshCommand_RemovesWill()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
         var calls = new List<string>();
@@ -2651,7 +2651,7 @@ public sealed class GitHubPluginTests
     /// <summary>Eine null-CheckoutSpec wird mit ArgumentNullException abgelehnt, bevor irgendein
     /// git-Aufruf auf der Arbeitskopie stattfindet.</summary>
     [Fact]
-    public async Task CheckoutPullRequestSourceAsync_NullSpec_WirftArgumentNullException()
+    public async Task CheckoutPullRequestSourceAsync_NullSpec_ThrowsArgumentNullException()
     {
         var act = () => _sut.CheckoutPullRequestSourceAsync("/repo", null!);
 
@@ -2670,7 +2670,7 @@ public sealed class GitHubPluginTests
     [Theory]
     [InlineData("ssh://git@github.com:2222/owner/repo.git")]
     [InlineData("ssh://user:pass@github.com/owner/repo.git")]
-    public async Task PushBranchAsync_NichtKonvertierbareRemoteUrl_KeinSetUrl(string remoteUrl)
+    public async Task PushBranchAsync_NotConvertibleRemoteUrl_NoSetUrl(string remoteUrl)
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token");
         _cliRunnerMock.Setup(c => c.RunAsync(
@@ -2772,7 +2772,7 @@ public sealed class GitHubPluginTests
     /// <summary>Ist remote.origin.url nicht lesbar, läuft der Push fail-closed ohne
     /// extraheader-Eintrag weiter — die Operation bricht nicht ab.</summary>
     [Fact]
-    public async Task PushBranchAsync_RemoteUrlNichtLesbar_KeinExtraHeader()
+    public async Task PushBranchAsync_RemoteUrlNotReadable_NoExtraHeader()
     {
         _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns("token123");
         _cliRunnerMock.Setup(c => c.RunAsync(

@@ -34,7 +34,7 @@ public sealed partial class TerminalControlTests
 
             InvokePreviewKeyDown(control, Key.C, Key.LeftCtrl, Key.LeftShift);
 
-            ClipboardTestHelfer.GetTextMitRetry().Should().Be("copy");
+            ClipboardTestHelper.GetTextWithRetry().Should().Be("copy");
             input.ToArray().Should().BeEmpty("Ctrl+Shift+C muss exklusiv kopieren und darf keinen Pastepfad auslösen");
         });
     }
@@ -42,7 +42,7 @@ public sealed partial class TerminalControlTests
     /// <summary>Ohne Auswahl bleibt die Zwischenablage unverändert und Ctrl+Shift+C erreicht
     /// den CLI-Input nicht.</summary>
     [OsInterfaceFact]
-    public void OnPreviewKeyDown_CtrlShiftCOhneAuswahl_LaesstClipboardUndCliInputUnveraendert()
+    public void OnPreviewKeyDown_CtrlShiftCWithoutSelection_LetsClipboardAndCliInputUnchanged()
     {
         RunOnSta(() =>
         {
@@ -55,7 +55,7 @@ public sealed partial class TerminalControlTests
 
             InvokePreviewKeyDown(control, Key.C, Key.LeftCtrl, Key.LeftShift);
 
-            ClipboardTestHelfer.GetTextMitRetry().Should().Be("unverändert");
+            ClipboardTestHelper.GetTextWithRetry().Should().Be("unverändert");
             input.ToArray().Should().BeEmpty();
         });
     }
@@ -64,7 +64,7 @@ public sealed partial class TerminalControlTests
     /// muss die erste Shift-Vertikalnavigation die Ausgangsspalte klemmen statt eine
     /// ungültige Zellversionsadresse zu lesen.</summary>
     [Fact]
-    public void ExtendSelection_ShiftUpMitCursorHinterLetzterSpalte_WirftNicht()
+    public void ExtendSelection_ShiftUpWithCursorBehindLastColumn_ThrowsNot()
     {
         RunOnSta(() =>
         {
@@ -82,7 +82,7 @@ public sealed partial class TerminalControlTests
     /// <summary>Die erste Shift-Navigation verwendet die Ausgangs-Cursorzelle als Anker,
     /// damit Shift+Home den gesamten Bereich bis zum Zeilenanfang markiert.</summary>
     [Fact]
-    public void ExtendSelection_ErsteShiftHomeNavigation_BehaeltCursorAlsAnker()
+    public void ExtendSelection_FirstShiftHomeNavigation_KeepsCursorAsAnchor()
     {
         RunOnSta(() =>
         {
@@ -106,7 +106,7 @@ public sealed partial class TerminalControlTests
     /// Modifierpfad, sichtbares Overlay und das anschließende Kopieren, ohne von der
     /// Windows-Eingabeinjektion des E2E-Hosts abhängig zu sein.</summary>
     [Fact]
-    public void OnPreviewKeyDown_MausankerDannShiftRechts_ZeichnetAuswahlUndKopiertText()
+    public void OnPreviewKeyDown_MouseanchorThenShiftRight_DrawsSelectionAndCopiesText()
     {
         RunOnSta(() =>
         {
@@ -134,7 +134,7 @@ public sealed partial class TerminalControlTests
             SetClipboardTextWithRetry("vorher");
             var copyArgs = InvokePreviewKeyDown(control, Key.C, Key.LeftCtrl, Key.LeftShift);
             copyArgs.Handled.Should().BeTrue();
-            ClipboardTestHelfer.GetTextMitRetry().Should().Be("er");
+            ClipboardTestHelper.GetTextWithRetry().Should().Be("er");
         });
     }
 
@@ -165,7 +165,7 @@ public sealed partial class TerminalControlTests
             SetClipboardTextWithRetry("vorher");
             typeof(TerminalControl).GetMethod("CopySelectionToClipboard", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .Invoke(control, null);
-            ClipboardTestHelfer.GetTextMitRetry().Should().Be("zweite");
+            ClipboardTestHelper.GetTextWithRetry().Should().Be("zweite");
         });
     }
 
@@ -199,14 +199,14 @@ public sealed partial class TerminalControlTests
             SetClipboardTextWithRetry("vorher");
             typeof(TerminalControl).GetMethod("CopySelectionToClipboard", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .Invoke(control, null);
-            ClipboardTestHelfer.GetTextMitRetry().Should().Be("ausgewaehlt");
+            ClipboardTestHelper.GetTextWithRetry().Should().Be("ausgewaehlt");
         });
     }
     /// <summary>Bei einer Session ohne Eingabekanal (Replay: <c>InputStream == Stream.Null</c>)
     /// müssen die Navigationstasten unbehandelt bleiben — nur so erreichen sie den umschließenden
     /// ScrollViewer, dessen Standard-Handling Line-/Page-/Home-/End-Scrollbefehle auslöst.</summary>
     [Fact]
-    public void OnPreviewKeyDown_ReplaySession_NavigationstastenBleibenUnbehandelt()
+    public void OnPreviewKeyDown_ReplaySession_NavigationkeyRemainUnhandled()
     {
         RunOnSta(() =>
         {
@@ -214,17 +214,17 @@ public sealed partial class TerminalControlTests
             using var session = CreateReplaySession(220, 50, "X");
             control.Session = session;
 
-            foreach (var taste in new[]
+            foreach (var key in new[]
             {
                 Key.Left, Key.Right, Key.Up, Key.Down,
                 Key.PageUp, Key.PageDown, Key.Home, Key.End,
             })
             {
-                var args = InvokePreviewKeyDown(control, taste);
+                var args = InvokePreviewKeyDown(control, key);
 
                 args.Handled.Should().BeFalse(
                     "die Navigationstaste {0} darf bei einer Session ohne Eingabekanal nicht verschluckt werden — sie muss zum ScrollViewer bubbeln",
-                    taste);
+                    key);
             }
         });
     }
@@ -233,7 +233,7 @@ public sealed partial class TerminalControlTests
     /// Navigationstasten weiterhin VT100-kodiert an den Prozess weitergeleitet und das
     /// Ereignis als behandelt markiert.</summary>
     [Fact]
-    public void OnPreviewKeyDown_LiveSession_NavigationstasteWirdAnSessionWeitergeleitet()
+    public void OnPreviewKeyDown_LiveSession_NavigationkeyWillAnSessionForwarded()
     {
         RunOnSta(() =>
         {
@@ -256,7 +256,7 @@ public sealed partial class TerminalControlTests
     /// <summary>Auch bei einer Session ohne Eingabekanal bleiben Nicht-Navigations-Tasten
     /// unverändert behandelt (das Ereignis geht weiterhin nicht an Vorgänger-Elemente).</summary>
     [Fact]
-    public void OnPreviewKeyDown_ReplaySession_NichtNavigationsTastenBleibenBehandelt()
+    public void OnPreviewKeyDown_ReplaySession_NotNavigationKeyRemainHandles()
     {
         RunOnSta(() =>
         {

@@ -15,75 +15,75 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
 
     /// <summary>NaechsteAenderungCommand springt zum Start des ersten Änderungsblocks, wenn noch nicht navigiert wurde.</summary>
     [Fact]
-    public async Task NaechsteAenderungCommand_ErsterAufruf_SpringtZuErstemBlock()
+    public async Task NextChangeCommand_FirstCall_JumpsToFirstBlock()
     {
-        var sut = await CreateSutMitDiffZeilenAsync(
-            Zeile(DiffLineStatus.Context),
-            Zeile(DiffLineStatus.Added),
-            Zeile(DiffLineStatus.Added),
-            Zeile(DiffLineStatus.Context),
-            Zeile(DiffLineStatus.Removed));
+        var sut = await CreateSutWithDiffLinesAsync(
+            Line(DiffLineStatus.Context),
+            Line(DiffLineStatus.Added),
+            Line(DiffLineStatus.Added),
+            Line(DiffLineStatus.Context),
+            Line(DiffLineStatus.Removed));
 
-        var fokussierteIndizes = new List<int>();
-        sut.DiffZeileFokussiert += fokussierteIndizes.Add;
+        var focusedIndexes = new List<int>();
+        sut.DiffLineFocused += focusedIndexes.Add;
 
-        sut.NaechsteAenderungCommand.Execute(null);
+        sut.NextChangeCommand.Execute(null);
 
-        fokussierteIndizes.Should().ContainSingle().Which.Should().Be(1);
+        focusedIndexes.Should().ContainSingle().Which.Should().Be(1);
     }
 
     /// <summary>Wiederholtes Aufrufen von NaechsteAenderungCommand springt der Reihe nach durch alle Änderungsblöcke und danach zurück zum Anfang (Wrap-Around).</summary>
     [Fact]
-    public async Task NaechsteAenderungCommand_MehrfachAufruf_SpringtDurchAlleBloeckeUndWrapt()
+    public async Task NextChangeCommand_MultipleCall_JumpsThroughAllBlocksAndWraps()
     {
-        var sut = await CreateSutMitDiffZeilenAsync(
-            Zeile(DiffLineStatus.Context),
-            Zeile(DiffLineStatus.Added),
-            Zeile(DiffLineStatus.Context),
-            Zeile(DiffLineStatus.Removed),
-            Zeile(DiffLineStatus.Removed));
+        var sut = await CreateSutWithDiffLinesAsync(
+            Line(DiffLineStatus.Context),
+            Line(DiffLineStatus.Added),
+            Line(DiffLineStatus.Context),
+            Line(DiffLineStatus.Removed),
+            Line(DiffLineStatus.Removed));
 
-        var fokussierteIndizes = new List<int>();
-        sut.DiffZeileFokussiert += fokussierteIndizes.Add;
+        var focusedIndexes = new List<int>();
+        sut.DiffLineFocused += focusedIndexes.Add;
 
-        sut.NaechsteAenderungCommand.Execute(null);
-        sut.NaechsteAenderungCommand.Execute(null);
-        sut.NaechsteAenderungCommand.Execute(null);
+        sut.NextChangeCommand.Execute(null);
+        sut.NextChangeCommand.Execute(null);
+        sut.NextChangeCommand.Execute(null);
 
-        fokussierteIndizes.Should().Equal(1, 3, 1);
+        focusedIndexes.Should().Equal(1, 3, 1);
     }
 
     /// <summary>VorherigeAenderungCommand springt beim ersten Aufruf zum letzten Änderungsblock.</summary>
     [Fact]
-    public async Task VorherigeAenderungCommand_ErsterAufruf_SpringtZuLetztemBlock()
+    public async Task PreviousChangeCommand_FirstCall_JumpsToLastBlock()
     {
-        var sut = await CreateSutMitDiffZeilenAsync(
-            Zeile(DiffLineStatus.Added),
-            Zeile(DiffLineStatus.Context),
-            Zeile(DiffLineStatus.Modified));
+        var sut = await CreateSutWithDiffLinesAsync(
+            Line(DiffLineStatus.Added),
+            Line(DiffLineStatus.Context),
+            Line(DiffLineStatus.Modified));
 
-        var fokussierteIndizes = new List<int>();
-        sut.DiffZeileFokussiert += fokussierteIndizes.Add;
+        var focusedIndexes = new List<int>();
+        sut.DiffLineFocused += focusedIndexes.Add;
 
-        sut.VorherigeAenderungCommand.Execute(null);
+        sut.PreviousChangeCommand.Execute(null);
 
-        fokussierteIndizes.Should().ContainSingle().Which.Should().Be(2);
+        focusedIndexes.Should().ContainSingle().Which.Should().Be(2);
     }
 
     /// <summary>Ohne Diff-Zeilen (kein Vergleichsmodus aktiv) wird kein Fokus-Event ausgelöst.</summary>
     [Fact]
-    public void NaechsteAenderungCommand_OhneDiffZeilen_LoestKeinEreignisAus()
+    public void NextChangeCommand_WithoutDiffLines_TriggersNoEventOut()
     {
         var sut = CreateSut();
-        var ereignisAusgeloest = false;
-        sut.DiffZeileFokussiert += _ => ereignisAusgeloest = true;
+        var eventTriggered = false;
+        sut.DiffLineFocused += _ => eventTriggered = true;
 
-        sut.NaechsteAenderungCommand.Execute(null);
+        sut.NextChangeCommand.Execute(null);
 
-        ereignisAusgeloest.Should().BeFalse();
+        eventTriggered.Should().BeFalse();
     }
 
-    private static TextDiffLine Zeile(DiffLineStatus status) => new("inhalt", status, 1, 1, []);
+    private static TextDiffLine Line(DiffLineStatus status) => new("inhalt", status, 1, 1, []);
 
     private static FileExplorerViewModel CreateSut()
     {
@@ -92,22 +92,22 @@ public sealed class FileExplorerViewModelTests_DiffNavigation
         return new FileExplorerViewModel(gitMock.Object, diffMock.Object, NullLogger<FileExplorerViewModel>.Instance);
     }
 
-    private static async Task<FileExplorerViewModel> CreateSutMitDiffZeilenAsync(params TextDiffLine[] zeilen)
+    private static async Task<FileExplorerViewModel> CreateSutWithDiffLinesAsync(params TextDiffLine[] lines)
     {
         var gitMock = new Mock<IGitWorkspaceBrowserService>();
         var diffMock = new Mock<ITextDiffService>();
         var sut = new FileExplorerViewModel(gitMock.Object, diffMock.Object, NullLogger<FileExplorerViewModel>.Instance);
 
         gitMock.Setup(g => g.LoadWorkingTreeAsync(RepositoryPath, It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        await sut.InitialisierenAsync(RepositoryPath);
+        await sut.InitializeAsync(RepositoryPath);
 
         var node = new WorkspaceFileNode { Name = "a.cs", RelativePath = "a.cs", CommitSha = "abc123" };
         var preview = new FilePreview("a.cs", null, false, false, false, "neu", "alt", null);
         gitMock.Setup(g => g.LoadCommitPreviewAsync(RepositoryPath, node, It.IsAny<CancellationToken>())).ReturnsAsync(preview);
-        diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(zeilen));
+        diffMock.Setup(d => d.BuildDiff("alt", "neu")).Returns(new FileTextDiff(lines));
 
-        sut.AusgewaehlterKnoten = node;
-        await WaitForAsync(() => sut.DiffZeilen.Count == zeilen.Length);
+        sut.SelectedNode = node;
+        await WaitForAsync(() => sut.DiffLines.Count == lines.Length);
 
         return sut;
     }

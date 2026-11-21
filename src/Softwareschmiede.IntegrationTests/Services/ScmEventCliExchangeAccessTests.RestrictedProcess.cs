@@ -20,7 +20,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
     private const int ChildPhaseBudgetSeconds = 90;
     private const int HostPhaseTimeoutSeconds = ChildPhaseBudgetSeconds + 30;
 
-    /// <summary>A normal CLI parent delegates the actual access probe and channel I/O to its restricted file-tool child.</summary>
+    /// <summary>Ein normaler CLI-Parent delegiert die eigentliche Zugriffsprüfung und Kanal-I/O an sein eingeschränktes Datei-Werkzeug-Kind.</summary>
     [Theory]
     [Trait("Category", "OsInterface")]
     // Dokumentiertes Flake-Ereignis aus PR #427: Der eingebettete PowerShell-Kindprozess
@@ -143,7 +143,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
                     await File.WriteAllTextAsync(promptPath + ".tmp", prompt, token);
                     File.Move(promptPath + ".tmp", promptPath);
                 });
-            using var adapter = new ScmPromptSessionAdapter(request.AufgabeId, request.CliRunId, prefix, spec, session.Object, [], () => !process.HasExited);
+            using var adapter = new ScmPromptSessionAdapter(request.WorkItemId, request.CliRunId, prefix, spec, session.Object, [], () => !process.HasExited);
             var access = await adapter.CheckExchangeAccessAsync(directory, TestContext.Current.CancellationToken);
             access.Status.Should().Be(ScmExchangeAccessStatus.Unknown, "only the real file tool may complete the probe");
             var probeDeadline = DateTime.UtcNow.AddSeconds(HostPhaseTimeoutSeconds);
@@ -168,11 +168,11 @@ public sealed partial class ScmEventCliExchangeAccessTests
             do
             {
                 messages = await protocol.ReadAsync(attempt, TestContext.Current.CancellationToken);
-                // The child publishes accepted.json and the action in immediate succession, but
-                // ReadAsync reports a file only after observing it unchanged twice. A snapshot in
-                // which the action is already stable while accepted.json was not yet seen in the
-                // previous pass is a legal transient state — wait for the complete expected state
-                // instead of breaking on the first action sighting.
+                // Das Kind veröffentlicht accepted.json und die Aktion in unmittelbarer Folge, aber
+                // ReadAsync meldet eine Datei erst, nachdem sie zweimal unverändert beobachtet wurde. Ein Snapshot,
+                // in dem die Aktion bereits stabil ist, während accepted.json im vorherigen Durchlauf noch nicht
+                // gesehen wurde, ist ein legaler Übergangszustand – auf den vollständigen erwarteten Zustand warten
+                // statt beim ersten Sichten der Aktion abzubrechen.
                 if (messages.Accepted is not null && messages.Actions.Count == 1) break;
                 if (process.HasExited) break;
                 await Task.Delay(25, TestContext.Current.CancellationToken);
@@ -213,7 +213,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
         }
     }
 
-    /// <summary>A real restricted child denied by the workspace cannot claim access through its normal CLI parent.</summary>
+    /// <summary>Ein echtes eingeschränktes Kind, das vom Workspace abgelehnt wird, kann über seinen normalen CLI-Parent keinen Zugriff beanspruchen.</summary>
     [Theory]
     [Trait("Category", "OsInterface")]
     [InlineData("Codex")]
@@ -224,8 +224,8 @@ public sealed partial class ScmEventCliExchangeAccessTests
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("The restricted process proof requires Windows.");
         await GitInit(_root);
         var sid = "S-1-5-21-" + string.Join('-', Enumerable.Range(0, 4).Select(_ => BitConverter.ToUInt32(RandomNumberGenerator.GetBytes(4))));
-        // The child may initialize in this workspace, but its non-inheritable right must never
-        // be promoted into an explicit grant on the private channel's descendants.
+        // Das Kind darf in diesem Workspace initialisieren, aber sein nicht vererbbares Recht darf niemals
+        // in ein explizites Grant auf die Nachkommen des privaten Kanals überführt werden.
         RestrictDirectory(_root, sid, inheritCapability: false);
         var (prefix, spec) = await Spec(provider, GrantingArguments(provider));
         var session = Session(Banner(provider), PromptGlyph(provider));
@@ -274,7 +274,7 @@ public sealed partial class ScmEventCliExchangeAccessTests
         _ => "--permission-mode acceptEdits",
     };
 
-    /// <summary>Pinned startup banner per provider as emitted by the supported CLI versions.</summary>
+    /// <summary>Gepinnte Start-Banner pro Anbieter, wie sie die unterstützten CLI-Versionen ausgeben.</summary>
     private static string Banner(string provider) => provider switch
     {
         "Codex" => "OpenAI Codex (v0.114.0)",

@@ -25,7 +25,7 @@ public sealed class ScmEventDispatchTests_AgentActions
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        fixture.Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmKontoModus>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        fixture.Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmAccountMode>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, string?>
             {
                 ["GH_TOKEN"] = "agent-secret-token",
@@ -48,13 +48,13 @@ public sealed class ScmEventDispatchTests_AgentActions
     /// der persistierten Observation auf — ein SeparatesKonto-Ereignis wird dem Agent-Konto
     /// weitergereicht und unter der Bot-Viewer-Identität geprüft.</summary>
     [Fact]
-    public async Task Dispatch_SeparatesKontoEvent_RevalidatesUnderAgentKonto()
+    public async Task Dispatch_SeparatesAccountEvent_RevalidatesAndAgentAccount()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         var botRepository = fixture.Repository with
         {
-            Konto = ScmKontoModus.SeparatesKonto,
+            Account = ScmAccountMode.SeparateAccount,
             ViewerId = "BOT",
             ViewerLogin = "scm-bot"
         };
@@ -64,7 +64,7 @@ public sealed class ScmEventDispatchTests_AgentActions
             .Returns((ScmRepositoryContext context, CancellationToken _) =>
             {
                 contexts.Add(context);
-                return Task.FromResult(botRepository with { Konto = context.Konto });
+                return Task.FromResult(botRepository with { Account = context.Account });
             });
         var (_, eventId) = await fixture.AddAsync(configured: true,
             body: "@scm-bot bitte übernehmen", eventRepository: botRepository);
@@ -73,7 +73,7 @@ public sealed class ScmEventDispatchTests_AgentActions
 
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
         var context = Assert.Single(contexts);
-        Assert.Equal(ScmKontoModus.SeparatesKonto, context.Konto);
+        Assert.Equal(ScmAccountMode.SeparateAccount, context.Account);
     }
 
     /// <summary>Ein Fehler beim Auflösen der Agenten-Anbindung blockiert den regulären CLI-Start
@@ -83,7 +83,7 @@ public sealed class ScmEventDispatchTests_AgentActions
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
-        fixture.Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmKontoModus>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        fixture.Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmAccountMode>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Credential-Store nicht erreichbar."));
         var (_, eventId) = await fixture.AddAsync(configured: true);
 
@@ -98,7 +98,7 @@ public sealed class ScmEventDispatchTests_AgentActions
     /// <summary>Die Zustellung reicht die Repository-URL des verknüpften GitRepository an die
     /// Agenten-Umgebung durch, damit das SCM-Plugin den extraheader-Key hostgebunden bilden kann.</summary>
     [Fact]
-    public async Task Dispatch_PassesRepositoryUrlToAgentEnvironment()
+    public async Task Dispatch_AdjustRepositoryUrlToAgentEnvironment()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -108,7 +108,7 @@ public sealed class ScmEventDispatchTests_AgentActions
 
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
         fixture.Git.As<IScmAgentAccess>().Verify(x => x.GetAgentEnvironmentAsync(
-            It.IsAny<ScmKontoModus>(), "https://github.com/owner/repo", It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<ScmAccountMode>(), "https://github.com/owner/repo", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>Der Agent meldet Annahme und schließt mit einem Bericht selbst ausgeführter
@@ -141,7 +141,7 @@ public sealed class ScmEventDispatchTests_AgentActions
         // Keine KI-Kanalaktion wurde remote ausgeführt — nur die Empfangsreaktion des Hosts.
         Assert.Equal(actionsBefore, fixture.Responses.Count);
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.DoesNotContain(await db.ScmOutgoingActions.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => x.Purpose.StartsWith("ai:", StringComparison.Ordinal));
     }
 

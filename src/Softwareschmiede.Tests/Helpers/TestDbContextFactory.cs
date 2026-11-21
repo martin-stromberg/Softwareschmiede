@@ -8,13 +8,13 @@ namespace Softwareschmiede.Tests.Helpers;
 public static class TestDbContextFactory
 {
     /// <summary>Erstellt einen neuen DbContext mit einer einzigartigen InMemory-Datenbank.</summary>
-    public static SoftwareschmiededDbContext Create()
+    public static SoftwareschmiedeDbContext Create()
     {
-        var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
+        var options = new DbContextOptionsBuilder<SoftwareschmiedeDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        var context = new SoftwareschmiededDbContext(options);
+        var context = new SoftwareschmiedeDbContext(options);
         context.Database.EnsureCreated();
         return context;
     }
@@ -26,14 +26,14 @@ public static class TestDbContextFactory
     /// </summary>
     /// <param name="connectionString">Der SQLite-Connection-String (z. B. <c>Data Source=...</c>).</param>
     /// <param name="interceptors">Optionale Interceptoren, die am Context registriert werden.</param>
-    public static SoftwareschmiededDbContext CreateSqlite(string connectionString, params IInterceptor[] interceptors)
+    public static SoftwareschmiedeDbContext CreateSqlite(string connectionString, params IInterceptor[] interceptors)
     {
-        var builder = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
+        var builder = new DbContextOptionsBuilder<SoftwareschmiedeDbContext>()
             .UseSqlite(connectionString);
 
         if (interceptors.Length > 0)
             builder.AddInterceptors(interceptors);
 
-        return new SoftwareschmiededDbContext(builder.Options);
+        return new SoftwareschmiedeDbContext(builder.Options);
     }
 }

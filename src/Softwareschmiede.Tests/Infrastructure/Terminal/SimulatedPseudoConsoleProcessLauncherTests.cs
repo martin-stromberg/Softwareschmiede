@@ -18,7 +18,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
     /// <summary>Nach dem Start muss der Kindprozess laufen und eine funktionsfähige Nicht-PTY-Sitzung
     /// geliefert werden (der simulierte Pfad ermittelt den Exit-Code über <c>Process.ExitCode</c>).</summary>
     [OsInterfaceFact]
-    public void Start_LiefertLaufendenProzessUndSession()
+    public void Start_ReturnsRunningProcessAndSession()
     {
         var result = _sut.Start(Guid.NewGuid(), CreateShellSpec());
         var process = result.Process;
@@ -40,7 +40,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
     /// gesendetes Kommando muss vom laufenden, interaktiven <c>cmd.exe</c> ausgeführt werden und im
     /// <see cref="Softwareschmiede.Infrastructure.Terminal.ITerminalSession.Buffer"/> erscheinen.</summary>
     [OsInterfaceFact]
-    public async Task Start_GesendetesKommandoWirdAusgefuehrt()
+    public async Task Start_SentCommandWillExecuted()
     {
         var result = _sut.Start(Guid.NewGuid(), CreateShellSpec());
         var process = result.Process;
@@ -77,7 +77,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
     /// ebenfalls vom interaktiven <c>cmd.exe</c> ausgeführt werden: Die Pipe-Übertragung braucht <c>\r\n</c> als
     /// Zeilenende, weshalb der Launcher den Input-Stream entsprechend übersetzt.</summary>
     [OsInterfaceFact]
-    public async Task Start_UeberWritePromptAsyncGesendeterPromptWirdAusgefuehrt()
+    public async Task Start_OverWritePromptAsyncSentPromptWillExecuted()
     {
         var result = _sut.Start(Guid.NewGuid(), CreateShellSpec());
         var process = result.Process;
@@ -111,7 +111,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
     /// der Prozess innerhalb kurzer Zeit als beendet erkennbar sein — bestätigt Kompatibilität mit
     /// <c>KiAusfuehrungsService.StopCliAsync</c>, das denselben Aufruf für den Stop-Fallback nutzt.</summary>
     [OsInterfaceFact]
-    public async Task Start_ProzessBeendetSichAufKillEntireProcessTree()
+    public async Task Start_ProcessCompletedSelfOnKillEntireProcessTree()
     {
         var result = _sut.Start(Guid.NewGuid(), CreateShellSpec());
         var process = result.Process;
@@ -121,18 +121,18 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
             process.Kill(entireProcessTree: true);
 
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-            var exited = false;
+            var completed = false;
             while (DateTime.UtcNow < deadline)
             {
                 if (process.HasExited)
                 {
-                    exited = true;
+                    completed = true;
                     break;
                 }
                 await Task.Delay(50);
             }
 
-            exited.Should().BeTrue("Kill(entireProcessTree: true) muss den simulierten Kindprozess zuverlässig beenden");
+            completed.Should().BeTrue("Kill(entireProcessTree: true) muss den simulierten Kindprozess zuverlässig beenden");
         }
         finally
         {
@@ -144,7 +144,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
     /// (möglich, weil <c>WriteInputAsync</c> in 4-KB-Stücken schreibt), darf nicht zu <c>\r\n\n</c>
     /// werden — das würde auf der Pipe einen leeren Zeilen-Submit auslösen.</summary>
     [Fact]
-    public void CrSubmittingInputStream_CrLfUeberChunkGrenze_KeinExtraZeilenvorschub()
+    public void CrSubmittingInputStream_CrLfOverChunkBoundary_NoExtraLinefeed()
     {
         var inner = new MemoryStream();
         using var stream = CreateCrSubmittingInputStream(inner);
@@ -160,7 +160,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
     /// <summary>Ein am Chunk-Ende stehendes <c>\r</c>, dem <em>kein</em> <c>\n</c> folgt, muss wie ein
     /// alleinstehendes CR zu <c>\r\n</c> übersetzt werden.</summary>
     [Fact]
-    public void CrSubmittingInputStream_CrAmChunkEndeOhneLf_WirdZuCrLf()
+    public void CrSubmittingInputStream_CrAtChunkEndWithoutLf_WillToCrLf()
     {
         var inner = new MemoryStream();
         using var stream = CreateCrSubmittingInputStream(inner);
@@ -175,7 +175,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
     /// <summary>Ein abschließendes, zurückgehaltenes <c>\r</c> muss spätestens beim Flush als
     /// <c>\r\n</c> ausgegeben werden — sonst bliebe der Submit eines Prompts unzustellt.</summary>
     [Fact]
-    public async Task CrSubmittingInputStream_AbschliessendesCr_WirdBeimFlushAusgegeben()
+    public async Task CrSubmittingInputStream_FinalCr_WillAtFlushOutput()
     {
         var inner = new MemoryStream();
         var stream = CreateCrSubmittingInputStream(inner);
@@ -190,7 +190,7 @@ public sealed class SimulatedPseudoConsoleProcessLauncherTests
     /// <summary>Die Grundübersetzung innerhalb eines Chunks bleibt unverändert: alleinstehendes
     /// <c>\r</c> wird zu <c>\r\n</c>, ein vorhandenes <c>\r\n</c>-Paar bleibt unverändert.</summary>
     [Fact]
-    public void CrSubmittingInputStream_InnerhalbChunk_UnveraenderteUebersetzung()
+    public void CrSubmittingInputStream_WithinChunk_UnchangedTranslation()
     {
         var inner = new MemoryStream();
         using var stream = CreateCrSubmittingInputStream(inner);

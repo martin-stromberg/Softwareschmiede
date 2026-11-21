@@ -11,7 +11,7 @@ namespace Softwareschmiede.App.Services.Testing;
 
 // Isolated E2E input only. Commands exercise real session services, never synthesize inbox state.
 internal sealed class ScmE2ERuntimeControl(ScmE2ETestConfiguration configuration, IServiceScopeFactory scopes,
-    KiAusfuehrungsService cli, IPluginManager plugins) : BackgroundService
+    AiExecutionService cli, IPluginManager plugins) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -36,10 +36,10 @@ internal sealed class ScmE2ERuntimeControl(ScmE2ETestConfiguration configuration
                             while (cli.GetScmPromptSession(command.TaskId)?.IsAlive == true) await Task.Delay(25, stoppingToken);
                         }
                         using var scope = scopes.CreateScope();
-                        var task = await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Aufgaben
+                        var task = await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems
                             .AsNoTracking().SingleAsync(x => x.Id == command.TaskId, stoppingToken);
                         var plugin = plugins.GetDevelopmentAutomationPlugins().Single();
-                        var handle = await cli.StartTerminalSessionAsync(task.Id, plugin, task.LokalerKlonPfad!, "--scm-exchange", stoppingToken);
+                        var handle = await cli.StartTerminalSessionAsync(task.Id, plugin, task.LocalClonePath!, "--scm-exchange", stoppingToken);
                         runId = handle.CliRunId;
                     }, stoppingToken);
                     await PublishResultAsync(resultPath, new { runId }, stoppingToken);

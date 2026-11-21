@@ -18,8 +18,8 @@ public sealed class TaskDetailView : BaseWindowView
 
     /// <inheritdoc/>
     public override bool IsVisible
-        => ElementExists(Window, cf => cf.ByName("EditTitel"))
-           && (ElementExists(Window, cf => cf.ByName("Speichern")) || ElementExists(Window, cf => cf.ByName("Zurück")));
+        => ElementExists(Window, cf => cf.ByName("EditTitle"))
+           && (ElementExists(Window, cf => cf.ByName("Save")) || ElementExists(Window, cf => cf.ByName("Back")));
 
     /// <returns>Diese Instanz, wenn die Ansicht bereits sichtbar ist.</returns>
     /// <exception cref="InvalidOperationException">Wird geworfen, wenn die Ansicht noch nicht sichtbar ist.</exception>
@@ -48,18 +48,18 @@ public sealed class TaskDetailView : BaseWindowView
     /// maßgebliche Quelle; nach dem Start bleibt nur das Anzeigeelement sichtbar.</returns>
     public string GetTaskTitle()
     {
-        var editTitel = Window.FindFirstDescendant(cf => cf.ByName("EditTitel"));
-        if (editTitel is not null && !editTitel.IsOffscreen)
-            return editTitel.AsTextBox().Text;
+        var editTitle = Window.FindFirstDescendant(cf => cf.ByName("EditTitle"));
+        if (editTitle is not null && !editTitle.IsOffscreen)
+            return editTitle.AsTextBox().Text;
 
-        return WaitForElement(Window, cf => cf.ByName("AufgabeTitel"), Short).Name;
+        return WaitForElement(Window, cf => cf.ByName("WorkItemTitle"), Short).Name;
     }
 
     /// <param name="title">Der neue Aufgabentitel.</param>
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView SetTaskTitle(string title)
     {
-        var box = WaitForElement(Window, cf => cf.ByName("EditTitel"), Short);
+        var box = WaitForElement(Window, cf => cf.ByName("EditTitle"), Short);
         ElementWaitHelper.ReplaceTextBoxText(box, title);
 
         return this;
@@ -69,7 +69,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView SaveTask()
     {
-        WaitForElement(Window, cf => cf.ByName("Speichern"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("Save"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -81,7 +81,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView WaitForPersisted()
     {
-        WaitForElement(Window, cf => cf.ByName("Starten"), Medium);
+        WaitForElement(Window, cf => cf.ByName("Start"), Medium);
         return this;
     }
 
@@ -89,19 +89,19 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Die Projektdetailansicht, die nach dem Löschen sichtbar wird.</returns>
     public ProjectDetailView DeleteTask()
     {
-        WaitForElement(Window, cf => cf.ByName("Starten"), Short);
+        WaitForElement(Window, cf => cf.ByName("Start"), Short);
 
-        WaitForElement(Window, cf => cf.ByName("Löschen"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("Delete"), Short).AsButton().ClickInForeground();
         new DeleteConfirmationDialogView(Window).Confirm();
 
-        WaitUntilGone(Window, cf => cf.ByName("Starten"), Short);
+        WaitUntilGone(Window, cf => cf.ByName("Start"), Short);
 
         return new ProjectDetailView(Window);
     }
 
     /// <summary>
     /// Klickt den "Zurück"-Button und wartet, bis die Aufgabendetailansicht verlassen wurde. Wartet
-    /// bewusst nicht fest auf "ProjektName" (Projektdetailansicht): Wurde die Aufgabe zuvor über die
+    /// bewusst nicht fest auf "ProjectName" (Projektdetailansicht): Wurde die Aufgabe zuvor über die
     /// Aufgabenliste in der Seitenleiste geöffnet (<see cref="MenuView.NavigateToTask"/>), führt "Zurück"
     /// stattdessen zum Dashboard (siehe MainWindowViewModel.NavigateZuAufgabe). Aufrufer ermitteln die
     /// tatsächliche Zielansicht danach selbst über <see cref="WindowExtensions.CurrentView"/>.
@@ -109,7 +109,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView GoBack()
     {
-        WaitForElement(Window, cf => cf.ByName("Zurück"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("Back"), Short).AsButton().ClickInForeground();
 
         var deadline = DateTime.UtcNow + Medium;
         while (DateTime.UtcNow < deadline)
@@ -134,19 +134,19 @@ public sealed class TaskDetailView : BaseWindowView
     /// <summary>
     /// Startet die Ausführung der Aufgabe über den "Starten"-Button und bedient den anschließend
     /// erscheinenden Plugin-Auswahl-Dialog (<see cref="PluginSelectionDialogView"/>): wählt das
-    /// angegebene KI-Plugin aus, setzt optional "FuerProjektVerwenden" und bestätigt mit "OK". Wartet
+    /// angegebene KI-Plugin aus, setzt optional "UseForProject" und bestätigt mit "OK". Wartet
     /// nicht auf das Ergebnis (Erfolg oder Fehlermeldung) - Aufrufer prüfen danach den erwarteten
     /// Zustand selbst, z. B. über <see cref="WaitForCliRunning"/> oder
     /// <c>Assert.IsType&lt;ErrorView&gt;(mainWindow.CurrentView())</c>.
     /// </summary>
     /// <param name="pluginName">Der Name des im Dialog auszuwählenden KI-Plugins.</param>
-    /// <param name="fuerProjektVerwenden">Wenn <c>true</c>, wird die "FuerProjektVerwenden"-Checkbox gesetzt, damit das gewählte Plugin als Projekt-Standard gespeichert wird.</param>
+    /// <param name="forProjectUse">Wenn <c>true</c>, wird die "UseForProject"-Checkbox gesetzt, damit das gewählte Plugin als Projekt-Standard gespeichert wird.</param>
     /// <returns>Diese Instanz.</returns>
-    public TaskDetailView Start(string pluginName, bool fuerProjektVerwenden)
+    public TaskDetailView Start(string pluginName, bool forProjectUse)
     {
         new PluginSelectionDialogView(Window)
             .ForceShow()
-            .SelectPlugin(pluginName, fuerProjektVerwenden)
+            .SelectPlugin(pluginName, forProjectUse)
             .Confirm();
 
         return this;
@@ -157,9 +157,9 @@ public sealed class TaskDetailView : BaseWindowView
     /// Verwendbar, wenn das KI-Plugin bereits persistiert ist und der Start direkt beginnt.
     /// </summary>
     /// <returns>Diese Instanz.</returns>
-    public TaskDetailView ClickStarten()
+    public TaskDetailView StartClick()
     {
-        WaitForElement(Window, cf => cf.ByName("Starten"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("Start"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -167,21 +167,21 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView WaitForCliRunning()
     {
-        WaitForElement(Window, cf => cf.ByName("CliStoppen"), Medium);
+        WaitForElement(Window, cf => cf.ByName("StopCli"), Medium);
         WaitForElement(Window, cf => cf.ByName("Gestartet"), Short);
 
         return this;
     }
 
     /// <returns><c>true</c>, wenn der "CliStoppen"-Button aktuell sichtbar ist (CLI läuft).</returns>
-    public bool IsCliRunning() => ElementExists(Window, cf => cf.ByName("CliStoppen"));
+    public bool IsCliRunning() => ElementExists(Window, cf => cf.ByName("StopCli"));
 
     /// <summary>Klickt den "CliStoppen"-Button, um die laufende CLI manuell zu beenden, und wartet, bis er verschwindet.</summary>
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView StopCli()
     {
-        WaitForElement(Window, cf => cf.ByName("CliStoppen"), Short).AsButton().ClickInForeground();
-        WaitUntilGone(Window, cf => cf.ByName("CliStoppen"), Medium);
+        WaitForElement(Window, cf => cf.ByName("StopCli"), Short).AsButton().ClickInForeground();
+        WaitUntilGone(Window, cf => cf.ByName("StopCli"), Medium);
 
         return this;
     }
@@ -193,7 +193,7 @@ public sealed class TaskDetailView : BaseWindowView
     public bool HasTerminalOutput() => ElementExists(Window, cf => cf.ByName("TerminalConsole"));
 
     /// <returns><c>true</c>, wenn der "CliNeustarten"-Button (manueller CLI-Neustart nach Beendigung) sichtbar ist.</returns>
-    public bool CanRestartCli() => ElementExists(Window, cf => cf.ByName("CliNeustarten"));
+    public bool CanRestartCli() => ElementExists(Window, cf => cf.ByName("RestartCli"));
 
     /// <returns><c>true</c>, wenn die Statusleiste den Aufgabenstatus "Gestartet" anzeigt.</returns>
     public bool IsTaskStarted() => ElementExists(Window, cf => cf.ByName("Gestartet"));
@@ -202,7 +202,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView Finish()
     {
-        WaitForElement(Window, cf => cf.ByName("Beenden"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("Exit"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -223,12 +223,12 @@ public sealed class TaskDetailView : BaseWindowView
         return this;
     }
 
-    /// <summary>Wartet, bis ein Protokolleintrag des angegebenen Typs ("ProtokollTyp-{Typ}") sichtbar ist.</summary>
-    /// <param name="typ">Der Protokolltyp (z. B. "GitAktion").</param>
+    /// <summary>Wartet, bis ein Protokolleintrag des angegebenen Typs ("LogKind-{Typ}") sichtbar ist.</summary>
+    /// <param name="type">Der Protokolltyp (z. B. "GitAktion").</param>
     /// <returns>Diese Instanz.</returns>
-    public TaskDetailView WaitForLogEntry(string typ)
+    public TaskDetailView WaitForLogEntry(string type)
     {
-        WaitForElement(Window, cf => cf.ByName($"ProtokollTyp-{typ}"), Long);
+        WaitForElement(Window, cf => cf.ByName($"LogKind-{type}"), Long);
         return this;
     }
 
@@ -236,7 +236,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView WaitForCliStopped()
     {
-        WaitUntilGone(Window, cf => cf.ByName("CliStoppen"), Short);
+        WaitUntilGone(Window, cf => cf.ByName("StopCli"), Short);
         return this;
     }
 
@@ -253,7 +253,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView WaitForStartAvailable()
     {
-        WaitForElement(Window, cf => cf.ByName("Starten"), Short);
+        WaitForElement(Window, cf => cf.ByName("Start"), Short);
         return this;
     }
 
@@ -265,7 +265,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView Restart()
     {
-        WaitForElement(Window, cf => cf.ByName("Starten"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("Start"), Short).AsButton().ClickInForeground();
         return this;
     }
 
@@ -275,8 +275,8 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView SetScheduledPromptTime(int hour, int minute)
     {
-        var stundeBox = WaitForElement(Window, cf => cf.ByName("ScheduledPromptStunde"), Short);
-        stundeBox.ClickInForeground();
+        var hourBox = WaitForElement(Window, cf => cf.ByName("ScheduledPromptHour"), Short);
+        hourBox.ClickInForeground();
         Keyboard.Type(hour.ToString("00"));
 
         var minuteBox = WaitForElement(Window, cf => cf.ByName("ScheduledPromptMinute"), Short);
@@ -286,12 +286,12 @@ public sealed class TaskDetailView : BaseWindowView
         return this;
     }
 
-    /// <summary>Wählt eine Promptvorlage in der "PromptVorlagenAuswahl"-ComboBox aus.</summary>
+    /// <summary>Wählt eine Promptvorlage in der "PromptTemplateSelection"-ComboBox aus.</summary>
     /// <param name="name">Der Name der Promptvorlage.</param>
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView SelectPromptTemplate(string name)
     {
-        var box = WaitForElement(Window, cf => cf.ByName("PromptVorlagenAuswahl"), Short);
+        var box = WaitForElement(Window, cf => cf.ByName("PromptTemplateSelection"), Short);
         SelectComboBoxItemByClick(box, name, Short);
         return this;
     }
@@ -300,7 +300,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView SendScheduledPrompt()
     {
-        WaitForElement(Window, cf => cf.ByName("ZeitgesteuertSenden"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("ScheduledSend"), Short).AsButton().ClickInForeground();
         WaitForElement(Window, cf => cf.ByName("ScheduledPromptStatus"), Medium);
         return this;
     }
@@ -317,7 +317,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView CancelScheduledPrompt()
     {
-        WaitForElement(Window, cf => cf.ByName("WartestellungAufheben"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("ReleaseWaiting"), Short).AsButton().ClickInForeground();
         WaitUntilGone(Window, cf => cf.ByName("ScheduledPromptStatus"), Medium);
         return this;
     }
@@ -326,68 +326,68 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView OpenIde()
     {
-        WaitForElement(Window, cf => cf.ByName("IdeOeffnen"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("OpenIde"), Short).AsButton().ClickInForeground();
         return this;
     }
 
-    /// <returns><c>true</c>, wenn der Dropdown-Button "IdeOeffnenDropdown" sichtbar ist (mindestens zwei Einstiegspunkte gefunden).</returns>
-    public bool HasIdeDropdown() => ElementExists(Window, cf => cf.ByName("IdeOeffnenDropdown"));
+    /// <returns><c>true</c>, wenn der Dropdown-Button "OpenIdeDropdown" sichtbar ist (mindestens zwei Einstiegspunkte gefunden).</returns>
+    public bool HasIdeDropdown() => ElementExists(Window, cf => cf.ByName("OpenIdeDropdown"));
 
     /// <returns><c>true</c>, wenn der Haupt-Button "IdeOeffnen" aktuell aktiviert ist.</returns>
-    public bool IsIdeButtonEnabled() => WaitForElement(Window, cf => cf.ByName("IdeOeffnen"), Short).Properties.IsEnabled.Value;
+    public bool IsIdeButtonEnabled() => WaitForElement(Window, cf => cf.ByName("OpenIde"), Short).Properties.IsEnabled.Value;
 
     /// <summary>Klickt den "ArbeitsverzeichnisOeffnen"-Button im Ribbon.</summary>
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView OpenWorkingDirectory()
     {
-        WaitForElement(Window, cf => cf.ByName("ArbeitsverzeichnisOeffnen"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("OpenWorkingDirectory"), Short).AsButton().ClickInForeground();
         return this;
     }
 
-    /// <returns><c>true</c>, wenn der "PluginAendern"-Button (Plugin-Wechsel-Selector, nur bei mehreren aktiven KI-Plugins sichtbar) angezeigt wird.</returns>
-    public bool HasPluginChangeButton() => ElementExists(Window, cf => cf.ByName("PluginAendern"));
+    /// <returns><c>true</c>, wenn der "SwitchPlugin"-Button (Plugin-Wechsel-Selector, nur bei mehreren aktiven KI-Plugins sichtbar) angezeigt wird.</returns>
+    public bool HasPluginChangeButton() => ElementExists(Window, cf => cf.ByName("SwitchPlugin"));
 
-    /// <summary>Wartet, bis der "PluginAendern"-Button (CLI-Ribbon-Gruppe) sichtbar ist.</summary>
+    /// <summary>Wartet, bis der "SwitchPlugin"-Button (CLI-Ribbon-Gruppe) sichtbar ist.</summary>
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView WaitForPluginChangeButton()
     {
-        WaitForElement(Window, cf => cf.ByName("PluginAendern"), Short);
+        WaitForElement(Window, cf => cf.ByName("SwitchPlugin"), Short);
         return this;
     }
 
     /// <summary>Klickt den CLI-Raw-Export-Button und bedient den nativen Save-Dialog.</summary>
-    /// <param name="zielPfad">Der Zielpfad der zu speichernden *.raw-Datei oder null/leer für Abbruch.</param>
+    /// <param name="targetPath">Der Zielpfad der zu speichernden *.raw-Datei oder null/leer für Abbruch.</param>
     /// <returns>Diese Instanz.</returns>
-    public TaskDetailView ExportCliRaw(string? zielPfad)
+    public TaskDetailView ExportCliRaw(string? targetPath)
     {
         WaitForEnabledElement(Window, "CliRawExport", Medium).AsButton().ClickInForeground();
-        return HandleSaveFileDialog(zielPfad);
+        return HandleSaveFileDialog(targetPath);
     }
 
     /// <summary>Klickt den "Aufzeichnung exportieren"-Button (CLI-Replay) und bedient den nativen Save-Dialog.</summary>
-    /// <param name="zielPfad">Der Zielpfad der zu speichernden *.clireplay-Datei oder null/leer für Abbruch.</param>
+    /// <param name="targetPath">Der Zielpfad der zu speichernden *.clireplay-Datei oder null/leer für Abbruch.</param>
     /// <returns>Diese Instanz.</returns>
-    public TaskDetailView ExportCliReplay(string? zielPfad)
+    public TaskDetailView ExportCliReplay(string? targetPath)
     {
         WaitForEnabledElement(Window, "CliReplayExport", Medium).AsButton().ClickInForeground();
-        return HandleSaveFileDialog(zielPfad);
+        return HandleSaveFileDialog(targetPath);
     }
 
     /// <summary>Bedient den nativen Save-Dialog: schreibt den Zielpfad und bestätigt, oder bricht per ESC ab.</summary>
-    /// <param name="zielPfad">Der Zielpfad oder null/leer zum Abbrechen.</param>
+    /// <param name="targetPath">Der Zielpfad oder null/leer zum Abbrechen.</param>
     /// <returns>Diese Instanz.</returns>
-    public TaskDetailView HandleSaveFileDialog(string? zielPfad)
+    public TaskDetailView HandleSaveFileDialog(string? targetPath)
     {
         var dialog = WaitForSaveDialog();
         dialog.Focus();
 
-        if (string.IsNullOrWhiteSpace(zielPfad))
+        if (string.IsNullOrWhiteSpace(targetPath))
         {
             Keyboard.Press(VirtualKeyShort.ESCAPE);
         }
         else
         {
-            Keyboard.Type(zielPfad);
+            Keyboard.Type(targetPath);
             Keyboard.Press(VirtualKeyShort.RETURN);
         }
 
@@ -395,16 +395,16 @@ public sealed class TaskDetailView : BaseWindowView
         return this;
     }
 
-    /// <summary>Wartet, bis der "PluginAendern"-Button (CLI-Ribbon-Gruppe) verschwindet.</summary>
+    /// <summary>Wartet, bis der "SwitchPlugin"-Button (CLI-Ribbon-Gruppe) verschwindet.</summary>
     /// <returns>Diese Instanz.</returns>
     public TaskDetailView WaitUntilPluginChangeButtonGone()
     {
-        WaitUntilGone(Window, cf => cf.ByName("PluginAendern"), Short);
+        WaitUntilGone(Window, cf => cf.ByName("SwitchPlugin"), Short);
         return this;
     }
 
     /// <summary>
-    /// Klickt den "PluginAendern"-Button, um bei laufender CLI ein anderes KI-Plugin zu wählen. Ruft
+    /// Klickt den "SwitchPlugin"-Button, um bei laufender CLI ein anderes KI-Plugin zu wählen. Ruft
     /// bewusst nicht <see cref="Dialogs.PluginSelectionDialogView.ForceShow"/> auf, da dessen
     /// Navigationslogik über den "Starten"-Button ausgelöst wird, der hier (CLI läuft bereits) nicht
     /// sichtbar ist - die zurückgegebene Instanz wartet stattdessen passiv (wie
@@ -413,7 +413,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Der KI-Plugin-Auswahl-Dialog, mit dem aktuellen Plugin vorselektiert.</returns>
     public Dialogs.PluginSelectionDialogView OpenPluginChangeDialog()
     {
-        WaitForElement(Window, cf => cf.ByName("PluginAendern"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("SwitchPlugin"), Short).AsButton().ClickInForeground();
         return new Dialogs.PluginSelectionDialogView(Window);
     }
 
@@ -448,7 +448,7 @@ public sealed class TaskDetailView : BaseWindowView
     }
 
     /// <summary>Markiert eine sichtbare Zeile des Live-Terminals mit einem echten Mausdrag.</summary>
-    public void MarkiereLiveTerminalZeile(LiveTerminalGeometry geometry, int viewportRow, int startCol, int endCol)
+    public void MarkLiveTerminalLine(LiveTerminalGeometry geometry, int viewportRow, int startCol, int endCol)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(viewportRow);
         ArgumentOutOfRangeException.ThrowIfNegative(startCol);
@@ -490,7 +490,7 @@ public sealed class TaskDetailView : BaseWindowView
     }
 
     /// <summary>Fokussiert die Auswahl und löst den realen Strg+Umschalt+C-Kopierpfad aus.</summary>
-    public void KopiereLiveAuswahl()
+    public void CopyLiveSelection()
     {
         var terminal = WaitForElement(Window, cf => cf.ByName("TerminalConsole"), Short);
         terminal.Focus();
@@ -590,7 +590,7 @@ public sealed class TaskDetailView : BaseWindowView
 
     /// <returns>Der aktuell in der Fußzeile angezeigte CLI-Statustext. Das Element trägt die feste
     /// AutomationId "CliStatusText" — für einen TextBlock (ohne gesetztes AutomationProperties.Name)
-    /// liefert die UIA-Name-Property den Textinhalt (wie bei "AktiverCliName").</returns>
+    /// liefert die UIA-Name-Property den Textinhalt (wie bei "ActiveCliName").</returns>
     public string GetCliStatusText()
     {
         var element = WaitForElement(Window, cf => cf.ByAutomationId("CliStatusText"), Short);
@@ -602,7 +602,7 @@ public sealed class TaskDetailView : BaseWindowView
     /// <returns>Der in der Fußzeile angezeigte aktive CLI-Name (ohne das Präfix "CLI: ").</returns>
     public string GetActiveCliName()
     {
-        var text = WaitForElement(Window, cf => cf.ByAutomationId("AktiverCliName"), Short).Name;
+        var text = WaitForElement(Window, cf => cf.ByAutomationId("ActiveCliName"), Short).Name;
         return text.StartsWith("CLI: ", StringComparison.Ordinal)
             ? text.Substring(5)
             : text;
@@ -621,21 +621,21 @@ public sealed class TaskDetailView : BaseWindowView
         try
         {
             var descendants = parent.FindAllDescendants();
-            var beschreibungen = new List<string>(descendants.Length);
+            var description = new List<string>(descendants.Length);
             foreach (var element in descendants)
             {
                 try
                 {
-                    beschreibungen.Add($"{element.ControlType}:'{element.Name}'");
+                    description.Add($"{element.ControlType}:'{element.Name}'");
                 }
                 catch
                 {
                     // Element nicht mehr abrufbar (z. B. bereits aus dem Baum entfernt) — überspringen.
                 }
             }
-            return beschreibungen.Count == 0
+            return description.Count == 0
                 ? "(keine)"
-                : $"[{beschreibungen.Count}] {string.Join(", ", beschreibungen)}";
+                : $"[{description.Count}] {string.Join(", ", description)}";
         }
         catch (Exception ex)
         {
@@ -680,11 +680,11 @@ public sealed class TaskDetailView : BaseWindowView
         throw new TimeoutException($"Element '{automationName}' wurde nicht innerhalb von {timeout.TotalSeconds}s aktiviert gefunden.");
     }
 
-    /// <summary>Klickt den Dropdown-Button "IdeOeffnenDropdown" und öffnet den Solution-Auswahl-Dialog.</summary>
+    /// <summary>Klickt den Dropdown-Button "OpenIdeDropdown" und öffnet den Solution-Auswahl-Dialog.</summary>
     /// <returns>Der geöffnete Solution-Auswahl-Dialog.</returns>
     public SolutionSelectionDialogView OpenIdeDropdown()
     {
-        WaitForElement(Window, cf => cf.ByName("IdeOeffnenDropdown"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("OpenIdeDropdown"), Short).AsButton().ClickInForeground();
 
         var dialog = new SolutionSelectionDialogView(Window);
         dialog.ForceShow();

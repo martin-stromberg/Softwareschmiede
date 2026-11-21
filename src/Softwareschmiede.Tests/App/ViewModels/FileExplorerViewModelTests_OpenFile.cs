@@ -1,0 +1,94 @@
+using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using Softwareschmiede.App.ViewModels;
+using Softwareschmiede.Application.Services;
+using Softwareschmiede.Domain.ValueObjects;
+
+namespace Softwareschmiede.Tests.App.ViewModels;
+
+/// <summary>Unit-Tests für DateiMitStandardanwendungOeffnenCommand von FileExplorerViewModel.</summary>
+public sealed class FileExplorerViewModelTests_OpenFile
+{
+    /// <summary>Ohne ausgewählten Knoten ist der Command nicht aktiv.</summary>
+    [Fact]
+    public void OpenFileWithDefaultappCommand_WithoutSelection_CanExecuteFalse()
+    {
+        var sut = CreateSut();
+
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>Für eine normale, nicht gelöschte Datei ist der Command aktiv. Die CanExecute-Prüfung hängt nur vom
+    /// synchron gesetzten Knoten ab, nicht vom asynchron nachgeladenen Vorschauinhalt.</summary>
+    [Fact]
+    public void OpenFileWithDefaultappCommand_NotDeletedFile_CanExecuteTrue()
+    {
+        var sut = CreateSut();
+        var node = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt" };
+
+        sut.SelectedNode = node;
+
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeTrue();
+    }
+
+    /// <summary>Für ein Verzeichnis ist der Command nicht aktiv.</summary>
+    [Fact]
+    public void OpenFileWithDefaultappCommand_Directory_CanExecuteFalse()
+    {
+        var sut = CreateSut();
+        var directoryNode = new WorkspaceFileNode { Name = "src", RelativePath = "src", IsDirectory = true };
+
+        sut.SelectedNode = directoryNode;
+
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>Für eine als gelöscht markierte Datei ist der Command nicht aktiv.</summary>
+    [Fact]
+    public void OpenFileWithDefaultappCommand_DeletedFile_CanExecuteFalse()
+    {
+        var sut = CreateSut();
+        var deletedNode = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt", IsDeleted = true };
+
+        sut.SelectedNode = deletedNode;
+
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>Wechselt die Auswahl von einer gültigen Datei zurück auf keinen Knoten (z. B. nach Aktualisieren), wird der
+    /// Command wieder inaktiv.</summary>
+    [Fact]
+    public void OpenFileWithDefaultappCommand_SelectionLifted_CanExecuteFalse()
+    {
+        var sut = CreateSut();
+        var node = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt" };
+        sut.SelectedNode = node;
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeTrue();
+
+        sut.SelectedNode = null;
+
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    /// <summary>Für einen aus einem historischen Commit stammenden Knoten (Vergleichsmodus, <c>CommitSha</c> gesetzt) ist der
+    /// Command nicht aktiv, da die angezeigte Vorschau (historischer Inhalt) nicht zwingend mit der Datei auf der
+    /// Festplatte übereinstimmt.</summary>
+    [Fact]
+    public void OpenFileWithDefaultappCommand_CommitNode_CanExecuteFalse()
+    {
+        var sut = CreateSut();
+        var commitNode = new WorkspaceFileNode { Name = "a.txt", RelativePath = "a.txt", CommitSha = "abc123" };
+
+        sut.SelectedNode = commitNode;
+
+        sut.OpenFileWithDefaultappCommand.CanExecute(null).Should().BeFalse();
+    }
+
+    private static FileExplorerViewModel CreateSut()
+    {
+        var gitMock = new Mock<IGitWorkspaceBrowserService>();
+        var diffMock = new Mock<ITextDiffService>();
+        return new FileExplorerViewModel(gitMock.Object, diffMock.Object, NullLogger<FileExplorerViewModel>.Instance);
+    }
+}

@@ -13,7 +13,7 @@ public sealed class VisualStudioCodeIdePluginTests
 {
     /// <summary>Prüft, dass PluginName, PluginPrefix und PluginType korrekt gesetzt sind.</summary>
     [Fact]
-    public void Eigenschaften_SindKorrektGesetzt()
+    public void Property_AreCorrectSet()
     {
         var sut = CreateSut(VisualStudioCodeAvailability.NotAvailable);
 
@@ -40,9 +40,9 @@ public sealed class VisualStudioCodeIdePluginTests
     {
         var sut = CreateSut(VisualStudioCodeAvailability.NotAvailable);
 
-        var aufruf = async () => await sut.CheckCompatibilityAsync(null!);
+        var call = async () => await sut.CheckCompatibilityAsync(null!);
 
-        await aufruf.Should().ThrowAsync<ArgumentException>();
+        await call.Should().ThrowAsync<ArgumentException>();
     }
 
     /// <summary>Ein leerer Pfad wirft eine Exception.</summary>
@@ -51,40 +51,40 @@ public sealed class VisualStudioCodeIdePluginTests
     {
         var sut = CreateSut(VisualStudioCodeAvailability.NotAvailable);
 
-        var aufruf = async () => await sut.CheckCompatibilityAsync(string.Empty);
+        var call = async () => await sut.CheckCompatibilityAsync(string.Empty);
 
-        await aufruf.Should().ThrowAsync<ArgumentException>();
+        await call.Should().ThrowAsync<ArgumentException>();
     }
 
     /// <summary>FindEntryPointsAsync liefert für VS Code immer genau einen Einstiegspunkt: das Repository-Root selbst.</summary>
     [Fact]
-    public async Task FindEntryPointsAsync_LiefertImmerGenauEinen()
+    public async Task FindEntryPointsAsync_ReturnsAlwaysExactlyA()
     {
-        var repositoryPfad = @"C:\repos\meinprojekt";
+        var repositoryPath = @"C:\repos\meinprojekt";
         var sut = CreateSut(VisualStudioCodeAvailability.NotAvailable);
 
-        var entryPoints = await sut.FindEntryPointsAsync(repositoryPfad, TestContext.Current.CancellationToken);
+        var entryPoints = await sut.FindEntryPointsAsync(repositoryPath, TestContext.Current.CancellationToken);
 
         entryPoints.Should().ContainSingle();
-        entryPoints[0].Path.Should().Be(repositoryPfad);
+        entryPoints[0].Path.Should().Be(repositoryPath);
         entryPoints[0].DisplayName.Should().Be("Visual Studio Code");
     }
 
-    /// <summary>OpenEntryPointAsync ruft IProzessStarter mit dem aufgelösten VS-Code-Befehl und dem Pfad des Einstiegspunkts auf.</summary>
+    /// <summary>OpenEntryPointAsync ruft IProcessStarter mit dem aufgelösten VS-Code-Befehl und dem Pfad des Einstiegspunkts auf.</summary>
     [Fact]
-    public async Task OpenEntryPointAsync_RuftOpenDirectoryAuf()
+    public async Task OpenEntryPointAsync_CallsOpenDirectoryOn()
     {
-        var repositoryPfad = @"C:\repos\meinprojekt";
-        var prozessStarterMock = new Mock<IProzessStarter>();
-        var sut = new VisualStudioCodeIdePlugin(prozessStarterMock.Object, CreateLocator(new VisualStudioCodeAvailability(true, "code.cmd")));
+        var repositoryPath = @"C:\repos\meinprojekt";
+        var processStarterMock = new Mock<IProcessStarter>();
+        var sut = new VisualStudioCodeIdePlugin(processStarterMock.Object, CreateLocator(new VisualStudioCodeAvailability(true, "code.cmd")));
 
-        await sut.OpenEntryPointAsync(new IdeEntryPoint(repositoryPfad), TestContext.Current.CancellationToken);
+        await sut.OpenEntryPointAsync(new IdeEntryPoint(repositoryPath), TestContext.Current.CancellationToken);
 
-        prozessStarterMock.Verify(
-            p => p.Starten(It.Is<ProzessStartAnfrage>(a =>
-                a.DateiName == "code.cmd" &&
-                a.Argumente == $"\"{repositoryPfad}\"" &&
-                a.ShellAusfuehren == false)),
+        processStarterMock.Verify(
+            p => p.Start(It.Is<ProcessStartRequest>(a =>
+                a.FileName == "code.cmd" &&
+                a.Arguments == $"\"{repositoryPath}\"" &&
+                a.UseShellExecute == false)),
             Times.Once);
     }
 
@@ -94,13 +94,13 @@ public sealed class VisualStudioCodeIdePluginTests
     {
         var sut = CreateSut(VisualStudioCodeAvailability.NotAvailable);
 
-        var aufruf = async () => await sut.OpenEntryPointAsync(new IdeEntryPoint(@"C:\repos\meinprojekt"));
+        var call = async () => await sut.OpenEntryPointAsync(new IdeEntryPoint(@"C:\repos\meinprojekt"));
 
-        await aufruf.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Visual Studio Code*");
+        await call.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Visual Studio Code*");
     }
 
     private static VisualStudioCodeIdePlugin CreateSut(VisualStudioCodeAvailability availability)
-        => new(new Mock<IProzessStarter>().Object, CreateLocator(availability));
+        => new(new Mock<IProcessStarter>().Object, CreateLocator(availability));
 
     private static IVisualStudioCodeLocator CreateLocator(VisualStudioCodeAvailability availability)
         => new TestVisualStudioCodeLocator(availability);

@@ -1,0 +1,37 @@
+using Microsoft.Extensions.Logging;
+using Softwareschmiede.Domain.Entities;
+using Softwareschmiede.Domain.Interfaces;
+
+namespace Softwareschmiede.Application.Services;
+
+/// <summary>Führt Repository-Startskripte mit freier Portzuweisung aus.</summary>
+public sealed class RepositoryStartScriptService
+{
+    private readonly ICliRunner _cliRunner;
+    private readonly ILogger<RepositoryStartScriptService> _logger;
+
+    /// <inheritdoc cref="RepositoryStartScriptService"/>
+    public RepositoryStartScriptService(
+        ICliRunner cliRunner,
+        ILogger<RepositoryStartScriptService> logger)
+    {
+        _cliRunner = cliRunner;
+        _logger = logger;
+    }
+
+    /// <summary>Führt das konfigurierte Startskript für ein Repository aus.</summary>
+    public async Task RunAsync(string repositoryRootPath, RepositoryStartConfiguration configuration, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRootPath);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        await RepositoryScriptExecutor.RunAsync(
+            repositoryRootPath,
+            configuration.Active,
+            configuration.StartScriptRelativePath,
+            "Startskript",
+            _cliRunner,
+            _logger,
+            ct).ConfigureAwait(false);
+    }
+}

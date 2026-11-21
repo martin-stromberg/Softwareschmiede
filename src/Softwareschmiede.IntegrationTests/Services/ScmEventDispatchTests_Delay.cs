@@ -34,9 +34,9 @@ public sealed class ScmEventDispatchTests_Delay
         // Zielzeitpunkt erreicht (verkürzt simuliert): Pause und Zurückstellung sind beendet.
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             await db.ScmIncomingEvents.Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)null), cancellationToken: TestContext.Current.CancellationToken);
-            await db.Aufgaben.Where(x => x.Id == taskId).ExecuteUpdateAsync(x => x.SetProperty(p => p.PausiertBisUtc, (DateTimeOffset?)null), cancellationToken: TestContext.Current.CancellationToken);
+            await db.WorkItems.Where(x => x.Id == taskId).ExecuteUpdateAsync(x => x.SetProperty(p => p.PausedUntilUtc, (DateTimeOffset?)null), cancellationToken: TestContext.Current.CancellationToken);
         }
         await fixture.DispatchAsync(eventId);
 
@@ -59,8 +59,8 @@ public sealed class ScmEventDispatchTests_Delay
         Assert.Equal("Abgebrochen", (await fixture.EventAsync(eventId)).Status);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-            Assert.Null((await db.Aufgaben.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausiertBisUtc);
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            Assert.Null((await db.WorkItems.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausedUntilUtc);
         }
         await fixture.DispatchAsync(eventId);
         Assert.Empty(fixture.Prompts);

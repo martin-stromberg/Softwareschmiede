@@ -52,11 +52,11 @@ Falls ein SCM-Plugin bei der Abfrage seiner Repositories fehlschlägt:
 
 | Komponente | Typ | Beschreibung |
 |---|---|---|
-| `ProjektService.GetUnassignedRepositoriesAsync()` | Service-Methode | Aggregiert unzugeordnete Repositories aus allen SCM-Plugins, filtert Duplikate und sortiert sie |
+| `ProjectService.GetUnassignedRepositoriesAsync()` | Service-Methode | Aggregiert unzugeordnete Repositories aus allen SCM-Plugins, filtert Duplikate und sortiert sie |
 | `ProjectListViewModel.UnassignedRepositories` | Property | ObservableCollection aller unzugeordneten Repositories für UI-Binding |
 | `ProjectListViewModel.IsLoadingRepositories` | Property | Loading-Flag zur Anzeige eines Lade-Indikators im Panel |
-| `ProjectListViewModel.LadenRepositorienSuggestionsAsync()` | Private Methode | Lädt Suggestions via Service und aktualisiert Collection |
-| `ProjectListViewModel.ProjektAusRepositoryErstellen()` | Private Methode | Erstellt Projekt aus Repository und ordnet Repository zu |
+| `ProjectListViewModel.LoadRepositoriesSuggestionsAsync()` | Private Methode | Lädt Suggestions via Service und aktualisiert Collection |
+| `ProjectListViewModel.CreateProjectFromRepository()` | Private Methode | Erstellt Projekt aus Repository und ordnet Repository zu |
 | `ProjectListViewModel.RepositoryDoubleclickCommand` | Command | AsyncRelayCommand für Doppelklick-Verarbeitung |
 | `ProjectListViewModel.FindPluginPrefixForRepositoryAsync()` | Private Methode | Findet das SCM-Plugin für einen Repository-URL |
 | `ProjectListView.xaml` | UI | Suggestions-Panel mit ItemsControl, Border und Lade-Indikator |
@@ -70,11 +70,11 @@ Falls ein SCM-Plugin bei der Abfrage seiner Repositories fehlschlägt:
 ```
 Projektübersichtsseite wird geladen
   ↓
-ProjectListViewModel.LadenAsync() aufgerufen
-  ├─→ ProjektService.GetAllAsync()
+ProjectListViewModel.LoadAsync() aufgerufen
+  ├─→ ProjectService.GetAllAsync()
   │   └─→ Projekte-Collection aktualisiert
-  └─→ LadenRepositorienSuggestionsAsync() aufgerufen
-      ├─→ ProjektService.GetUnassignedRepositoriesAsync()
+  └─→ LoadRepositoriesSuggestionsAsync() aufgerufen
+      ├─→ ProjectService.GetUnassignedRepositoriesAsync()
       │   ├─→ Alle zugeordneten Repository-URLs abfragen (HashSet)
       │   ├─→ Für jedes Plugin: GetAvailableRepositoriesAsync()
       │   │   ├─→ Erfolg: Repositories sammeln
@@ -89,7 +89,7 @@ ProjectListViewModel.LadenAsync() aufgerufen
 ## Einschränkungen
 
 - Falls alle verfügbaren Repositories bereits zugeordnet sind, zeigt das Panel einen leeren Zustand
-- Die Plugin-Fehlertoleranz bedeutet, dass Repositories eines fehlerhaften Plugins nicht sichtbar sind, bis das Plugin wieder funktioniert
+- Die Plugin-FehlertoleranceMinutes bedeutet, dass Repositories eines fehlerhaften Plugins nicht sichtbar sind, bis das Plugin wieder funktioniert
 - Das Panel wird nur beim Laden der Seite und beim Zurücknavigieren von der Projektdetailansicht aktualisiert (nicht in Echtzeit bei Änderungen von außen)
 - Pagination oder Limits existieren nicht; sehr große Repository-Mengen (hunderte+) könnten zu Performance-Problemen führen
 
@@ -102,8 +102,8 @@ Die Implementierung wird durch folgende Tests abgedeckt:
 | `GetUnassignedRepositoriesAsync_ShouldReturnAllRepositories_WhenAllUnassigned()` | ProjektServiceTests | Rückgabe aller verfügbaren Repositories, wenn keine zugeordnet |
 | `GetUnassignedRepositoriesAsync_ShouldExcludeAssignedRepositories()` | ProjektServiceTests | Filterung zugeordneter Repositories |
 | `GetUnassignedRepositoriesAsync_ShouldSortByUpdatedAtDescendingThenByNameAscending()` | ProjektServiceTests | Korrekte Sortierung |
-| `GetUnassignedRepositoriesAsync_ShouldHandlePluginError_AndContinueWithOtherPlugins()` | ProjektServiceTests | Fehlertoleranz bei Plugin-Ausfällen |
-| `LadenRepositorienSuggestionsAsync_ShouldLoadAndPopulateUnassignedRepositories()` | ProjectListViewModelTests | ViewModel-Property wird korrekt gefüllt |
+| `GetUnassignedRepositoriesAsync_ShouldHandlePluginError_AndContinueWithOtherPlugins()` | ProjektServiceTests | FehlertoleranceMinutes bei Plugin-Ausfällen |
+| `LoadRepositoriesSuggestionsAsync_ShouldLoadAndPopulateUnassignedRepositories()` | ProjectListViewModelTests | ViewModel-Property wird korrekt gefüllt |
 | `RepositoryDoubleclickCommand_ShouldCreateProjectAndAssignRepository()` | ProjectListViewModelTests | Projekt-Erstellung und Repository-Zuordnung |
-| `UnassignedRepositoriesConverter_ShouldFormatRelativeTime()` | UnassignedRepositoriesConverterTests | Relative Zeitformatierung |
+| `UnassignedRepositoriesConverterTests()` | UnassignedRepositoriesConverterTests | Relative Zeitformatierung |
 | `UnassignedRepositoriesConverter_ShouldHandleNullAndMinValue()` | UnassignedRepositoriesConverterTests | Fallback-Verhalten bei fehlenden Daten |

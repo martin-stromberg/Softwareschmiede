@@ -10,7 +10,7 @@ namespace Softwareschmiede.Tests.Domain.Abstractions;
 /// <summary>GitPluginBaseTests.</summary>
 public sealed class GitPluginBaseTests
 {
-    /// <summary><summary>CreateBranchAsync_ShouldRunCheckoutMinusB.</summary>.</summary>
+    /// <summary>CreateBranchAsync_ShouldRunCheckoutMinusB.</summary>
     [Fact]
     public async Task CreateBranchAsync_ShouldRunCheckoutMinusB()
     {
@@ -29,7 +29,7 @@ public sealed class GitPluginBaseTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>CreateBranchAsync_ShouldThrow_WhenGitCheckoutFails.</summary>.</summary>
+    /// <summary>CreateBranchAsync_ShouldThrow_WhenGitCheckoutFails.</summary>
     [Fact]
     public async Task CreateBranchAsync_ShouldThrow_WhenGitCheckoutFails()
     {
@@ -90,7 +90,7 @@ public sealed class GitPluginBaseTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>CommitAsync_ShouldRunAddAndCommit.</summary>.</summary>
+    /// <summary>CommitAsync_ShouldRunAddAndCommit.</summary>
     [Fact]
     public async Task CommitAsync_ShouldRunAddAndCommit()
     {
@@ -116,7 +116,7 @@ public sealed class GitPluginBaseTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>CommitAsync_ShouldThrow_WhenGitAddFails.</summary>.</summary>
+    /// <summary>CommitAsync_ShouldThrow_WhenGitAddFails.</summary>
     [Fact]
     public async Task CommitAsync_ShouldThrow_WhenGitAddFails()
     {
@@ -136,7 +136,7 @@ public sealed class GitPluginBaseTests
             .WithMessage("*git add fehlgeschlagen*");
     }
 
-    /// <summary><summary>CommitAsync_ShouldThrow_WhenGitCommitFails.</summary>.</summary>
+    /// <summary>CommitAsync_ShouldThrow_WhenGitCommitFails.</summary>
     [Fact]
     public async Task CommitAsync_ShouldThrow_WhenGitCommitFails()
     {
@@ -163,7 +163,7 @@ public sealed class GitPluginBaseTests
             .WithMessage("*git commit fehlgeschlagen*");
     }
 
-    /// <summary><summary>CheckoutRemoteBranchAsync_ShouldRunTrackOriginBranch_WhenSuccess.</summary>.</summary>
+    /// <summary>CheckoutRemoteBranchAsync_ShouldRunTrackOriginBranch_WhenSuccess.</summary>
     [Fact]
     public async Task CheckoutRemoteBranchAsync_ShouldRunTrackOriginBranch_WhenSuccess()
     {
@@ -182,7 +182,7 @@ public sealed class GitPluginBaseTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>EnsureGitRepositoryAsync_ShouldThrow_WhenRevParseFails.</summary>.</summary>
+    /// <summary>EnsureGitRepositoryAsync_ShouldThrow_WhenRevParseFails.</summary>
     [Fact]
     public async Task EnsureGitRepositoryAsync_ShouldThrow_WhenRevParseFails()
     {
@@ -202,7 +202,7 @@ public sealed class GitPluginBaseTests
             .WithMessage("*ist kein Git-Repository*");
     }
 
-    /// <summary><summary>ResetAsync_ShouldThrow_WhenGitFails.</summary>.</summary>
+    /// <summary>ResetAsync_ShouldThrow_WhenGitFails.</summary>
     [Fact]
     public async Task ResetAsync_ShouldThrow_WhenGitFails()
     {

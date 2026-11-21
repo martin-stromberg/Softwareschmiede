@@ -11,59 +11,59 @@ namespace Softwareschmiede.Tests.E2E;
 [Collection("E2E")]
 public partial class End2EndTest : WpfTestBase
 {
-    /// <summary>Prüft Start und Einstellungen in einem isolierten App-Lifecycle.</summary>
+    /// <summary>Prüft Start und Settings in einem isolierten App-Lifecycle.</summary>
     [Fact]
-    public Task General_BasisUndEinstellungen_E2E()
-        => MitFrischerAppAsync(mainWindow =>
+    public Task General_BaseAndSettings_E2E()
+        => WithFreshAppAsync(mainWindow =>
         {
-            AppStarten_ZeigtVersionsTextInFusszeile_E2E(mainWindow);
-            Einstellungen_SpeichernCodexAlsStandardKiPluginUndExecutablePath_PersistiertBeides_E2E(mainWindow);
-            Einstellungen_AllgemeinEnthaeltNurVorhandeneAbschnitte_E2E(mainWindow);
-            Einstellungen_AusfuehrungsLimitsGlobalUndProPlugin_E2E(mainWindow);
-            Einstellungen_IssueAufbereitungKonfigurieren_E2E(mainWindow);
-            IdePluginSettings_AktivierungValidierungUndReihenfolge_E2E(mainWindow);
+            StartApp_ShowsVersionsTextInFooter_E2E(mainWindow);
+            Settings_SaveCodexAsDefaultAiPluginAndExecutablePath_PersistedBoth_E2E(mainWindow);
+            Settings_GeneralContainsOnlyExistingSection_E2E(mainWindow);
+            Settings_ExecutionLimitGlobalAndPerPlugin_E2E(mainWindow);
+            Settings_ConfigureIssuePreparation_E2E(mainWindow);
+            IdePluginSettings_ActivationValidationAndOrder_E2E(mainWindow);
             return Task.CompletedTask;
         });
 
     /// <summary>Prüft Repository-, Aufgaben- und Terminal-Fallback-Szenarien isoliert.</summary>
     [Fact]
-    public Task General_RepositoryUndAufgaben_E2E()
-        => MitFrischerAppAsync(async mainWindow =>
+    public Task General_RepositoryAndWorkItems_E2E()
+        => WithFreshAppAsync(async mainWindow =>
         {
-            await RepositoryZuweisung(mainWindow);
-            Todo_ErstellenAbhakenLoeschenUndAbschlussValidierung_E2E(mainWindow);
-            TaskDetail_ZeigtDaten_Zurueck_UndOeffnenFensterumfassend_E2E(mainWindow);
-            await AufgabePausieren_DialogCountdownAbblendungUndAufheben_E2E(mainWindow);
-            mainWindow = await AufgabenListe_KompakteKachelSymboleUndModuswechsel_E2E(mainWindow);
-            await SessionLimit_MarkerPauseProtokollUndUpdateSicherheit_E2E(mainWindow);
-            await TerminalFallbackDiagnose_PipeFallbackUndRequiresPtyFehler_E2E(mainWindow);
-            CommandLineParameters_TextBoxSpeichertWertUndHilfeDialogFunktioniert_E2E(mainWindow);
+            await RepositoryAssignment(mainWindow);
+            Todo_CreateCheckoffDeleteAndCompletionValidation_E2E(mainWindow);
+            TaskDetail_ShowsData_Back_AndOpenWindowspanning_E2E(mainWindow);
+            await PauseWorkItem_DialogCountdownDimmingAndLift_E2E(mainWindow);
+            mainWindow = await WorkItemsList_CompactTileSymbolAndModeswitch_E2E(mainWindow);
+            await SessionLimit_MarkerPauseLogAndUpdateSafe_E2E(mainWindow);
+            await TerminalFallbackDiagnostics_PipeFallbackAndRequiresPtyError_E2E(mainWindow);
+            CommandLineParameter_TextBoxSavesValueAndHelpDialogWorks_E2E(mainWindow);
         });
 
     /// <summary>Prüft die Wiedergabeaufzeichnung isoliert, damit Hänger direkt zuordenbar bleiben.</summary>
     [Fact]
     public Task General_Konsolenwiedergabe_E2E()
-        => MitFrischerAppAsync(KonsolenTestfenster_OeffnetLaedtAufzeichnungUndSpieltAb_E2E);
+        => WithFreshAppAsync(ConsoleTestwindow_OpensLoadsRecordingAndPlaysFrom_E2E);
 
     /// <summary>Prüft den Auto-Shutdown-Fluss (Issue 6) in einem eigenen App-Lifecycle plus Neustart.</summary>
     [Fact]
     public Task General_AutoShutdown_E2E()
-        => MitFrischerAppAsync(AutoShutdown_CountdownAbbruchAufzeichnungUndPersistenz_E2E);
+        => WithFreshAppAsync(AutoShutdown_CountdownCancelRecordingAndPersistence_E2E);
 
     /// <summary>Prüft View- und Dialognavigation in einem eigenen App-Lifecycle.</summary>
     [Fact]
     public Task General_ViewNavigation_E2E()
-        => MitFrischerAppAsync(async mainWindow =>
+        => WithFreshAppAsync(async mainWindow =>
         {
-            ViewPatternHappyPath_NavigiertUndErstelltKorrekt_E2E(mainWindow);
-            AnsichtenErkennung_LiefertKorrekteViewTypen_E2E(mainWindow);
-            MenueNavigation_WechseltZwischenAnsichten_E2E(mainWindow);
-            ForceShow_NavigiertKorrektZuAnsicht_E2E(mainWindow);
-            ForceClose_OhneRekursion_SchliesstNurEineEbene_E2E(mainWindow);
-            ForceClose_MitRekursion_SchliesstBisDashboard_E2E(mainWindow);
-            DialogErkennung_LiefertKorrekteDialogViewTypen_E2E(mainWindow);
-            UnbekannteAnsicht_WirftAussagekraeftigeException_E2E(mainWindow);
-            await FehlerAnsichtErkennung_ZeigtFehlermeldung_E2E(mainWindow);
+            ViewPatternHappyPath_NavigatesAndCreatesCorrect_E2E(mainWindow);
+            ViewDetection_ReturnsCorrectViewTypes_E2E(mainWindow);
+            MenuNavigation_SwitchesBetweenView_E2E(mainWindow);
+            ForceShow_NavigatesCorrectToView_E2E(mainWindow);
+            ForceClose_WithoutRecursion_ClosesOnlyALevel_E2E(mainWindow);
+            ForceClose_WithRecursion_ClosesUntilDashboard_E2E(mainWindow);
+            DialogDetection_ReturnsCorrectDialogViewTypes_E2E(mainWindow);
+            UnknownView_ThrowsMeaningfulException_E2E(mainWindow);
+            await ErrorViewDetection_ShowsErrormessage_E2E(mainWindow);
         });
 
     /// <summary>Prüft die isolierten Update-Fixture-Smokes separat.</summary>
@@ -78,21 +78,21 @@ public partial class End2EndTest : WpfTestBase
     [Fact]
     public async Task General_UpdateStartvarianten_E2E()
     {
-        await Settings_AllModesAndUpdatePfadPersist();
+        await Settings_AllModesAndUpdatePathPersist();
         await Startup_ModesDriveUpdatePipeline();
-        await UpdatePfad_SelectsExclusiveChannelAsset();
+        await UpdatePath_SelectsExclusiveChannelAsset();
         await SavedChangesInvalidatePreviousOffer();
         await Startup_NoUpdateOrUncheckableRemainsUsable();
         await Startup_SafetyCancelAndErrorsRemainUsable();
         await Startup_IsOnceAndCommandsStayBlocked();
     }
 
-    private async Task MitFrischerAppAsync(Func<Window, Task> szenario)
+    private async Task WithFreshAppAsync(Func<Window, Task> scenario)
     {
         var app = LaunchApp(true);
         try
         {
-            await szenario(WarteAufEchtesHauptfenster(app));
+            await scenario(WaitOnRealMainwindow(app));
         }
         finally
         {
@@ -100,11 +100,11 @@ public partial class End2EndTest : WpfTestBase
         }
     }
 
-    private static async Task WartenBisAsync(Func<Task<bool>> bedingung, int maxVersuche = 150)
+    private static async Task WaitUntilAsync(Func<Task<bool>> condition, int maxAttempts = 150)
     {
-        for (var i = 0; i < maxVersuche; i++)
+        for (var i = 0; i < maxAttempts; i++)
         {
-            if (await bedingung())
+            if (await condition())
             {
                 return;
             }
@@ -125,7 +125,7 @@ public partial class End2EndTest : WpfTestBase
         var app = LaunchApp(true);
         try
         {
-            await ReplayText_MarkAndCopyViaMouse(WarteAufEchtesHauptfenster(app));
+            await ReplayText_MarkAndCopyViaMouse(WaitOnRealMainwindow(app));
         }
         finally
         {
@@ -144,7 +144,7 @@ public partial class End2EndTest : WpfTestBase
         var app = LaunchApp(true);
         try
         {
-            await ReplayText_CopyShortcutWithFocusedSelection(WarteAufEchtesHauptfenster(app));
+            await ReplayText_CopyShortcutWithFocusedSelection(WaitOnRealMainwindow(app));
         }
         finally
         {
@@ -160,17 +160,17 @@ public partial class End2EndTest : WpfTestBase
     [Trait("Scenario", "TextCopyLiveTerminal")]
     public async Task TerminalText_LiveMarkCopyAndKeepSelection_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
+        SkipWhenConPtyNotAvailable();
 
         var app = LaunchApp(true);
         try
         {
-            var mainWindow = WarteAufEchtesHauptfenster(app);
+            var mainWindow = WaitOnRealMainwindow(app);
             ConfirmLocalDirectoryGitInitInSourceDirectory();
-            SetupProjectMitNeuerAufgabe(mainWindow, "Live-TextCopy-Repo", "Live-TextCopy-Projekt");
-            var taskDetail = new Views.TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+            SetupProjectWithNewWorkItem(mainWindow, "Live-TextCopy-Repo", "Live-TextCopy-Projekt");
+            var taskDetail = new Views.TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
 
-            await ConPtyStart_ZeigtTerminalPanelMitStoppenButtonUndBanner_E2E(mainWindow, taskDetail);
+            await ConPtyStart_ShowsTerminalPanelWithStopButtonAndBanner_E2E(mainWindow, taskDetail);
             await TerminalText_LiveMarkCopyAndKeepSelection(mainWindow, taskDetail);
         }
         finally
@@ -183,19 +183,19 @@ public partial class End2EndTest : WpfTestBase
     [Fact]
     [Trait("Category", "E2E")]
     [Trait("Scenario", "ConPtySessionReattach")]
-    public async Task ConPty_SessionReattach_KeineDoppelausgabe_E2E()
+    public async Task ConPty_SessionReattach_NoDoubleoutput_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
+        SkipWhenConPtyNotAvailable();
 
         var app = LaunchApp(true);
         try
         {
-            var mainWindow = WarteAufEchtesHauptfenster(app);
+            var mainWindow = WaitOnRealMainwindow(app);
             ConfirmLocalDirectoryGitInitInSourceDirectory();
-            SetupProjectMitNeuerAufgabe(mainWindow, "ConPty-Reattach-Repo", "ConPty-Reattach-Projekt");
-            var taskDetail = new Views.TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
-            await ConPtyStart_ZeigtTerminalPanelMitStoppenButtonUndBanner_E2E(mainWindow, taskDetail);
-            await ConPtySessionReattach_WegUndZurueck_KeineDoppelausgabe_E2E(taskDetail);
+            SetupProjectWithNewWorkItem(mainWindow, "ConPty-Reattach-Repo", "ConPty-Reattach-Projekt");
+            var taskDetail = new Views.TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
+            await ConPtyStart_ShowsTerminalPanelWithStopButtonAndBanner_E2E(mainWindow, taskDetail);
+            await ConPtySessionReattach_PathAndBack_NoDoubleoutput_E2E(taskDetail);
         }
         finally
         {
@@ -207,15 +207,15 @@ public partial class End2EndTest : WpfTestBase
     /// Führt ConPTY-abhängige UI-Szenarien in einem gemeinsamen App-Lifecycle aus.
     /// </summary>
     [Fact]
-    public async Task ConPty_LifecycleUndReplay_E2E()
+    public async Task ConPty_LifecycleAndReplay_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
+        SkipWhenConPtyNotAvailable();
 
         var app = LaunchApp(true);
         try
         {
-            var mainWindow = WarteAufEchtesHauptfenster(app);
-            await ConPtyLifecycle_StartResizeTastatureingabeUndProzessende_E2E(mainWindow);
+            var mainWindow = WaitOnRealMainwindow(app);
+            await ConPtyLifecycle_StartResizeKeyboardinputAndProcessend_E2E(mainWindow);
         }
         finally
         {
@@ -226,37 +226,37 @@ public partial class End2EndTest : WpfTestBase
     /// <summary>
     /// Führt die verbleibenden ConPTY-abhängigen UI-Szenarien in einem gemeinsamen App-Lifecycle aus.
     /// Der vollständige Terminal-Lifecycle läuft bewusst separat in
-    /// <see cref="ConPty_LifecycleUndReplay_E2E"/>, damit sein lang laufender UI- und Prozesszustand
+    /// <see cref="ConPty_LifecycleAndReplay_E2E"/>, damit sein lang laufender UI- und Prozesszustand
     /// nicht von den unabhängigen Navigationsszenarien beeinflusst wird.
     /// </summary>
     [Fact]
-    public async Task ConPty_WeitereLebenszyklusSzenarien_E2E()
+    public async Task ConPty_FurtherLifecycleScenarios_E2E()
     {
-        SkipWennConPtyNichtVerfuegbar();
+        SkipWhenConPtyNotAvailable();
 
         var app = LaunchApp(true);
-        var mainWindow = WarteAufEchtesHauptfenster(app);
+        var mainWindow = WaitOnRealMainwindow(app);
 
-        await ZeitgesteuerterPrompt_NachPlanen_ZeigtWartestellungStatus_E2E(mainWindow);
-        await AufgabeStarten_MitKonfiguriertemArbeitsverzeichnis_CliStartetErfolgreich_E2E(mainWindow);
-        await VerzeichnisAktionen_ArbeitsverzeichnisUndIdeOeffnen_E2E(mainWindow);
-        await VerzeichnisAktionen_KonfiguriertesArbeitsverzeichnisWirdAufgeloest_E2E(mainWindow);
-        await IdeAuswahl_KeineEinstiegspunkteUndDropdownAbbruch_E2E(mainWindow);
-        AufgabeWechselUeberSeitenleiste_ZeigtNeueAufgabeMitEigenerCli_E2E(mainWindow);
-        AufgabeStarten_MitCodexCommandLineParametersImStore_KiSimulatorStartetKorrekt_E2E(mainWindow);
-        PluginProjectDefault_SpeichernUndAutomatischeUebernahmeInFolgeaufgabe_E2E(mainWindow);
-        PluginAuswahlAbbrechenOkUndWechsel_E2E(mainWindow);
-        PluginAktivierung_ValidierungPersistenzUndSinglePluginVerhalten_E2E(mainWindow);
-        DateiExplorer_ZeigtBaumUndModeButtons_UndWechseltZuInfoUndZurueck_E2E(mainWindow);
-        AufgabeAnlegen_SpeichernPersistiert_UndAbbrechenVerwirftTitel_E2E(mainWindow);
-        AufgabeOeffnen_NachStoppen_StartetCliNichtAutomatischErstExplizit_E2E(mainWindow);
-        AufgabeStarten_KlontRepositoryUndStartetCli_E2E(mainWindow);
-        CliRawExport_ErstelltRawDateiMitCliOutput_HappyPath_E2E(mainWindow);
-        CliRawExport_AbbruchErzeugtKeineDateiUndKeinenFehlerbanner_E2E(mainWindow);
-        CliPanel_BleibtSichtbarNachBeendigung_E2E(mainWindow);
-        SeitenleistenKachel_AktualisiertStatusAutomatisch_OhneManuellesNeuladen_E2E(mainWindow);
-        await DateiExplorer_KlapptVerzeichnisZuUndErneutAuf_LaedtKinderNach_E2E(mainWindow);
-        await DateiExplorer_KlapptVerzeichnisAufUndLaedtKinderNach_E2E(mainWindow);
+        await ScheduledPrompt_AfterPlan_ShowsQueueStatus_E2E(mainWindow);
+        await StartWorkItem_WithConfiguredWorkingDirectory_CliStartsSuccessful_E2E(mainWindow);
+        await DirectoryAction_OpenWorkingDirectoryAndIde_E2E(mainWindow);
+        await DirectoryAction_ConfiguredWorkingDirectoryWillResolved_E2E(mainWindow);
+        await IdeSelection_NoEntrypointsAndDropdownCancel_E2E(mainWindow);
+        WorkItemSwitchOverSidebar_ShowsNewWorkItemWithOwnCli_E2E(mainWindow);
+        StartWorkItem_WithCodexCommandLineParameterInStore_AiSimulatorStartsCorrect_E2E(mainWindow);
+        PluginProjectDefault_SaveAndAutomaticApplicationInFollowuptask_E2E(mainWindow);
+        SwitchPluginSelectionCancelOkAnd_E2E(mainWindow);
+        PluginActivation_ValidationPersistenceAndSinglePluginBehavior_E2E(mainWindow);
+        FileExplorer_ShowsTreeAndModeButtons_AndSwitchesToInfoAndBack_E2E(mainWindow);
+        WorkItemCreate_SavePersisted_AndCancelDiscardsTitle_E2E(mainWindow);
+        OpenWorkItem_StopAfter_StartsCliNotAutomaticFirstExplicit_E2E(mainWindow);
+        StartWorkItem_ClonesRepositoryAndStartsCli_E2E(mainWindow);
+        CliRawExport_CreatesRawFileWithCliOutput_HappyPath_E2E(mainWindow);
+        CliRawExport_CancelCreatesNoFileAndNoErrorbanner_E2E(mainWindow);
+        CliPanel_RemainsVisibleAfterTermination_E2E(mainWindow);
+        SidebarTile_UpdatesStatusAutomatic_WithoutManualReload_E2E(mainWindow);
+        await FileExplorer_WorksDirectoryToAndAgainOn_LoadsChildrenAfter_E2E(mainWindow);
+        await FileExplorer_WorksDirectoryOnAndLoadsChildrenAfter_E2E(mainWindow);
 
         app.Close();
     }

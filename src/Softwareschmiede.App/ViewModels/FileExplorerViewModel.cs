@@ -24,79 +24,79 @@ public sealed class FileExplorerViewModel : ViewModelBase
     private readonly Action<Action> _dispatcherInvoke;
 
     private string? _repositoryPath;
-    private WorkspaceFileNode? _ausgewaehlterKnoten;
-    private string? _dateiInhalt;
-    private DateibrowserAnsichtsmodus _aktuellerModus = DateibrowserAnsichtsmodus.Standard;
-    private CancellationTokenSource? _dateiLadenCts;
-    private int _aktuellerAenderungsIndex = -1;
+    private WorkspaceFileNode? _selectedNode;
+    private string? _fileContent;
+    private FileBrowserViewMode _currentMode = FileBrowserViewMode.Default;
+    private CancellationTokenSource? _fileLoadCts;
+    private int _currentChangeIndex = -1;
 
     /// <summary>Wurzelknoten des Arbeitsbaums im Standardmodus.</summary>
-    public ObservableCollection<WorkspaceFileNode> Wurzelknoten { get; } = new();
+    public ObservableCollection<WorkspaceFileNode> RootNodes { get; } = new();
 
     /// <summary>Commits des aktuellen Branches im Vergleichsmodus.</summary>
-    public ObservableCollection<BranchCommit> CommitGruppen { get; } = new();
+    public ObservableCollection<BranchCommit> CommitGroup { get; } = new();
 
     /// <summary>Zeilen des aktuell angezeigten Diffs im Vergleichsmodus.</summary>
-    public ObservableCollection<TextDiffLine> DiffZeilen { get; } = new();
+    public ObservableCollection<TextDiffLine> DiffLines { get; } = new();
 
     /// <summary>Aktuell im Baum ausgewählter Knoten. Das Setzen lädt die Dateivorschau bzw. den Diff.</summary>
-    public WorkspaceFileNode? AusgewaehlterKnoten
+    public WorkspaceFileNode? SelectedNode
     {
-        get => _ausgewaehlterKnoten;
+        get => _selectedNode;
         set
         {
-            if (!SetProperty(ref _ausgewaehlterKnoten, value))
+            if (!SetProperty(ref _selectedNode, value))
                 return;
 
-            _dateiLadenCts?.Cancel();
-            _dateiLadenCts?.Dispose();
-            _dateiLadenCts = new CancellationTokenSource();
-            DateiLadenAsync(value, _dateiLadenCts.Token).SafeFireAndForget(_logger, "FileExplorerViewModel.DateiLadenAsync");
+            _fileLoadCts?.Cancel();
+            _fileLoadCts?.Dispose();
+            _fileLoadCts = new CancellationTokenSource();
+            LoadFileAsync(value, _fileLoadCts.Token).SafeFireAndForget(_logger, "FileExplorerViewModel.LoadFileAsync");
         }
     }
 
     /// <summary>Inhalt bzw. Hinweistext der aktuell ausgewählten Datei.</summary>
-    public string? DateiInhalt
+    public string? FileContent
     {
-        get => _dateiInhalt;
-        private set => SetProperty(ref _dateiInhalt, value);
+        get => _fileContent;
+        private set => SetProperty(ref _fileContent, value);
     }
 
     /// <summary>Aktuell gewählter Anzeigemodus des Explorers.</summary>
-    public DateibrowserAnsichtsmodus AktuellerModus
+    public FileBrowserViewMode CurrentMode
     {
-        get => _aktuellerModus;
-        private set => SetProperty(ref _aktuellerModus, value);
+        get => _currentMode;
+        private set => SetProperty(ref _currentMode, value);
     }
 
     /// <summary>Gibt an, ob für die aktuelle Auswahl ein Diff angezeigt werden soll (statt reinem Dateiinhalt).</summary>
-    public bool ZeigtDiffAnsicht => DiffZeilen.Count > 0;
+    public bool ShowsDiffView => DiffLines.Count > 0;
 
     /// <summary>Wechselt in den Standardmodus und lädt den vollständigen Arbeitsbaum neu.</summary>
-    public ICommand StandardAnsichtCommand { get; }
+    public ICommand DefaultViewCommand { get; }
 
     /// <summary>Wechselt in den Vergleichsmodus und lädt die Branch-Commits.</summary>
-    public ICommand VergleichCommand { get; }
+    public ICommand CompareCommand { get; }
 
     /// <summary>Lädt den aktuellen Modus (Baum bzw. Commits) neu.</summary>
-    public ICommand AktualisierenCommand { get; }
+    public ICommand RefreshCommand { get; }
 
     /// <summary>Springt im Diff zur nächsten Änderung (Added/Removed/Modified-Block).</summary>
-    public ICommand NaechsteAenderungCommand { get; }
+    public ICommand NextChangeCommand { get; }
 
     /// <summary>Springt im Diff zur vorherigen Änderung (Added/Removed/Modified-Block).</summary>
-    public ICommand VorherigeAenderungCommand { get; }
+    public ICommand PreviousChangeCommand { get; }
 
     /// <summary>Öffnet die aktuell angezeigte Datei mit der Standardanwendung des Betriebssystems.</summary>
-    public ICommand DateiMitStandardanwendungOeffnenCommand { get; }
+    public ICommand OpenFileWithDefaultappCommand { get; }
 
-    /// <summary>Wird ausgelöst, wenn per Navigation zu einer Änderung gesprungen wurde, mit dem Index der Zielzeile in <see cref="DiffZeilen"/>.</summary>
-    public event Action<int>? DiffZeileFokussiert;
+    /// <summary>Wird ausgelöst, wenn per Navigation zu einer Änderung gesprungen wurde, mit dem Index der Zielzeile in <see cref="DiffLines"/>.</summary>
+    public event Action<int>? DiffLineFocused;
 
     /// <summary>Gibt an, ob die aktuell im Baum ausgewählte Datei mit der Standardanwendung geöffnet werden kann (kein
     /// Verzeichnis, nicht gelöscht, kein Commit-Knoten aus dem Vergleichsmodus – nur dann stimmt die angezeigte
     /// Vorschau mit der Datei auf der Festplatte überein).</summary>
-    private bool KannAktuelleDateiOeffnen => _ausgewaehlterKnoten is { IsDirectory: false, IsDeleted: false, CommitSha: null };
+    private bool OpenCanCurrentFile => _selectedNode is { IsDirectory: false, IsDeleted: false, CommitSha: null };
 
     /// <inheritdoc cref="FileExplorerViewModel"/>
     public FileExplorerViewModel(
@@ -110,37 +110,37 @@ public sealed class FileExplorerViewModel : ViewModelBase
         _logger = logger;
         _dispatcherInvoke = DispatcherInvokeFactory.Create(dispatcherInvoke);
 
-        StandardAnsichtCommand = new AsyncRelayCommand(StandardAnsichtAsync);
-        VergleichCommand = new AsyncRelayCommand(VergleichAsync);
-        AktualisierenCommand = new AsyncRelayCommand(AktualisierenAsync);
-        NaechsteAenderungCommand = new RelayCommand(() => AenderungNavigieren(vorwaerts: true), () => ZeigtDiffAnsicht);
-        VorherigeAenderungCommand = new RelayCommand(() => AenderungNavigieren(vorwaerts: false), () => ZeigtDiffAnsicht);
-        DateiMitStandardanwendungOeffnenCommand = new RelayCommand(DateiMitStandardanwendungOeffnen, () => KannAktuelleDateiOeffnen);
+        DefaultViewCommand = new AsyncRelayCommand(DefaultViewAsync);
+        CompareCommand = new AsyncRelayCommand(CompareAsync);
+        RefreshCommand = new AsyncRelayCommand(RefreshAsync);
+        NextChangeCommand = new RelayCommand(() => NavigateChange(vorwaerts: true), () => ShowsDiffView);
+        PreviousChangeCommand = new RelayCommand(() => NavigateChange(vorwaerts: false), () => ShowsDiffView);
+        OpenFileWithDefaultappCommand = new RelayCommand(OpenFileWithDefaultapp, () => OpenCanCurrentFile);
     }
 
     /// <summary>Setzt das Repository-Verzeichnis, wechselt in den Standardmodus und lädt den Arbeitsbaum.</summary>
     /// <param name="repositoryPath">Pfad des geklonten Repositories, oder <c>null</c>/leer wenn noch kein Repository vorhanden ist.</param>
     /// <param name="ct">Cancellation Token.</param>
-    public async Task InitialisierenAsync(string? repositoryPath, CancellationToken ct = default)
+    public async Task InitializeAsync(string? repositoryPath, CancellationToken ct = default)
     {
         _repositoryPath = repositoryPath;
-        AktuellerModus = DateibrowserAnsichtsmodus.Standard;
-        AuswahlUndLadevorgangZuruecksetzen();
+        CurrentMode = FileBrowserViewMode.Default;
+        ResetSelectionAndLadevorgang();
 
         if (string.IsNullOrWhiteSpace(repositoryPath))
         {
-            Wurzelknoten.Clear();
-            CommitGruppen.Clear();
+            RootNodes.Clear();
+            CommitGroup.Clear();
             return;
         }
 
-        await LadeArbeitsbaumAsync(ct);
+        await LoadWorkingTreeAsync(ct);
     }
 
     /// <summary>Lädt die geänderten Dateien eines Commits nach, sofern sie noch nicht geladen wurden.</summary>
     /// <param name="commit">Der aufzuklappende Commit-Knoten.</param>
     /// <param name="ct">Cancellation Token.</param>
-    public async Task CommitAufklappenAsync(BranchCommit commit, CancellationToken ct = default)
+    public async Task ExpandCommitAsync(BranchCommit commit, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(commit);
 
@@ -173,23 +173,23 @@ public sealed class FileExplorerViewModel : ViewModelBase
     }
 
     /// <summary>Lädt die Kinder eines Verzeichnisknotens nach, sofern sie noch nicht geladen wurden.</summary>
-    /// <param name="knoten">Der aufzuklappende Verzeichnisknoten.</param>
+    /// <param name="node">Der aufzuklappende Verzeichnisknoten.</param>
     /// <param name="ct">Cancellation Token.</param>
-    public async Task LadeKinderAsync(WorkspaceFileNode knoten, CancellationToken ct = default)
+    public async Task LoadChildrenAsync(WorkspaceFileNode node, CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(knoten);
+        ArgumentNullException.ThrowIfNull(node);
 
-        if (!knoten.IsDirectory || knoten.ChildrenLoaded || string.IsNullOrWhiteSpace(_repositoryPath))
+        if (!node.IsDirectory || node.ChildrenLoaded || string.IsNullOrWhiteSpace(_repositoryPath))
             return;
 
         try
         {
-            var kinder = await _gitWorkspaceBrowserService.LoadSubtreeAsync(_repositoryPath, knoten.RelativePath, knoten.Depth + 1, ct);
+            var kinder = await _gitWorkspaceBrowserService.LoadSubtreeAsync(_repositoryPath, node.RelativePath, node.Depth + 1, ct);
 
             _dispatcherInvoke(() =>
             {
-                knoten.Children.ReplaceAll(kinder);
-                knoten.ChildrenLoaded = true;
+                node.Children.ReplaceAll(kinder);
+                node.ChildrenLoaded = true;
             });
         }
         catch (OperationCanceledException)
@@ -198,17 +198,17 @@ public sealed class FileExplorerViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Kinder für {RelativePath} konnten nicht geladen werden.", knoten.RelativePath);
+            _logger.LogError(ex, "Kinder für {RelativePath} konnten nicht geladen werden.", node.RelativePath);
         }
     }
 
     /// <summary>Räumt beim Zuklappen eines Verzeichnisknotens dessen Groß-Enkel-Knoten auf, sodass pro Verzeichnis stets eine Ebene mehr geladen als sichtbar ist.</summary>
-    /// <param name="knoten">Der zugeklappte Verzeichnisknoten.</param>
-    public void BeraeumeKnoten(WorkspaceFileNode knoten)
+    /// <param name="node">Der zugeklappte Verzeichnisknoten.</param>
+    public void CleanNode(WorkspaceFileNode node)
     {
-        ArgumentNullException.ThrowIfNull(knoten);
+        ArgumentNullException.ThrowIfNull(node);
 
-        foreach (var kind in knoten.Children)
+        foreach (var kind in node.Children)
         {
             if (kind.IsDirectory && kind.ChildrenLoaded)
             {
@@ -218,12 +218,12 @@ public sealed class FileExplorerViewModel : ViewModelBase
         }
     }
 
-    private async Task DateiLadenAsync(WorkspaceFileNode? knoten, CancellationToken ct)
+    private async Task LoadFileAsync(WorkspaceFileNode? node, CancellationToken ct)
     {
-        if (knoten is null || knoten.IsDirectory || knoten.IsPlaceholder)
+        if (node is null || node.IsDirectory || node.IsPlaceholder)
         {
-            DateiInhalt = null;
-            ClearDiffZeilen();
+            FileContent = null;
+            ClearDiffLines();
             return;
         }
 
@@ -232,29 +232,29 @@ public sealed class FileExplorerViewModel : ViewModelBase
 
         try
         {
-            var preview = knoten.CommitSha is not null
-                ? await _gitWorkspaceBrowserService.LoadCommitPreviewAsync(_repositoryPath, knoten, ct)
-                : await _gitWorkspaceBrowserService.LoadPreviewAsync(_repositoryPath, knoten, ct);
+            var preview = node.CommitSha is not null
+                ? await _gitWorkspaceBrowserService.LoadCommitPreviewAsync(_repositoryPath, node, ct)
+                : await _gitWorkspaceBrowserService.LoadPreviewAsync(_repositoryPath, node, ct);
 
             _dispatcherInvoke(() =>
             {
                 if (preview.IsBinary || preview.IsTooBig)
                 {
-                    DateiInhalt = preview.Hint;
-                    ClearDiffZeilen();
+                    FileContent = preview.Hint;
+                    ClearDiffLines();
                     return;
                 }
 
-                if (knoten.CommitSha is not null)
+                if (node.CommitSha is not null)
                 {
-                    DateiInhalt = preview.CurrentContent;
+                    FileContent = preview.CurrentContent;
                     var diff = _textDiffService.BuildDiff(preview.OriginalContent, preview.CurrentContent);
-                    SetDiffZeilen(diff.Lines);
+                    SetDiffLines(diff.Lines);
                 }
                 else
                 {
-                    DateiInhalt = preview.CurrentContent;
-                    ClearDiffZeilen();
+                    FileContent = preview.CurrentContent;
+                    ClearDiffLines();
                 }
             });
         }
@@ -264,40 +264,40 @@ public sealed class FileExplorerViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Dateivorschau für {RelativePath} konnte nicht geladen werden.", knoten.RelativePath);
+            _logger.LogError(ex, "Dateivorschau für {RelativePath} konnte nicht geladen werden.", node.RelativePath);
             _dispatcherInvoke(() =>
             {
-                DateiInhalt = "Datei konnte nicht geladen werden.";
-                ClearDiffZeilen();
+                FileContent = "Datei konnte nicht geladen werden.";
+                ClearDiffLines();
             });
         }
     }
 
-    private async Task StandardAnsichtAsync(CancellationToken ct)
+    private async Task DefaultViewAsync(CancellationToken ct)
     {
-        AktuellerModus = DateibrowserAnsichtsmodus.Standard;
-        await LadeArbeitsbaumAsync(ct);
+        CurrentMode = FileBrowserViewMode.Default;
+        await LoadWorkingTreeAsync(ct);
     }
 
-    private async Task VergleichAsync(CancellationToken ct)
+    private async Task CompareAsync(CancellationToken ct)
     {
-        AktuellerModus = DateibrowserAnsichtsmodus.Vergleich;
-        await LadeCommitsAsync(ct);
+        CurrentMode = FileBrowserViewMode.Compare;
+        await LoadCommitsAsync(ct);
     }
 
-    private async Task AktualisierenAsync(CancellationToken ct)
+    private async Task RefreshAsync(CancellationToken ct)
     {
-        Wurzelknoten.Clear();
-        CommitGruppen.Clear();
-        AuswahlUndLadevorgangZuruecksetzen();
+        RootNodes.Clear();
+        CommitGroup.Clear();
+        ResetSelectionAndLadevorgang();
 
-        if (AktuellerModus == DateibrowserAnsichtsmodus.Vergleich)
-            await LadeCommitsAsync(ct);
+        if (CurrentMode == FileBrowserViewMode.Compare)
+            await LoadCommitsAsync(ct);
         else
-            await LadeArbeitsbaumAsync(ct);
+            await LoadWorkingTreeAsync(ct);
     }
 
-    private async Task LadeArbeitsbaumAsync(CancellationToken ct)
+    private async Task LoadWorkingTreeAsync(CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_repositoryPath))
             return;
@@ -307,9 +307,9 @@ public sealed class FileExplorerViewModel : ViewModelBase
             var nodes = await _gitWorkspaceBrowserService.LoadWorkingTreeAsync(_repositoryPath, InitialLoadDepth, ct);
             _dispatcherInvoke(() =>
             {
-                Wurzelknoten.Clear();
+                RootNodes.Clear();
                 foreach (var node in nodes)
-                    Wurzelknoten.Add(node);
+                    RootNodes.Add(node);
             });
         }
         catch (OperationCanceledException)
@@ -322,7 +322,7 @@ public sealed class FileExplorerViewModel : ViewModelBase
         }
     }
 
-    private async Task LadeCommitsAsync(CancellationToken ct)
+    private async Task LoadCommitsAsync(CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_repositoryPath))
             return;
@@ -332,9 +332,9 @@ public sealed class FileExplorerViewModel : ViewModelBase
             var snapshot = await _gitWorkspaceBrowserService.LoadSnapshotAsync(_repositoryPath, ct);
             _dispatcherInvoke(() =>
             {
-                CommitGruppen.Clear();
+                CommitGroup.Clear();
                 foreach (var commit in snapshot.BranchCommits)
-                    CommitGruppen.Add(commit);
+                    CommitGroup.Add(commit);
             });
         }
         catch (OperationCanceledException)
@@ -347,95 +347,95 @@ public sealed class FileExplorerViewModel : ViewModelBase
         }
     }
 
-    private void SetDiffZeilen(IEnumerable<TextDiffLine> zeilen)
+    private void SetDiffLines(IEnumerable<TextDiffLine> lines)
     {
-        DiffZeilen.Clear();
-        foreach (var zeile in zeilen)
-            DiffZeilen.Add(zeile);
-        _aktuellerAenderungsIndex = -1;
-        OnPropertyChanged(nameof(ZeigtDiffAnsicht));
+        DiffLines.Clear();
+        foreach (var line in lines)
+            DiffLines.Add(line);
+        _currentChangeIndex = -1;
+        OnPropertyChanged(nameof(ShowsDiffView));
     }
 
-    private void ClearDiffZeilen()
+    private void ClearDiffLines()
     {
-        _aktuellerAenderungsIndex = -1;
+        _currentChangeIndex = -1;
 
-        if (DiffZeilen.Count == 0)
+        if (DiffLines.Count == 0)
             return;
 
-        DiffZeilen.Clear();
-        OnPropertyChanged(nameof(ZeigtDiffAnsicht));
+        DiffLines.Clear();
+        OnPropertyChanged(nameof(ShowsDiffView));
     }
 
-    private void AenderungNavigieren(bool vorwaerts)
+    private void NavigateChange(bool vorwaerts)
     {
-        var blockStartIndizes = ErmittleAenderungsBlockStartIndizes();
+        var blockStartIndizes = ResolveChangeBlockStartIndizes();
         if (blockStartIndizes.Count == 0)
             return;
 
-        var aktuellePosition = blockStartIndizes.IndexOf(_aktuellerAenderungsIndex);
-        int neuePosition;
-        if (aktuellePosition < 0)
+        var currentPosition = blockStartIndizes.IndexOf(_currentChangeIndex);
+        int newPosition;
+        if (currentPosition < 0)
         {
-            neuePosition = vorwaerts ? 0 : blockStartIndizes.Count - 1;
+            newPosition = vorwaerts ? 0 : blockStartIndizes.Count - 1;
         }
         else
         {
-            neuePosition = vorwaerts
-                ? (aktuellePosition + 1) % blockStartIndizes.Count
-                : (aktuellePosition - 1 + blockStartIndizes.Count) % blockStartIndizes.Count;
+            newPosition = vorwaerts
+                ? (currentPosition + 1) % blockStartIndizes.Count
+                : (currentPosition - 1 + blockStartIndizes.Count) % blockStartIndizes.Count;
         }
 
-        _aktuellerAenderungsIndex = blockStartIndizes[neuePosition];
-        DiffZeileFokussiert?.Invoke(_aktuellerAenderungsIndex);
+        _currentChangeIndex = blockStartIndizes[newPosition];
+        DiffLineFocused?.Invoke(_currentChangeIndex);
     }
 
-    private void DateiMitStandardanwendungOeffnen()
+    private void OpenFileWithDefaultapp()
     {
-        if (string.IsNullOrWhiteSpace(_repositoryPath) || !KannAktuelleDateiOeffnen)
+        if (string.IsNullOrWhiteSpace(_repositoryPath) || !OpenCanCurrentFile)
             return;
 
-        var knoten = _ausgewaehlterKnoten!;
+        var node = _selectedNode!;
 
         try
         {
-            var vollstaendigerPfad = Path.GetFullPath(Path.Combine(_repositoryPath, knoten.RelativePath));
+            var completePath = Path.GetFullPath(Path.Combine(_repositoryPath, node.RelativePath));
             Process.Start(new ProcessStartInfo
             {
-                FileName = vollstaendigerPfad,
+                FileName = completePath,
                 UseShellExecute = true
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Datei {RelativePath} konnte nicht mit der Standardanwendung geöffnet werden.", knoten.RelativePath);
+            _logger.LogError(ex, "Datei {RelativePath} konnte nicht mit der Standardanwendung geöffnet werden.", node.RelativePath);
         }
     }
 
-    private void AuswahlUndLadevorgangZuruecksetzen()
+    private void ResetSelectionAndLadevorgang()
     {
-        _dateiLadenCts?.Cancel();
-        _dateiLadenCts?.Dispose();
-        _dateiLadenCts = null;
-        _ausgewaehlterKnoten = null;
-        OnPropertyChanged(nameof(AusgewaehlterKnoten));
-        DateiInhalt = null;
-        ClearDiffZeilen();
+        _fileLoadCts?.Cancel();
+        _fileLoadCts?.Dispose();
+        _fileLoadCts = null;
+        _selectedNode = null;
+        OnPropertyChanged(nameof(SelectedNode));
+        FileContent = null;
+        ClearDiffLines();
     }
 
-    private List<int> ErmittleAenderungsBlockStartIndizes()
+    private List<int> ResolveChangeBlockStartIndizes()
     {
         var indizes = new List<int>();
         var inBlock = false;
-        for (var i = 0; i < DiffZeilen.Count; i++)
+        for (var i = 0; i < DiffLines.Count; i++)
         {
-            var istAenderung = DiffZeilen[i].Status != DiffLineStatus.Context;
-            if (istAenderung && !inBlock)
+            var isChange = DiffLines[i].Status != DiffLineStatus.Context;
+            if (isChange && !inBlock)
             {
                 indizes.Add(i);
                 inBlock = true;
             }
-            else if (!istAenderung)
+            else if (!isChange)
             {
                 inBlock = false;
             }

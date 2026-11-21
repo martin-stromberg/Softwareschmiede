@@ -27,7 +27,7 @@ public sealed class LocalDirectoryPluginTests
         result.Issue.Should().BeNull();
     }
 
-    /// <summary><summary>CloneRepositoryAsync_ShouldRequireExplicitConfirmation_ForGitInitInSourceDirectory.</summary>.</summary>
+    /// <summary>CloneRepositoryAsync_ShouldRequireExplicitConfirmation_ForGitInitInSourceDirectory.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldRequireExplicitConfirmation_ForGitInitInSourceDirectory()
     {
@@ -54,7 +54,7 @@ public sealed class LocalDirectoryPluginTests
             .WithMessage("*nicht bestätigt*");
     }
 
-    /// <summary><summary>CloneRepositoryAsync_ShouldFailHard_WhenWorkspaceIsDirty.</summary>.</summary>
+    /// <summary>CloneRepositoryAsync_ShouldFailHard_WhenWorkspaceIsDirty.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldFailHard_WhenWorkspaceIsDirty()
     {
@@ -87,7 +87,7 @@ public sealed class LocalDirectoryPluginTests
             .WithMessage("*uncommitted changes*");
     }
 
-    /// <summary><summary>CloneRepositoryAsync_ShouldAbortCopy_WhenGuardrailFileLimitIsExceeded.</summary>.</summary>
+    /// <summary>CloneRepositoryAsync_ShouldAbortCopy_WhenGuardrailFileLimitIsExceeded.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldAbortCopy_WhenGuardrailFileLimitIsExceeded()
     {
@@ -117,7 +117,7 @@ public sealed class LocalDirectoryPluginTests
         Directory.Exists(targetDir).Should().BeFalse("partielle Kopien müssen aufgeräumt werden");
     }
 
-    /// <summary><summary>CloneRepositoryAsync_ShouldAbortCopy_WhenGuardrailMegabyteLimitIsExceeded.</summary>.</summary>
+    /// <summary>CloneRepositoryAsync_ShouldAbortCopy_WhenGuardrailMegabyteLimitIsExceeded.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldAbortCopy_WhenGuardrailMegabyteLimitIsExceeded()
     {
@@ -146,7 +146,7 @@ public sealed class LocalDirectoryPluginTests
         Directory.Exists(targetDir).Should().BeFalse("partielle Kopien müssen aufgeräumt werden");
     }
 
-    /// <summary><summary>CloneRepositoryAsync_ShouldThrow_WhenSeparateModeUsesSameSourceAndTarget.</summary>.</summary>
+    /// <summary>CloneRepositoryAsync_ShouldThrow_WhenSeparateModeUsesSameSourceAndTarget.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldThrow_WhenSeparateModeUsesSameSourceAndTarget()
     {
@@ -162,7 +162,7 @@ public sealed class LocalDirectoryPluginTests
             .WithMessage("*erfordert ein anderes Zielverzeichnis*");
     }
 
-    /// <summary><summary>CloneRepositoryAsync_ShouldThrow_WhenSeparateTargetDirectoryIsNotEmpty.</summary>.</summary>
+    /// <summary>CloneRepositoryAsync_ShouldThrow_WhenSeparateTargetDirectoryIsNotEmpty.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldThrow_WhenSeparateTargetDirectoryIsNotEmpty()
     {
@@ -181,7 +181,7 @@ public sealed class LocalDirectoryPluginTests
             .WithMessage("*ist nicht leer*");
     }
 
-    /// <summary><summary>CloneRepositoryAsync_ShouldUseConfiguredSourceDirectory_WhenRepositoryUrlIsEmpty.</summary>.</summary>
+    /// <summary>CloneRepositoryAsync_ShouldUseConfiguredSourceDirectory_WhenRepositoryUrlIsEmpty.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldUseConfiguredSourceDirectory_WhenRepositoryUrlIsEmpty()
     {
@@ -321,7 +321,7 @@ public sealed class LocalDirectoryPluginTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>CloneRepositoryAsync_ShouldUseRequestedTargetDirectory_WhenWorkingDirectorySettingExists.</summary>.</summary>
+    /// <summary>CloneRepositoryAsync_ShouldUseRequestedTargetDirectory_WhenWorkingDirectorySettingExists.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldUseRequestedTargetDirectory_WhenWorkingDirectorySettingExists()
     {
@@ -386,7 +386,7 @@ public sealed class LocalDirectoryPluginTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>GetSettingGroups_ShouldNotExposeWorkingDirectoryField.</summary>.</summary>
+    /// <summary>GetSettingGroups_ShouldNotExposeWorkingDirectoryField.</summary>
     [Fact]
     public void GetSettingGroups_ShouldNotExposeWorkingDirectoryField()
     {
@@ -406,7 +406,7 @@ public sealed class LocalDirectoryPluginTests
         allFieldKeys.Should().NotContain("ConfirmGitInitInSourceDirectory");
     }
 
-    /// <summary><summary>GetSettingGroups_ShouldExposeGitInitConfirmation_WhenModeIsInSourceDirectory.</summary>.</summary>
+    /// <summary>GetSettingGroups_ShouldExposeGitInitConfirmation_WhenModeIsInSourceDirectory.</summary>
     [Fact]
     public void GetSettingGroups_ShouldExposeGitInitConfirmation_WhenModeIsInSourceDirectory()
     {
@@ -425,7 +425,7 @@ public sealed class LocalDirectoryPluginTests
         allFieldKeys.Should().Contain("ConfirmGitInitInSourceDirectory");
     }
 
-    /// <summary><summary>GetRepositoryLinkFields_ShouldRequireSourceDirectory.</summary>.</summary>
+    /// <summary>GetRepositoryLinkFields_ShouldRequireSourceDirectory.</summary>
     [Fact]
     public void GetRepositoryLinkFields_ShouldRequireSourceDirectory()
     {
@@ -442,7 +442,7 @@ public sealed class LocalDirectoryPluginTests
             && field.FieldType == PluginSettingFieldType.Text);
     }
 
-    /// <summary><summary>CloneRepositoryAsync_ShouldThrow_WhenGitInitFails_InSourceDirectory.</summary>.</summary>
+    /// <summary>CloneRepositoryAsync_ShouldThrow_WhenGitInitFails_InSourceDirectory.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldThrow_WhenGitInitFails_InSourceDirectory()
     {
@@ -477,7 +477,7 @@ public sealed class LocalDirectoryPluginTests
             .WithMessage("*git init fehlgeschlagen*");
     }
 
-    /// <summary><summary>CloneRepositoryAsync_ShouldThrow_WhenGitStatusCheckFails.</summary>.</summary>
+    /// <summary>CloneRepositoryAsync_ShouldThrow_WhenGitStatusCheckFails.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldThrow_WhenGitStatusCheckFails()
     {
@@ -511,7 +511,7 @@ public sealed class LocalDirectoryPluginTests
             .WithMessage("*Workspace-Status konnte nicht geprüft werden*");
     }
 
-    /// <summary><summary>PushBranchAsync_ShouldSynchronizeFilesAndDeleteGitDeletedEntries_InSeparateMode.</summary>.</summary>
+    /// <summary>PushBranchAsync_ShouldSynchronizeFilesAndDeleteGitDeletedEntries_InSeparateMode.</summary>
     [Fact]
     public async Task PushBranchAsync_ShouldSynchronizeFilesAndDeleteGitDeletedEntries_InSeparateMode()
     {
@@ -553,7 +553,7 @@ public sealed class LocalDirectoryPluginTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>PullAsync_ShouldSynchronizeSourceToWorkspace_WithoutMerge.</summary>.</summary>
+    /// <summary>PullAsync_ShouldSynchronizeSourceToWorkspace_WithoutMerge.</summary>
     [Fact]
     public async Task PullAsync_ShouldSynchronizeSourceToWorkspace_WithoutMerge()
     {
@@ -589,7 +589,7 @@ public sealed class LocalDirectoryPluginTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>GetGitActionCapabilitiesAsync_ShouldReturnCopyFlowFlags_WhenWorkspaceModeIsSeparate.</summary>.</summary>
+    /// <summary>GetGitActionCapabilitiesAsync_ShouldReturnCopyFlowFlags_WhenWorkspaceModeIsSeparate.</summary>
     [Fact]
     public async Task GetGitActionCapabilitiesAsync_ShouldReturnCopyFlowFlags_WhenWorkspaceModeIsSeparate()
     {
@@ -659,7 +659,7 @@ public sealed class LocalDirectoryPluginTests
         result.CanMergeToSource.Should().BeTrue();
     }
 
-    /// <summary><summary>PushBranchAsync_ShouldThrowNotSupportedException_WhenWorkspaceModeIsInSourceDirectory.</summary>.</summary>
+    /// <summary>PushBranchAsync_ShouldThrowNotSupportedException_WhenWorkspaceModeIsInSourceDirectory.</summary>
     [Fact]
     public async Task PushBranchAsync_ShouldThrowNotSupportedException_WhenWorkspaceModeIsInSourceDirectory()
     {
@@ -673,7 +673,7 @@ public sealed class LocalDirectoryPluginTests
             .WithMessage("*PushBranchAsync*");
     }
 
-    /// <summary><summary>PullAsync_ShouldThrowNotSupportedException_WhenWorkspaceModeIsInSourceDirectory.</summary>.</summary>
+    /// <summary>PullAsync_ShouldThrowNotSupportedException_WhenWorkspaceModeIsInSourceDirectory.</summary>
     [Fact]
     public async Task PullAsync_ShouldThrowNotSupportedException_WhenWorkspaceModeIsInSourceDirectory()
     {
@@ -687,7 +687,7 @@ public sealed class LocalDirectoryPluginTests
             .WithMessage("*PullAsync*");
     }
 
-    /// <summary><summary>MergeToSourceAsync_ShouldThrowNotSupportedException_WhenWorkspaceModeIsInSourceDirectory.</summary>.</summary>
+    /// <summary>MergeToSourceAsync_ShouldThrowNotSupportedException_WhenWorkspaceModeIsInSourceDirectory.</summary>
     [Fact]
     public async Task MergeToSourceAsync_ShouldThrowNotSupportedException_WhenWorkspaceModeIsInSourceDirectory()
     {
@@ -743,7 +743,7 @@ public sealed class LocalDirectoryPluginTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>PullAsync_ShouldThrowInvalidOperationException_WhenWorkspaceContainsChanges.</summary>.</summary>
+    /// <summary>PullAsync_ShouldThrowInvalidOperationException_WhenWorkspaceContainsChanges.</summary>
     [Fact]
     public async Task PullAsync_ShouldThrowInvalidOperationException_WhenWorkspaceContainsChanges()
     {
@@ -778,7 +778,7 @@ public sealed class LocalDirectoryPluginTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>PushBranchAsync_ShouldThrowInvalidOperationException_WhenWorkspaceEqualsSource.</summary>.</summary>
+    /// <summary>PushBranchAsync_ShouldThrowInvalidOperationException_WhenWorkspaceEqualsSource.</summary>
     [Fact]
     public async Task PushBranchAsync_ShouldThrowInvalidOperationException_WhenWorkspaceEqualsSource()
     {
@@ -805,7 +805,7 @@ public sealed class LocalDirectoryPluginTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>PushBranchAsync_ShouldThrowInvalidOperationException_WhenGitStatusForDeleteSyncFails.</summary>.</summary>
+    /// <summary>PushBranchAsync_ShouldThrowInvalidOperationException_WhenGitStatusForDeleteSyncFails.</summary>
     [Fact]
     public async Task PushBranchAsync_ShouldThrowInvalidOperationException_WhenGitStatusForDeleteSyncFails()
     {
@@ -841,7 +841,7 @@ public sealed class LocalDirectoryPluginTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>CloneRepositoryAsync_ShouldFallbackToSeparateMode_WhenWorkspaceModeIsInvalid.</summary>.</summary>
+    /// <summary>CloneRepositoryAsync_ShouldFallbackToSeparateMode_WhenWorkspaceModeIsInvalid.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldFallbackToSeparateMode_WhenWorkspaceModeIsInvalid()
     {
@@ -906,7 +906,7 @@ public sealed class LocalDirectoryPluginTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>CloneRepositoryAsync_ShouldThrow_WhenNoSourceDirectoryIsProvided.</summary>.</summary>
+    /// <summary>CloneRepositoryAsync_ShouldThrow_WhenNoSourceDirectoryIsProvided.</summary>
     [Fact]
     public async Task CloneRepositoryAsync_ShouldThrow_WhenNoSourceDirectoryIsProvided()
     {
@@ -921,7 +921,7 @@ public sealed class LocalDirectoryPluginTests
             .WithMessage("*kein Quellverzeichnis*");
     }
 
-    /// <summary><summary>PullAsync_ShouldUseConfiguredSourceDirectory_WhenPointerAndRemoteAreMissing.</summary>.</summary>
+    /// <summary>PullAsync_ShouldUseConfiguredSourceDirectory_WhenPointerAndRemoteAreMissing.</summary>
     [Fact]
     public async Task PullAsync_ShouldUseConfiguredSourceDirectory_WhenPointerAndRemoteAreMissing()
     {
@@ -964,7 +964,7 @@ public sealed class LocalDirectoryPluginTests
         cli.VerifyAll();
     }
 
-    /// <summary><summary>UnsupportedRemoteMethods_ShouldThrowNotSupportedException.</summary>.</summary>
+    /// <summary>UnsupportedRemoteMethods_ShouldThrowNotSupportedException.</summary>
     [Fact]
     public async Task UnsupportedRemoteMethods_ShouldThrowNotSupportedException()
     {

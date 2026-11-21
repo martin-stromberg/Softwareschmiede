@@ -1,8 +1,8 @@
-# Contributing
+# Mitwirken
 
 Dieses Dokument beschreibt die Commit-Konventionen und Team-Richtlinien für Beiträge zu diesem Repository. Die automatisierte Release-Pipeline (siehe [`docs/CI_CD.md`](docs/CI_CD.md)) wertet die hier beschriebenen Commit-Nachrichten aus, um Versionen automatisch zu bestimmen.
 
-## Commit Message Convention (Conventional Commits)
+## Commit-Message-Konvention (Conventional Commits)
 
 Alle Commits auf `main` und Feature-Branches müssen nach [Conventional Commits](https://www.conventionalcommits.org/) formatiert sein:
 
@@ -16,7 +16,7 @@ Alle Commits auf `main` und Feature-Branches müssen nach [Conventional Commits]
 <footer>
 ```
 
-### Types
+### Typen
 
 - **feat:** Neue Feature
 - **fix:** Bugfix
@@ -27,7 +27,7 @@ Alle Commits auf `main` und Feature-Branches müssen nach [Conventional Commits]
 - **perf:** Performance-Verbesserungen
 - **ci:** CI/CD-Konfiguration
 
-### Versioning Impact
+### Auswirkung auf die Versionierung
 
 - `feat:` → Minor-Version (`x.Y.z`)
 - `fix:` → Patch-Version (`x.y.Z`)
@@ -50,7 +50,7 @@ feat!: Redesign plugin API (BREAKING CHANGE: old plugin format no longer support
 
 Breaking Changes MÜSSEN mit `BREAKING CHANGE:` im Commit-Footer oder mit `!` nach dem Type (z. B. `feat!:`) gekennzeichnet werden. Nur so wird von Semantic Release eine Major-Version erzeugt.
 
-## Manual Release Tag (Override)
+## Manueller Release-Tag (Override)
 
 Wenn eine bestimmte Version erzwungen werden soll, statt sie automatisch aus den Commits zu berechnen:
 
@@ -61,7 +61,7 @@ git push origin v2.5.0
 
 Ein Tag-Push löst in `.github/workflows/release.yml` den eigenständigen Job `release-manual-tag` aus (unabhängig vom `release`-Job, der nur auf Pushes nach `main` reagiert). Dieser Job baut die Anwendung, verpackt sie als ZIP und erstellt direkt ein GitHub-Release für genau diesen Tag inkl. automatisch generierter Release Notes — unabhängig von den seit dem letzten Release verwendeten Commit-Typen. Der nächste reguläre Push auf `main` verwendet diesen Tag anschließend als neue Ausgangsbasis für die automatische Versionsberechnung durch Semantic Release.
 
-## Rules
+## Regeln
 
 1. Commit-Typen MÜSSEN eingehalten werden.
 2. Breaking Changes MÜSSEN mit `BREAKING CHANGE:` im Footer oder `!` nach Type gekennzeichnet werden.

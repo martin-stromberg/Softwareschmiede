@@ -63,7 +63,7 @@ public sealed class ScmEventValidationServiceTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void MissingTriggerKeyword_FallsBackToDefault(string? keyword)
+    public void MissingTriggerKeyword_IfBackToDefault(string? keyword)
     {
         Assert.Null(ScmEventValidationService.GetRejection(Observe("$Softwareschmiede bitte", "42", null, false), keyword));
         Assert.NotNull(ScmEventValidationService.GetRejection(Observe("!Bearbeite bitte", "42", null, false), keyword));
@@ -102,12 +102,12 @@ public sealed class ScmEventValidationServiceTests
     [InlineData("$Softwareschmiede bitte", false)]
     [InlineData("'@scm-bot'", false)]
     [InlineData("Kein Aufruf", false)]
-    public void SeparatesKonto_MentionReplacesKeywordTrigger(string body, bool valid)
+    public void SeparatesAccount_MentionReplacesKeywordTrigger(string body, bool valid)
     {
         var observation = ObserveSeparate(body, "42", null, false);
         Assert.Equal(valid, ScmEventValidationService.GetRejection(observation) is null);
         Assert.Equal(!valid, ScmEventValidationService.GetRejection(observation)
-            is ScmEventValidationService.KeineErwaehnungRejection);
+            is ScmEventValidationService.NoMentionRejection);
     }
 
     /// <summary>Im SeparatesKonto gilt die Autor-/Editor-Prüfung gegen den Repository-Owner, nicht gegen den Bot-Viewer.</summary>
@@ -116,7 +116,7 @@ public sealed class ScmEventValidationServiceTests
     [InlineData("bot-id", null, false, false)]
     [InlineData("42", "bot-id", true, false)]
     [InlineData("bot-id", "42", true, true)]
-    public void SeparatesKonto_AuthorOrEditorMustBeOwner_NotViewer(string author, string? editor, bool edited, bool valid)
+    public void SeparatesAccount_AuthorOrEditorMustBeOwner_NotViewer(string author, string? editor, bool edited, bool valid)
     {
         var observation = ObserveSeparate("@scm-bot bitte", author, editor, edited);
         Assert.Equal(valid, ScmEventValidationService.GetRejection(observation) is null);
@@ -124,18 +124,18 @@ public sealed class ScmEventValidationServiceTests
 
     /// <summary>Im SeparatesKonto entfällt die Viewer-Owner-Regel: der Viewer ist das Bot-Konto, kein Owner.</summary>
     [Fact]
-    public void SeparatesKonto_ViewerOwnerRuleDoesNotApply()
+    public void SeparatesAccount_ViewerOwnerRuleDoesNotApply()
         => Assert.Null(ScmEventValidationService.GetRejection(ObserveSeparate("@scm-bot bitte", "42", null, false)));
 
     /// <summary>Die Marker-Regel „Eigene Antwort" gilt im SeparatesKonto weiter.</summary>
     [Fact]
-    public void SeparatesKonto_OwnResponseMarkerStillRejected()
+    public void SeparatesAccount_OwnResponseMarkerStillRejected()
         => Assert.Equal("Eigene Antwort", ScmEventValidationService.GetRejection(
             ObserveSeparate("@scm-bot\n<!-- softwareschmiede:action:abc -->", "42", null, false)));
 
     /// <summary>Regression: Im Benutzerkonto bleibt der Keyword-Trigger unverändert; eine @mention triggert nicht.</summary>
     [Fact]
-    public void Benutzerkonto_KeywordStaysTheOnlyTrigger()
+    public void Useraccount_KeywordStaysTheOnlyTrigger()
     {
         Assert.NotNull(ScmEventValidationService.GetRejection(Observe("@scm-bot bitte", "42", null, false)));
         Assert.Null(ScmEventValidationService.GetRejection(Observe("$Softwareschmiede bitte", "42", null, false)));
@@ -149,16 +149,16 @@ public sealed class ScmEventValidationServiceTests
     public void ViewerReaction_RejectsCommentKinds(ScmContentKind kind)
     {
         var observation = Observe("$Softwareschmiede bitte", "42", null, false, ["EYES"], kind);
-        Assert.Equal(ScmEventValidationService.BereitsReagiertRejection, ScmEventValidationService.GetRejection(observation));
+        Assert.Equal(ScmEventValidationService.AlreadyReactedRejection, ScmEventValidationService.GetRejection(observation));
     }
 
     /// <summary>Im SeparatesKonto bindet die Reaktion an das Bot-Konto; auch eine manuell gesetzte
     /// Reaktion (nicht nur die Empfangsreaktion) unterdrückt den Kommentar.</summary>
     [Fact]
-    public void SeparatesKonto_ViewerReaction_Rejects()
+    public void SeparatesAccount_ViewerReaction_Rejects()
     {
         var observation = ObserveSeparate("@scm-bot bitte", "42", null, false, ["THUMBS_UP"]);
-        Assert.Equal(ScmEventValidationService.BereitsReagiertRejection, ScmEventValidationService.GetRejection(observation));
+        Assert.Equal(ScmEventValidationService.AlreadyReactedRejection, ScmEventValidationService.GetRejection(observation));
     }
 
     /// <summary>Die Reaktionsprüfung läuft erst nach dem Trigger: ein reagierter Kommentar ohne
@@ -167,7 +167,7 @@ public sealed class ScmEventValidationServiceTests
     public void ViewerReaction_CheckRunsAfterTrigger()
     {
         Assert.Equal("Kein Trigger", ScmEventValidationService.GetRejection(Observe("Nur Text", "42", null, false, ["EYES"])));
-        Assert.Equal(ScmEventValidationService.KeineErwaehnungRejection,
+        Assert.Equal(ScmEventValidationService.NoMentionRejection,
             ScmEventValidationService.GetRejection(ObserveSeparate("Nur Text", "42", null, false, ["EYES"])));
     }
 
@@ -195,7 +195,7 @@ public sealed class ScmEventValidationServiceTests
     /// <summary>Die Vertrauenslisten-Akzeptanz gilt im SeparatesKonto an derselben Stelle wie
     /// die Owner-Prüfung: Autor github-actions mit frei stehender Erwähnung wird angenommen.</summary>
     [Fact]
-    public void SeparatesKonto_GitHubActionsAuthor_IsAccepted()
+    public void SeparatesAccount_GitHubActionsAuthor_IsAccepted()
     {
         var observation = ObserveSeparate("@scm-bot bitte", "bot-id", null, false, authorLogin: "github-actions[bot]");
         Assert.Null(ScmEventValidationService.GetRejection(observation));
@@ -244,7 +244,7 @@ public sealed class ScmEventValidationServiceTests
     {
         var date = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
         var repository = new ScmEventRepository("test", "host", "repo42", "OWNER", "repo", "42", "bot-id", "scm-bot", true,
-            Softwareschmiede.Domain.Enums.ScmKontoModus.SeparatesKonto);
+            Softwareschmiede.Domain.Enums.ScmAccountMode.SeparateAccount);
         return new(new(repository, ScmReferenceKind.Issue, 1),
             kind, "node", "1", date, date, edited ? date : null, author, authorLogin, editor, editorLogin, body, "https://host/OWNER/repo/issues/1", date,
             viewerReactions);

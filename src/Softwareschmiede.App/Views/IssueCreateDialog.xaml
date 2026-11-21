@@ -37,7 +37,7 @@
                 Margin="0,0,0,12"
                 Visibility="{Binding ErrorMessage, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
             <TextBlock Text="{Binding ErrorMessage}"
-                       AutomationProperties.Name="IssueAnlageFehler"
+                       AutomationProperties.Name="IssueCreationError"
                        Foreground="White"
                        TextWrapping="Wrap" />
         </Border>
@@ -55,7 +55,7 @@
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            Margin="0,0,0,4" />
                 <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
-                         AutomationProperties.Name="IssueTitel"
+                         AutomationProperties.Name="IssueTitle"
                          Padding="8,6" />
             </StackPanel>
 
@@ -69,7 +69,7 @@
                 <ComboBox ItemsSource="{Binding Templates}"
                           SelectedItem="{Binding SelectedTemplate, Mode=TwoWay}"
                           DisplayMemberPath="Name"
-                          AutomationProperties.Name="IssueTemplateAuswahl"
+                          AutomationProperties.Name="IssueTemplateSelection"
                           Padding="6,4" />
             </StackPanel>
 
@@ -79,15 +79,15 @@
                            Foreground="{DynamicResource SecondaryTextBrush}"
                            Margin="0,0,0,4" />
                 <StackPanel Orientation="Horizontal">
-                    <ComboBox ItemsSource="{Binding VerfuegbareKiPlugins}"
-                              SelectedItem="{Binding SelectedKiPluginPrefix, Mode=TwoWay}"
-                              AutomationProperties.Name="IssueKiProvider"
+                    <ComboBox ItemsSource="{Binding AvailableAiPlugins}"
+                              SelectedItem="{Binding SelectedAiPluginPrefix, Mode=TwoWay}"
+                              AutomationProperties.Name="IssueAiProvider"
                               Width="180"
                               Padding="6,4"
                               IsEnabled="{Binding CanUseAi}" />
                     <Button Content="Ausfüllen"
-                            AutomationProperties.Name="IssueKiAusfuellen"
-                            Command="{Binding KiAusfuellenCommand}"
+                            AutomationProperties.Name="IssueAiFill"
+                            Command="{Binding AiFillCommand}"
                             Padding="10,6"
                             Margin="8,0,0,0" />
                 </StackPanel>
@@ -106,7 +106,7 @@
                        Margin="0,0,0,4" />
             <TextBox Grid.Row="1"
                      Text="{Binding Body, UpdateSourceTrigger=PropertyChanged}"
-                     AutomationProperties.Name="IssueBeschreibung"
+                     AutomationProperties.Name="IssueDescription"
                      TextWrapping="Wrap"
                      AcceptsReturn="True"
                      VerticalScrollBarVisibility="Auto"
@@ -129,18 +129,18 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right">
                 <CheckBox Content="Aufgabenbeschreibung nach Issue-Anlage aktualisieren"
-                          AutomationProperties.Name="AufgabenbeschreibungNachIssueAnlageAktualisieren"
+                          AutomationProperties.Name="UpdateWorkItemDescriptionAfterIssueCreation"
                           IsChecked="{Binding UpdateTaskDescriptionAfterCreate, Mode=TwoWay}"
                           VerticalAlignment="Center"
                           Margin="0,0,16,0" />
                 <Button Content="Abbrechen"
-                        AutomationProperties.Name="IssueAnlageAbbrechen"
-                        Command="{Binding AbbrechenCommand}"
+                        AutomationProperties.Name="CancelIssueCreation"
+                        Command="{Binding CancelCommand}"
                         Padding="12,6"
                         Margin="0,0,8,0" />
                 <Button Content="Anlegen"
-                        AutomationProperties.Name="IssueAnlegen"
-                        Command="{Binding ErstellenCommand}"
+                        AutomationProperties.Name="CreateIssue"
+                        Command="{Binding CreateCommand}"
                         Padding="12,6"
                         Background="{DynamicResource AccentBrush}"
                         Foreground="White"

@@ -48,7 +48,7 @@ public sealed class ScmEventDispatchTests_Attachments
         Assert.StartsWith(directory, attachment.Path);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var action = await db.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments", cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal("Succeeded", action.Status);
             Assert.Null(action.AttemptId);
@@ -151,7 +151,7 @@ public sealed class ScmEventDispatchTests_Attachments
         Assert.Empty(request.Attachments!);
         Assert.Contains("Übersprungen: ungueltig.png (Datei-Signatur passt nicht zum Bildformat)", request.Body);
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.Equal("Succeeded", (await db.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments", cancellationToken: TestContext.Current.CancellationToken)).Status);
     }
 
@@ -215,7 +215,7 @@ public sealed class ScmEventDispatchTests_Attachments
         Assert.Equal("VerarbeitungUngeklärt", item.Status);
         Assert.Contains("Aktionskennung", item.Reason);
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         // Die vorweggenommene ai-Aktion wurde regulär ausgeführt; keine attachments-Aktion
         // hat sie still als Succeeded-Nachweis übernommen.
         var action = await db.ScmOutgoingActions.SingleAsync(x => x.Id == usurped, cancellationToken: TestContext.Current.CancellationToken);
@@ -247,7 +247,7 @@ public sealed class ScmEventDispatchTests_Attachments
         Assert.Equal("Verarbeitet", (await fixture.EventAsync(eventId)).Status);
         Assert.DoesNotContain(fixture.Responses, x => x.Attachments is { Count: > 0 });
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.Empty(await db.ScmOutgoingActions.Where(x => x.Purpose == "attachments").ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
@@ -308,7 +308,7 @@ public sealed class ScmEventDispatchTests_Attachments
         Assert.Equal("Verarbeitet", (await fixture.EventAsync(eventId)).Status);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var action = await db.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments", cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal("Failed", action.Status);
             Assert.NotNull(action.NextAttemptUtc);
@@ -319,7 +319,7 @@ public sealed class ScmEventDispatchTests_Attachments
 
         Assert.Equal(2, attempts);
         using var verification = fixture.Services.CreateScope();
-        var db2 = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db2 = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.Equal("Succeeded", (await db2.ScmOutgoingActions.SingleAsync(x => x.Purpose == "attachments", cancellationToken: TestContext.Current.CancellationToken)).Status);
         Assert.Equal("Verarbeitet", (await fixture.EventAsync(eventId)).Status);
     }

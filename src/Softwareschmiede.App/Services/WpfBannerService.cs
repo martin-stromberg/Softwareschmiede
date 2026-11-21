@@ -6,10 +6,10 @@ using Windows.UI.Notifications;
 namespace Softwareschmiede.App.Services;
 
 /// <summary>
-/// WPF-Implementierung von <see cref="IBenachrichtigungsBannerService"/>.
+/// WPF-Implementierung von <see cref="INotificationBannerService"/>.
 /// Verwendet die Windows Toast Notification API für Desktop-Banner.
 /// </summary>
-public sealed class WpfBannerService : IBenachrichtigungsBannerService
+public sealed class WpfBannerService : INotificationBannerService
 {
     // Hinweis: Diese AppId muss als AUMID (Application User Model ID) in der Windows-Registry
     // registriert sein, damit Toast-Benachrichtigungen funktionieren. Bei nicht-paketierten

@@ -11,75 +11,75 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 /// <summary>E2E-Test: CLI-Prozess starten und Fenster in WPF-Control einbetten.</summary>
 public sealed class CliEmbeddingServiceIntegrationTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
-    private readonly KiAusfuehrungsService _kiService;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
+    private readonly AiExecutionService _aiService;
 
     /// <summary>CliEmbeddingServiceIntegrationTests.</summary>
     public CliEmbeddingServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        _aiService = TestAiExecutionServiceFactory.Create(scopeFactoryMock.Object);
     }
 
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
-        _kiService.Dispose();
+        _aiService.Dispose();
         _db.Dispose();
     }
 
     /// <summary>IsRunning gibt false zurück wenn kein Prozess gestartet wurde.</summary>
     [Fact]
-    public void IsRunning_GibtFalse_WennKeinProzessGestartet()
+    public void IsRunning_ReturnsFalse_WhenNoProcessStarted()
     {
-        var aufgabeId = Guid.NewGuid();
-        _kiService.IsRunning(aufgabeId).Should().BeFalse();
+        var workItemId = Guid.NewGuid();
+        _aiService.IsRunning(workItemId).Should().BeFalse();
     }
 
     /// <summary>GetLastExitCode gibt null zurück wenn kein Prozess gestartet wurde.</summary>
     [Fact]
-    public void GetLastExitCode_GibtNull_WennKeinProzessGestartet()
+    public void GetLastExitCode_ReturnsNull_WhenNoProcessStarted()
     {
-        var aufgabeId = Guid.NewGuid();
-        _kiService.GetLastExitCode(aufgabeId).Should().BeNull();
+        var workItemId = Guid.NewGuid();
+        _aiService.GetLastExitCode(workItemId).Should().BeNull();
     }
 
     /// <summary>StartCliAsync startet einen Prozess und setzt IsRunning auf true.</summary>
     [OsInterfaceFact]
-    public async Task StartCliAsync_StartetProzess_UndSetztIsRunningAufTrue()
+    public async Task StartCliAsync_StartsProcess_AndSetsIsRunningOnTrue()
     {
-        var aufgabeId = Guid.NewGuid();
-        var pluginMock = new FakeKiPlugin();
+        var workItemId = Guid.NewGuid();
+        var pluginMock = new FakeAiPlugin();
 
-        var handle = await _kiService.StartCliAsync(aufgabeId, pluginMock, Path.GetTempPath());
+        var handle = await _aiService.StartCliAsync(workItemId, pluginMock, Path.GetTempPath());
 
         handle.Should().NotBeNull();
-        handle.AufgabeId.Should().Be(aufgabeId);
+        handle.WorkItemId.Should().Be(workItemId);
 
-        await _kiService.StopCliAsync(aufgabeId);
+        await _aiService.StopCliAsync(workItemId);
     }
 
     /// <summary>StartTerminalSessionAsync startet einen Prozess via ConPTY und liefert eine PseudoConsoleSession.</summary>
     [OsInterfaceFact]
     [Trait("Category", "ConPTY")]
-    public async Task StartTerminalSessionAsync_StartetProzess_UndSetztPseudoConsoleSession()
+    public async Task StartTerminalSessionAsync_StartsProcess_AndSetsPseudoConsoleSession()
     {
-        var aufgabeId = Guid.NewGuid();
-        var pluginMock = new FakeKiPlugin();
+        var workItemId = Guid.NewGuid();
+        var pluginMock = new FakeAiPlugin();
 
-        var handle = await _kiService.StartTerminalSessionAsync(aufgabeId, pluginMock, Path.GetTempPath());
+        var handle = await _aiService.StartTerminalSessionAsync(workItemId, pluginMock, Path.GetTempPath());
 
         handle.Should().NotBeNull();
-        handle.AufgabeId.Should().Be(aufgabeId);
+        handle.WorkItemId.Should().Be(workItemId);
         handle.Session.Should().NotBeNull("StartTerminalSessionAsync muss eine ITerminalSession liefern");
 
-        await _kiService.StopCliAsync(aufgabeId);
+        await _aiService.StopCliAsync(workItemId);
     }
 }
 
 /// <summary>Fake-KI-Plugin für Tests.</summary>
-internal sealed class FakeKiPlugin : IKiPlugin
+internal sealed class FakeAiPlugin : IAiPlugin
 {
     public string PluginName => "FakeKi";
     public string PluginPrefix => "fake";
@@ -92,7 +92,7 @@ internal sealed class FakeKiPlugin : IKiPlugin
     /// <summary>Task.</summary>
     public Task<System.Diagnostics.ProcessStartInfo> StartCliAsync(
         string localRepoPath,
-        string? parameters = null,
+        string? parameter = null,
         CancellationToken ct = default)
     {
         var psi = new System.Diagnostics.ProcessStartInfo
@@ -106,7 +106,7 @@ internal sealed class FakeKiPlugin : IKiPlugin
     }
 
     /// <summary>GetProcessWindowTitle.</summary>
-    public string GetProcessWindowTitle(Guid aufgabeId) => "FakeKi";
+    public string GetProcessWindowTitle(Guid workItemId) => "FakeKi";
 
     /// <summary>SupportsSessionContinuation.</summary>
     public bool SupportsSessionContinuation() => false;
@@ -118,6 +118,6 @@ internal sealed class FakeKiPlugin : IKiPlugin
     public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
 
     /// <summary>GetTerminalStartSpecAsync.</summary>
-    public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+    public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameter = null, CancellationToken ct = default)
         => Task.FromResult(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec { FileName = "cmd.exe", WorkingDirectory = localRepoPath, PluginName = PluginName });
 }

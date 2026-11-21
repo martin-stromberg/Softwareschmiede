@@ -77,9 +77,9 @@ public sealed partial class TerminalControlTests
 
             control.Session = session;
 
-            var operationsPosted = RaiseOutputAndCountDispatcherOperations(session, stream, "X");
+            var operationPosted = RaiseOutputAndCountDispatcherOperation(session, stream, "X");
 
-            operationsPosted.Should().BeGreaterThan(
+            operationPosted.Should().BeGreaterThan(
                 0,
                 "OnSessionChanged muss einen BufferChanged-Handler auf der neuen Session registrieren, der bei neuer Ausgabe eine Neuzeichnung des Controls anstößt");
         });
@@ -102,13 +102,13 @@ public sealed partial class TerminalControlTests
             control.Session = sessionA;
             control.Session = sessionB;
 
-            var operationsOnOldSession = RaiseOutputAndCountDispatcherOperations(sessionA, streamA, "A");
-            operationsOnOldSession.Should().Be(
+            var operationOnOldSession = RaiseOutputAndCountDispatcherOperation(sessionA, streamA, "A");
+            operationOnOldSession.Should().Be(
                 0,
                 "beim Wechsel zu einer neuen Session darf neue Ausgabe der alten Session keine Neuzeichnung des Controls mehr anstoßen");
 
-            var operationsOnNewSession = RaiseOutputAndCountDispatcherOperations(sessionB, streamB, "B");
-            operationsOnNewSession.Should().BeGreaterThan(
+            var operationOnNewSession = RaiseOutputAndCountDispatcherOperation(sessionB, streamB, "B");
+            operationOnNewSession.Should().BeGreaterThan(
                 0,
                 "die neue Session muss weiterhin Neuzeichnungen des Controls anstoßen");
         });
@@ -128,9 +128,9 @@ public sealed partial class TerminalControlTests
             control.Session = session;
             control.Session = null;
 
-            var operationsPosted = RaiseOutputAndCountDispatcherOperations(session, stream, "X");
+            var operationPosted = RaiseOutputAndCountDispatcherOperation(session, stream, "X");
 
-            operationsPosted.Should().Be(
+            operationPosted.Should().Be(
                 0,
                 "wird die Session auf null gesetzt, darf spätere Ausgabe der alten Session keine Neuzeichnung des Controls mehr anstoßen");
         });
@@ -182,13 +182,13 @@ public sealed partial class TerminalControlTests
             control.Session = sessionA;
             Task.WhenAny(doneA.Task, Task.Delay(TimeSpan.FromSeconds(5))).GetAwaiter().GetResult();
 
-            var zeichenNachErstemRender = sessionA.Buffer.GetRow(0)[0].Character;
+            var characterAfterFirstRender = sessionA.Buffer.GetRow(0)[0].Character;
 
             control.Session = sessionB;
             control.Session = sessionA;
 
             sessionA.Buffer.GetRow(0)[0].Character.Should().Be(
-                zeichenNachErstemRender,
+                characterAfterFirstRender,
                 "der Bufferinhalt von Session A muss nach dem Wechsel zu B und zurück erhalten bleiben");
         });
     }
@@ -197,7 +197,7 @@ public sealed partial class TerminalControlTests
     /// Replay-Puffer neu aufgebaut — Ausgabe, die während der Trennung eintraf, ist genau einmal
     /// vorhanden, Live-Chunks erscheinen nicht doppelt.</summary>
     [Fact]
-    public void OnSessionChanged_ReattachedSession_KeineDoppelteAusgabe()
+    public void OnSessionChanged_ReattachedSession_NoDoubleOutput()
     {
         RunOnSta(() =>
         {
@@ -208,19 +208,19 @@ public sealed partial class TerminalControlTests
             control.Session = session;
 
             // "A" schieben, solange das Control gebunden ist.
-            var aVerarbeitet = new TaskCompletionSource();
-            session.BufferChanged += (_, _) => { if (BufferText(session).Contains('A')) aVerarbeitet.TrySetResult(); };
+            var aProcesses = new TaskCompletionSource();
+            session.BufferChanged += (_, _) => { if (BufferText(session).Contains('A')) aProcesses.TrySetResult(); };
             stream.Push("A");
-            Task.WhenAny(aVerarbeitet.Task, Task.Delay(TimeSpan.FromSeconds(5))).GetAwaiter().GetResult();
-            aVerarbeitet.Task.IsCompletedSuccessfully.Should().BeTrue("die gebundene Ausgabe muss verarbeitet werden");
+            Task.WhenAny(aProcesses.Task, Task.Delay(TimeSpan.FromSeconds(5))).GetAwaiter().GetResult();
+            aProcesses.Task.IsCompletedSuccessfully.Should().BeTrue("die gebundene Ausgabe muss verarbeitet werden");
 
             // Trennen; währenddessen trifft "B" ein (nur im Buffer/Replay der Session, nicht am Control).
             control.Session = null;
-            var bVerarbeitet = new TaskCompletionSource();
-            session.BufferChanged += (_, _) => { if (BufferText(session).Contains('B')) bVerarbeitet.TrySetResult(); };
+            var bProcesses = new TaskCompletionSource();
+            session.BufferChanged += (_, _) => { if (BufferText(session).Contains('B')) bProcesses.TrySetResult(); };
             stream.Push("B");
-            Task.WhenAny(bVerarbeitet.Task, Task.Delay(TimeSpan.FromSeconds(5))).GetAwaiter().GetResult();
-            bVerarbeitet.Task.IsCompletedSuccessfully.Should().BeTrue("die Ausgabe während der Trennung muss sessionseitig weiterlaufen");
+            Task.WhenAny(bProcesses.Task, Task.Delay(TimeSpan.FromSeconds(5))).GetAwaiter().GetResult();
+            bProcesses.Task.IsCompletedSuccessfully.Should().BeTrue("die Ausgabe während der Trennung muss sessionseitig weiterlaufen");
 
             // Reattach: RebuildBufferFromReplay stellt "AB" wieder her — ohne Duplikat.
             control.Session = session;
@@ -235,7 +235,7 @@ public sealed partial class TerminalControlTests
     /// <summary>Bei aktivem Alternate Screen meldet das Control kein Scrollback: Extent entspricht dem
     /// sichtbaren Grid, der Offset bleibt auf 0 geklemmt und Line-/Page-Scrollen sind No-Ops.</summary>
     [Fact]
-    public void ScrollInfo_AlternateScreen_KeinScrollbackKeinOffset()
+    public void ScrollInfo_AlternateScreen_NoScrollbackNoOffset()
     {
         RunOnSta(() =>
         {
@@ -274,7 +274,7 @@ public sealed partial class TerminalControlTests
 
     /// <summary>TerminalControl stellt dem umgebenden ScrollViewer zeilenbasierte Scrollinformationen bereit.</summary>
     [Fact]
-    public void ScrollInfo_LangerVerlauf_MeldetExtentGroesserAlsViewport()
+    public void ScrollInfo_LongerHistory_ReportsExtentLargerAsViewport()
     {
         RunOnSta(() =>
         {
@@ -293,7 +293,7 @@ public sealed partial class TerminalControlTests
 
     /// <summary>SetVerticalOffset sowie Line-/Page-Scrollen klemmen den Offset auf den gültigen Bereich.</summary>
     [Fact]
-    public void ScrollInfo_SetVerticalOffsetUndNavigation_KlemmenOffset()
+    public void ScrollInfo_SetVerticalOffsetAndNavigation_ClampOffset()
     {
         RunOnSta(() =>
         {
@@ -325,7 +325,7 @@ public sealed partial class TerminalControlTests
 
     /// <summary>Wenn der Anwender am Ende steht, folgt der Scroll-Offset neuem Output automatisch ans neue Ende.</summary>
     [Fact]
-    public void ScrollInfo_NeueAusgabeAmEnde_FolgtNeuemEnde()
+    public void ScrollInfo_NewOutputAtEnd_FollowsNewEnd()
     {
         RunOnSta(() =>
         {
@@ -348,7 +348,7 @@ public sealed partial class TerminalControlTests
 
     /// <summary>Scrollt der Anwender manuell nach oben, bleibt der Offset bei neuer Ausgabe erhalten.</summary>
     [Fact]
-    public void ScrollInfo_ManuellNachOben_NeueAusgabeErhaeltOffset()
+    public void ScrollInfo_ManualAfterTop_NewOutputReceivesOffset()
     {
         RunOnSta(() =>
         {
@@ -370,7 +370,7 @@ public sealed partial class TerminalControlTests
 
     /// <summary>Ein Sessionwechsel setzt den Scrollzustand wieder auf Follow-End.</summary>
     [Fact]
-    public void OnSessionChanged_SetztScrollzustandAufEnde()
+    public void OnSessionChanged_SetsScrollstateOnEnd()
     {
         RunOnSta(() =>
         {
@@ -394,7 +394,7 @@ public sealed partial class TerminalControlTests
     /// <summary>Im echten ScrollViewer-Layout mit CanContentScroll erhält das Terminal einen realen ScrollOwner
     /// und berechnet den Viewport aus der begrenzten sichtbaren Höhe statt aus dem 50-Zeilen-Fallback.</summary>
     [Fact]
-    public void ScrollViewerLayout_CanContentScroll_BegrenztViewportAufSichtbareHoehe()
+    public void ScrollViewerLayout_CanContentScroll_LimitedViewportOnVisibleHeight()
     {
         RunOnSta(() =>
         {
@@ -431,7 +431,7 @@ public sealed partial class TerminalControlTests
     /// == <c>false</c>, z. B. <see cref="TerminalReplaySession"/>) darf das Control den Buffer beim
     /// Binden nicht auf die Control-Größe verkleinern — die Aufzeichnungs-Geometrie bleibt erhalten.</summary>
     [Fact]
-    public void OnSessionChanged_FixierteGeometrie_BehaeltAufzeichnungsGroesse()
+    public void OnSessionChanged_FixedGeometry_KeepsRecordingSize()
     {
         RunOnSta(() =>
         {
@@ -450,7 +450,7 @@ public sealed partial class TerminalControlTests
     /// <summary>Bei fixierter Geometrie darf auch eine Größenänderung des Controls den Buffer nicht
     /// verkleinern; der horizontale Extent bildet weiterhin die volle Aufzeichnungsbreite ab.</summary>
     [Fact]
-    public void OnRenderSizeChanged_FixierteGeometrie_ResizedNicht()
+    public void OnRenderSizeChanged_FixedGeometry_ResizedNot()
     {
         RunOnSta(() =>
         {
@@ -464,9 +464,9 @@ public sealed partial class TerminalControlTests
             scrollInfo.ExtentWidth.Should().BeApproximately(220 * cellWidth, 0.01);
 
             // Re-Arrange auf eine andere Control-Größe — die Buffer-Geometrie bleibt fixiert.
-            var neueGroesse = new Size(320, 96);
-            control.Measure(neueGroesse);
-            control.Arrange(new Rect(neueGroesse));
+            var newSize = new Size(320, 96);
+            control.Measure(newSize);
+            control.Arrange(new Rect(newSize));
 
             session.Buffer.Cols.Should().Be(220);
             session.Buffer.Rows.Should().Be(50);
@@ -480,7 +480,7 @@ public sealed partial class TerminalControlTests
     /// auf den ScrollableWidth-Bereich und die Line-/Page-/MouseWheel-Methoden verschieben den
     /// Offset erwartbar — ohne Einfluss auf die vertikale Achse.</summary>
     [Fact]
-    public void ScrollInfo_FixierteGeometrie_HorizontalesScrollen()
+    public void ScrollInfo_FixedGeometry_HorizontalScroll()
     {
         RunOnSta(() =>
         {
@@ -498,7 +498,7 @@ public sealed partial class TerminalControlTests
             scrollInfo.ExtentWidth.Should().BeGreaterThan(scrollInfo.ViewportWidth,
                 "ein 220-spaltiger Buffer ist breiter als der 160-px-Viewport");
             var maxOffset = scrollInfo.ExtentWidth - scrollInfo.ViewportWidth;
-            var verticalOffsetVorher = scrollInfo.VerticalOffset;
+            var verticalOffsetBefore = scrollInfo.VerticalOffset;
 
             scrollInfo.SetHorizontalOffset(-10);
             scrollInfo.HorizontalOffset.Should().Be(0);
@@ -523,7 +523,7 @@ public sealed partial class TerminalControlTests
             scrollInfo.LineLeft();
             scrollInfo.HorizontalOffset.Should().BeApproximately(maxOffset - cellWidth, 0.01);
 
-            scrollInfo.VerticalOffset.Should().Be(verticalOffsetVorher,
+            scrollInfo.VerticalOffset.Should().Be(verticalOffsetBefore,
                 "horizontales Scrollen darf die vertikale Achse nicht beeinflussen");
 
             // Ohne CanHorizontallyScroll des Hosts fällt der Extent auf den Viewport zurück —
@@ -545,7 +545,7 @@ public sealed partial class TerminalControlTests
     /// Seiten-Scrollweite auf eine Zelle geklemmt bleiben — ohne die Klemmung würde die Distanz
     /// negativ und PageLeft/PageRight scrollten in die falsche Richtung.</summary>
     [Fact]
-    public void ScrollInfo_PageScrollen_SchmalerViewport_ScrollrichtungBleibtErhalten()
+    public void ScrollInfo_PageScroll_NarrowerViewport_GetScrolldirectionRemains()
     {
         RunOnSta(() =>
         {
@@ -583,7 +583,7 @@ public sealed partial class TerminalControlTests
     /// Extent kann den Viewport dadurch nie übersteigen und es entsteht kein horizontaler
     /// Scrollbereich.</summary>
     [Fact]
-    public void ScrollInfo_LiveSession_KeinHorizontalerScrollbereich()
+    public void ScrollInfo_LiveSession_NoHorizontalScrollrange()
     {
         RunOnSta(() =>
         {
@@ -612,11 +612,11 @@ public sealed partial class TerminalControlTests
     /// <param name="stream">Der steuerbare Output-Stream der Sitzung, in den <paramref name="content"/> geschoben wird.</param>
     /// <param name="content">Der zu schiebende Ausgabeinhalt.</param>
     /// <returns>Die Anzahl der während der Verarbeitung am UI-Dispatcher angestoßenen Operationen.</returns>
-    private static int RaiseOutputAndCountDispatcherOperations(PseudoConsoleSession session, ControllableStream stream, string content)
+    private static int RaiseOutputAndCountDispatcherOperation(PseudoConsoleSession session, ControllableStream stream, string content)
     {
         var dispatcher = Dispatcher.CurrentDispatcher;
-        var operationsPosted = 0;
-        void OnOperationPosted(object? sender, DispatcherHookEventArgs e) => operationsPosted++;
+        var operationPosted = 0;
+        void OnOperationPosted(object? sender, DispatcherHookEventArgs e) => operationPosted++;
 
         var processed = new TaskCompletionSource();
         void OnBufferChanged(object? sender, EventArgs e) => processed.TrySetResult();
@@ -634,7 +634,7 @@ public sealed partial class TerminalControlTests
             session.BufferChanged -= OnBufferChanged;
         }
 
-        return operationsPosted;
+        return operationPosted;
     }
 
     private static void SetLogger(TerminalControl control, ILogger<TerminalControl> logger)
@@ -676,22 +676,22 @@ public sealed partial class TerminalControlTests
     /// <see cref="ITerminalSession.SupportsResize"/> == <c>false</c>) in der angegebenen
     /// Aufzeichnungs-Geometrie — das Gegenstück zu <see cref="CreateSession(Stream)"/> für
     /// Live-Sessions.</summary>
-    private static TerminalReplaySession CreateReplaySession(int cols, int rows, params string[] chunkInhalte)
+    private static TerminalReplaySession CreateReplaySession(int cols, int rows, params string[] chunkContents)
     {
-        var chunks = chunkInhalte
+        var chunks = chunkContents
             .Select((text, i) => new CliOutputChunkRecord(
                 TimeSpan.FromMilliseconds(i * 10),
                 System.Text.Encoding.UTF8.GetBytes(text)))
             .ToArray();
         return new TerminalReplaySession(
-            new CliOutputAufzeichnung
+            new CliOutputRecording
             {
-                AufgabeId = Guid.NewGuid(),
+                WorkItemId = Guid.NewGuid(),
                 PluginName = "TestPlugin",
                 StartUtc = DateTimeOffset.UtcNow,
                 Cols = cols,
                 Rows = rows,
-                IstVollstaendig = true,
+                IsComplete = true,
                 Chunks = chunks,
             },
             new FakeTimeProvider());

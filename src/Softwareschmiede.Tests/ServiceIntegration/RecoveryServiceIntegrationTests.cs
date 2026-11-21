@@ -11,125 +11,125 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 /// <summary>E2E-Test: App startet, erkennt InArbeit/Wartend-Aufgaben, zeigt Recovery-Banner.</summary>
 public sealed class RecoveryServiceIntegrationTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
-    private readonly AufgabeService _aufgabeService;
-    private readonly ProjektService _projektService;
-    private readonly Guid _projektId;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
+    private readonly WorkItemService _workItemService;
+    private readonly ProjectService _projectService;
+    private readonly Guid _projectId;
 
     /// <summary>RecoveryServiceIntegrationTests.</summary>
     public RecoveryServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
-        _projektService = new ProjektService(_db, NullLogger<ProjektService>.Instance);
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _projectService = new ProjectService(_db, NullLogger<ProjectService>.Instance);
 
-        var projekt = _projektService.CreateAsync("Recovery-Projekt", null).GetAwaiter().GetResult();
-        _projektId = projekt.Id;
+        var project = _projectService.CreateAsync("Recovery-Projekt", null).GetAwaiter().GetResult();
+        _projectId = project.Id;
     }
 
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    /// <summary><summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit.</summary>.</summary>
+    /// <summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit.</summary>
     [Fact]
-    public async Task ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndInArbeit()
+    public async Task ScanForRecoveryCandidates_FindsWorkItems_WithOldHeartbeatAndInWork()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        SetzeAltenHeartbeat(aufgabe.Id, minutesAlt: 10);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        SetOldHeartbeat(workItem.Id, minutesAlt: 10);
 
         var running = new E2EFakeRunningStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var kandidaten = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
+        var candidates = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
 
-        kandidaten.Should().Contain(aufgabe.Id);
+        candidates.Should().Contain(workItem.Id);
     }
 
-    /// <summary><summary>ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat.</summary>.</summary>
+    /// <summary>ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat.</summary>
     [Fact]
-    public async Task ScanForRecoveryCandidates_IgnoriertAufgaben_MitFrischemHeartbeat()
+    public async Task ScanForRecoveryCandidates_IgnoresWorkItems_WithFreshHeartbeat()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        SetzeAltenHeartbeat(aufgabe.Id, minutesAlt: 1);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        SetOldHeartbeat(workItem.Id, minutesAlt: 1);
 
         var running = new E2EFakeRunningStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var kandidaten = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
+        var candidates = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
 
-        kandidaten.Should().NotContain(aufgabe.Id);
+        candidates.Should().NotContain(workItem.Id);
     }
 
-    /// <summary><summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend.</summary>.</summary>
+    /// <summary>ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend.</summary>
     [Fact]
-    public async Task ScanForRecoveryCandidates_FindetAufgaben_MitAltemHeartbeatUndWartend()
+    public async Task ScanForRecoveryCandidates_FindsWorkItems_WithOldHeartbeatAndWaiting()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Wartend);
-        SetzeAltenHeartbeat(aufgabe.Id, minutesAlt: 10);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Waiting);
+        SetOldHeartbeat(workItem.Id, minutesAlt: 10);
 
         var running = new E2EFakeRunningStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var kandidaten = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
+        var candidates = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
 
-        kandidaten.Should().Contain(aufgabe.Id);
+        candidates.Should().Contain(workItem.Id);
     }
 
-    /// <summary><summary>ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben.</summary>.</summary>
+    /// <summary>ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben.</summary>
     [Fact]
-    public async Task ScanForRecoveryCandidates_IgnoriertLaufendeAufgaben()
+    public async Task ScanForRecoveryCandidates_IgnoresRunningWorkItems()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        SetzeAltenHeartbeat(aufgabe.Id, minutesAlt: 10);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        SetOldHeartbeat(workItem.Id, minutesAlt: 10);
 
         var running = new E2EFakeRunningStatusSource(isRunning: true);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        var kandidaten = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
+        var candidates = await sut.ScanForRecoveryCandidatesAsync(TestContext.Current.CancellationToken);
 
-        kandidaten.Should().NotContain(aufgabe.Id);
+        candidates.Should().NotContain(workItem.Id);
     }
 
-    /// <summary><summary>RecoverManuellAsync_Setzt_StatusAufGestartet.</summary>.</summary>
+    /// <summary>RecoverManuellAsync_Setzt_StatusAufGestartet.</summary>
     [Fact]
-    public async Task RecoverManuellAsync_Setzt_StatusAufGestartet()
+    public async Task RecoverManualAsync_Sets_StatusOnStarted()
     {
-        var aufgabe = await ErstelleAufgabeAsync(AufgabeStatus.Gestartet);
-        SetzeAltenHeartbeat(aufgabe.Id, minutesAlt: 10);
+        var workItem = await CreateWorkItemAsync(WorkItemStatus.Started);
+        SetOldHeartbeat(workItem.Id, minutesAlt: 10);
 
         var running = new E2EFakeRunningStatusSource(false);
-        var sut = new AufgabeRecoveryService(_db, running, NullLogger<AufgabeRecoveryService>.Instance);
+        var sut = new WorkItemRecoveryService(_db, running, NullLogger<WorkItemRecoveryService>.Instance);
 
-        await sut.RecoverManuellAsync(aufgabe.Id, TestContext.Current.CancellationToken);
+        await sut.RecoverManuallyAsync(workItem.Id, TestContext.Current.CancellationToken);
 
-        var geladen = await _db.Aufgaben.FindAsync(new object?[] { aufgabe.Id }, TestContext.Current.CancellationToken);
-        geladen!.Status.Should().Be(AufgabeStatus.Gestartet);
+        var loaded = await _db.WorkItems.FindAsync(new object?[] { workItem.Id }, TestContext.Current.CancellationToken);
+        loaded!.Status.Should().Be(WorkItemStatus.Started);
     }
 
-    private async Task<Aufgabe> ErstelleAufgabeAsync(AufgabeStatus status)
+    private async Task<WorkItem> CreateWorkItemAsync(WorkItemStatus status)
     {
-        var aufgabe = new Aufgabe
+        var workItem = new WorkItem
         {
             Id = Guid.NewGuid(),
-            ProjektId = _projektId,
-            Titel = "Recovery-Aufgabe",
+            ProjectId = _projectId,
+            Title = "Recovery-Aufgabe",
             Status = status,
-            AusfuehrungsStatus = status.IstAktivOderWartend()
-                ? AufgabeAusfuehrungsStatus.Aktiv
-                : AufgabeAusfuehrungsStatus.NichtGestartet,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            ExecutionStatus = status.IsActiveOrWaiting()
+                ? WorkItemExecutionStatus.Active
+                : WorkItemExecutionStatus.NotStarted,
+            CreatedAt = DateTimeOffset.UtcNow
         };
-        _db.Aufgaben.Add(aufgabe);
+        _db.WorkItems.Add(workItem);
         await _db.SaveChangesAsync();
-        return aufgabe;
+        return workItem;
     }
 
-    private void SetzeAltenHeartbeat(Guid aufgabeId, int minutesAlt)
+    private void SetOldHeartbeat(Guid workItemId, int minutesAlt)
     {
-        var aufgabe = _db.Aufgaben.Find(aufgabeId)!;
-        aufgabe.LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-minutesAlt);
+        var workItem = _db.WorkItems.Find(workItemId)!;
+        workItem.LastHeartbeatUtc = DateTimeOffset.UtcNow.AddMinutes(-minutesAlt);
         _db.SaveChanges();
-        _db.Entry(aufgabe).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+        _db.Entry(workItem).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
     }
 }
 
@@ -146,11 +146,11 @@ internal sealed class E2EFakeRunningStatusSource : IRunningAutomationStatusSourc
 #pragma warning restore CS0067
 
     /// <summary>IsRunning.</summary>
-    public bool IsRunning(Guid aufgabeId) => _isRunning;
+    public bool IsRunning(Guid workItemId) => _isRunning;
 
     /// <summary>GetLiveLaufStatus.</summary>
-    public Softwareschmiede.Domain.Enums.AufgabeLaufStatus? GetLiveLaufStatus(Guid aufgabeId)
-        => _isRunning ? Softwareschmiede.Domain.Enums.AufgabeLaufStatus.Laeuft : null;
+    public Softwareschmiede.Domain.Enums.WorkItemRunStatus? GetLiveRunStatus(Guid workItemId)
+        => _isRunning ? Softwareschmiede.Domain.Enums.WorkItemRunStatus.Running : null;
 
     /// <summary>GetRunningCount.</summary>
     public int GetRunningCount() => _isRunning ? 1 : 0;

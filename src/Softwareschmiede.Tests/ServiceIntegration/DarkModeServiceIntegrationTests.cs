@@ -8,56 +8,56 @@ namespace Softwareschmiede.Tests.ServiceIntegration;
 /// <summary>Integrationstests für die Dark-Mode-Persistierung.</summary>
 public sealed class DarkModeServiceIntegrationTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
-    private readonly AppEinstellungService _einstellungService;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
+    private readonly AppSettingService _settingService;
 
     /// <summary>DarkModeServiceIntegrationTests.</summary>
     public DarkModeServiceIntegrationTests()
     {
         _db = TestDbContextFactory.Create();
-        _einstellungService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
+        _settingService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
     }
 
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    /// <summary><summary>DarkMode_WirdGespeichert_UndBeimLadenWiederhergestellt.</summary>.</summary>
+    /// <summary>DarkMode_WirdGespeichert_UndBeimLadenWiederhergestellt.</summary>
     [Fact]
-    public async Task DarkMode_WirdGespeichert_UndBeimLadenWiederhergestellt()
+    public async Task DarkMode_WillSaved_AndAtLoadRestored()
     {
-        await _einstellungService.SetSettingAsync(AppEinstellungService.DesignModeKey, "Dark", TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync(AppSettingService.DesignModeKey, "Dark", TestContext.Current.CancellationToken);
 
-        var geladen = await _einstellungService.GetSettingAsync(AppEinstellungService.DesignModeKey, TestContext.Current.CancellationToken);
-        geladen.Should().Be("Dark");
+        var loaded = await _settingService.GetSettingAsync(AppSettingService.DesignModeKey, TestContext.Current.CancellationToken);
+        loaded.Should().Be("Dark");
     }
 
-    /// <summary><summary>DarkMode_KannAufLightUmgestellt_Werden.</summary>.</summary>
+    /// <summary>DarkMode_KannAufLightUmgestellt_Werden.</summary>
     [Fact]
-    public async Task DarkMode_KannAufLightUmgestellt_Werden()
+    public async Task DarkMode_CanOnLightSwitched_Be()
     {
-        await _einstellungService.SetSettingAsync(AppEinstellungService.DesignModeKey, "Dark", TestContext.Current.CancellationToken);
-        await _einstellungService.SetSettingAsync(AppEinstellungService.DesignModeKey, "Light", TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync(AppSettingService.DesignModeKey, "Dark", TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync(AppSettingService.DesignModeKey, "Light", TestContext.Current.CancellationToken);
 
-        var geladen = await _einstellungService.GetSettingAsync(AppEinstellungService.DesignModeKey, TestContext.Current.CancellationToken);
-        geladen.Should().Be("Light");
+        var loaded = await _settingService.GetSettingAsync(AppSettingService.DesignModeKey, TestContext.Current.CancellationToken);
+        loaded.Should().Be("Light");
     }
 
-    /// <summary><summary>DarkMode_Standardwert_IstNull_OhneGespeicherteEinstellung.</summary>.</summary>
+    /// <summary>DarkMode_Standardwert_IstNull_OhneGespeicherteEinstellung.</summary>
     [Fact]
-    public async Task DarkMode_Standardwert_IstNull_OhneGespeicherteEinstellung()
+    public async Task DarkMode_Defaultvalue_IsNull_WithoutSavedSetting()
     {
-        var geladen = await _einstellungService.GetSettingAsync(AppEinstellungService.DesignModeKey, TestContext.Current.CancellationToken);
-        geladen.Should().BeNull();
+        var loaded = await _settingService.GetSettingAsync(AppSettingService.DesignModeKey, TestContext.Current.CancellationToken);
+        loaded.Should().BeNull();
     }
 
-    /// <summary><summary>DarkMode_WirdBeimNeustart_Wiederhergestellt.</summary>.</summary>
+    /// <summary>DarkMode_WirdBeimNeustart_Wiederhergestellt.</summary>
     [Fact]
-    public async Task DarkMode_WirdBeimNeustart_Wiederhergestellt()
+    public async Task DarkMode_WillAtRestart_Restored()
     {
-        await _einstellungService.SetSettingAsync(AppEinstellungService.DesignModeKey, "Dark", TestContext.Current.CancellationToken);
+        await _settingService.SetSettingAsync(AppSettingService.DesignModeKey, "Dark", TestContext.Current.CancellationToken);
 
-        var neuerService = new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance);
-        var geladen = await neuerService.GetSettingAsync(AppEinstellungService.DesignModeKey, TestContext.Current.CancellationToken);
-        geladen.Should().Be("Dark");
+        var newService = new AppSettingService(_db, NullLogger<AppSettingService>.Instance);
+        var loaded = await newService.GetSettingAsync(AppSettingService.DesignModeKey, TestContext.Current.CancellationToken);
+        loaded.Should().Be("Dark");
     }
 }

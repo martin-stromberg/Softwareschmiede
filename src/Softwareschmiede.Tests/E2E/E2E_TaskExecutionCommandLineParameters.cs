@@ -16,7 +16,7 @@ public partial class End2EndTest
     /// Speichert CommandLineParameters für das Codex-Plugin im Credential Store, startet dann eine
     /// Aufgabe mit dem KI Simulator und prüft, dass die Aufgabe trotzdem korrekt startet.
     /// </summary>
-    protected void AufgabeStarten_MitCodexCommandLineParametersImStore_KiSimulatorStartetKorrekt_E2E(Window mainWindow)
+    protected void StartWorkItem_WithCodexCommandLineParameterInStore_AiSimulatorStartsCorrect_E2E(Window mainWindow)
     {
         var credentialStore = new WindowsCredentialStore();
         var backup = credentialStore.GetCredential("Softwareschmiede.Codex.CommandLineParameters");
@@ -26,12 +26,12 @@ public partial class End2EndTest
                 "Softwareschmiede.Codex.CommandLineParameters", "--test-regression-flag");
             ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-            SetupProjectMitNeuerAufgabe(
+            SetupProjectWithNewWorkItem(
                 mainWindow,
                 "CmdParamsRegressionRepo",
                 "CmdParams-Regressions-Projekt");
 
-            var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+            var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
             taskDetail.WaitForCliRunning();
 
             taskDetail.ForceClose(recurseToDashboard: false);

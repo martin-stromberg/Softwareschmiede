@@ -9,15 +9,15 @@ public sealed record ScmRequirement(
     ScmRepositoryContext? RepositoryContext)
 {
     /// <summary>Titel der Anforderung.</summary>
-    public string Titel => Kind switch
+    public string Title => Kind switch
     {
-        ScmRequirementKind.Issue => Issue?.Titel ?? string.Empty,
-        ScmRequirementKind.PullRequest => PullRequest?.Titel ?? string.Empty,
+        ScmRequirementKind.Issue => Issue?.Title ?? string.Empty,
+        ScmRequirementKind.PullRequest => PullRequest?.Title ?? string.Empty,
         _ => Alert?.Title ?? string.Empty
     };
 
     /// <summary>Erste Anzeigezeile fuer den Anforderungstyp.</summary>
-    public string TypText => Kind switch
+    public string KindText => Kind switch
     {
         ScmRequirementKind.Issue => "Offene Anforderung",
         ScmRequirementKind.PullRequest => "Pull Request",
@@ -25,10 +25,10 @@ public sealed record ScmRequirement(
     };
 
     /// <summary>Issue- oder Pull-Request-Nummer.</summary>
-    public int? Nummer => Issue?.Nummer ?? PullRequest?.Nummer;
+    public int? Number => Issue?.Number ?? PullRequest?.Number;
 
     /// <summary>Anzeige der Issue- oder Pull-Request-Nummer.</summary>
-    public string NummerText => Nummer is null ? string.Empty : $"#{Nummer}";
+    public string NumberText => Number is null ? string.Empty : $"#{Number}";
 
     /// <summary>Stabile sichtbare Providerbezeichnung fuer Pull Requests.</summary>
     public string ProviderText => PullRequest is null
@@ -72,8 +72,8 @@ public sealed record ScmRequirement(
 
     /// <summary>Strukturierte Automatisierungskennung des Vorschlags.</summary>
     public string AutomationText => RepositoryContext is null
-        ? $"{Kind}:{NummerText}:{Titel}"
-        : $"{Kind}:{ProviderText}:{NummerText}:{RepositoryContext.GitRepositoryId:N}:{RepositoryContext.RepositoryId}";
+        ? $"{Kind}:{NumberText}:{Title}"
+        : $"{Kind}:{ProviderText}:{NumberText}:{RepositoryContext.GitRepositoryId:N}:{RepositoryContext.RepositoryId}";
 
     /// <summary>Erzeugt eine SCM-Anforderung aus einem Issue und Repository-Snapshot.</summary>
     public static ScmRequirement FromIssue(Issue issue, ScmRepositoryContext repositoryContext)

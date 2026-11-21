@@ -17,12 +17,12 @@ public partial class End2EndTest
     /// <summary>
     /// Szenario: Neue Aufgabe erstellen, Titel ausfüllen, speichern (Phase Speichern); anschließend
     /// explizit zur Projektansicht zurückkehren und eine weitere Aufgabe über "Zurück" abbrechen
-    /// (Phase Abbrechen). Prüft: Die gespeicherte Aufgabe bleibt nach dem Speichern in der
+    /// (Phase Cancel). Prüft: Die gespeicherte Aufgabe bleibt nach dem Speichern in der
     /// TaskDetailView geöffnet, wird mit Status "Neu" persistiert und erscheint nach expliziter
     /// Rücknavigation in der Liste. Die im Abbrechen-Pfad eingegebene Titeländerung wird nicht
     /// persistiert, die zuvor angelegte Aufgabe (Status "Neu") bleibt jedoch weiterhin vorhanden.
     /// </summary>
-    protected void AufgabeAnlegen_SpeichernPersistiert_UndAbbrechenVerwirftTitel_E2E(Window mainWindow)
+    protected void WorkItemCreate_SavePersisted_AndCancelDiscardsTitle_E2E(Window mainWindow)
     {
         var projectList = new ProjectListView(mainWindow).ForceShow();
         projectList.CreateProject("NeueAufgabe-Test");
@@ -43,10 +43,10 @@ public partial class End2EndTest
         // Neue Aufgabe erscheint mit aktualisiertem Titel in der Aufgabenliste.
         projectDetailAfterSave.WaitForTask("Persistierte Neue Aufgabe");
 
-        // Phase Abbrechen
-        var taskDetailAbbrechen = projectDetailAfterSave.CreateTask();
-        taskDetailAbbrechen.SetTaskTitle("Nicht gespeicherter Titel");
-        taskDetailAbbrechen.GoBack();
+        // Phase Cancel
+        var taskDetailCancel = projectDetailAfterSave.CreateTask();
+        taskDetailCancel.SetTaskTitle("Nicht gespeicherter Titel");
+        taskDetailCancel.GoBack();
         var projectDetailAfterCancel = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());
 
         // Der nicht gespeicherte Titel erscheint nicht in der Aufgabenliste

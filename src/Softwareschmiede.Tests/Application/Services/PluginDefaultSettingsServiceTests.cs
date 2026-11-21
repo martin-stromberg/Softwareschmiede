@@ -7,7 +7,7 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für persistierte Standard-Plugin-Einstellungen.</summary>
+/// <summary>Tests für persistierte Standard-Plugin--Einstellungen.</summary>
 public sealed class PluginDefaultSettingsServiceTests
 {
     /// <summary>Speichert einen neuen Wert je Plugin-Typ.</summary>
@@ -22,8 +22,8 @@ public sealed class PluginDefaultSettingsServiceTests
         await sut.SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, "Softwareschmiede.GitHubCopilot", TestContext.Current.CancellationToken);
 
         // Assert
-        var entity = await db.AppEinstellungen.SingleAsync(e => e.Schluessel == "plugins.default.DevelopmentAutomation", cancellationToken: TestContext.Current.CancellationToken);
-        entity.Wert.Should().Be("Softwareschmiede.GitHubCopilot");
+        var entity = await db.AppSettings.SingleAsync(e => e.Key == "plugins.default.DevelopmentAutomation", cancellationToken: TestContext.Current.CancellationToken);
+        entity.Value.Should().Be("Softwareschmiede.GitHubCopilot");
     }
 
     /// <summary>Normalisiert gespeicherte Werte mit Leerzeichen.</summary>
@@ -55,7 +55,7 @@ public sealed class PluginDefaultSettingsServiceTests
         await sut.SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, "Softwareschmiede.New", TestContext.Current.CancellationToken);
 
         // Assert
-        db.AppEinstellungen.Count(e => e.Schluessel == "plugins.default.DevelopmentAutomation").Should().Be(1);
+        db.AppSettings.Count(e => e.Key == "plugins.default.DevelopmentAutomation").Should().Be(1);
         var value = await sut.GetDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, TestContext.Current.CancellationToken);
         value.Should().Be("Softwareschmiede.New");
     }
@@ -73,8 +73,8 @@ public sealed class PluginDefaultSettingsServiceTests
         await sut.SaveDefaultPluginPrefixAsync(PluginType.SourceCodeManagement, "   ", TestContext.Current.CancellationToken);
 
         // Assert
-        var entity = await db.AppEinstellungen.SingleAsync(e => e.Schluessel == "plugins.default.SourceCodeManagement", cancellationToken: TestContext.Current.CancellationToken);
-        entity.Wert.Should().BeNull();
+        var entity = await db.AppSettings.SingleAsync(e => e.Key == "plugins.default.SourceCodeManagement", cancellationToken: TestContext.Current.CancellationToken);
+        entity.Value.Should().BeNull();
     }
 
     /// <summary>Gespeicherter Projekt-Default wird korrekt abgerufen.</summary>
@@ -84,11 +84,11 @@ public sealed class PluginDefaultSettingsServiceTests
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var sut = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var projektId = Guid.NewGuid();
-        await sut.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
+        var projectId = Guid.NewGuid();
+        await sut.SaveProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
 
         // Act
-        var value = await sut.GetProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, TestContext.Current.CancellationToken);
+        var value = await sut.GetProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, TestContext.Current.CancellationToken);
 
         // Assert
         value.Should().Be("Softwareschmiede.ProjectKi");
@@ -111,18 +111,18 @@ public sealed class PluginDefaultSettingsServiceTests
 
     /// <summary>Projekt-Default wird mit scoped Key in AppEinstellung gespeichert.</summary>
     [Fact]
-    public async Task TestSaveProjectDefaultPluginPrefix_StoresInAppEinstellung()
+    public async Task TestSaveProjectDefaultPluginPrefix_StoresInAppSetting()
     {
         // Arrange
         await using var db = TestDbContextFactory.Create();
         var sut = new PluginDefaultSettingsService(db, NullLogger<PluginDefaultSettingsService>.Instance);
-        var projektId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
 
         // Act
-        await sut.SaveProjectDefaultPluginPrefixAsync(projektId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
+        await sut.SaveProjectDefaultPluginPrefixAsync(projectId, PluginType.DevelopmentAutomation, "Softwareschmiede.ProjectKi", TestContext.Current.CancellationToken);
 
         // Assert
-        var entity = await db.AppEinstellungen.SingleAsync(e => e.Schluessel == $"plugins.default.project.{projektId}.DevelopmentAutomation", cancellationToken: TestContext.Current.CancellationToken);
-        entity.Wert.Should().Be("Softwareschmiede.ProjectKi");
+        var entity = await db.AppSettings.SingleAsync(e => e.Key == $"plugins.default.project.{projectId}.DevelopmentAutomation", cancellationToken: TestContext.Current.CancellationToken);
+        entity.Value.Should().Be("Softwareschmiede.ProjectKi");
     }
 }

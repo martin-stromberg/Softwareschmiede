@@ -28,7 +28,7 @@ public sealed class CodexPluginTests
     {
         _sut.PluginName.Should().Be("Codex CLI");
         _sut.PluginPrefix.Should().Be("Softwareschmiede.Codex");
-        _sut.ProviderDateiPraefix.Should().Be("codex");
+        _sut.ProviderFilePrefix.Should().Be("codex");
         _sut.PluginType.Should().Be(PluginType.DevelopmentAutomation);
 
         var settings = _sut.GetSettingGroups();
@@ -36,14 +36,14 @@ public sealed class CodexPluginTests
         settings.Should().Contain(group => group.GroupName == "Ausfuehrung");
         settings.Should().Contain(group => group.GroupName == "CLI-Konfiguration");
         settings.SelectMany(g => g.Fields).Should().Contain(f => f.Key == "ExecutablePath");
-        var commandLineParametersField = settings.SelectMany(g => g.Fields)
+        var commandLineParameterField = settings.SelectMany(g => g.Fields)
             .Should().ContainSingle(f => f.Key == "CommandLineParameters")
             .Subject;
-        commandLineParametersField.DefaultValue.Should().BeNull();
-        commandLineParametersField.IsRequired.Should().BeFalse();
+        commandLineParameterField.DefaultValue.Should().BeNull();
+        commandLineParameterField.IsRequired.Should().BeFalse();
     }
 
-    /// <summary>SupportsSessionContinuation returns false until a stable local CLI pattern exists.</summary>
+    /// <summary>SupportsSessionContinuation gibt false zurück, bis ein stabiles lokales CLI-Muster existiert.</summary>
     [Fact]
     public void SupportsSessionContinuation_ShouldReturnFalse()
     {
@@ -59,7 +59,7 @@ public sealed class CodexPluginTests
 
     /// <summary>Die Issue-Ausfuellhilfe uebergibt Template und Originalanforderung vollstaendig ueber stdin.</summary>
     [Fact]
-    public void BuildIssueTemplateFillInvocation_ShouldIncludeTemplateAndRequirement_InStandardInput()
+    public void BuildIssueTemplateFillInvocation_ShouldIncludeTemplateAndRequirement_InDefaultInput()
     {
         const string templateBody = "## Fehlerbeschreibung\nBitte ausfuellen.";
         const string originalRequirement = "Als Nutzer moechte ich ein Issue aus einer Aufgabe anlegen.";
@@ -114,14 +114,14 @@ public sealed class CodexPluginTests
 
     /// <summary>StartCliAsync passes optional parameters as arguments.</summary>
     [Fact]
-    public async Task StartCliAsync_ShouldPassParameters_AsArguments()
+    public async Task StartCliAsync_ShouldPassParameter_AsArguments()
     {
         var psi = await _sut.StartCliAsync("/repo", "--some-flag", TestContext.Current.CancellationToken);
 
         psi.Arguments.Should().Be("--some-flag");
     }
 
-    /// <summary>StartCliAsync does not set an auth environment variable by default.</summary>
+    /// <summary>StartCliAsync setzt standardmäßig keine Auth-Umgebungsvariable.</summary>
     [Fact]
     public async Task StartCliAsync_ShouldNotSetAuthEnvironmentVariable()
     {
@@ -133,7 +133,7 @@ public sealed class CodexPluginTests
 
     /// <summary>StartCliAsync appends CommandLineParameters from credential store to arguments.</summary>
     [Fact]
-    public async Task StartCliAsync_ShouldIncludeCommandLineParameters_InProcessStartInfo()
+    public async Task StartCliAsync_ShouldIncludeCommandLineParameter_InProcessStartInfo()
     {
         _credentialStoreMock.Setup(store => store.GetCredential("Softwareschmiede.Codex.CommandLineParameters"))
             .Returns("--verbose --model gpt-4");

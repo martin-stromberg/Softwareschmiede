@@ -10,10 +10,10 @@ public interface IPseudoConsoleProcessLauncher
 
     /// <summary>Startet den in <paramref name="spec"/> beschriebenen CLI-Prozess direkt (die Spec ist bereits
     /// durch <c>TerminalExecutableResolver</c> normalisiert — der Launcher enthält keine eigene Auflösungslogik).</summary>
-    /// <param name="aufgabeId">ID der Aufgabe (für Logging).</param>
+    /// <param name="workItemId">ID der Aufgabe (für Logging).</param>
     /// <param name="spec">Die normalisierte Startbeschreibung der Anbieter-CLI.</param>
     /// <param name="outputSink">Optionale Senke für Terminal-Ausgabe.</param>
     /// <returns>Ein <see cref="TerminalSessionStartResult"/> mit Prozess, Session und
     /// Backend-Kennzeichnung.</returns>
-    TerminalSessionStartResult Start(Guid aufgabeId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null);
+    TerminalSessionStartResult Start(Guid workItemId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink = null);
 }

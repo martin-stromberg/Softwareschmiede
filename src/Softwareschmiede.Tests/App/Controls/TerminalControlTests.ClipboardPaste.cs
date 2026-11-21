@@ -29,11 +29,11 @@ public sealed partial class TerminalControlTests
     /// </summary>
     /// <param name="text">Der in die Zwischenablage zu schreibende Text.</param>
     private static void SetClipboardTextWithRetry(string text)
-        => ClipboardTestHelfer.SetTextMitRetry(text);
+        => ClipboardTestHelper.SetTextWithRetry(text);
 
     /// <summary>Leert die Windows-Zwischenablage mit Retry - Begründung siehe <see cref="SetClipboardTextWithRetry"/>.</summary>
     private static void ClearClipboardWithRetry()
-        => ClipboardTestHelfer.LeerenMitRetry();
+        => ClipboardTestHelper.EmptyWithRetry();
 
     /// <summary>Drückt der Anwender <c>Ctrl+V</c>, muss das Tastaturereignis als behandelt markiert werden,
     /// damit es nicht an den bestehenden Tastatur-Encoder weitergereicht wird.</summary>
@@ -222,7 +222,7 @@ public sealed partial class TerminalControlTests
     /// <summary>Ein langer mehrzeiliger Clipboard-Inhalt muss vollständig und mit normalisierten Zeilenumbrüchen
     /// in der Session ankommen.</summary>
     [OsInterfaceFact]
-    public void ReadClipboardAndInsertAsync_LangerMehrzeiligerText_WritesCompleteEncodedBytes()
+    public void ReadClipboardAndInsertAsync_LongerMultilineText_WritesCompleteEncodedBytes()
     {
         RunOnSta(() =>
         {
@@ -245,7 +245,7 @@ public sealed partial class TerminalControlTests
     /// <summary>Ein laufender Paste schreibt in die beim Start übergebene Session, auch wenn das Control später
     /// eine andere Session anzeigt.</summary>
     [OsInterfaceFact]
-    public void ReadClipboardAndInsertAsync_SessionWechseltWaerendPaste_SchreibtInSnapshotSession()
+    public void ReadClipboardAndInsertAsync_SessionSwitchesDuringPaste_WritesInSnapshotSession()
     {
         RunOnSta(() =>
         {

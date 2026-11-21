@@ -84,7 +84,7 @@ Der automatische Einmal-Retry greift ausschliesslich fuer `Flaky`-markierte Test
 1. Primaer-TRX parsen, fehlgeschlagene Testnamen einsammeln (Theory-Datenzeilen werden auf den Methoden-FQN normalisiert).
 2. Flaky-Menge via `dotnet test --no-build --list-tests --filter "Category=Flaky"` ermitteln.
 3. Schnittmenge leer → „keine Flaky-Fehlschlaege", Exit 0 (kein Retry; bei Build-Fehlschlag/fehlendem TRX ebenso).
-4. Sonst genau ein gefilterter Re-Run: `--filter "(Category=Flaky)&(FullyQualifiedName~...)"` → Retry-TRX `<primaername>-flaky-retry.trx`.
+4. Sonst genau ein gefilterter Re-Run: `--filter "(Category=Flaky)&(FullyQualifiedName~...)"` → Retry-TRX `<primaryname>-flaky-retry.trx`.
 5. Auswertung recovered/persistent: recovered wird als `::notice::`, persistent als `::warning::` annotiert; persistente Fehlschlaege lassen den Schritt mit Exit 1 fehlschlagen (der Job bleibt durch `continue-on-error` nicht-blockierend).
 
 Beide TRX-Dateien (Primaer und Retry) wandern ueber das Artefakt-Glob `test-results-os-interface*.trx` ins Upload-Artefakt — der Erstfehlschlag bleibt sichtbar.
@@ -158,7 +158,7 @@ Treffer ohne `OsInterface`-Markierung pruefen: Helper/Fixtures ohne eigene Testm
 
 ## Externe Runner
 
-Fuer `/run-tests` gilt die erwartete Auswertung:
+Fuer `/run-tests` gilt die expectede Auswertung:
 
 - regulaere Fehler bilden die blockierende Fehlermenge
 - OS-Schnittstellen-Fehler werden separat gelistet

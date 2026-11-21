@@ -23,8 +23,8 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
         }
     }
 
-    // The E2E suite never creates screenshots; the stub stays dormant but keeps an
-    // unexpected upload call diagnosable in scm-calls.jsonl like every remote call.
+    // Die E2E-Suite erstellt niemals Screenshots; der Stub bleibt ruhend, hält aber einen
+    // unerwarteten Upload-Aufruf in scm-calls.jsonl wie jeden Remote-Aufruf diagnostizierbar.
     public Task<GitHubEventApiResponse> UploadAsync(GitHubAssetUploadRequest request, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -74,7 +74,7 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
             var variables = document.RootElement.GetProperty("variables");
             if (variables.TryGetProperty("id", out var id))
             {
-                var text = scenario.Texts.SingleOrDefault(x => x.NodeId == id.GetString());
+                var text = scenario.Text.SingleOrDefault(x => x.NodeId == id.GetString());
                 if (text is not null) return Json(new { data = new { node = Node(text) } });
                 var response = responses.SingleOrDefault(x => "RESPONSE_" + x.Id == id.GetString());
                 if (response is not null)
@@ -87,7 +87,7 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
                 var field = query.Contains("pullRequests(", StringComparison.Ordinal) ? "pullRequests" : "issues";
                 var prKind = field == "pullRequests";
                 object[] nodes = query.Contains("[CLOSED", StringComparison.Ordinal) ? []
-                    : scenario.Texts.Where(x => x.PullRequest == prKind).Select(x => x.Number).Distinct()
+                    : scenario.Text.Where(x => x.PullRequest == prKind).Select(x => x.Number).Distinct()
                         .Select(n => (object)new { number = n, updatedAt = DateTimeOffset.UtcNow }).ToArray();
                 return Json(new { data = new { repository = new Dictionary<string, object> { [field] = new { nodes, pageInfo = new { hasNextPage = false, endCursor = (string?)null } } } } });
             }
@@ -97,7 +97,7 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
                 return Json(new { data = new { repository = new { pullRequest = PullRequestStatus(number) } } });
             if (query.Contains("reviews(", StringComparison.Ordinal))
                 return Json(new { data = new { repository = new { pullRequest = new { reviews = new { nodes = Array.Empty<object>(), pageInfo = new { hasNextPage = false, endCursor = (string?)null } } } } } });
-            var description = scenario.Texts.SingleOrDefault(x => x.Number == number && x.PullRequest == pr && x.Kind == "Description")
+            var description = scenario.Text.SingleOrDefault(x => x.Number == number && x.PullRequest == pr && x.Kind == "Description")
                 ?? new ScmE2EText { Id = number + (pr ? 10000 : 0), Number = number, Kind = "Description", PullRequest = pr, Body = "Beschreibung ohne Trigger" };
             return Json(new { data = new { repository = new Dictionary<string, object> { [pr ? "pullRequest" : "issue"] = Node(description) } } });
         }
@@ -124,9 +124,9 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
         {
             var detailNumber = int.Parse(detail.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
             var detailPr = detail.Groups[1].Value == "pulls";
-            var title = scenario.Texts.FirstOrDefault(x => x.Number == detailNumber && x.PullRequest == detailPr)?.Titel
+            var title = scenario.Text.FirstOrDefault(x => x.Number == detailNumber && x.PullRequest == detailPr)?.Title
                 ?? $"SCM Referenz {detailNumber}";
-            var body = scenario.Texts.FirstOrDefault(x => x.Number == detailNumber && x.PullRequest == detailPr
+            var body = scenario.Text.FirstOrDefault(x => x.Number == detailNumber && x.PullRequest == detailPr
                 && x.Kind == "Description")?.Body ?? string.Empty;
             if (!detailPr)
                 return Json(new
@@ -160,7 +160,7 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
         {
             var number = int.Parse(match.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
             var kind = match.Groups[1].Value == "pulls" ? "ReviewComment" : "IssueComment";
-            var items = scenario.Texts.Where(x => x.Number == number && x.Kind == kind)
+            var items = scenario.Text.Where(x => x.Number == number && x.Kind == kind)
                 .Select(x => (object)new { id = x.Id, node_id = x.NodeId, body = x.Body, user = new { node_id = x.Author == "scm-owner" ? "OWNER" : "OTHER", login = x.Author } }).ToList();
             items.AddRange(responses.Where(x => x.Endpoint == path).Select(Remote));
             return Json(items);

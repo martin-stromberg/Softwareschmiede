@@ -47,9 +47,9 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
         RetrySourcesCommand = Command(async ct =>
         {
             using var scope = _scopes.CreateScope();
-            var monitoringEnabled = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmMonitoringEnabledAsync(ct);
+            var monitoringEnabled = await scope.ServiceProvider.GetRequiredService<AppSettingService>().GetScmMonitoringEnabledAsync(ct);
             // Die Backoff-Rücksetzung gilt für Ereignis- wie Backmerge-Checkpoints gleichermaßen.
-            await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmObservationCheckpoints
+            await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmObservationCheckpoints
                 .ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)null), ct);
             if (!monitoringEnabled)
             {
@@ -60,12 +60,12 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
                 await scope.ServiceProvider.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(ct);
             }
             // Der Backmerge-Prüfzyklus ist unabhängig vom Ereignisüberwachungs-Schalter;
-            // er prüft seinen eigenen Modus (Einstellungen → Automatisierung → Prozessabläufe).
+            // er prüft seinen eigenen Modus (Settings → Automatisierung → Prozessabläufe).
             await scope.ServiceProvider.GetRequiredService<ScmBackmergeMonitoringService>().RunOnceAsync(ct);
             // Der Aufbereitungs-Entdeckungszyklus ist ebenfalls unabhängig vom
             // Ereignisüberwachungs-Schalter; er prüft seinen eigenen Schalter
-            // (Einstellungen → Automatisierung → Issue-Aufbereitung).
-            await scope.ServiceProvider.GetRequiredService<ScmIssueAufbereitungMonitoringService>().RunOnceAsync(ct);
+            // (Settings → Automatisierung → Issue-Aufbereitung).
+            await scope.ServiceProvider.GetRequiredService<ScmIssuePreparationMonitoringService>().RunOnceAsync(ct);
         });
         OpenEventCommand = Command(OpenAsync, () => SelectedEvent is { IsFinal: false, IsBlocked: false, AttemptId: null });
         // Eine nach „Verarbeitet" permanent gescheiterte Outbox-Aktion (z. B. Screenshot-Nachweis)
@@ -85,14 +85,14 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
 
     /// <summary>Wird vom Hauptfenster auf dessen Aufgabennavigation gesetzt.</summary>
     public Action<Guid>? NavigateToTaskAction { get; set; }
-    /// <summary>Öffnet die regulären CLI-Einstellungen.</summary>
+    /// <summary>Öffnet die regulären CLI--Einstellungen.</summary>
     public Action? NavigateToSettingsAction { get; set; }
     /// <summary>Führt zum Dashboard zurück.</summary>
     public Action? BackAction { get; set; }
     /// <summary>Gefilterte, dauerhafte Ereignisse.</summary>
     public ObservableCollection<ScmEventQueueItem> Events { get; } = new();
     /// <summary>Verfügbare Anzeigefilter.</summary>
-    public IReadOnlyList<string> Filters { get; } = ["Wartend", "Verarbeitet", "Abgebrochen", "Alle"];
+    public IReadOnlyList<string> Filter { get; } = ["Wartend", "Verarbeitet", "Abgebrochen", "Alle"];
     /// <summary>Reiner Anzeigefilter; löst keine Ereignisverarbeitung aus.</summary>
     public string SelectedFilter
     {
@@ -169,22 +169,22 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
         {
             _dispatch(() => IsLoading = true);
             using var scope = _scopes.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var filter = SelectedFilter;
             var query = db.ScmIncomingEvents.AsNoTracking();
             if (filter == "Wartend") query = query.Where(x => x.Status != "Verarbeitet" && x.Status != "Abgebrochen");
             if (filter == "Verarbeitet") query = query.Where(x => x.Status == "Verarbeitet");
             if (filter == "Abgebrochen") query = query.Where(x => x.Status == "Abgebrochen");
             var records = await query.OrderBy(x => x.Sequence).ToListAsync(ct);
-            var taskIds = records.Select(x => x.AufgabeId).Distinct().ToArray();
-            var tasks = await db.Aufgaben.AsNoTracking().Where(x => taskIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+            var taskIds = records.Select(x => x.WorkItemId).Distinct().ToArray();
+            var tasks = await db.WorkItems.AsNoTracking().Where(x => taskIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
             // Nicht abgeschlossene Outbox-Aktionen markieren, damit „Erneut prüfen" auch an
             // einem „Verarbeitet"-Ereignis mit gescheiterter Folgeaktion angeboten werden kann.
             var eventIds = records.Select(x => x.Id).ToArray();
             var openActionEvents = (await db.ScmOutgoingActions.AsNoTracking()
                 .Where(x => x.Status != "Succeeded" && eventIds.Contains(x.EventId))
                 .Select(x => x.EventId).Distinct().ToListAsync(ct)).ToHashSet();
-            var entries = records.Select(item => ScmEventQueueItem.From(item, tasks.GetValueOrDefault(item.AufgabeId),
+            var entries = records.Select(item => ScmEventQueueItem.From(item, tasks.GetValueOrDefault(item.WorkItemId),
                 openActionEvents.Contains(item.Id))).ToList();
             // "Keine Aufgabe zugeordnet" ist der erwartete Normalzustand enumerierter Referenzen ohne lokale
             // Aufgabe und weder eine Unterbrechung noch ein Fehler — nur echte Beobachtungsfehler alarmieren.
@@ -196,7 +196,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
                 .Join(db.ScmIncomingEvents.AsNoTracking(), x => x.EventId, e => e.Id,
                     (x, e) => new { x.Purpose, x.Status, x.Error, x.NextAttemptUtc, Event = e })
                 .ToListAsync(ct);
-            var monitoringEnabled = await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().GetScmMonitoringEnabledAsync(ct);
+            var monitoringEnabled = await scope.ServiceProvider.GetRequiredService<AppSettingService>().GetScmMonitoringEnabledAsync(ct);
             // Die heilsame Schaltfläche unterscheidet sich: Quellen-Fehler löst ausschließlich
             // „Quellen erneut prüfen", eine gesperrte Outbox-Aktion (z. B. Screenshot-Nachweis)
             // nur das ereignisbezogene „Erneut prüfen" am betroffenen Ereignis.
@@ -219,7 +219,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
                 LoadError = null;
                 Diagnostics = diagnostic;
                 MonitoringNotice = !monitoringEnabled
-                    ? "Die SCM-Ereignisüberwachung ist deaktiviert; neue Anfragen werden nicht eingelesen oder automatisch zugestellt (Einstellungen → Automatisierung → Aufgaben ausführen)."
+                    ? "Die SCM-Ereignisüberwachung ist deaktiviert; neue Anfragen werden nicht eingelesen oder automatisch zugestellt (Settings → Automatisierung → Aufgaben ausführen)."
                     : alertErrors.Count == 0 ? null
                     : "Die GitHub-Überwachung ist für betroffene Quellen unterbrochen; neue Anfragen können fehlen. "
                       + alertErrors[0].Diagnostic
@@ -275,21 +275,21 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             if (session is not null)
             {
                 var confirmed = false;
-                _dispatch(() => confirmed = _dialogs.BestaetigenDialog(
+                _dispatch(() => confirmed = _dialogs.ConfirmDialog(
                     $"An laufende CLI übergeben: {session.PluginPrefix}\nSitzung: {session.CliRunId:D}\nEine beschäftigte CLI wartet auf Eingabebereitschaft.", "SCM-Ereignis öffnen"));
                 return confirmed ? session.PluginPrefix : null;
             }
-            var available = await selection.GetAvailableKiPluginPrefixesAsync(token);
+            var available = await selection.GetAvailableAiPluginPrefixesAsync(token);
             if (available.Count == 0)
             {
                 _dispatch(() => Message = "Keine aktivierte CLI verfügbar. Bitte in den Einstellungen eine CLI aktivieren.");
                 return null;
             }
             // Absichtlich kein Single-Plugin-Kurzschluss: auch ein einziges Plugin erfordert die Auswahlbestätigung.
-            var result = await _dialogs.ShowPluginSelectionDialogAsync(available, task.KiPluginPrefix, token);
+            var result = await _dialogs.ShowPluginSelectionDialogAsync(available, task.AiPluginPrefix, token);
             if (result.SelectedPluginPrefix is null) return null;
             if (result.SaveAsProjectDefault)
-                await selection.SaveProjectDefaultPluginPrefixAsync(task.ProjektId, PluginType.DevelopmentAutomation, result.SelectedPluginPrefix, token);
+                await selection.SaveProjectDefaultPluginPrefixAsync(task.ProjectId, PluginType.DevelopmentAutomation, result.SelectedPluginPrefix, token);
             return result.SelectedPluginPrefix;
         }, ct);
     }
@@ -300,7 +300,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
         using var scope = _scopes.CreateScope();
         ct.ThrowIfCancellationRequested();
         await action(scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>(), item);
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var current = await db.ScmIncomingEvents.AsNoTracking().SingleOrDefaultAsync(x => x.Id == item.Id, ct);
         if (current is not null)
         {
@@ -320,7 +320,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
     private async Task ResendAsync(CancellationToken ct)
     {
         if (SelectedEvent is not { CanResend: true, AttemptId: { } attempt } item) return;
-        if (!_dialogs.BestaetigenDialog("Der vorherige Versuch könnte bereits verarbeitet worden sein. Neu senden kann eine Doppelbearbeitung und doppelte Antworten verursachen. Trotzdem neu senden?", "Mögliche Doppelbearbeitung")) return;
+        if (!_dialogs.ConfirmDialog("Der vorherige Versuch könnte bereits verarbeitet worden sein. Neu senden kann eine Doppelbearbeitung und doppelte Antworten verursachen. Trotzdem neu senden?", "Mögliche Doppelbearbeitung")) return;
         using var scope = _scopes.CreateScope();
         await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ResendAsync(item.Id, attempt, ct);
     }
@@ -329,7 +329,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
     {
         if (SelectedEvent is not { IsFinal: false } item) return;
         var delivered = item.AttemptId is not null;
-        if (!_dialogs.BestaetigenDialog(
+        if (!_dialogs.ConfirmDialog(
                 "Das Ereignis wird endgültig abgebrochen: keine weiteren Zustell- oder Prüfversuche und keine weiteren GitHub-Antworten."
                 + (delivered ? "\nEine eventuell laufende CLI-Verarbeitung wird dadurch nicht beendet." : string.Empty)
                 + "\nEreignis abbrechen?", "SCM-Ereignis abbrechen")) return;
@@ -394,16 +394,16 @@ public sealed record ScmEventQueueItem(Guid Id, Guid TaskId, string TaskTitle, s
     /// <summary>Nur ein als bestätigbar markierter, noch nicht zugestellter Wartegrund bietet die Bestätigung an.</summary>
     public bool CanConfirmReady => !IsBlocked && AttemptId is null && CliRunId is not null && ScmCliWaitReason.IsConfirmable(Reason);
     /// <summary>Erstellt die menschenlesbare Projektion aus dauerhaften Daten.</summary>
-    public static ScmEventQueueItem From(ScmIncomingEvent item, Aufgabe? task, bool hasOpenActions)
+    public static ScmEventQueueItem From(ScmIncomingEvent item, WorkItem? task, bool hasOpenActions)
     {
         var observation = ScmEventStore.Observation(item);
-        var blocked = task is null || task.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert || task.PausiertBisUtc > DateTimeOffset.UtcNow;
-        var reason = task is null ? "Zugehörige Aufgabe wurde entfernt." : task.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert
-            ? "Aufgabe beendet/archiviert; Start gesperrt." : task.PausiertBisUtc > DateTimeOffset.UtcNow ? "Aufgabe pausiert; Start gesperrt." : item.Reason;
-        return new(item.Id, item.AufgabeId, task?.Titel ?? "Entfernte Aufgabe",
+        var blocked = task is null || task.Status is WorkItemStatus.Completed or WorkItemStatus.Archived || task.PausedUntilUtc > DateTimeOffset.UtcNow;
+        var reason = task is null ? "Zugehörige Aufgabe wurde entfernt." : task.Status is WorkItemStatus.Completed or WorkItemStatus.Archived
+            ? "Aufgabe beendet/archiviert; Start gesperrt." : task.PausedUntilUtc > DateTimeOffset.UtcNow ? "Aufgabe pausiert; Start gesperrt." : item.Reason;
+        return new(item.Id, item.WorkItemId, task?.Title ?? "Entfernte Aufgabe",
             $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}",
             $"{(observation.Reference.Kind == Domain.ValueObjects.ScmReferenceKind.Issue ? "Issue" : "Pull Request")} #{observation.Reference.Number}",
-            item.Zweck == ScmIssueAufbereitungsService.Zweck ? "Issue-Aufbereitung"
+            item.Purpose == ScmIssuePreparationService.Purpose ? "Issue-Aufbereitung"
                 : observation.ContentKind switch { Domain.ValueObjects.ScmContentKind.Description => "Beschreibung", Domain.ValueObjects.ScmContentKind.ReviewComment => "Review-Kommentar", Domain.ValueObjects.ScmContentKind.PullRequestReview => "Review", _ => "Kommentar" },
             DateTimeOffset.FromUnixTimeMilliseconds(item.ReceivedUtc).ToLocalTime().ToString("g"), item.Status,
             item.Status switch { "ZustellungVorbereitet" => "Zustellung vorbereitet", "InBearbeitung" => "In Bearbeitung", "ZustellungUngewiss" => "Zustellung ungewiss", "VerarbeitungUngeklärt" => "Verarbeitung ungeklärt", _ => item.Status },

@@ -4,16 +4,16 @@ namespace Softwareschmiede.Domain.Enums;
 public sealed class InvalidStatusTransitionException : InvalidOperationException
 {
     /// <summary>Erstellt eine neue Instanz der <see cref="InvalidStatusTransitionException"/>.</summary>
-    public InvalidStatusTransitionException(AufgabeStatus von, AufgabeStatus nach)
-        : base($"Statusübergang von '{von}' nach '{nach}' ist nicht erlaubt.")
+    public InvalidStatusTransitionException(WorkItemStatus von, WorkItemStatus nach)
+        : base($"Statusübergang von '{von.ToDisplayText()}' nach '{nach.ToDisplayText()}' ist nicht erlaubt.")
     {
-        Von = von;
-        Nach = nach;
+        From = von;
+        To = nach;
     }
 
     /// <summary>Ausgangsstatus.</summary>
-    public AufgabeStatus Von { get; }
+    public WorkItemStatus From { get; }
 
     /// <summary>Zielstatus.</summary>
-    public AufgabeStatus Nach { get; }
+    public WorkItemStatus To { get; }
 }

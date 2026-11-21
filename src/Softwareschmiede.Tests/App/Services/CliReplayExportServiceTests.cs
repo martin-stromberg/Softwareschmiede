@@ -14,15 +14,15 @@ namespace Softwareschmiede.Tests.App.Services;
 /// <summary>Unit-Tests für <see cref="CliReplayExportService"/>.</summary>
 public sealed class CliReplayExportServiceTests : IDisposable
 {
-    private readonly KiAusfuehrungsService _kiService;
-    private readonly CliReplayAufzeichnungStore _store = new();
+    private readonly AiExecutionService _aiService;
+    private readonly CliReplayRecordingStore _store = new();
     private readonly CliReplayExportService _sut;
 
     /// <summary>CliReplayExportServiceTests.</summary>
     public CliReplayExportServiceTests()
     {
-        _kiService = TestKiAusfuehrungsServiceFactory.Create();
-        _sut = new CliReplayExportService(_kiService, _store, NullLogger<CliReplayExportService>.Instance);
+        _aiService = TestAiExecutionServiceFactory.Create();
+        _sut = new CliReplayExportService(_aiService, _store, NullLogger<CliReplayExportService>.Instance);
     }
 
     /// <summary>Dispose — die KiAusfuehrungsService-Instanzen werden bewusst nicht disposed, weil der
@@ -34,69 +34,69 @@ public sealed class CliReplayExportServiceTests : IDisposable
 
     /// <summary>Ohne aufgezeichnete Session schlägt der Export mit InvalidOperationException fehl.</summary>
     [Fact]
-    public async Task ExportCliReplayAsync_OhneAufzeichnung_WirftInvalidOperationException()
+    public async Task ExportCliReplayAsync_WithoutRecording_ThrowsInvalidOperationException()
     {
         var act = () => _sut.ExportCliReplayAsync(Guid.NewGuid(), Path.Combine(Path.GetTempPath(), "x.clireplay"));
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    /// <summary><see cref="CliReplayExportService.HatAufzeichnung"/> spiegelt die Verfügbarkeit des
+    /// <summary><see cref="CliReplayExportService.HasRecording"/> spiegelt die Verfügbarkeit des
     /// Mitschnitts wider — false ohne Session-Start, true nach einem Start.</summary>
     [Fact]
-    public async Task HatAufzeichnung_SpiegeltVerfuegbarkeitDesMitschnitts()
+    public async Task HasRecording_MirrorsAvailabilityOfRecording()
     {
-        var aufgabeId = Guid.NewGuid();
-        _sut.HatAufzeichnung(aufgabeId).Should().BeFalse("ohne Session-Start liegt kein Mitschnitt vor");
+        var workItemId = Guid.NewGuid();
+        _sut.HasRecording(workItemId).Should().BeFalse("ohne Session-Start liegt kein Mitschnitt vor");
 
-        var kiService = TestKiAusfuehrungsServiceFactory.Create(
+        var aiService = TestAiExecutionServiceFactory.Create(
             new Mock<IServiceScopeFactory>().Object,
             launcher: TestTerminalSessionFactory.CreateChunkEmittingLauncher([Encoding.UTF8.GetBytes("x")]));
-        var sut = new CliReplayExportService(kiService, _store, NullLogger<CliReplayExportService>.Instance);
-        var pluginMock = new Mock<IKiPlugin>();
+        var sut = new CliReplayExportService(aiService, _store, NullLogger<CliReplayExportService>.Instance);
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.SetupTerminalSpec();
-        await kiService.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        await aiService.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        sut.HatAufzeichnung(aufgabeId).Should().BeTrue();
+        sut.HasRecording(workItemId).Should().BeTrue();
     }
 
     /// <summary>Der Export schreibt den Mitschnitt der laufenden Session als .clireplay — inklusive
     /// Chunks, die vor der ersten BufferChanged-Beobachtung ankamen (Rekorder ab Session-Start).</summary>
     [Fact]
-    public async Task ExportCliReplayAsync_MitAufzeichnung_SchreibtLadbareReplayDatei()
+    public async Task ExportCliReplayAsync_WithRecording_WritesLoadableReplayFile()
     {
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var chunks = new[]
         {
             Encoding.UTF8.GetBytes("chunk-eins"),
             Encoding.UTF8.GetBytes("\x1b[31mchunk-zwei"),
         };
-        var kiService = TestKiAusfuehrungsServiceFactory.Create(
+        var aiService = TestAiExecutionServiceFactory.Create(
             new Mock<IServiceScopeFactory>().Object,
             launcher: TestTerminalSessionFactory.CreateChunkEmittingLauncher(chunks));
-        var sut = new CliReplayExportService(kiService, _store, NullLogger<CliReplayExportService>.Instance);
-        var pluginMock = new Mock<IKiPlugin>();
+        var sut = new CliReplayExportService(aiService, _store, NullLogger<CliReplayExportService>.Instance);
+        var pluginMock = new Mock<IAiPlugin>();
         pluginMock.SetupTerminalSpec();
 
-        await kiService.StartTerminalSessionAsync(aufgabeId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
+        await aiService.StartTerminalSessionAsync(workItemId, pluginMock.Object, Path.GetTempPath(), ct: TestContext.Current.CancellationToken);
 
-        var zielPfad = Path.Combine(Path.GetTempPath(), $"cli-replay-{Guid.NewGuid():N}.clireplay");
+        var targetPath = Path.Combine(Path.GetTempPath(), $"cli-replay-{Guid.NewGuid():N}.clireplay");
         try
         {
-            await sut.ExportCliReplayAsync(aufgabeId, zielPfad, TestContext.Current.CancellationToken);
+            await sut.ExportCliReplayAsync(workItemId, targetPath, TestContext.Current.CancellationToken);
 
-            File.Exists(zielPfad).Should().BeTrue();
-            var geladen = await _store.LadeAsync(zielPfad, TestContext.Current.CancellationToken);
-            geladen.AufgabeId.Should().Be(aufgabeId);
-            geladen.PluginName.Should().Be("TestPlugin");
-            geladen.Chunks.Should().HaveCount(2);
-            geladen.Chunks[0].Data.Should().Equal(chunks[0]);
-            geladen.Chunks[1].Data.Should().Equal(chunks[1]);
+            File.Exists(targetPath).Should().BeTrue();
+            var loaded = await _store.LoadAsync(targetPath, TestContext.Current.CancellationToken);
+            loaded.WorkItemId.Should().Be(workItemId);
+            loaded.PluginName.Should().Be("TestPlugin");
+            loaded.Chunks.Should().HaveCount(2);
+            loaded.Chunks[0].Data.Should().Equal(chunks[0]);
+            loaded.Chunks[1].Data.Should().Equal(chunks[1]);
         }
         finally
         {
-            if (File.Exists(zielPfad))
-                File.Delete(zielPfad);
+            if (File.Exists(targetPath))
+                File.Delete(targetPath);
         }
     }
 }

@@ -3,7 +3,7 @@ using Softwareschmiede.Domain.Enums;
 namespace Softwareschmiede.Domain.ValueObjects;
 
 /// <summary>Startbeschreibung einer KI-CLI für den interaktiven Terminal-Pfad.
-/// Plugins liefern die Spec über <c>IKiPlugin.GetTerminalStartSpecAsync</c>; der Host löst
+/// Plugins liefern die Spec über <c>IAiPlugin.GetTerminalStartSpecAsync</c>; der Host löst
 /// <see cref="FileName"/> anschließend selbst auf und wählt das Backend (PTY oder Pipe).</summary>
 public sealed record TerminalSessionStartSpec
 {

@@ -4,7 +4,7 @@
 
 ## Voraussetzungen
 
-- Ein Task mit konfiguriertem, geklontem Repository (mit lokalem Arbeitsverzeichnis unter `LokalerKlonPfad`)
+- Ein Task mit konfiguriertem, geklontem Repository (mit lokalem Arbeitsverzeichnis unter `LocalClonePath`)
 - Die Aufgabendetailansicht ist offen
 - Das neue „Dateien"-Register ist sichtbar (Button neben „Info", „CLI", „Diff")
 

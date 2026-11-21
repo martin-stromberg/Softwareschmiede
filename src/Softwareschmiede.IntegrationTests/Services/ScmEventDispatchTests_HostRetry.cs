@@ -9,10 +9,10 @@ using Softwareschmiede.TestSupport;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
-/// <summary>Host response retries must not reopen a separately blocked event dispatch.</summary>
+/// <summary>Wiederholungen der Host-Antwort dürfen einen separat blockierten Ereignisversand nicht wieder öffnen.</summary>
 public sealed class ScmEventDispatchTests_HostRetry
 {
-    /// <summary>Only an explicit retry or the event deadline may release the dispatch delay.</summary>
+    /// <summary>Nur eine explizite Wiederholung oder die Ereignis-Frist darf die Dispatch-Verzögerung aufheben.</summary>
     [Theory]
     [InlineData(ScmResponseKind.Reaction, true)]
     [InlineData(ScmResponseKind.Comment, true)]
@@ -23,7 +23,7 @@ public sealed class ScmEventDispatchTests_HostRetry
         await using var fixture = new ScmDispatchFixture(time: clock);
         await fixture.InitializeAsync();
         var (_, eventId) = await fixture.AddAsync(configured: true);
-        fixture.Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        fixture.Ai.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(false);
         var hostAttempts = 0;
         fixture.Git.As<IScmEventResponder>().Setup(x => x.ExecuteResponseAsync(
             It.Is<ScmResponseRequest>(r => r.Kind == delayedResponse), It.IsAny<CancellationToken>()))
@@ -38,15 +38,15 @@ public sealed class ScmEventDispatchTests_HostRetry
         Assert.Equal(long.MaxValue, (await fixture.EventAsync(eventId)).NextAttemptUtc);
         var retryAt = manualRetry ? long.MaxValue : clock.Now.AddHours(2).ToUnixTimeMilliseconds();
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmIncomingEvents
+            await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmIncomingEvents
                 .Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(e => e.NextAttemptUtc, retryAt), cancellationToken: TestContext.Current.CancellationToken);
 
-        fixture.Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        fixture.Ai.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
         clock.Now = clock.Now.AddHours(1);
         await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, hostAttempts);
-        fixture.Ki.Verify(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()), Times.Once);
+        fixture.Ai.Verify(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()), Times.Once);
         Assert.Empty(fixture.Sessions);
         Assert.Empty(fixture.Prompts);
         Assert.Equal(retryAt, (await fixture.EventAsync(eventId)).NextAttemptUtc);
@@ -80,7 +80,7 @@ public sealed class ScmEventDispatchTests_HostRetry
             .ThrowsAsync(new ScmProviderException(ScmProviderFailureKind.RateLimit, "Fixture rate limit", clock.Now.AddSeconds(10)));
         await fixture.DispatchAsync(eventId);
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmIncomingEvents
+            await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmIncomingEvents
                 .Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(e => e.Status, "Verarbeitet"), cancellationToken: TestContext.Current.CancellationToken);
         fixture.Git.As<IScmEventResponder>().Setup(x => x.ExecuteResponseAsync(
             It.IsAny<ScmResponseRequest>(), It.IsAny<CancellationToken>()))
@@ -90,12 +90,12 @@ public sealed class ScmEventDispatchTests_HostRetry
         await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var verification = fixture.Services.CreateScope();
-        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         Assert.Equal("Succeeded", (await db.ScmOutgoingActions.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Status);
         Assert.Equal("Verarbeitet", (await fixture.EventAsync(eventId)).Status);
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);
-        fixture.Ki.Verify(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()), Times.Once);
+        fixture.Ai.Verify(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private sealed class TestClock : TimeProvider

@@ -14,26 +14,26 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Tests für den Concurrency-Schutz von CliProcessManager.AktualisierungAsync.</summary>
 public sealed class CliProcessManagerTests : IDisposable
 {
-    private readonly KiAusfuehrungsService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly CliProcessManager _sut;
 
     /// <summary>CliProcessManagerTests.</summary>
     public CliProcessManagerTests()
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        _aiService = TestAiExecutionServiceFactory.Create(scopeFactoryMock.Object);
         _sut = new CliProcessManager(
-            _kiService,
+            _aiService,
             scopeFactoryMock.Object,
             NullLogger<CliProcessManager>.Instance,
-            new AufgabeLaufdatenChangedNotifier());
+            new WorkItemRunDataChangedNotifier());
     }
 
     /// <summary>Dispose.</summary>
     public void Dispose()
     {
         _sut.Dispose();
-        _kiService.Dispose();
+        _aiService.Dispose();
     }
 
     /// <summary>
@@ -41,18 +41,18 @@ public sealed class CliProcessManagerTests : IDisposable
     /// weiterer Aufruf für dieselbe Aufgabe nicht fortschreiten. Erst nach Freigabe der Semaphore läuft der Aufruf weiter.
     /// </summary>
     [Fact]
-    public async Task AktualisierungAsync_WithConcurrentTimerTicks_Serializes()
+    public async Task UpdateAsync_WithConcurrentTimerTicks_Serializes()
     {
-        var aufgabeId = Guid.NewGuid();
-        _sut.StartHeartbeat(aufgabeId);
+        var workItemId = Guid.NewGuid();
+        _sut.StartHeartbeat(workItemId);
 
         var semaphoresField = typeof(CliProcessManager).GetField("_updateSemaphores", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var semaphores = (ConcurrentDictionary<Guid, SemaphoreSlim>)semaphoresField.GetValue(_sut)!;
-        var semaphore = semaphores[aufgabeId];
+        var semaphore = semaphores[workItemId];
         await semaphore.WaitAsync(TestContext.Current.CancellationToken);
 
-        var method = typeof(CliProcessManager).GetMethod("AktualisierungAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var task = (Task)method.Invoke(_sut, new object[] { aufgabeId })!;
+        var method = typeof(CliProcessManager).GetMethod("UpdateAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var task = (Task)method.Invoke(_sut, new object[] { workItemId })!;
 
         await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
         task.IsCompleted.Should().BeFalse("AktualisierungAsync muss blockieren, solange die Semaphore der Aufgabe belegt ist");
@@ -68,20 +68,20 @@ public sealed class CliProcessManagerTests : IDisposable
     /// Ein Aufruf für Aufgabe B muss fortschreiten können, während die Semaphore von Aufgabe A belegt ist.
     /// </summary>
     [Fact]
-    public async Task AktualisierungAsync_WithDifferentAufgaben_DoesNotSerializeAcrossTasks()
+    public async Task UpdateAsync_WithDifferentWorkItems_DoesNotSerializeAcrossTasks()
     {
-        var aufgabeIdA = Guid.NewGuid();
-        var aufgabeIdB = Guid.NewGuid();
-        _sut.StartHeartbeat(aufgabeIdA);
-        _sut.StartHeartbeat(aufgabeIdB);
+        var workItemIdA = Guid.NewGuid();
+        var workItemIdB = Guid.NewGuid();
+        _sut.StartHeartbeat(workItemIdA);
+        _sut.StartHeartbeat(workItemIdB);
 
         var semaphoresField = typeof(CliProcessManager).GetField("_updateSemaphores", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var semaphores = (ConcurrentDictionary<Guid, SemaphoreSlim>)semaphoresField.GetValue(_sut)!;
-        var semaphoreA = semaphores[aufgabeIdA];
+        var semaphoreA = semaphores[workItemIdA];
         await semaphoreA.WaitAsync(TestContext.Current.CancellationToken);
 
-        var method = typeof(CliProcessManager).GetMethod("AktualisierungAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var taskB = (Task)method.Invoke(_sut, new object[] { aufgabeIdB })!;
+        var method = typeof(CliProcessManager).GetMethod("UpdateAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var taskB = (Task)method.Invoke(_sut, new object[] { workItemIdB })!;
 
         var finished = await Task.WhenAny(taskB, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         finished.Should().Be(taskB, "die Semaphore einer anderen Aufgabe darf den Heartbeat-Update von Aufgabe B nicht blockieren");
@@ -92,44 +92,44 @@ public sealed class CliProcessManagerTests : IDisposable
 
     /// <summary>Shutdown-Race: AktivenLaufSetzenAsync darf nicht fehlschlagen, wenn der DI-Provider bereits disposed ist.</summary>
     [Fact]
-    public async Task AktivenLaufSetzenAsync_WithDisposedScopeFactory_Completes()
+    public async Task SetActiveRunAsync_WithDisposedScopeFactory_Completes()
     {
-        await InvokePersistierungsMethodeMitDisposedScopeFactoryAsync("AktivenLaufSetzenAsync", Guid.NewGuid());
+        await InvokePersistenceMethodWithDisposedScopeFactoryAsync("SetActiveRunAsync", Guid.NewGuid());
     }
 
     /// <summary>Shutdown-Race: AktivenLaufBeendenAsync darf nicht fehlschlagen, wenn der DI-Provider bereits disposed ist.</summary>
     [Fact]
-    public async Task AktivenLaufBeendenAsync_WithDisposedScopeFactory_Completes()
+    public async Task EndActiveRunAsync_WithDisposedScopeFactory_Completes()
     {
-        await InvokePersistierungsMethodeMitDisposedScopeFactoryAsync("AktivenLaufBeendenAsync", Guid.NewGuid());
+        await InvokePersistenceMethodWithDisposedScopeFactoryAsync("EndActiveRunAsync", Guid.NewGuid());
     }
 
     /// <summary>Shutdown-Race: LaufdatenSicherstellenAsync darf nicht fehlschlagen, wenn der DI-Provider
     /// bereits disposed ist. Damit der interne <c>IsRunning</c>-Guard den Persistenzpfad wirklich erreicht
     /// (sonst wäre der Test wirkungslos), wird zuvor ein laufendes Handle gepflanzt.</summary>
     [Fact]
-    public async Task LaufdatenSicherstellenAsync_WithDisposedScopeFactory_Completes()
+    public async Task RundataEnsureAsync_WithDisposedScopeFactory_Completes()
     {
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         scopeFactoryMock
             .Setup(f => f.CreateScope())
             .Throws(new ObjectDisposedException("ServiceProvider"));
 
-        using var kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        using var aiService = TestAiExecutionServiceFactory.Create(scopeFactoryMock.Object);
 
-        var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(kiService)!;
-        handles[aufgabeId] = new CliProcessHandle(aufgabeId, System.Diagnostics.Process.GetCurrentProcess());
+        var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var handles = (System.Collections.Concurrent.ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(aiService)!;
+        handles[workItemId] = new CliProcessHandle(workItemId, System.Diagnostics.Process.GetCurrentProcess());
 
         using var manager = new CliProcessManager(
-            kiService,
+            aiService,
             scopeFactoryMock.Object,
             NullLogger<CliProcessManager>.Instance,
-            new AufgabeLaufdatenChangedNotifier());
+            new WorkItemRunDataChangedNotifier());
 
-        var method = typeof(CliProcessManager).GetMethod("LaufdatenSicherstellenAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var task = (Task)method.Invoke(manager, new object[] { aufgabeId })!;
+        var method = typeof(CliProcessManager).GetMethod("EnsureRunDataAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var task = (Task)method.Invoke(manager, new object[] { workItemId })!;
         await task;
     }
 
@@ -141,30 +141,30 @@ public sealed class CliProcessManagerTests : IDisposable
     /// laufendem Prozess permanent weiter.
     /// </summary>
     [Fact]
-    public async Task Dispose_VerhindertNeuanlageVonTimerUndSubscription()
+    public async Task Dispose_PreventsNewcreationOfTimerAndSubscription()
     {
-        var aufgabeId = Guid.NewGuid();
+        var workItemId = Guid.NewGuid();
 
         // Laufendes Handle mit Session pflanzen, damit LaufdatenSicherstellenAsync den
         // IsRunning-Check passiert und beide Anlagepfade (Timer + Subscription) erreicht würden.
-        var handlesField = typeof(KiAusfuehrungsService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var handles = (ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_kiService)!;
+        var handlesField = typeof(AiExecutionService).GetField("_handles", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var handles = (ConcurrentDictionary<Guid, CliProcessHandle>)handlesField.GetValue(_aiService)!;
         var sessionMock = new Mock<ITerminalSession>();
-        handles[aufgabeId] = new CliProcessHandle(aufgabeId, System.Diagnostics.Process.GetCurrentProcess())
+        handles[workItemId] = new CliProcessHandle(workItemId, System.Diagnostics.Process.GetCurrentProcess())
         {
             Session = sessionMock.Object
         };
 
         _sut.Dispose();
 
-        var method = typeof(CliProcessManager).GetMethod("LaufdatenSicherstellenAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        await (Task)method.Invoke(_sut, new object[] { aufgabeId })!;
-        _sut.StartHeartbeat(aufgabeId);
+        var method = typeof(CliProcessManager).GetMethod("EnsureRunDataAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        await (Task)method.Invoke(_sut, new object[] { workItemId })!;
+        _sut.StartHeartbeat(workItemId);
 
         // SubscribeRuntimeStatus separat aufrufen, damit dessen _disposed-Guard nicht nur indirekt
         // über den Early-Return in LaufdatenSicherstellenAsync abgedeckt ist.
         var subscribeMethod = typeof(CliProcessManager).GetMethod("SubscribeRuntimeStatus", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        subscribeMethod.Invoke(_sut, new object[] { aufgabeId });
+        subscribeMethod.Invoke(_sut, new object[] { workItemId });
 
         var heartbeatField = typeof(CliProcessManager).GetField("_heartbeatTimers", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var heartbeatTimers = (ConcurrentDictionary<Guid, Timer>)heartbeatField.GetValue(_sut)!;
@@ -179,19 +179,19 @@ public sealed class CliProcessManagerTests : IDisposable
             Times.Never);
     }
 
-    private async Task InvokePersistierungsMethodeMitDisposedScopeFactoryAsync(string methodName, params object[] arguments)
+    private async Task InvokePersistenceMethodWithDisposedScopeFactoryAsync(string methodName, params object[] arguments)
     {
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         scopeFactoryMock
             .Setup(f => f.CreateScope())
             .Throws(new ObjectDisposedException("ServiceProvider"));
 
-        using var kiService = TestKiAusfuehrungsServiceFactory.Create(scopeFactoryMock.Object);
+        using var aiService = TestAiExecutionServiceFactory.Create(scopeFactoryMock.Object);
         using var manager = new CliProcessManager(
-            kiService,
+            aiService,
             scopeFactoryMock.Object,
             NullLogger<CliProcessManager>.Instance,
-            new AufgabeLaufdatenChangedNotifier());
+            new WorkItemRunDataChangedNotifier());
 
         var method = typeof(CliProcessManager).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance)!;
         var task = (Task)method.Invoke(manager, arguments)!;

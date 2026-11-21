@@ -5,17 +5,17 @@ namespace Softwareschmiede.Application.Services.Updates;
 /// <summary>Prüft aktive CLI-Aufgaben vor dem Start eines Programmupdates.</summary>
 public sealed class CliUpdateSafetyService : ICliUpdateSafetyService
 {
-    private readonly AufgabeService _aufgabeService;
-    private readonly KiPluginLimitService _kiPluginLimitService;
+    private readonly WorkItemService _workItemService;
+    private readonly AiPluginLimitService _kiPluginLimitService;
     private readonly ILogger<CliUpdateSafetyService> _logger;
 
     /// <inheritdoc cref="CliUpdateSafetyService"/>
     public CliUpdateSafetyService(
-        AufgabeService aufgabeService,
-        KiPluginLimitService kiPluginLimitService,
+        WorkItemService workItemService,
+        AiPluginLimitService kiPluginLimitService,
         ILogger<CliUpdateSafetyService> logger)
     {
-        _aufgabeService = aufgabeService;
+        _workItemService = workItemService;
         _kiPluginLimitService = kiPluginLimitService;
         _logger = logger;
     }
@@ -23,17 +23,17 @@ public sealed class CliUpdateSafetyService : ICliUpdateSafetyService
     /// <inheritdoc/>
     public async Task<CliUpdateSafetyResult> CheckAsync(CancellationToken ct = default)
     {
-        var activeTasks = await _aufgabeService.GetAktiveAufgabenAsync(ct);
+        var activeTasks = await _workItemService.GetActiveWorkItemsAsync(ct);
 
         var prefixes = activeTasks
-            .Select(a => a.KiPluginPrefix)
+            .Select(a => a.AiPluginPrefix)
             .Where(p => !string.IsNullOrWhiteSpace(p))
             .Select(p => p!)
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
         // Persistierte, noch zukünftige Plugin-Session-Limits in einer Abfrage laden.
-        var sessionLimits = await _kiPluginLimitService.GetAktiveSessionLimitsAsync(prefixes, ct);
+        var sessionLimits = await _kiPluginLimitService.GetActiveSessionLimitsAsync(prefixes, ct);
 
         var now = DateTimeOffset.UtcNow;
         var riskyTasks = activeTasks
@@ -42,15 +42,15 @@ public sealed class CliUpdateSafetyService : ICliUpdateSafetyService
                 // Ein bekannt limitiertes Plugin kann die Ausführung bis zum Reset ohnehin nicht
                 // fortsetzen — die Aufgabe ist kein Update-Risiko, auch bei frischem Heartbeat
                 // (Heartbeat-Toleranz entfällt komplett).
-                if (!string.IsNullOrWhiteSpace(a.KiPluginPrefix)
-                    && sessionLimits.TryGetValue(a.KiPluginPrefix, out _))
+                if (!string.IsNullOrWhiteSpace(a.AiPluginPrefix)
+                    && sessionLimits.TryGetValue(a.AiPluginPrefix, out _))
                 {
                     return false;
                 }
 
-                return AufgabeLaufAktivitaet.IstAktiv(a.AktiveRunId, a.LastHeartbeatUtc, now);
+                return WorkItemRunActivity.IsActive(a.ActiveRunId, a.LastHeartbeatUtc, now);
             })
-            .Select(a => $"{a.Titel} ({a.Id})")
+            .Select(a => $"{a.Title} ({a.Id})")
             .ToList();
 
         if (riskyTasks.Count > 0)

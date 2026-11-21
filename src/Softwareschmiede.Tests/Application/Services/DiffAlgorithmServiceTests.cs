@@ -10,7 +10,7 @@ public sealed class DiffAlgorithmServiceTests
 {
     private readonly DiffAlgorithmService _sut = new(NullLogger<DiffAlgorithmService>.Instance);
 
-    /// <summary><summary>GenerateDiffAsync_ShouldThrowArgumentNullException_WhenSourceOrTargetIsEmpty.</summary>.</summary>
+    /// <summary>GenerateDiffAsync_ShouldThrowArgumentNullException_WhenSourceOrTargetIsEmpty.</summary>
     [Fact]
     public async Task GenerateDiffAsync_ShouldThrowArgumentNullException_WhenSourceOrTargetIsEmpty()
     {
@@ -23,7 +23,7 @@ public sealed class DiffAlgorithmServiceTests
         await targetAct.Should().ThrowAsync<ArgumentNullException>();
     }
 
-    /// <summary><summary>GenerateDiffAsync_ShouldReturnExpectedLineStatusesAndCounts.</summary>.</summary>
+    /// <summary>GenerateDiffAsync_ShouldReturnExpectedLineStatusesAndCounts.</summary>
     [Fact]
     public async Task GenerateDiffAsync_ShouldReturnExpectedLineStatusesAndCounts()
     {
@@ -55,7 +55,7 @@ public sealed class DiffAlgorithmServiceTests
         lines[3].TargetLineNumber.Should().Be(3);
     }
 
-    /// <summary><summary>GenerateDiffAsync_ShouldSplitBlocks_WhenChangeTypeSwitchesBetweenRemovedAndAdded.</summary>.</summary>
+    /// <summary>GenerateDiffAsync_ShouldSplitBlocks_WhenChangeTypeSwitchesBetweenRemovedAndAdded.</summary>
     [Fact]
     public async Task GenerateDiffAsync_ShouldSplitBlocks_WhenChangeTypeSwitchesBetweenRemovedAndAdded()
     {

@@ -23,7 +23,7 @@ public static class PluginSettingEntryEditHelper
     }
 
     /// <summary>Öffnet einen Dateiauswahl-Dialog und übernimmt den gewählten Pfad in den <see cref="PluginSettingEntry"/>.</summary>
-    public static void OnDateiAuswaehlenClick(object sender, RoutedEventArgs e)
+    public static void OnFileSelectClick(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement element || element.DataContext is not PluginSettingEntry entry)
             return;

@@ -31,10 +31,10 @@
                            VerticalAlignment="Center" />
             </Grid>
         </HierarchicalDataTemplate>
-        <Style x:Key="FileExplorerBaumItemContainerStyle" TargetType="TreeViewItem">
+        <Style x:Key="FileExplorerTreeItemContainerStyle" TargetType="TreeViewItem">
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
-        <Style x:Key="StandardBaumItemContainerStyle" TargetType="TreeViewItem" BasedOn="{StaticResource FileExplorerBaumItemContainerStyle}">
+        <Style x:Key="DefaultTreeItemContainerStyle" TargetType="TreeViewItem" BasedOn="{StaticResource FileExplorerTreeItemContainerStyle}">
             <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
         </Style>
     </UserControl.Resources>
@@ -49,20 +49,20 @@
 
             <!-- Baum: Standardmodus (Arbeitsbaum) -->
             <TreeView Grid.Column="0"
-                      x:Name="StandardBaum"
-                      AutomationProperties.Name="FileExplorerBaum"
+                      x:Name="DefaultTree"
+                      AutomationProperties.Name="FileExplorerTree"
                       Background="{DynamicResource SurfaceBrush}"
                       BorderBrush="{DynamicResource BorderBrush}"
                       BorderThickness="1"
-                      ItemsSource="{Binding Wurzelknoten}"
-                      SelectedItemChanged="OnBaumSelectedItemChanged"
-                      TreeViewItem.Expanded="OnBaumKnotenExpanded"
-                      TreeViewItem.Collapsed="OnBaumKnotenCollapsed"
-                      ItemContainerStyle="{StaticResource StandardBaumItemContainerStyle}">
+                      ItemsSource="{Binding RootNodes}"
+                      SelectedItemChanged="OnTreeSelectedItemChanged"
+                      TreeViewItem.Expanded="OnTreeNodeExpanded"
+                      TreeViewItem.Collapsed="OnTreeNodeCollapsed"
+                      ItemContainerStyle="{StaticResource DefaultTreeItemContainerStyle}">
                 <TreeView.Style>
                     <Style TargetType="TreeView">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding AktuellerModus}" Value="Vergleich">
+                            <DataTrigger Binding="{Binding CurrentMode}" Value="Compare">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>
@@ -72,15 +72,15 @@
 
             <!-- Baum: Vergleichsmodus (Commits mit geänderten Dateien) -->
             <TreeView Grid.Column="0"
-                      x:Name="VergleichBaum"
-                      AutomationProperties.Name="FileExplorerVergleichBaum"
+                      x:Name="CompareTree"
+                      AutomationProperties.Name="FileExplorerCompareTree"
                       Background="{DynamicResource SurfaceBrush}"
                       BorderBrush="{DynamicResource BorderBrush}"
                       BorderThickness="1"
-                      ItemsSource="{Binding CommitGruppen}"
-                      SelectedItemChanged="OnBaumSelectedItemChanged"
-                      TreeViewItem.Expanded="OnCommitKnotenExpanded"
-                      ItemContainerStyle="{StaticResource FileExplorerBaumItemContainerStyle}">
+                      ItemsSource="{Binding CommitGroup}"
+                      SelectedItemChanged="OnTreeSelectedItemChanged"
+                      TreeViewItem.Expanded="OnCommitNodeExpanded"
+                      ItemContainerStyle="{StaticResource FileExplorerTreeItemContainerStyle}">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type vo:BranchCommit}"
                                                ItemsSource="{Binding Files}">
@@ -94,14 +94,14 @@
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            FontSize="11" />
                                 <TextBlock Text="Lädt…"
-                                           AutomationProperties.Name="FileExplorerCommitLaedt"
+                                           AutomationProperties.Name="FileExplorerCommitLoading"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            FontSize="11"
                                            Margin="6,0,0,0"
                                            Visibility="{Binding IsLoadingFiles, Converter={StaticResource BoolToVisibilityConverter}}" />
                             </StackPanel>
                             <TextBlock Text="{Binding ErrorMessage}"
-                                       AutomationProperties.Name="FileExplorerCommitFehler"
+                                       AutomationProperties.Name="FileExplorerCommitError"
                                        Foreground="{DynamicResource ErrorBrush}"
                                        FontSize="11"
                                        TextWrapping="Wrap"
@@ -112,7 +112,7 @@
                 <TreeView.Style>
                     <Style TargetType="TreeView">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding AktuellerModus}" Value="Standard">
+                            <DataTrigger Binding="{Binding CurrentMode}" Value="Default">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>
@@ -138,20 +138,20 @@
                             Orientation="Horizontal"
                             Margin="0,0,0,8">
                     <StackPanel Orientation="Horizontal"
-                                Visibility="{Binding ZeigtDiffAnsicht, Converter={StaticResource BoolToVisibilityConverter}}">
+                                Visibility="{Binding ShowsDiffView, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Button Content="◀"
                                 ToolTip="Vorherige Änderung"
-                                AutomationProperties.Name="FileExplorerVorherigeAenderungButton"
+                                AutomationProperties.Name="FileExplorerPreviousChangeButton"
                                 AutomationProperties.HelpText="Vorherige Änderung"
-                                Command="{Binding VorherigeAenderungCommand}"
+                                Command="{Binding PreviousChangeCommand}"
                                 Padding="10,4"
                                 Margin="0,0,6,0"
                                 FontSize="12" />
                         <Button Content="▶"
                                 ToolTip="Nächste Änderung"
-                                AutomationProperties.Name="FileExplorerNaechsteAenderungButton"
+                                AutomationProperties.Name="FileExplorerNextChangeButton"
                                 AutomationProperties.HelpText="Nächste Änderung"
-                                Command="{Binding NaechsteAenderungCommand}"
+                                Command="{Binding NextChangeCommand}"
                                 Padding="10,4"
                                 Margin="0,0,6,0"
                                 FontSize="12" />
@@ -161,9 +161,9 @@
                 <Grid Grid.Row="1">
                     <ScrollViewer VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Auto"
-                                  Visibility="{Binding ZeigtDiffAnsicht, Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                        <TextBlock AutomationProperties.Name="FileExplorerDateiInhalt"
-                                   Text="{Binding DateiInhalt}"
+                                  Visibility="{Binding ShowsDiffView, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                        <TextBlock AutomationProperties.Name="FileExplorerFileContent"
+                                   Text="{Binding FileContent}"
                                    FontFamily="Consolas"
                                    FontSize="12"
                                    TextWrapping="NoWrap"
@@ -171,8 +171,8 @@
                     </ScrollViewer>
 
                     <controls:DiffViewer x:Name="DiffViewerControl"
-                                         Lines="{Binding DiffZeilen}"
-                                         Visibility="{Binding ZeigtDiffAnsicht, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                         Lines="{Binding DiffLines}"
+                                         Visibility="{Binding ShowsDiffView, Converter={StaticResource BoolToVisibilityConverter}}" />
                 </Grid>
             </Grid>
         </Grid>

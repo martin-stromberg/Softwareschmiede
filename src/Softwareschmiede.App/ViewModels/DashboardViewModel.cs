@@ -10,38 +10,38 @@ namespace Softwareschmiede.App.ViewModels;
 /// <summary>ViewModel für das Dashboard mit Zusammenfassung aller Projekte und Aufgaben.</summary>
 public sealed class DashboardViewModel : ViewModelBase
 {
-    private readonly ProjektService _projektService;
-    private readonly AufgabeService _aufgabeService;
-    private readonly AufgabeRecoveryService _recoveryService;
-    private readonly AufgabenListenModusBindung _modusBindung;
+    private readonly ProjectService _projectService;
+    private readonly WorkItemService _workItemService;
+    private readonly WorkItemRecoveryService _recoveryService;
+    private readonly WorkItemListModeBinding _modeBinding;
     private readonly ILogger<DashboardViewModel> _logger;
 
-    private int _projektAnzahl;
-    private int _aktiveAufgaben;
-    private int _wartendAufgaben;
+    private int _projectCount;
+    private int _activeWorkItems;
+    private int _waitingWorkItems;
     private bool _isLoading;
-    private string? _fehlerMeldung;
-    private ObservableCollection<AktiveAufgabePanelItem> _aktiveAufgabenListe = new();
+    private string? _errorMessage;
+    private ObservableCollection<ActiveWorkItemPanelItem> _activeWorkItemsList = new();
 
     /// <summary>Anzahl aller Projekte.</summary>
-    public int ProjektAnzahl
+    public int ProjectCount
     {
-        get => _projektAnzahl;
-        private set => SetProperty(ref _projektAnzahl, value);
+        get => _projectCount;
+        private set => SetProperty(ref _projectCount, value);
     }
 
     /// <summary>Anzahl aktiver Aufgaben (Status Gestartet).</summary>
-    public int AktiveAufgaben
+    public int ActiveWorkItems
     {
-        get => _aktiveAufgaben;
-        private set => SetProperty(ref _aktiveAufgaben, value);
+        get => _activeWorkItems;
+        private set => SetProperty(ref _activeWorkItems, value);
     }
 
     /// <summary>Anzahl wartender Aufgaben (Status Wartend).</summary>
-    public int WartendAufgaben
+    public int WaitingWorkItems
     {
-        get => _wartendAufgaben;
-        private set => SetProperty(ref _wartendAufgaben, value);
+        get => _waitingWorkItems;
+        private set => SetProperty(ref _waitingWorkItems, value);
     }
 
     /// <summary>Gibt an, ob Daten geladen werden.</summary>
@@ -52,90 +52,90 @@ public sealed class DashboardViewModel : ViewModelBase
     }
 
     /// <summary>Fehlermeldung bei Ladefehlern.</summary>
-    public string? FehlerMeldung
+    public string? ErrorMessage
     {
-        get => _fehlerMeldung;
-        private set => SetProperty(ref _fehlerMeldung, value);
+        get => _errorMessage;
+        private set => SetProperty(ref _errorMessage, value);
     }
 
     /// <summary>Liste von Recovery-Kandidaten.</summary>
     public ObservableCollection<Guid> RecoveryKandidaten { get; } = new();
 
     /// <summary>Gibt an, ob es Recovery-Kandidaten gibt.</summary>
-    public bool HatRecoveryKandidaten => RecoveryKandidaten.Count > 0;
+    public bool HasRecoveryKandidaten => RecoveryKandidaten.Count > 0;
 
     /// <summary>Liste der zuletzt aktiven Projekte.</summary>
-    public ObservableCollection<Projekt> LetzteProjects { get; } = new();
+    public ObservableCollection<Project> LastProjects { get; } = new();
 
     /// <summary>Liste der aktuell aktiven Aufgaben (Status Gestartet oder Wartend). Wird vom MainWindowViewModel über <see cref="Initialize"/> als gemeinsame Datenquelle gesetzt.</summary>
-    public ObservableCollection<AktiveAufgabePanelItem> AktiveAufgabenListe
+    public ObservableCollection<ActiveWorkItemPanelItem> ActiveWorkItemsList
     {
-        get => _aktiveAufgabenListe;
-        private set => SetProperty(ref _aktiveAufgabenListe, value);
+        get => _activeWorkItemsList;
+        private set => SetProperty(ref _activeWorkItemsList, value);
     }
 
     /// <summary>Delegat zur Navigation zu einer aktiven Aufgabe, wird vom MainWindowViewModel über <see cref="Initialize"/> gesetzt.</summary>
-    private Action<Guid>? NavigateZuAufgabeAction { get; set; }
+    private Action<Guid>? NavigateToWorkItemAction { get; set; }
 
     /// <summary>Navigiert zur Aufgabendetailansicht einer aktiven Aufgabe.</summary>
-    public ICommand NavigateZuAufgabeCommand { get; }
+    public ICommand NavigateToWorkItemCommand { get; }
 
     /// <summary>Lädt die Dashboard-Daten neu.</summary>
-    public ICommand LadenCommand { get; }
+    public ICommand LoadCommand { get; }
 
     /// <summary>
     /// Anzeigemodus der Dashboard-Aufgabenliste (flach nach Datum oder gruppiert nach Repository/KI).
-    /// Änderungen werden über den <see cref="AufgabenListenModusService"/> unter dem
+    /// Änderungen werden über den <see cref="WorkItemListModeService"/> unter dem
     /// Dashboard-eigenen Einstellungsschlüssel persistiert — unabhängig vom Seitenleisten-Modus.
     /// </summary>
-    public AufgabenListenModus AufgabenListenModus
+    public WorkItemListMode WorkItemListMode
     {
-        get => _modusBindung.Wert;
-        set => _modusBindung.Wert = value;
+        get => _modeBinding.Value;
+        set => _modeBinding.Value = value;
     }
 
     /// <inheritdoc cref="DashboardViewModel"/>
     public DashboardViewModel(
-        ProjektService projektService,
-        AufgabeService aufgabeService,
-        AufgabeRecoveryService recoveryService,
+        ProjectService projectService,
+        WorkItemService workItemService,
+        WorkItemRecoveryService recoveryService,
         ILogger<DashboardViewModel> logger,
-        AufgabenListenModusService? aufgabenListenModusService = null)
+        WorkItemListModeService? workItemsListModeService = null)
     {
-        _projektService = projektService;
-        _aufgabeService = aufgabeService;
+        _projectService = projectService;
+        _workItemService = workItemService;
         _recoveryService = recoveryService;
-        _modusBindung = AufgabenListenModusBindung.FuerDashboard(aufgabenListenModusService, logger);
-        _modusBindung.WertGeaendert += () => OnPropertyChanged(nameof(AufgabenListenModus));
+        _modeBinding = WorkItemListModeBinding.ForDashboard(workItemsListModeService, logger);
+        _modeBinding.ValueChanged += () => OnPropertyChanged(nameof(WorkItemListMode));
         _logger = logger;
 
-        LadenCommand = new AsyncRelayCommand(LadenAsync);
-        NavigateZuAufgabeCommand = new RelayCommand<Guid>(id => NavigateZuAufgabeAction?.Invoke(id));
-        RecoveryKandidaten.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HatRecoveryKandidaten));
+        LoadCommand = new AsyncRelayCommand(LoadAsync);
+        NavigateToWorkItemCommand = new RelayCommand<Guid>(id => NavigateToWorkItemAction?.Invoke(id));
+        RecoveryKandidaten.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRecoveryKandidaten));
     }
 
-    private async Task LadenAsync(CancellationToken ct)
+    private async Task LoadAsync(CancellationToken ct)
     {
         IsLoading = true;
-        FehlerMeldung = null;
+        ErrorMessage = null;
 
         try
         {
-            var projekte = await _projektService.GetAllAsync(ct);
-            ProjektAnzahl = projekte.Count;
+            var projects = await _projectService.GetAllAsync(ct);
+            ProjectCount = projects.Count;
 
             RecoveryKandidaten.Clear();
-            var kandidaten = await _recoveryService.ScanForRecoveryCandidatesAsync(ct);
-            foreach (var id in kandidaten)
+            var candidates = await _recoveryService.ScanForRecoveryCandidatesAsync(ct);
+            foreach (var id in candidates)
                 RecoveryKandidaten.Add(id);
 
-            LetzteProjects.Clear();
-            foreach (var projekt in projekte.Take(5))
-                LetzteProjects.Add(projekt);
+            LastProjects.Clear();
+            foreach (var project in projects.Take(5))
+                LastProjects.Add(project);
 
-            var (aktiveCount, wartendCount) = await _aufgabeService.GetAktiveUndWartendeCountAsync(ct);
-            AktiveAufgaben = aktiveCount;
-            WartendAufgaben = wartendCount;
+            var (activeCount, waitingCount) = await _workItemService.GetActiveAndWaitingCountAsync(ct);
+            ActiveWorkItems = activeCount;
+            WaitingWorkItems = waitingCount;
         }
         catch (OperationCanceledException)
         {
@@ -144,7 +144,7 @@ public sealed class DashboardViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Laden der Dashboard-Daten.");
-            FehlerMeldung = $"Fehler beim Laden: {ex.Message}";
+            ErrorMessage = $"Fehler beim Laden: {ex.Message}";
         }
         finally
         {
@@ -153,13 +153,13 @@ public sealed class DashboardViewModel : ViewModelBase
     }
 
     /// <summary>Verdrahtet die vom MainWindowViewModel bereitgestellte gemeinsame Aufgabenliste und die Navigationsaktion, statt sie über extern beschreibbare Properties zu setzen.</summary>
-    /// <param name="aktiveAufgabenListe">Die gemeinsame Datenquelle für aktive Aufgaben, die auch das MainWindowViewModel für die Seitenleiste verwendet.</param>
-    /// <param name="navigateZuAufgabeAction">Der Delegat, der die Navigation zur Aufgabendetailansicht auslöst.</param>
-    public void Initialize(ObservableCollection<AktiveAufgabePanelItem> aktiveAufgabenListe, Action<Guid> navigateZuAufgabeAction)
+    /// <param name="activeWorkItemsList">Die gemeinsame Datenquelle für aktive Aufgaben, die auch das MainWindowViewModel für die Seitenleiste verwendet.</param>
+    /// <param name="navigateToWorkItemAction">Der Delegat, der die Navigation zur Aufgabendetailansicht auslöst.</param>
+    public void Initialize(ObservableCollection<ActiveWorkItemPanelItem> activeWorkItemsList, Action<Guid> navigateToWorkItemAction)
     {
-        AktiveAufgabenListe = aktiveAufgabenListe;
-        NavigateZuAufgabeAction = navigateZuAufgabeAction;
-        GespeichertenAufgabenListenModusLadenAsync()
+        ActiveWorkItemsList = activeWorkItemsList;
+        NavigateToWorkItemAction = navigateToWorkItemAction;
+        LoadSavedWorkItemsListModeAsync()
             .SafeFireAndForget(_logger, "Dashboard-Aufgabenlisten-Modus laden");
     }
 
@@ -167,9 +167,9 @@ public sealed class DashboardViewModel : ViewModelBase
     /// Lädt den persistierten Anzeigemodus der Dashboard-Aufgabenliste und wendet ihn an, ohne den
     /// Wert zurückzuschreiben. Wird aus <see cref="Initialize"/> per <c>SafeFireAndForget</c>
     /// angestoßen und ist für Tests direkt awaitbar. Ein zwischenzeitlich vom Anwender gewählter
-    /// Modus wird nicht überschrieben (Race-Guard in <see cref="AufgabenListenModusBindung"/>).
+    /// Modus wird nicht überschrieben (Race-Guard in <see cref="WorkItemListModeBinding"/>).
     /// </summary>
     /// <param name="ct">Token zum Abbrechen der Operation.</param>
-    public Task GespeichertenAufgabenListenModusLadenAsync(CancellationToken ct = default)
-        => _modusBindung.GespeichertenWertLadenAsync(ct);
+    public Task LoadSavedWorkItemsListModeAsync(CancellationToken ct = default)
+        => _modeBinding.LoadSavedValueAsync(ct);
 }

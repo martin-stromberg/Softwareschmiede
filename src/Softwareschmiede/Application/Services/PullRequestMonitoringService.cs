@@ -29,7 +29,7 @@ public sealed class PullRequestMonitoringService : PeriodicBackgroundService
     public override async Task RunOnceAsync(CancellationToken ct = default)
     {
         using var scope = _scopeFactory.CreateScope();
-        var references = scope.ServiceProvider.GetRequiredService<PullRequestReferenzService>();
+        var references = scope.ServiceProvider.GetRequiredService<PullRequestReferenceService>();
         var due = await references.GetDueForMonitoringAsync(_timeProvider.GetUtcNow(), 20, ct);
 
         foreach (var pullRequest in due)
@@ -38,17 +38,17 @@ public sealed class PullRequestMonitoringService : PeriodicBackgroundService
                 scope.ServiceProvider,
                 pullRequest,
                 references,
-                PullRequestMonitoringPolicy.CanAutoComplete(pullRequest.Rolle, pullRequest.Provider),
+                PullRequestMonitoringPolicy.CanAutoComplete(pullRequest.Role, pullRequest.Provider),
                 ct);
         }
     }
 
     /// <summary>Aktualisiert alle noch laufenden Pull Requests einer Aufgabe sofort, unabhaengig vom naechsten Polling-Zeitpunkt.</summary>
-    public async Task RefreshAufgabeAsync(Guid aufgabeId, CancellationToken ct = default)
+    public async Task RefreshWorkItemAsync(Guid workItemId, CancellationToken ct = default)
     {
         using var scope = _scopeFactory.CreateScope();
-        var references = scope.ServiceProvider.GetRequiredService<PullRequestReferenzService>();
-        var pullRequests = await references.GetRefreshableByAufgabeAsync(aufgabeId, ct);
+        var references = scope.ServiceProvider.GetRequiredService<PullRequestReferenceService>();
+        var pullRequests = await references.GetRefreshableByWorkItemAsync(workItemId, ct);
 
         foreach (var pullRequest in pullRequests)
         {
@@ -58,18 +58,18 @@ public sealed class PullRequestMonitoringService : PeriodicBackgroundService
 
     private async Task MonitorAsync(
         IServiceProvider services,
-        PullRequestReferenz pullRequest,
-        PullRequestReferenzService references,
+        PullRequestReference pullRequest,
+        PullRequestReferenceService references,
         bool allowAutoComplete,
         CancellationToken ct)
     {
-        if (!PullRequestMonitoringPolicy.CanMonitor(pullRequest.Rolle, pullRequest.Provider))
+        if (!PullRequestMonitoringPolicy.CanMonitor(pullRequest.Role, pullRequest.Provider))
         {
             return;
         }
 
         var plugin = ResolveProviderPlugin(services, pullRequest.Provider);
-        var protokoll = services.GetRequiredService<ProtokollService>();
+        var log = services.GetRequiredService<LogService>();
 
         try
         {
@@ -101,11 +101,11 @@ public sealed class PullRequestMonitoringService : PeriodicBackgroundService
             }
 
             if (allowAutoComplete
-                && PullRequestMonitoringPolicy.CanAutoComplete(pullRequest.Rolle, pullRequest.Provider)
+                && PullRequestMonitoringPolicy.CanAutoComplete(pullRequest.Role, pullRequest.Provider)
                 && phase == PullRequestMonitoringPhase.PreMergeSucceeded
                 && IsAutoCompleteEnabled(services, plugin))
             {
-                await TryCompleteAsync(services, references, protokoll, plugin, pullRequest, ct);
+                await TryCompleteAsync(services, references, log, plugin, pullRequest, ct);
             }
         }
         catch (OperationCanceledException)
@@ -124,10 +124,10 @@ public sealed class PullRequestMonitoringService : PeriodicBackgroundService
 
     private async Task TryCompleteAsync(
         IServiceProvider services,
-        PullRequestReferenzService references,
-        ProtokollService protokoll,
+        PullRequestReferenceService references,
+        LogService log,
         IGitPlugin plugin,
-        PullRequestReferenz pullRequest,
+        PullRequestReference pullRequest,
         CancellationToken ct)
     {
         pullRequest.MonitoringPhase = PullRequestMonitoringPhase.Completing;
@@ -143,25 +143,25 @@ public sealed class PullRequestMonitoringService : PeriodicBackgroundService
             pullRequest.MergeCommitSha = result.MergeCommitSha ?? pullRequest.MergeCommitSha;
             if (result.PullRequestMerged)
             {
-                await protokoll.AddEintragAsync(
-                    pullRequest.AufgabeId,
-                    ProtokollTyp.GitAktion,
+                await log.AddEntryAsync(
+                    pullRequest.WorkItemId,
+                    LogEntryType.GitAction,
                     $"Pull Request #{pullRequest.PullRequestNumber} automatisch abgeschlossen.",
                     ct: ct);
                 await references.SetPhaseAsync(pullRequest, PullRequestMonitoringPhase.Completed, ct);
             }
             else
             {
-                var protokollMessage = options.Strategy == PullRequestCompletionStrategy.ApprovalOnly
+                var logMessage = options.Strategy == PullRequestCompletionStrategy.ApprovalOnly
                     ? $"Pull Request #{pullRequest.PullRequestNumber} automatisch genehmigt; Merge steht noch aus."
                     : $"Auto-Merge fuer Pull Request #{pullRequest.PullRequestNumber} aktiviert; Merge steht noch aus.";
                 var uncertainty = options.Strategy == PullRequestCompletionStrategy.ApprovalOnly
                     ? "Pull Request wurde genehmigt, ist aber noch offen und wird weiter ueberwacht."
                     : "Auto-Merge wurde aktiviert, der Pull Request ist aber noch offen und wird weiter ueberwacht.";
-                await protokoll.AddEintragAsync(
-                    pullRequest.AufgabeId,
-                    ProtokollTyp.GitAktion,
-                    protokollMessage,
+                await log.AddEntryAsync(
+                    pullRequest.WorkItemId,
+                    LogEntryType.GitAction,
+                    logMessage,
                     ct: ct);
                 await references.SetProviderUncertaintyAsync(
                     pullRequest,
@@ -175,9 +175,9 @@ public sealed class PullRequestMonitoringService : PeriodicBackgroundService
 
         var phase = result.Blocked ? PullRequestMonitoringPhase.Blocked : PullRequestMonitoringPhase.Failed;
         var message = result.Message ?? "Pull Request konnte nicht automatisch abgeschlossen werden.";
-        await protokoll.AddEintragAsync(
-            pullRequest.AufgabeId,
-            ProtokollTyp.GitAktion,
+        await log.AddEntryAsync(
+            pullRequest.WorkItemId,
+            LogEntryType.GitAction,
             $"Pull Request #{pullRequest.PullRequestNumber} nicht automatisch abgeschlossen: {message}",
             ct: ct);
         await references.SetProblemAsync(pullRequest, phase, message, ct);

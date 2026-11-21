@@ -16,26 +16,26 @@ namespace Softwareschmiede.Tests.E2E;
 /// SQLite-Datenbank, Szenario- und Konfigurationsdatei, Stable-/RC-ZIP-Paketen mit getrennten
 /// Download-URLs und unterscheidbarem Inhalt, dateibasierten Freigabe-Gates sowie dem
 /// strukturierten JSONL-Protokoll. Alle App-seitig geschriebenen Update-Artefakte bleiben
-/// innerhalb der Testwurzel.
+/// innerhalb der TestRoot.
 /// </summary>
 public sealed class UpdateE2EFixture : IDisposable
 {
     /// <summary>Standardmäßig simulierte installierte Version.</summary>
-    public const string InstallierteVersion = "1.2.0";
+    public const string InstalledVersion = "1.2.0";
 
-    /// <summary>Version des simulierten Stable-Releases (neuer als <see cref="InstallierteVersion"/>).</summary>
+    /// <summary>Version des simulierten Stable-Releases (neuer als <see cref="InstalledVersion"/>).</summary>
     public const string StableVersion = "1.3.0";
 
     /// <summary>Version des simulierten Release-Candidates (neuer als <see cref="StableVersion"/>).</summary>
     public const string RcVersion = "1.4.0-rc.1";
 
-    /// <summary>Release-Listendaten-Dateiname relativ zur Testwurzel.</summary>
-    public const string ReleaseListDateiName = "releases.json";
+    /// <summary>Release-Listendaten-Dateiname relativ zur TestRoot.</summary>
+    public const string ReleaseListFileName = "releases.json";
 
-    private static readonly UpdateOptions StandardOptionen = new();
+    private static readonly UpdateOptions DefaultOptions = new();
 
     private static readonly string RepositoryApiUrl =
-        $"https://api.github.com/repos/{StandardOptionen.RepositoryOwner}/{StandardOptionen.RepositoryName}";
+        $"https://api.github.com/repos/{DefaultOptions.RepositoryOwner}/{DefaultOptions.RepositoryName}";
 
     /// <summary>Der Release-API-Endpunkt, den <c>GitHubReleaseClient</c> mit den Standard-<see cref="UpdateOptions"/> anfragt.</summary>
     public static readonly string ReleaseApiUrl = $"{RepositoryApiUrl}/releases?per_page=100";
@@ -64,73 +64,73 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <summary>GitHub-API-Asset-URL (Fallback-Download-Route) des RC-Manifests.</summary>
     public static readonly string RcManifestAssetApiUrl = AssetApiUrl(RcManifestAssetId);
 
-    private static readonly JsonSerializerOptions JsonOptionen = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    private readonly UpdateE2ESzenario _szenario = new();
-    private readonly object _szenarioLock = new();
+    private readonly UpdateE2EScenario _scenario = new();
+    private readonly object _scenarioLock = new();
     private bool _disposed;
 
     /// <inheritdoc cref="UpdateE2EFixture"/>
     public UpdateE2EFixture()
     {
-        SzenarioId = $"update-e2e-{Guid.NewGuid():N}";
-        Testwurzel = Path.Combine(Path.GetTempPath(), $"softwareschmiede_update_e2e_{Guid.NewGuid():N}");
-        InstalliertesVerzeichnis = Path.Combine(Testwurzel, "installed");
-        GatesVerzeichnis = Path.Combine(Testwurzel, "gates");
-        PaketVerzeichnis = Path.Combine(Testwurzel, "packages");
-        SzenarioDateiPfad = Path.Combine(Testwurzel, "scenario.json");
-        ProtokollDateiPfad = Path.Combine(Testwurzel, "events.jsonl");
-        KonfigurationDateiPfad = Path.Combine(Testwurzel, "testconfig.json");
-        DatenbankPfad = Path.Combine(Testwurzel, "test.db");
+        ScenarioId = $"update-e2e-{Guid.NewGuid():N}";
+        TestRoot = Path.Combine(Path.GetTempPath(), $"softwareschmiede_update_e2e_{Guid.NewGuid():N}");
+        InstalledDirectory = Path.Combine(TestRoot, "installed");
+        GatesDirectory = Path.Combine(TestRoot, "gates");
+        PackageDirectory = Path.Combine(TestRoot, "packages");
+        ScenarioFilePath = Path.Combine(TestRoot, "scenario.json");
+        LogFilePath = Path.Combine(TestRoot, "events.jsonl");
+        ConfigurationFilePath = Path.Combine(TestRoot, "testconfig.json");
+        DatabasePath = Path.Combine(TestRoot, "test.db");
 
-        Directory.CreateDirectory(InstalliertesVerzeichnis);
-        Directory.CreateDirectory(GatesVerzeichnis);
-        Directory.CreateDirectory(PaketVerzeichnis);
+        Directory.CreateDirectory(InstalledDirectory);
+        Directory.CreateDirectory(GatesDirectory);
+        Directory.CreateDirectory(PackageDirectory);
 
-        SchreibeInstallierteVersion(InstallierteVersion);
+        WriteInstalledVersion(InstalledVersion);
 
         // Deutlich unterscheidbare, eindeutige Download-URLs; niemals echte Release-Quellen.
-        StableDownloadUrl = $"https://e2e.invalid/{SzenarioId}/release-{StableVersion}.zip";
-        RcDownloadUrl = $"https://e2e.invalid/{SzenarioId}/release-{RcVersion}.zip";
-        StableManifestDownloadUrl = $"https://e2e.invalid/{SzenarioId}/update-{StableVersion}.json";
-        RcManifestDownloadUrl = $"https://e2e.invalid/{SzenarioId}/update-{RcVersion}.json";
-        StableZipPfad = Path.Combine(PaketVerzeichnis, $"release-{StableVersion}.zip");
-        RcZipPfad = Path.Combine(PaketVerzeichnis, $"release-{RcVersion}.zip");
+        StableDownloadUrl = $"https://e2e.invalid/{ScenarioId}/release-{StableVersion}.zip";
+        RcDownloadUrl = $"https://e2e.invalid/{ScenarioId}/release-{RcVersion}.zip";
+        StableManifestDownloadUrl = $"https://e2e.invalid/{ScenarioId}/update-{StableVersion}.json";
+        RcManifestDownloadUrl = $"https://e2e.invalid/{ScenarioId}/update-{RcVersion}.json";
+        StableZipPath = Path.Combine(PackageDirectory, $"release-{StableVersion}.zip");
+        RcZipPath = Path.Combine(PackageDirectory, $"release-{RcVersion}.zip");
 
-        ErstellePaketZip(StableZipPfad, StableVersion, "stable-marker");
-        ErstellePaketZip(RcZipPfad, RcVersion, "rc-marker");
+        CreatePackageZip(StableZipPath, StableVersion, "stable-marker");
+        CreatePackageZip(RcZipPath, RcVersion, "rc-marker");
 
-        SetzeStandardAntworten();
-        SpeichereSzenario();
-        SchreibeKonfiguration();
+        SetDefaultResponses();
+        SaveScenario();
+        WriteConfiguration();
     }
 
     /// <summary>Eindeutige Szenario-/Prozess-Identität für jeden Protokolleintrag.</summary>
-    public string SzenarioId { get; }
+    public string ScenarioId { get; }
 
     /// <summary>Eindeutiges Temp-Wurzelverzeichnis dieser Fixture.</summary>
-    public string Testwurzel { get; }
+    public string TestRoot { get; }
 
     /// <summary>Simuliertes Installationsverzeichnis mit der <c>version.json</c>.</summary>
-    public string InstalliertesVerzeichnis { get; }
+    public string InstalledDirectory { get; }
 
     /// <summary>Verzeichnis der dateibasierten Freigabe-/Abbruch-Gates.</summary>
-    public string GatesVerzeichnis { get; }
+    public string GatesDirectory { get; }
 
     /// <summary>Verzeichnis der erzeugten ZIP-Pakete.</summary>
-    public string PaketVerzeichnis { get; }
+    public string PackageDirectory { get; }
 
     /// <summary>Pfad der pro Request/Lesebefehl neu gelesenen Szenariodatei.</summary>
-    public string SzenarioDateiPfad { get; }
+    public string ScenarioFilePath { get; }
 
     /// <summary>Pfad der strukturierten JSONL-Protokolldatei.</summary>
-    public string ProtokollDateiPfad { get; }
+    public string LogFilePath { get; }
 
     /// <summary>Pfad der Testkonfigurations-JSON (Wert von <c>SOFTWARESCHMIEDE_UPDATE_TEST_CONFIG</c>).</summary>
-    public string KonfigurationDateiPfad { get; }
+    public string ConfigurationFilePath { get; }
 
     /// <summary>Pfad der fixture-eigenen SQLite-Testdatenbank.</summary>
-    public string DatenbankPfad { get; }
+    public string DatabasePath { get; }
 
     /// <summary>Download-URL des Stable-Pakets.</summary>
     public string StableDownloadUrl { get; }
@@ -145,141 +145,141 @@ public sealed class UpdateE2EFixture : IDisposable
     public string RcManifestDownloadUrl { get; }
 
     /// <summary>Pfad der Stable-ZIP-Datei.</summary>
-    public string StableZipPfad { get; }
+    public string StableZipPath { get; }
 
     /// <summary>Pfad der RC-ZIP-Datei.</summary>
-    public string RcZipPfad { get; }
+    public string RcZipPath { get; }
 
     /// <summary>
     /// Liefert die prozessbezogenen Umgebungsvariablen für den App-Start:
     /// <c>SOFTWARESCHMIEDE_UPDATE_TEST_CONFIG</c> und <c>SOFTWARESCHMIEDE_TEST_DB_PATH</c>.
     /// </summary>
     /// <returns>Die Umgebungsvariablen für <c>WpfTestBase.LaunchApp</c>.</returns>
-    public IReadOnlyDictionary<string, string?> ErzeugeStartUmgebung()
+    public IReadOnlyDictionary<string, string?> CreateStartEnvironment()
         => new Dictionary<string, string?>
         {
-            [UpdateE2ETestConfiguration.UmgebungsVariable] = KonfigurationDateiPfad,
-            [UpdateE2ETestConfiguration.TestDatenbankUmgebungsVariable] = DatenbankPfad
+            [UpdateE2ETestConfiguration.EnvironmentVariable] = ConfigurationFilePath,
+            [UpdateE2ETestConfiguration.TestDatabaseEnvironmentVariable] = DatabasePath
         };
 
     /// <summary>
     /// Setzt die Standard-Antworten: Der Release-Endpunkt liefert die Release-Liste mit Stable- und
     /// RC-Release (sofortige Antwort), beide Paket-URLs liefern die zugehörigen ZIP-Dateien.
     /// </summary>
-    /// <param name="mitRcRelease">Bei <c>false</c> enthält die Release-Liste nur das Stable-Release.</param>
-    public void SetzeStandardAntworten(bool mitRcRelease = true)
+    /// <param name="withRcRelease">Bei <c>false</c> enthält die Release-Liste nur das Stable-Release.</param>
+    public void SetDefaultResponses(bool withRcRelease = true)
     {
-        _szenario.Antworten.Clear();
-        _szenario.Antworten.Add(new UpdateE2EAntwort
+        _scenario.Answer.Clear();
+        _scenario.Answer.Add(new UpdateE2EResponse
         {
             Url = ReleaseApiUrl,
             Status = 200,
-            Inhalt = ErzeugeReleaseListenJson(mitRcRelease)
+            Content = CreateReleaseListsJson(withRcRelease)
         });
-        foreach (var (url, zipPfad) in new[]
+        foreach (var (url, zipPath) in new[]
         {
-            (StableDownloadUrl, StableZipPfad),
-            (RcDownloadUrl, RcZipPfad),
-            (StableAssetApiUrl, StableZipPfad),
-            (RcAssetApiUrl, RcZipPfad)
+            (StableDownloadUrl, StableZipPath),
+            (RcDownloadUrl, RcZipPath),
+            (StableAssetApiUrl, StableZipPath),
+            (RcAssetApiUrl, RcZipPath)
         })
         {
-            _szenario.Antworten.Add(new UpdateE2EAntwort
+            _scenario.Answer.Add(new UpdateE2EResponse
             {
                 Url = url,
                 Status = 200,
-                BodyDatei = RelativZurWurzel(zipPfad)
+                BodyFile = RelativeToRoot(zipPath)
             });
         }
 
-        foreach (var (manifestUrl, version, downloadUrl, zipPfad) in new[]
+        foreach (var (manifestUrl, version, downloadUrl, zipPath) in new[]
         {
-            (StableManifestDownloadUrl, StableVersion, StableDownloadUrl, StableZipPfad),
-            (RcManifestDownloadUrl, RcVersion, RcDownloadUrl, RcZipPfad),
-            (StableManifestAssetApiUrl, StableVersion, StableDownloadUrl, StableZipPfad),
-            (RcManifestAssetApiUrl, RcVersion, RcDownloadUrl, RcZipPfad)
+            (StableManifestDownloadUrl, StableVersion, StableDownloadUrl, StableZipPath),
+            (RcManifestDownloadUrl, RcVersion, RcDownloadUrl, RcZipPath),
+            (StableManifestAssetApiUrl, StableVersion, StableDownloadUrl, StableZipPath),
+            (RcManifestAssetApiUrl, RcVersion, RcDownloadUrl, RcZipPath)
         })
         {
-            _szenario.Antworten.Add(new UpdateE2EAntwort
+            _scenario.Answer.Add(new UpdateE2EResponse
             {
                 Url = manifestUrl,
                 Status = 200,
-                Inhalt = ErzeugeManifestJson(version, downloadUrl, zipPfad),
-                Art = "manifest"
+                Content = CreateManifestJson(version, downloadUrl, zipPath),
+                Kind = "manifest"
             });
         }
     }
 
     /// <summary>Mutiert das Szenario thread-sicher und schreibt die Szenariodatei anschließend neu.</summary>
     /// <param name="mutation">Die Änderung am Szenario.</param>
-    public void AktualisiereSzenario(Action<UpdateE2ESzenario> mutation)
+    public void UpdateScenario(Action<UpdateE2EScenario> mutation)
     {
-        lock (_szenarioLock)
+        lock (_scenarioLock)
         {
-            mutation(_szenario);
-            SpeichereSzenario();
+            mutation(_scenario);
+            SaveScenario();
         }
     }
 
     /// <summary>Schreibt das aktuelle Szenario in die Szenariodatei.</summary>
-    public void SpeichereSzenario()
+    public void SaveScenario()
     {
-        lock (_szenarioLock)
+        lock (_scenarioLock)
         {
-            File.WriteAllText(SzenarioDateiPfad, JsonSerializer.Serialize(_szenario, JsonOptionen));
+            File.WriteAllText(ScenarioFilePath, JsonSerializer.Serialize(_scenario, JsonOptions));
         }
     }
 
     /// <summary>
     /// Aktiviert den kontrollierten Settings-Lesefehler für die gewählte Lesegrenze.
     /// </summary>
-    /// <param name="grenze"><c>Initial</c>, <c>BeforePreparation</c> oder <c>BeforeUpdaterStart</c>.</param>
-    /// <param name="versuch">Versuchsauswahl (<c>any</c>, <c>startup</c>, <c>manuell</c>, <c>pruefen</c>, <c>starten</c>).</param>
-    /// <param name="aufFreigabeWarten">Bei <c>true</c> blockiert der betroffene Read bis zur Gate-Freigabe.</param>
-    /// <param name="wartezeitSekunden">Maximale Gate-Wartezeit in Sekunden.</param>
-    public void AktiviereLesefehler(
-        string grenze,
-        string versuch = "any",
-        bool aufFreigabeWarten = true,
-        int wartezeitSekunden = 30)
+    /// <param name="limit"><c>Initial</c>, <c>BeforePreparation</c> oder <c>BeforeUpdaterStart</c>.</param>
+    /// <param name="attempt">Versuchsauswahl (<c>any</c>, <c>startup</c>, <c>manuell</c>, <c>pruefen</c>, <c>starten</c>).</param>
+    /// <param name="onReleaseWait">Bei <c>true</c> blockiert der betroffene Read bis zur Gate-Freigabe.</param>
+    /// <param name="waittimeSeconds">Maximale Gate-Wartezeit in Sekunden.</param>
+    public void ActivateReadfailure(
+        string limit,
+        string attempt = "any",
+        bool onReleaseWait = true,
+        int waittimeSeconds = 30)
     {
-        AktualisiereSzenario(s => s.Lesefehler = new UpdateE2ELesefehler
+        UpdateScenario(s => s.ReadFailure = new UpdateE2EReadFailure
         {
-            Aktiv = true,
-            Versuch = versuch,
-            Grenze = grenze,
-            AufFreigabeWarten = aufFreigabeWarten,
-            WartezeitSekunden = wartezeitSekunden
+            Active = true,
+            Attempt = attempt,
+            Limit = limit,
+            WaitForRelease = onReleaseWait,
+            WaitTimeoutSeconds = waittimeSeconds
         });
     }
 
     /// <summary>
     /// Deaktiviert den kontrollierten Settings-Lesefehler ausdrücklich und protokolliert
-    /// <see cref="UpdateE2EEreignisse.UpdateSettingsReadFailureDisabled"/> als Runner-Ereignis.
+    /// <see cref="UpdateE2EEvents.UpdateSettingsReadFailureDisabled"/> als Runner-Ereignis.
     /// </summary>
-    public void DeaktiviereLesefehler()
+    public void DeactivateReadfailure()
     {
-        AktualisiereSzenario(s => s.Lesefehler = new UpdateE2ELesefehler { Aktiv = false });
-        UpdateE2EProtokoll.Anfuegen(
-            ProtokollDateiPfad, SzenarioId, UpdateE2EEreignisse.UpdateSettingsReadFailureDisabled);
+        UpdateScenario(s => s.ReadFailure = new UpdateE2EReadFailure { Active = false });
+        UpdateE2ELog.Append(
+            LogFilePath, ScenarioId, UpdateE2EEvents.UpdateSettingsReadFailureDisabled);
     }
 
     /// <summary>Schreibt die Freigabe-Datei <c>{gate}.release</c> für ein blockiertes Gate.</summary>
     /// <param name="gate">Der Gate-Name.</param>
-    public void OeffneGate(string gate)
-        => File.WriteAllText(Path.Combine(GatesVerzeichnis, $"{gate}.release"), "release");
+    public void OpenGate(string gate)
+        => File.WriteAllText(Path.Combine(GatesDirectory, $"{gate}.release"), "release");
 
     /// <summary>Schreibt die Abbruch-Datei <c>{gate}.cancel</c> für ein blockiertes Gate.</summary>
     /// <param name="gate">Der Gate-Name.</param>
-    public void BrecheGateAb(string gate)
-        => File.WriteAllText(Path.Combine(GatesVerzeichnis, $"{gate}.cancel"), "cancel");
+    public void CancelGateFrom(string gate)
+        => File.WriteAllText(Path.Combine(GatesDirectory, $"{gate}.cancel"), "cancel");
 
     /// <summary>Entfernt beide Gate-Dateien eines Gates wieder.</summary>
     /// <param name="gate">Der Gate-Name.</param>
-    public void SetzeGateZurueck(string gate)
+    public void SetGateBack(string gate)
     {
-        var release = Path.Combine(GatesVerzeichnis, $"{gate}.release");
-        var cancel = Path.Combine(GatesVerzeichnis, $"{gate}.cancel");
+        var release = Path.Combine(GatesDirectory, $"{gate}.release");
+        var cancel = Path.Combine(GatesDirectory, $"{gate}.cancel");
         if (File.Exists(release))
             File.Delete(release);
         if (File.Exists(cancel))
@@ -287,117 +287,117 @@ public sealed class UpdateE2EFixture : IDisposable
     }
 
     /// <summary>
-    /// Erstellt die Fixture-Datenbank (EF-Migration) und persistiert die Update-Einstellungen
+    /// Erstellt die Fixture-Datenbank (EF-Migration) und persistiert die Update--Einstellungen
     /// darin. Für Vorbedingungen vor dem ersten App-Start.
     /// </summary>
-    /// <param name="modus">Der zu speichernde Update-Modus.</param>
-    /// <param name="updatePfad">Der zu speichernde Update-Pfad.</param>
-    public async Task SetzeUpdateEinstellungenAsync(UpdateMode modus, string updatePfad)
-        => await SchreibeUpdateEinstellungenAsync(modus, updatePfad, migriere: true);
+    /// <param name="mode">Der zu speichernde Update-Modus.</param>
+    /// <param name="updatePath">Der zu speichernde Update-Pfad.</param>
+    public async Task SetUpdateSettingsAsync(UpdateMode mode, string updatePath)
+        => await WriteUpdateSettingsAsync(mode, updatePath, migrate: true);
 
     /// <summary>
-    /// Persistiert Update-Einstellungen in der bereits bestehenden Fixture-Datenbank
+    /// Persistiert Update--Einstellungen in der bereits bestehenden Fixture-Datenbank
     /// (für Änderungen zwischen zwei App-Läufen bei erhaltener Datenbank).
     /// </summary>
-    /// <param name="modus">Der zu speichernde Update-Modus.</param>
-    /// <param name="updatePfad">Der zu speichernde Update-Pfad.</param>
-    public async Task AktualisiereUpdateEinstellungenAsync(UpdateMode modus, string updatePfad)
-        => await SchreibeUpdateEinstellungenAsync(modus, updatePfad, migriere: false);
+    /// <param name="mode">Der zu speichernde Update-Modus.</param>
+    /// <param name="updatePath">Der zu speichernde Update-Pfad.</param>
+    public async Task UpdateUpdateSettingsAsync(UpdateMode mode, string updatePath)
+        => await WriteUpdateSettingsAsync(mode, updatePath, migrate: false);
 
     /// <summary>
-    /// Persistiert die Update-Einstellungen über einen eigenen DbContext auf der
-    /// Fixture-Datenbank; migriert das Schema nur bei <paramref name="migriere"/>.
+    /// Persistiert die Update--Einstellungen über einen eigenen DbContext auf der
+    /// Fixture-Datenbank; migriert das Schema nur bei <paramref name="migrate"/>.
     /// </summary>
-    /// <param name="modus">Der zu speichernde Update-Modus.</param>
-    /// <param name="updatePfad">Der zu speichernde Update-Pfad.</param>
-    /// <param name="migriere">Bei <c>true</c> wird die Fixture-Datenbank zuvor per EF-Migration erstellt.</param>
-    private async Task SchreibeUpdateEinstellungenAsync(UpdateMode modus, string updatePfad, bool migriere)
+    /// <param name="mode">Der zu speichernde Update-Modus.</param>
+    /// <param name="updatePath">Der zu speichernde Update-Pfad.</param>
+    /// <param name="migrate">Bei <c>true</c> wird die Fixture-Datenbank zuvor per EF-Migration erstellt.</param>
+    private async Task WriteUpdateSettingsAsync(UpdateMode mode, string updatePath, bool migrate)
     {
-        var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
-            .UseSqlite($"Data Source={DatenbankPfad}")
+        var options = new DbContextOptionsBuilder<SoftwareschmiedeDbContext>()
+            .UseSqlite($"Data Source={DatabasePath}")
             .Options;
 
-        await using var db = new SoftwareschmiededDbContext(options);
-        if (migriere)
+        await using var db = new SoftwareschmiedeDbContext(options);
+        if (migrate)
             await db.Database.MigrateAsync();
-        var service = new AppEinstellungService(db, NullLogger<AppEinstellungService>.Instance);
-        await service.SetUpdateSettingsAsync(new UpdateSettings(modus, updatePfad));
+        var service = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        await service.SetUpdateSettingsAsync(new UpdateSettings(mode, updatePath));
     }
 
     /// <summary>Liest alle bisher geschriebenen JSONL-Protokolleinträge.</summary>
     /// <returns>Die Protokolleinträge in Dateireihenfolge.</returns>
-    public IReadOnlyList<UpdateE2EProtokollEintrag> LeseProtokoll()
+    public IReadOnlyList<UpdateE2ELogEntry> ReadLog()
     {
-        if (!File.Exists(ProtokollDateiPfad))
+        if (!File.Exists(LogFilePath))
             return [];
 
-        var eintraege = new List<UpdateE2EProtokollEintrag>();
-        string inhalt;
-        using (var stream = new FileStream(ProtokollDateiPfad, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        var entries = new List<UpdateE2ELogEntry>();
+        string content;
+        using (var stream = new FileStream(LogFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
         using (var reader = new StreamReader(stream))
         {
-            inhalt = reader.ReadToEnd();
+            content = reader.ReadToEnd();
         }
 
-        foreach (var zeile in inhalt.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        foreach (var line in content.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
-            var eintrag = JsonSerializer.Deserialize<UpdateE2EProtokollEintrag>(zeile.Trim());
-            if (eintrag is not null)
-                eintraege.Add(eintrag);
+            var entry = JsonSerializer.Deserialize<UpdateE2ELogEntry>(line.Trim());
+            if (entry is not null)
+                entries.Add(entry);
         }
 
-        return eintraege;
+        return entries;
     }
 
     /// <summary>
     /// Wartet begrenzt, bis mindestens <paramref name="mindestens"/> Protokolleinträge mit dem
     /// Ereignisnamen (und optionalem Filter) vorliegen, und liefert die Treffer.
     /// </summary>
-    /// <param name="ereignis">Der Ereignisname.</param>
+    /// <param name="evt">Der Ereignisname.</param>
     /// <param name="timeout">Maximale Wartezeit.</param>
     /// <param name="mindestens">Mindestanzahl der Treffer.</param>
     /// <param name="filter">Optionaler Filter auf den Nutzdaten-Eintrag.</param>
     /// <returns>Die gefundenen Einträge.</returns>
     /// <exception cref="TimeoutException">Die Ereignisse erschienen nicht rechtzeitig.</exception>
-    public async Task<IReadOnlyList<UpdateE2EProtokollEintrag>> WarteAufEreignisAsync(
-        string ereignis,
+    public async Task<IReadOnlyList<UpdateE2ELogEntry>> WaitOnEventAsync(
+        string evt,
         TimeSpan timeout,
         int mindestens = 1,
-        Func<UpdateE2EProtokollEintrag, bool>? filter = null)
+        Func<UpdateE2ELogEntry, bool>? filter = null)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
-            var treffer = LeseProtokoll()
-                .Where(e => e.Ereignis == ereignis && (filter is null || filter(e)))
+            var match = ReadLog()
+                .Where(e => e.Event == evt && (filter is null || filter(e)))
                 .ToList();
-            if (treffer.Count >= mindestens)
-                return treffer;
+            if (match.Count >= mindestens)
+                return match;
 
             await Task.Delay(100);
         }
 
-        var protokoll = LeseProtokoll();
-        var gleichnamig = protokoll
-            .Where(e => e.Ereignis == ereignis)
-            .Select(e => e.Daten is null ? "(ohne Daten)" : JsonSerializer.Serialize(e.Daten));
+        var log = ReadLog();
+        var gleichnamig = log
+            .Where(e => e.Event == evt)
+            .Select(e => e.Data is null ? "(ohne Daten)" : JsonSerializer.Serialize(e.Data));
         throw new TimeoutException(
-            $"Protokollereignis '{ereignis}' (mindestens {mindestens}) erschien nicht innerhalb von {timeout.TotalSeconds}s. " +
-            $"Bisherige Ereignisse: {string.Join(", ", protokoll.Select(e => e.Ereignis).Distinct())}. " +
-            $"Vorhandene '{ereignis}'-Daten: {string.Join(" | ", gleichnamig)}");
+            $"Protokollereignis '{evt}' (mindestens {mindestens}) erschien nicht innerhalb von {timeout.TotalSeconds}s. " +
+            $"Bisherige Ereignisse: {string.Join(", ", log.Select(e => e.Event).Distinct())}. " +
+            $"Vorhandene '{evt}'-Daten: {string.Join(" | ", gleichnamig)}");
     }
 
     /// <summary>Liefert die Anzahl der Protokolleinträge eines Ereignisnamens.</summary>
-    /// <param name="ereignis">Der Ereignisname.</param>
+    /// <param name="evt">Der Ereignisname.</param>
     /// <returns>Die Anzahl der Einträge.</returns>
-    public int ZaehleEreignis(string ereignis)
-        => LeseProtokoll().Count(e => e.Ereignis == ereignis);
+    public int CountEvent(string evt)
+        => ReadLog().Count(e => e.Event == evt);
 
     /// <summary>Liefert den <c>data</c>-Wert eines Protokolleintrags als <see cref="JsonElement"/>.</summary>
-    /// <param name="eintrag">Der Protokolleintrag.</param>
+    /// <param name="entry">Der Protokolleintrag.</param>
     /// <returns>Das Nutzdaten-Element oder <c>null</c>.</returns>
-    public static JsonElement? Daten(UpdateE2EProtokollEintrag eintrag)
-        => eintrag.Daten as JsonElement? ?? (eintrag.Daten is null ? null : JsonSerializer.SerializeToElement(eintrag.Daten));
+    public static JsonElement? Data(UpdateE2ELogEntry entry)
+        => entry.Data as JsonElement? ?? (entry.Data is null ? null : JsonSerializer.SerializeToElement(entry.Data));
 
     /// <summary>GitHub-API-Asset-URL (Fallback-Download-Route) zu einer Asset-ID.</summary>
     /// <param name="assetId">Die Asset-ID.</param>
@@ -410,10 +410,10 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <param name="downloadUrl">Die Browser-Download-URL.</param>
     /// <param name="assetName">Der Asset-Name; Standard ist <see cref="UpdateOptions.AssetName"/>.</param>
     /// <returns>Das anonyme Asset-Objekt.</returns>
-    public static object ErstelleAssetJson(string apiUrl, long assetId, string downloadUrl, string? assetName = null)
+    public static object CreateAssetJson(string apiUrl, long assetId, string downloadUrl, string? assetName = null)
         => new
         {
-            name = assetName ?? StandardOptionen.AssetName,
+            name = assetName ?? DefaultOptions.AssetName,
             url = apiUrl,
             id = assetId,
             browser_download_url = downloadUrl
@@ -424,19 +424,19 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <param name="assetId">Die Asset-ID.</param>
     /// <param name="downloadUrl">Die Browser-Download-URL.</param>
     /// <returns>Das anonyme Asset-Objekt.</returns>
-    public static object ErstelleManifestAssetJson(string apiUrl, long assetId, string downloadUrl)
-        => ErstelleAssetJson(apiUrl, assetId, downloadUrl, StandardOptionen.ManifestAssetName);
+    public static object CreateManifestAssetJson(string apiUrl, long assetId, string downloadUrl)
+        => CreateAssetJson(apiUrl, assetId, downloadUrl, DefaultOptions.ManifestAssetName);
 
     /// <summary>
     /// Erzeugt das Update-Manifest (<c>update.json</c>) im Workflow-Schema mit dem tatsächlichen
-    /// SHA-256 und der Größe der Paket-ZIP unter <paramref name="zipPfad"/>.
+    /// SHA-256 und der Größe der Paket-ZIP unter <paramref name="zipPath"/>.
     /// </summary>
     /// <param name="version">Die Release-Version.</param>
     /// <param name="downloadUrl">Die Browser-Download-URL des Paket-Assets (<c>assetUrl</c>-Feld).</param>
-    /// <param name="zipPfad">Pfad der zu verifizierenden Paket-ZIP.</param>
+    /// <param name="zipPath">Pfad der zu verifizierenden Paket-ZIP.</param>
     /// <returns>Das Manifest als JSON-Text.</returns>
-    public static string ErzeugeManifestJson(string version, string downloadUrl, string zipPfad)
-        => ErzeugeManifestJson(version, downloadUrl, File.ReadAllBytes(zipPfad));
+    public static string CreateManifestJson(string version, string downloadUrl, string zipPath)
+        => CreateManifestJson(version, downloadUrl, File.ReadAllBytes(zipPath));
 
     /// <summary>
     /// Erzeugt das Update-Manifest (<c>update.json</c>) im Workflow-Schema mit dem tatsächlichen
@@ -447,7 +447,7 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <param name="zipBytes">Bytes der zu verifizierenden Paket-ZIP.</param>
     /// <param name="sha256Override">Optionaler abweichender SHA-256-Wert (für Mismatch-Szenarien).</param>
     /// <returns>Das Manifest als JSON-Text.</returns>
-    public static string ErzeugeManifestJson(string version, string downloadUrl, byte[] zipBytes, string? sha256Override = null)
+    public static string CreateManifestJson(string version, string downloadUrl, byte[] zipBytes, string? sha256Override = null)
     {
         var sha256 = sha256Override ?? Convert.ToHexString(SHA256.HashData(zipBytes)).ToLowerInvariant();
         return JsonSerializer.Serialize(new
@@ -461,7 +461,7 @@ public sealed class UpdateE2EFixture : IDisposable
                 {
                     platform = "windows",
                     runtimeIdentifier = "win-x64",
-                    assetName = StandardOptionen.AssetName,
+                    assetName = DefaultOptions.AssetName,
                     assetUrl = downloadUrl,
                     sha256,
                     sizeBytes = (long)zipBytes.Length
@@ -474,10 +474,10 @@ public sealed class UpdateE2EFixture : IDisposable
     /// <param name="version">Die Release-Version (Tag wird als <c>v{version}</c> gesetzt).</param>
     /// <param name="prerelease">Ob das Release als Vorabversion markiert ist.</param>
     /// <param name="publishedAt">Der Veröffentlichungszeitpunkt (<c>published_at</c>-Feld).</param>
-    /// <param name="assetJson">Das Asset-Objekt des Releases (aus <see cref="ErstelleAssetJson"/>).</param>
-    /// <param name="manifestAssetJson">Optionales Manifest-Asset-Objekt des Releases (aus <see cref="ErstelleManifestAssetJson"/>).</param>
+    /// <param name="assetJson">Das Asset-Objekt des Releases (aus <see cref="CreateAssetJson"/>).</param>
+    /// <param name="manifestAssetJson">Optionales Manifest-Asset-Objekt des Releases (aus <see cref="CreateManifestAssetJson"/>).</param>
     /// <returns>Das anonyme Release-Objekt.</returns>
-    public static object ErstelleReleaseJson(string version, bool prerelease, DateTimeOffset publishedAt, object assetJson, object? manifestAssetJson = null)
+    public static object CreateReleaseJson(string version, bool prerelease, DateTimeOffset publishedAt, object assetJson, object? manifestAssetJson = null)
         => new
         {
             tag_name = $"v{version}",
@@ -491,16 +491,16 @@ public sealed class UpdateE2EFixture : IDisposable
     /// Erzeugt eine Release-Paket-ZIP mit Root-Einträgen <c>Softwareschmiede.exe</c> (unterscheidbarer
     /// Markerinhalt) und <c>version.json</c> passend zu <paramref name="version"/>.
     /// </summary>
-    /// <param name="zipPfad">Zielpfad der ZIP-Datei.</param>
+    /// <param name="zipPath">Zielpfad der ZIP-Datei.</param>
     /// <param name="version">Die Paketversion.</param>
     /// <param name="marker">Unterscheidbarer Inhaltsmarker der Paket-Exe.</param>
-    public static void ErstellePaketZip(string zipPfad, string version, string marker)
+    public static void CreatePackageZip(string zipPath, string version, string marker)
     {
-        if (File.Exists(zipPfad))
-            File.Delete(zipPfad);
+        if (File.Exists(zipPath))
+            File.Delete(zipPath);
 
-        var executableName = StandardOptionen.ExecutableName;
-        using var archiv = ZipFile.Open(zipPfad, ZipArchiveMode.Create);
+        var executableName = DefaultOptions.ExecutableName;
+        using var archiv = ZipFile.Open(zipPath, ZipArchiveMode.Create);
 
         var exe = archiv.CreateEntry(executableName);
         using (var writer = new StreamWriter(exe.Open()))
@@ -512,12 +512,12 @@ public sealed class UpdateE2EFixture : IDisposable
     }
 
     /// <summary>Liest den Markerinhalt der Paket-Exe aus einem entpackten Verzeichnis.</summary>
-    /// <param name="verzeichnis">Das entpackte Paketverzeichnis.</param>
+    /// <param name="directory">Das entpackte Paketverzeichnis.</param>
     /// <returns>Der Inhalt der Paket-Exe oder <c>null</c>.</returns>
-    public static string? LesePaketExeInhalt(string verzeichnis)
+    public static string? ReadPackageExeContent(string directory)
     {
-        var pfad = Path.Combine(verzeichnis, StandardOptionen.ExecutableName);
-        return File.Exists(pfad) ? File.ReadAllText(pfad) : null;
+        var path = Path.Combine(directory, DefaultOptions.ExecutableName);
+        return File.Exists(path) ? File.ReadAllText(path) : null;
     }
 
     /// <inheritdoc/>
@@ -528,19 +528,19 @@ public sealed class UpdateE2EFixture : IDisposable
         _disposed = true;
 
         // Fehlersteuerung sicher zurücksetzen, auch wenn der Test mittendrin abbricht.
-        try { DeaktiviereLesefehler(); } catch { /* Testwurzel evtl. schon entfernt. */ }
+        try { DeactivateReadfailure(); } catch { /* TestRoot evtl. schon entfernt. */ }
 
-        // Diagnose-Fluchtventil: Mit SOFTWARESCHMIEDE_UPDATE_E2E_KEEP=1 bleibt die Testwurzel
+        // Diagnose-Fluchtventil: Mit SOFTWARESCHMIEDE_UPDATE_E2E_KEEP=1 bleibt die TestRoot
         // (Szenario, Gates, JSONL-Protokoll) zur Fehleranalyse erhalten.
         if (Environment.GetEnvironmentVariable("SOFTWARESCHMIEDE_UPDATE_E2E_KEEP") == "1")
             return;
 
-        for (var versuch = 0; versuch < 5; versuch++)
+        for (var attempt = 0; attempt < 5; attempt++)
         {
             try
             {
-                if (Directory.Exists(Testwurzel))
-                    Directory.Delete(Testwurzel, recursive: true);
+                if (Directory.Exists(TestRoot))
+                    Directory.Delete(TestRoot, recursive: true);
                 return;
             }
             catch (IOException)
@@ -554,52 +554,52 @@ public sealed class UpdateE2EFixture : IDisposable
         }
     }
 
-    private void SchreibeInstallierteVersion(string version)
+    private void WriteInstalledVersion(string version)
     {
         File.WriteAllText(
-            Path.Combine(InstalliertesVerzeichnis, "version.json"),
+            Path.Combine(InstalledDirectory, "version.json"),
             $$"""{"version":"{{version}}","tagName":"v{{version}}"}""");
     }
 
-    private void SchreibeKonfiguration()
+    private void WriteConfiguration()
     {
-        var konfiguration = new UpdateE2ETestConfiguration
+        var configuration = new UpdateE2ETestConfiguration
         {
-            Testwurzel = Testwurzel,
-            SzenarioDateiPfad = SzenarioDateiPfad,
-            ProtokollDateiPfad = ProtokollDateiPfad,
-            SzenarioId = SzenarioId,
-            GatesVerzeichnis = GatesVerzeichnis
+            TestRoot = TestRoot,
+            ScenarioFilePath = ScenarioFilePath,
+            LogFilePath = LogFilePath,
+            ScenarioId = ScenarioId,
+            GatesDirectory = GatesDirectory
         };
 
-        File.WriteAllText(KonfigurationDateiPfad, JsonSerializer.Serialize(konfiguration, JsonOptionen));
+        File.WriteAllText(ConfigurationFilePath, JsonSerializer.Serialize(configuration, JsonOptions));
     }
 
-    private string ErzeugeReleaseListenJson(bool mitRcRelease)
+    private string CreateReleaseListsJson(bool withRcRelease)
     {
         var releases = new List<object>
         {
-            ErstelleReleaseJson(
+            CreateReleaseJson(
                 StableVersion,
                 prerelease: false,
                 DateTimeOffset.UtcNow.AddDays(-7),
-                ErstelleAssetJson(StableAssetApiUrl, StableAssetId, StableDownloadUrl),
-                ErstelleManifestAssetJson(StableManifestAssetApiUrl, StableManifestAssetId, StableManifestDownloadUrl))
+                CreateAssetJson(StableAssetApiUrl, StableAssetId, StableDownloadUrl),
+                CreateManifestAssetJson(StableManifestAssetApiUrl, StableManifestAssetId, StableManifestDownloadUrl))
         };
 
-        if (mitRcRelease)
+        if (withRcRelease)
         {
-            releases.Insert(0, ErstelleReleaseJson(
+            releases.Insert(0, CreateReleaseJson(
                 RcVersion,
                 prerelease: true,
                 DateTimeOffset.UtcNow,
-                ErstelleAssetJson(RcAssetApiUrl, RcAssetId, RcDownloadUrl),
-                ErstelleManifestAssetJson(RcManifestAssetApiUrl, RcManifestAssetId, RcManifestDownloadUrl)));
+                CreateAssetJson(RcAssetApiUrl, RcAssetId, RcDownloadUrl),
+                CreateManifestAssetJson(RcManifestAssetApiUrl, RcManifestAssetId, RcManifestDownloadUrl)));
         }
 
         return JsonSerializer.Serialize(releases);
     }
 
-    private string RelativZurWurzel(string pfad)
-        => Path.GetRelativePath(Testwurzel, pfad);
+    private string RelativeToRoot(string path)
+        => Path.GetRelativePath(TestRoot, path);
 }

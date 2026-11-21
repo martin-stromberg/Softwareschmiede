@@ -22,7 +22,7 @@ internal sealed class ScmE2EPluginManager : IPluginManager
         credentialStore.SetCredential("Softwareschmiede.GitHub.Token", "isolated-fixture-token");
         // Zwei getrennte Fixture-Identitäten: ein falsches Client-Routing (Benutzer- statt
         // Agent-Client) liefe gegen scm-owner und fiele beim scm-bot-Abgleich sofort auf.
-        // Der netrcPath zeigt in die Testwurzel, damit die Konstruktor-Bereinigung des
+        // Der netrcPath zeigt in die TestRoot, damit die Konstruktor-Bereinigung des
         // Plugins nicht die echte %USERPROFILE%\_netrc des ausführenden Benutzers verändert.
         _gitHub = new GitHubPlugin(new ScmE2EGitRunner(cliRunner, configuration), credentialStore, logger,
             new ScmE2EApiClient(configuration), new ScmE2EApiClient(configuration, "scm-bot", "BOT"),
@@ -30,11 +30,11 @@ internal sealed class ScmE2EPluginManager : IPluginManager
     }
 
     public IReadOnlyList<IGitPlugin> GetSourceCodeManagementPlugins() => [_gitHub];
-    public IReadOnlyList<IKiPlugin> GetDevelopmentAutomationPlugins()
+    public IReadOnlyList<IAiPlugin> GetDevelopmentAutomationPlugins()
         => _configuration.ReadScenario().PluginAvailable
             ? _inner.GetDevelopmentAutomationPlugins().Where(x => x.PluginPrefix == "Softwareschmiede.KiSimulator").ToArray() : [];
     public IGitPlugin GetDefaultSourceCodeManagementPlugin() => _gitHub;
-    public IKiPlugin GetDefaultDevelopmentAutomationPlugin() => GetDevelopmentAutomationPlugins().First();
+    public IAiPlugin GetDefaultDevelopmentAutomationPlugin() => GetDevelopmentAutomationPlugins().First();
     public IReadOnlyList<IIdePlugin> GetIdePlugins() => _inner.GetIdePlugins();
     public IIdePlugin GetDefaultIdePlugin() => _inner.GetDefaultIdePlugin();
 }

@@ -17,9 +17,9 @@ public sealed class DatabaseFixture : IAsyncDisposable
     private bool _disposed;
 
     /// <summary>Der DbContext, der auf die temporäre SQLite-Datenbankdatei zeigt.</summary>
-    public SoftwareschmiededDbContext Context { get; }
+    public SoftwareschmiedeDbContext Context { get; }
 
-    private DatabaseFixture(string dbFilePath, SqliteConnection connection, SoftwareschmiededDbContext context)
+    private DatabaseFixture(string dbFilePath, SqliteConnection connection, SoftwareschmiedeDbContext context)
     {
         _dbFilePath = dbFilePath;
         _connection = connection;
@@ -44,12 +44,12 @@ public sealed class DatabaseFixture : IAsyncDisposable
             await cmd.ExecuteNonQueryAsync(ct);
         }
 
-        var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
+        var options = new DbContextOptionsBuilder<SoftwareschmiedeDbContext>()
             .UseSqlite(connection)
             .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
 
-        var context = new SoftwareschmiededDbContext(options);
+        var context = new SoftwareschmiedeDbContext(options);
         await context.Database.MigrateAsync(ct);
 
         return new DatabaseFixture(dbFilePath, connection, context);
@@ -60,15 +60,15 @@ public sealed class DatabaseFixture : IAsyncDisposable
     /// Nützlich, um Persistenz zu prüfen (zweiter Context liest geschriebene Daten).
     /// Der Aufrufer ist für den Dispose des zurückgegebenen Contexts verantwortlich.
     /// </summary>
-    public SoftwareschmiededDbContext CreateNewContext()
+    public SoftwareschmiedeDbContext CreateNewContext()
     {
-        var options = new DbContextOptionsBuilder<SoftwareschmiededDbContext>()
+        var options = new DbContextOptionsBuilder<SoftwareschmiedeDbContext>()
             .UseSqlite($"Data Source={_dbFilePath}")
             .AddInterceptors(new SqliteBusyTimeoutInterceptor())
             .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
 
-        return new SoftwareschmiededDbContext(options);
+        return new SoftwareschmiedeDbContext(options);
     }
 
     /// <inheritdoc/>

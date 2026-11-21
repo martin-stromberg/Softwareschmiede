@@ -6,7 +6,7 @@ public static class GitBranchNameValidator
     /// <summary>Prüft, ob <paramref name="branchName"/> ein gültiger Git-Branch-Name ist.</summary>
     /// <param name="branchName">Der zu prüfende Branch-Name.</param>
     /// <returns><see langword="true"/>, wenn <paramref name="branchName"/> ein gültiger Git-Branch-Name ist.</returns>
-    public static bool IstGueltig(string branchName)
+    public static bool IsValid(string branchName)
     {
         if (branchName.StartsWith('/') || branchName.EndsWith('/') || branchName.EndsWith('.'))
         {

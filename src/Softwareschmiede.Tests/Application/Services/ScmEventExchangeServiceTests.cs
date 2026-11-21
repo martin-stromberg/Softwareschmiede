@@ -13,14 +13,14 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     private readonly ScmEventExchangeProtocol _protocol = new();
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    /// <summary>Creates an isolated repository, without credentials or a remote.</summary>
+    /// <summary>Erstellt ein isoliertes Repository, ohne Anmeldedaten oder Remote.</summary>
     public ScmEventExchangeServiceTests()
     {
         Directory.CreateDirectory(_root);
         Git("init", "--quiet");
     }
 
-    /// <summary>The full original text is JSON data and never terminal control bytes.</summary>
+    /// <summary>Der vollständige Originaltext ist JSON-Dateninhalt und niemals Terminal-Steuerbytes.</summary>
     [Fact]
     public async Task Prepare_ExcludesChannelAndEscapesAllTerminalControls()
     {
@@ -77,7 +77,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     /// <summary>Der Sitzungsname steht als erstes Feld im Probe-Prompt und wird in der Anweisung als
     /// Sitzungstitel benannt; Sonderzeichen bleiben JSON-kodiert, die Probe-Pfade unverändert.</summary>
     [Fact]
-    public void AccessProbePrompt_WithSessionName_NamesTheSession()
+    public void AccessProbePrompt_WithSessionName_NameTheSession()
     {
         var probe = new ScmExchangeAccessProbe(Guid.NewGuid(), "nonce", "fingerprint",
             Path.Combine(_root, "probe"), []);
@@ -105,7 +105,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
         document.RootElement.GetProperty("instruction").GetString().Should().NotContain("sessionName");
     }
 
-    /// <summary>An occupied or tracked channel is never overwritten.</summary>
+    /// <summary>Ein belegter oder verfolgter Kanal wird niemals überschrieben.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -174,7 +174,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
         (await _protocol.ReadAsync(attempt, TestContext.Current.CancellationToken)).Diagnostic.Should().Contain("verändert");
     }
 
-    /// <summary>A correlated result may transition failure to success, but success is immutable.</summary>
+    /// <summary>Ein korreliertes Ergebnis darf Fehlschlag in Erfolg überführen, Erfolg ist jedoch unveränderlich.</summary>
     [Fact]
     public async Task Result_AllowsRetryButNeverChangesSuccess()
     {
@@ -494,7 +494,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
     /// <summary>Removes only the newly created isolated test repository.</summary>
     public void Dispose()
     {
-        // Git object files are read-only on Windows, including objects created by the tracked-content case.
+        // Git-Objektdateien sind unter Windows schreibgeschützt, einschließlich Objekten, die vom Tracked-Content-
         TempDirectoryCleanup.DeleteBestEffort(_root, normalizeAttributes: true);
     }
 }

@@ -13,13 +13,13 @@ namespace Softwareschmiede.Application.Services;
 /// <summary>
 /// Abschlussüberwachung von Aufgaben mit SCM-Referenz: Prüft zyklisch — im selben Intervall-Stil wie
 /// <see cref="ScmEventMonitoringService"/> — den Remote-Zustand der verknüpften SCM-Referenzen der
-/// durch den Prüfmodus (<see cref="ScmTaskCompletionPruefmodus"/>) bestimmten Aufgaben.
+/// durch den Prüfmodus (<see cref="ScmTaskCompletionCheckMode"/>) bestimmten Aufgaben.
 /// Ereignisgesteuert werden nur Aufgaben mit mindestens einem Inbox-Ereignis beobachtet, im Modus
 /// „AlleAufgaben“ alle noch nicht beendeten Aufgaben; Voraussetzung ist stets eine SCM-Referenz
 /// (Issue oder Pull Request). Ist die verknüpfte Referenz geschlossen/gemergt (alle verknüpften
 /// Pull Requests; ohne Pull-Request-Verknüpfung das verknüpfte Issue), startet die persistierte
-/// Wartezeit (<see cref="Aufgabe.ScmAbschlussErkanntUtc"/>); nach deren Ablauf wird die laufende
-/// KI-Ausführung beendet und die Aufgabe auf den Endstatus <see cref="AufgabeStatus.Beendet"/>
+/// Wartezeit (<see cref="WorkItem.ScmCompletionDetectedUtc"/>); nach deren Ablauf wird die laufende
+/// KI-Ausführung beendet und die Aufgabe auf den Endstatus <see cref="WorkItemStatus.Completed"/>
 /// gesetzt. Aufgaben ohne jede SCM-Referenz bleiben unberührt.
 /// </summary>
 public sealed class ScmTaskCompletionMonitoringService(
@@ -33,32 +33,32 @@ public sealed class ScmTaskCompletionMonitoringService(
     {
         await startup.WaitAsync(ct);
         using var scope = scopes.CreateScope();
-        var einstellungen = scope.ServiceProvider.GetRequiredService<AppEinstellungService>();
+        var settings = scope.ServiceProvider.GetRequiredService<AppSettingService>();
         // Laufzeit-Schalter (Einstellungen → Automatisierung → Aufgaben beenden): Bei deaktivierter
         // Abschlussüberwachung wird weder beobachtet noch automatisch abgeschlossen; ein bereits
         // gesetzter Erkennungszeitpunkt bleibt persistiert bestehen.
-        if (!await einstellungen.GetScmTaskCompletionEnabledAsync(ct))
+        if (!await settings.GetScmTaskCompletionEnabledAsync(ct))
         {
             logger.LogDebug("SCM-Abschlussüberwachung ist deaktiviert; Durchlauf wird übersprungen.");
             return;
         }
-        var wait = TimeSpan.FromMinutes(await einstellungen.GetScmTaskCompletionWaitMinutesAsync(ct));
-        var pruefmodus = await einstellungen.GetScmTaskCompletionPruefmodusAsync(ct);
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var wait = TimeSpan.FromMinutes(await settings.GetScmTaskCompletionWaitMinutesAsync(ct));
+        var checkMode = await settings.GetScmTaskCompletionCheckModeAsync(ct);
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         // Ereignisgesteuert = mindestens ein eingegangenes SCM-Ereignis; abgeschlossene Ereignisse
         // entscheiden die Referenzbeobachtung nicht vorzeitig — erst nach deren Abschluss.
         // Kandidaten brauchen immer eine SCM-Referenz (Issue oder Pull Request); Aufgaben ohne
         // Referenz werden nie beobachtet.
-        var candidates = pruefmodus == ScmTaskCompletionPruefmodus.AlleAufgaben
-            ? await db.Aufgaben
-                .Where(a => a.Status != AufgabeStatus.Beendet && a.Status != AufgabeStatus.Archiviert
-                    && (a.IssueReferenz != null || a.PullRequests.Any()))
+        var candidates = checkMode == ScmTaskCompletionCheckMode.AllWorkItems
+            ? await db.WorkItems
+                .Where(a => a.Status != WorkItemStatus.Completed && a.Status != WorkItemStatus.Archived
+                    && (a.IssueReference != null || a.PullRequests.Any()))
                 .Select(a => a.Id)
                 .ToListAsync(ct)
-            : await db.Aufgaben
-                .Where(a => a.Status != AufgabeStatus.Beendet && a.Status != AufgabeStatus.Archiviert
-                    && db.ScmIncomingEvents.Any(e => e.AufgabeId == a.Id)
-                    && (a.IssueReferenz != null || a.PullRequests.Any()))
+            : await db.WorkItems
+                .Where(a => a.Status != WorkItemStatus.Completed && a.Status != WorkItemStatus.Archived
+                    && db.ScmIncomingEvents.Any(e => e.WorkItemId == a.Id)
+                    && (a.IssueReference != null || a.PullRequests.Any()))
                 .Select(a => a.Id)
                 .ToListAsync(ct);
         foreach (var taskId in candidates)
@@ -79,65 +79,65 @@ public sealed class ScmTaskCompletionMonitoringService(
     {
         using var scope = scopes.CreateScope();
         var services = scope.ServiceProvider;
-        var db = services.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = services.GetRequiredService<SoftwareschmiedeDbContext>();
         // Laufende oder wartende Ereignisverarbeitung hat Vorrang; eine Referenzbeobachtung wäre verfrüht.
         if (await db.ScmIncomingEvents.AnyAsync(
-                x => x.AufgabeId == taskId && x.Status != "Verarbeitet" && x.Status != "Abgebrochen", ct))
+                x => x.WorkItemId == taskId && x.Status != "Verarbeitet" && x.Status != "Abgebrochen", ct))
             return;
-        var task = await db.Aufgaben
+        var task = await db.WorkItems
             .Include(a => a.GitRepository)
-            .Include(a => a.IssueReferenz)
+            .Include(a => a.IssueReference)
             .Include(a => a.PullRequests)
             .SingleOrDefaultAsync(a => a.Id == taskId, ct);
-        if (task is null || task.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert)
+        if (task is null || task.Status is WorkItemStatus.Completed or WorkItemStatus.Archived)
             return;
 
         var now = _time.GetUtcNow();
-        var protokoll = services.GetRequiredService<ProtokollService>();
+        var log = services.GetRequiredService<LogService>();
         var closedLabel = await DetermineClosureAsync(services, db, task, ct);
         if (closedLabel is null)
         {
             // Die Referenz wurde wieder geöffnet (oder ist noch offen): Der Countdown wird zurückgesetzt.
-            if (task.ScmAbschlussErkanntUtc is not null)
+            if (task.ScmCompletionDetectedUtc is not null)
             {
-                var label = task.ScmAbschlussReferenz ?? "Verknüpfte SCM-Referenz";
-                task.ScmAbschlussErkanntUtc = null;
-                task.ScmAbschlussReferenz = null;
+                var label = task.ScmCompletionReference ?? "Verknüpfte SCM-Referenz";
+                task.ScmCompletionDetectedUtc = null;
+                task.ScmCompletionReference = null;
                 await db.SaveChangesAsync(ct);
-                await protokoll.AddEintragAsync(taskId, ProtokollTyp.SystemMeldung,
+                await log.AddEntryAsync(taskId, LogEntryType.SystemMessage,
                     $"{label} ist wieder offen; der automatische Abschluss wurde zurückgesetzt.", ct: ct);
             }
             return;
         }
-        if (task.ScmAbschlussErkanntUtc is null)
+        if (task.ScmCompletionDetectedUtc is null)
         {
-            task.ScmAbschlussErkanntUtc = now;
-            task.ScmAbschlussReferenz = closedLabel;
+            task.ScmCompletionDetectedUtc = now;
+            task.ScmCompletionReference = closedLabel;
             await db.SaveChangesAsync(ct);
-            await protokoll.AddEintragAsync(taskId, ProtokollTyp.SystemMeldung,
+            await log.AddEntryAsync(taskId, LogEntryType.SystemMessage,
                 $"{closedLabel} ist geschlossen/gemergt; die Aufgabe wird nach Ablauf der konfigurierten Wartezeit automatisch beendet.",
                 ct: ct);
             return;
         }
-        if (now - task.ScmAbschlussErkanntUtc.Value < wait)
+        if (now - task.ScmCompletionDetectedUtc.Value < wait)
             return;
         // Der Abschluss läuft unter derselben Aufgabensperre wie Dispatch und manuelle Starts.
         await ScmTaskCoordinator.Shared.RunAsync(taskId, async () =>
         {
             db.ChangeTracker.Clear();
-            var current = await db.Aufgaben.FindAsync([taskId], ct);
-            if (current is null || current.Status is AufgabeStatus.Beendet or AufgabeStatus.Archiviert
-                || current.ScmAbschlussErkanntUtc is null
-                || _time.GetUtcNow() - current.ScmAbschlussErkanntUtc.Value < wait)
+            var current = await db.WorkItems.FindAsync([taskId], ct);
+            if (current is null || current.Status is WorkItemStatus.Completed or WorkItemStatus.Archived
+                || current.ScmCompletionDetectedUtc is null
+                || _time.GetUtcNow() - current.ScmCompletionDetectedUtc.Value < wait)
                 return;
             if (await db.ScmIncomingEvents.AnyAsync(
-                    x => x.AufgabeId == taskId && x.Status != "Verarbeitet" && x.Status != "Abgebrochen", ct))
+                    x => x.WorkItemId == taskId && x.Status != "Verarbeitet" && x.Status != "Abgebrochen", ct))
                 return;
             try
             {
-                await services.GetRequiredService<EntwicklungsprozessService>().AbschliessenAsync(taskId, ct);
-                await protokoll.AddEintragAsync(taskId, ProtokollTyp.SystemMeldung,
-                    $"Aufgabe automatisch beendet: {current.ScmAbschlussReferenz} ist geschlossen/gemergt und die Abschluss-Wartezeit ist abgelaufen.",
+                await services.GetRequiredService<DevelopmentProcessService>().CompleteAsync(taskId, ct);
+                await log.AddEntryAsync(taskId, LogEntryType.SystemMessage,
+                    $"Aufgabe automatisch beendet: {current.ScmCompletionReference} ist geschlossen/gemergt und die Abschluss-Wartezeit ist abgelaufen.",
                     ct: ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
@@ -156,7 +156,7 @@ public sealed class ScmTaskCompletionMonitoringService(
     /// Pull-Request-Verknüpfung gilt der Zustand des verknüpften Issues. Gibt eine Anzeigebezeichnung
     /// der geschlossenen Referenz zurück oder <see langword="null"/>.</summary>
     private async Task<string?> DetermineClosureAsync(
-        IServiceProvider services, SoftwareschmiededDbContext db, Aufgabe task, CancellationToken ct)
+        IServiceProvider services, SoftwareschmiedeDbContext db, WorkItem task, CancellationToken ct)
     {
         var plugins = services.GetRequiredService<IPluginManager>().GetSourceCodeManagementPlugins();
         if (task.PullRequests.Count > 0)
@@ -169,7 +169,7 @@ public sealed class ScmTaskCompletionMonitoringService(
                 if (reference.Status == PullRequestStatus.Merged)
                     continue;
                 var plugin = ResolvePlugin(plugins, task, reference.Provider);
-                if (plugin is null || !PullRequestMonitoringPolicy.CanMonitor(reference.Rolle, reference.Provider))
+                if (plugin is null || !PullRequestMonitoringPolicy.CanMonitor(reference.Role, reference.Provider))
                     return null;
                 PullRequestStatusInfo status;
                 try
@@ -195,7 +195,7 @@ public sealed class ScmTaskCompletionMonitoringService(
             var numbers = task.PullRequests.Select(x => x.PullRequestNumber);
             return "Pull Request " + string.Join(", ", numbers.Select(x => "#" + x));
         }
-        if (task.IssueReferenz?.IssueNummer is > 0 && task.GitRepository is not null)
+        if (task.IssueReference?.IssueNumber is > 0 && task.GitRepository is not null)
         {
             var plugin = plugins.FirstOrDefault(x => ScmPluginMatcher.MatchesPlugin(x, task.GitRepository));
             if (plugin is not IScmEventSource source)
@@ -204,11 +204,11 @@ public sealed class ScmTaskCompletionMonitoringService(
             // Überwachungsmodus der Ereignisüberwachung.
             var repository = await source.GetEventRepositoryAsync(
                 new ScmRepositoryContext(task.GitRepository.Id, plugin.PluginPrefix,
-                    task.GitRepository.RepositoryUrl, ScmKontoModus.Benutzerkonto), ct);
+                    task.GitRepository.RepositoryUrl, ScmAccountMode.UserAccount), ct);
             var issue = await source.ReadIssueAsync(
-                new ScmEventReference(repository, ScmReferenceKind.Issue, task.IssueReferenz.IssueNummer.Value), ct);
-            return issue?.IstGeschlossen == true
-                ? $"Issue #{task.IssueReferenz.IssueNummer.Value}"
+                new ScmEventReference(repository, ScmReferenceKind.Issue, task.IssueReference.IssueNumber.Value), ct);
+            return issue?.IsClosed == true
+                ? $"Issue #{task.IssueReference.IssueNumber.Value}"
                 : null;
         }
         return null;
@@ -216,7 +216,7 @@ public sealed class ScmTaskCompletionMonitoringService(
 
     /// <summary>Löst das Plugin für eine Referenz bevorzugt über den Provider-Prefix auf und fällt
     /// andernfalls auf das Repository-Plugin der Aufgabe zurück.</summary>
-    private static IGitPlugin? ResolvePlugin(IReadOnlyList<IGitPlugin> plugins, Aufgabe task, PullRequestProvider provider)
+    private static IGitPlugin? ResolvePlugin(IReadOnlyList<IGitPlugin> plugins, WorkItem task, PullRequestProvider provider)
     {
         var expected = PullRequestProviderDescriptor.GetPluginPrefix(provider);
         return plugins.FirstOrDefault(x => string.Equals(x.PluginPrefix, expected, StringComparison.OrdinalIgnoreCase))

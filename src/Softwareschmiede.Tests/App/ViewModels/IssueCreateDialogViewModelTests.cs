@@ -140,7 +140,7 @@ public sealed class IssueCreateDialogViewModelTests
         bool? closed = null;
         sut.CloseRequested += (_, result) => closed = result;
 
-        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
 
         _issueProvider.Request.Should().Be(new IssueCreateRequest("Aufgabe", "Original"));
         sut.UpdateTaskDescriptionAfterCreate.Should().BeTrue();
@@ -150,7 +150,7 @@ public sealed class IssueCreateDialogViewModelTests
 
     /// <summary>Submit legt kein Provider-Issue an, wenn live bereits eine Referenz existiert.</summary>
     [Fact]
-    public async Task Submit_ShouldNotCreateIssue_WhenIssueWasAssignedInParallel()
+    public async Task Submit_ShouldNotCreateIssue_WhenIssueWhatAssignedInParallel()
     {
         var sut = CreateSut();
         sut.Initialize(
@@ -162,7 +162,7 @@ public sealed class IssueCreateDialogViewModelTests
             null,
             issueAlreadyAssignedLive: _ => Task.FromResult(true));
 
-        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
 
         _issueProvider.Request.Should().BeNull();
         sut.ErrorMessage.Should().Contain("bereits ein Issue");
@@ -176,7 +176,7 @@ public sealed class IssueCreateDialogViewModelTests
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", null);
         sut.Title = " ";
 
-        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
 
         sut.CanSubmit.Should().BeFalse();
         _issueProvider.Request.Should().BeNull();
@@ -192,7 +192,7 @@ public sealed class IssueCreateDialogViewModelTests
         bool? closed = null;
         sut.CloseRequested += (_, result) => closed = result;
 
-        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
 
         _issueProvider.Request.Should().Be(new IssueCreateRequest("Aufgabe", "Original"));
         sut.CreatedIssue.Should().BeNull();
@@ -213,7 +213,7 @@ public sealed class IssueCreateDialogViewModelTests
         bool? closed = null;
         sut.CloseRequested += (_, result) => closed = result;
 
-        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
 
         sut.CreatedIssue.Should().BeNull();
         sut.ErrorMessage.Should().Contain("Netzwerkfehler");
@@ -229,7 +229,7 @@ public sealed class IssueCreateDialogViewModelTests
         _issueProvider.ExceptionToThrow = new OperationCanceledException();
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", null);
 
-        await ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
 
         sut.CreatedIssue.Should().BeNull();
         sut.ErrorMessage.Should().BeNull();
@@ -245,13 +245,13 @@ public sealed class IssueCreateDialogViewModelTests
         _issueProvider.Release = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", null);
 
-        var first = ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        var first = ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
         await _issueProvider.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         sut.CanSubmit.Should().BeFalse();
-        sut.ErstellenCommand.CanExecute(null).Should().BeFalse();
+        sut.CreateCommand.CanExecute(null).Should().BeFalse();
 
-        var second = ((AsyncRelayCommand)sut.ErstellenCommand).ExecuteAsync();
+        var second = ((AsyncRelayCommand)sut.CreateCommand).ExecuteAsync();
         _issueProvider.Release.SetResult(null);
         await Task.WhenAll(first, second);
 
@@ -277,33 +277,33 @@ public sealed class IssueCreateDialogViewModelTests
 
     /// <summary>KI-Ausfüllhilfe übernimmt das generierte Ergebnis in den editierbaren Body.</summary>
     [Fact]
-    public async Task KiAusfuellen_ShouldReplaceBodyWithGeneratedText()
+    public async Task AiFill_ShouldReplaceBodyWithGeneratedText()
     {
-        var kiPlugin = new FakeKiPlugin();
-        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = new FakeAiPlugin();
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FakeKi");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
 
-        await ((AsyncRelayCommand)sut.KiAusfuellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.AiFillCommand).ExecuteAsync();
 
-        kiPlugin.ReceivedTemplateBody.Should().Be("Template");
-        kiPlugin.ReceivedOriginalRequirement.Should().Be("Original");
+        aiPlugin.ReceivedTemplateBody.Should().Be("Template");
+        aiPlugin.ReceivedOriginalRequirement.Should().Be("Original");
         sut.Body.Should().Be("KI-Ergebnis: Template / Original");
     }
 
     /// <summary>KI-Ausfüllhilfe übernimmt deutsche Umlaute und Sonderzeichen unverändert in den editierbaren Body.</summary>
     [Fact]
-    public async Task KiAusfuellen_ShouldKeepGermanSpecialCharactersInBody()
+    public async Task AiFill_ShouldKeepGermanSpecialCharactersInBody()
     {
         var generatedBody = "KI-Ergebnis: plötzlich für Selbstwertgefühl, Größe, Straße, äöüß & €.";
-        var kiPlugin = new FakeKiPlugin(generatedBody);
-        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = new FakeAiPlugin(generatedBody);
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FakeKi");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
 
-        await ((AsyncRelayCommand)sut.KiAusfuellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.AiFillCommand).ExecuteAsync();
 
         sut.Body.Should().Be(generatedBody);
         sut.Body.Should().NotContain("plÃ");
@@ -313,12 +313,12 @@ public sealed class IssueCreateDialogViewModelTests
 
     /// <summary>Alle verfügbaren KI-Plugins mit Textgenerator-Fähigkeit werden in der Auswahl angezeigt.</summary>
     [Fact]
-    public void Initialize_ShouldListAllAvailableTextGenerators_InKiPluginSelection()
+    public void Initialize_ShouldListAllAvailableTextGenerators_InAiPluginSelection()
     {
-        var codexPlugin = new FakeKiPlugin { PluginPrefixOverride = "Softwareschmiede.Codex" };
-        var claudePlugin = new FakeKiPlugin { PluginPrefixOverride = "Softwareschmiede.ClaudeCli" };
-        var devinPlugin = new FakeKiPlugin { PluginPrefixOverride = "Softwareschmiede.Devin" };
-        var copilotPlugin = new FakeKiPlugin { PluginPrefixOverride = "Softwareschmiede.GitHubCopilot" };
+        var codexPlugin = new FakeAiPlugin { PluginPrefixOverride = "Softwareschmiede.Codex" };
+        var claudePlugin = new FakeAiPlugin { PluginPrefixOverride = "Softwareschmiede.ClaudeCli" };
+        var devinPlugin = new FakeAiPlugin { PluginPrefixOverride = "Softwareschmiede.Devin" };
+        var copilotPlugin = new FakeAiPlugin { PluginPrefixOverride = "Softwareschmiede.GitHubCopilot" };
         _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins())
             .Returns([codexPlugin, claudePlugin, devinPlugin, copilotPlugin]);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
@@ -326,66 +326,66 @@ public sealed class IssueCreateDialogViewModelTests
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "Softwareschmiede.Devin");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
 
-        sut.VerfuegbareKiPlugins.Should().BeEquivalentTo([
+        sut.AvailableAiPlugins.Should().BeEquivalentTo([
             "Softwareschmiede.Codex",
             "Softwareschmiede.ClaudeCli",
             "Softwareschmiede.Devin",
             "Softwareschmiede.GitHubCopilot"
         ], options => options.WithStrictOrdering());
-        sut.SelectedKiPluginPrefix.Should().Be("Softwareschmiede.Devin");
+        sut.SelectedAiPluginPrefix.Should().Be("Softwareschmiede.Devin");
         sut.CanUseAi.Should().BeTrue();
     }
 
     /// <summary>KI-Aktion bleibt deaktiviert, wenn nur KI-Plugins ohne Textgenerator-Fähigkeit verfügbar sind.</summary>
     [Fact]
-    public void Initialize_ShouldHideKiAction_WhenNoTextGeneratorIsAvailable()
+    public void Initialize_ShouldHideAiAction_WhenNoTextGeneratorIsAvailable()
     {
-        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([new FakePlainKiPlugin()]);
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([new FakePlainAiPlugin()]);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
 
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "PlainKi");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
 
-        sut.VerfuegbareKiPlugins.Should().BeEmpty();
-        sut.SelectedKiPluginPrefix.Should().BeNull();
+        sut.AvailableAiPlugins.Should().BeEmpty();
+        sut.SelectedAiPluginPrefix.Should().BeNull();
         sut.CanUseAi.Should().BeFalse();
     }
 
     /// <summary>FiltereAktivePluginsAsync entfernt deaktivierte Plugins aus VerfuegbareKiPlugins.</summary>
     [Fact]
-    public async Task FiltereAktivePluginsAsync_ShouldRemoveDeactivatedPlugins()
+    public async Task FilterActivePluginsAsync_ShouldRemoveDeactivatedPlugins()
     {
-        var aktivesPlugin = new FakeKiPlugin();
-        var deaktiviertesPlugin = new FakeFailingKiPlugin();
-        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([aktivesPlugin, deaktiviertesPlugin]);
+        var activePlugin = new FakeAiPlugin();
+        var disabledPlugin = new FakeFailingAiPlugin();
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([activePlugin, disabledPlugin]);
         await using var db = Softwareschmiede.Tests.Helpers.TestDbContextFactory.Create();
-        var einstellungService = new Softwareschmiede.Application.Services.AppEinstellungService(
-            db, NullLogger<Softwareschmiede.Application.Services.AppEinstellungService>.Instance);
+        var settingService = new Softwareschmiede.Application.Services.AppSettingService(
+            db, NullLogger<Softwareschmiede.Application.Services.AppSettingService>.Instance);
         var activationService = new Softwareschmiede.Application.Services.PluginActivationService(
-            einstellungService, _pluginManagerMock.Object, NullLogger<Softwareschmiede.Application.Services.PluginActivationService>.Instance);
+            settingService, _pluginManagerMock.Object, NullLogger<Softwareschmiede.Application.Services.PluginActivationService>.Instance);
         await activationService.SetPluginEnabledAsync("FailKi", false, TestContext.Current.CancellationToken);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance, activationService);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FakeKi");
 
-        await sut.FiltereAktivePluginsAsync(TestContext.Current.CancellationToken);
+        await sut.FilterActivePluginsAsync(TestContext.Current.CancellationToken);
 
-        sut.VerfuegbareKiPlugins.Should().ContainSingle();
-        sut.VerfuegbareKiPlugins.Should().Contain("FakeKi");
-        sut.SelectedKiPluginPrefix.Should().Be("FakeKi");
+        sut.AvailableAiPlugins.Should().ContainSingle();
+        sut.AvailableAiPlugins.Should().Contain("FakeKi");
+        sut.SelectedAiPluginPrefix.Should().Be("FakeKi");
     }
 
     /// <summary>KI-Fehler bleiben im Dialog und verlieren den bisherigen Body nicht.</summary>
     [Fact]
-    public async Task KiAusfuellen_ShouldKeepBodyAndShowError_WhenGeneratorFails()
+    public async Task AiFill_ShouldKeepBodyAndShowError_WhenGeneratorFails()
     {
-        var kiPlugin = new FakeFailingKiPlugin();
-        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = new FakeFailingAiPlugin();
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "FailKi");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
         sut.Body = "Bisheriger Body";
 
-        await ((AsyncRelayCommand)sut.KiAusfuellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.AiFillCommand).ExecuteAsync();
 
         sut.Body.Should().Be("Bisheriger Body");
         sut.ErrorMessage.Should().Contain("KI-Ausfüllhilfe fehlgeschlagen");
@@ -393,16 +393,16 @@ public sealed class IssueCreateDialogViewModelTests
 
     /// <summary>Cancellation waehrend der KI-Ausfuellhilfe erhaelt den bisherigen Body und setzt den Laufzustand zurueck.</summary>
     [Fact]
-    public async Task KiAusfuellen_ShouldKeepBodyAndResetGenerating_WhenCancelled()
+    public async Task AiFill_ShouldKeepBodyAndResetGenerating_WhenCancelled()
     {
-        var kiPlugin = new FakeCancellingKiPlugin();
-        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([kiPlugin]);
+        var aiPlugin = new FakeCancellingAiPlugin();
+        _pluginManagerMock.Setup(p => p.GetDevelopmentAutomationPlugins()).Returns([aiPlugin]);
         var sut = new IssueCreateDialogViewModel(_pluginManagerMock.Object, NullLogger<IssueCreateDialogViewModel>.Instance);
         sut.Initialize(_issueProvider, _templateProvider, "owner/repo", "Aufgabe", "Original", "CancelKi");
         sut.SelectedTemplate = new IssueTemplate("Bug", "Template");
         sut.Body = "Bisheriger Body";
 
-        await ((AsyncRelayCommand)sut.KiAusfuellenCommand).ExecuteAsync();
+        await ((AsyncRelayCommand)sut.AiFillCommand).ExecuteAsync();
 
         sut.Body.Should().Be("Bisheriger Body");
         sut.ErrorMessage.Should().BeNull();
@@ -451,7 +451,7 @@ public sealed class IssueCreateDialogViewModelTests
                 : Task.FromResult(Result);
     }
 
-    private sealed class FakeKiPlugin(string? generatedBody = null) : IKiPlugin, IIssueTemplateTextGenerator
+    private sealed class FakeAiPlugin(string? generatedBody = null) : IAiPlugin, IIssueTemplateTextGenerator
     {
         public string? ReceivedTemplateBody { get; private set; }
         public string? ReceivedOriginalRequirement { get; private set; }
@@ -460,12 +460,12 @@ public sealed class IssueCreateDialogViewModelTests
         public string PluginPrefix => PluginPrefixOverride;
         public PluginType PluginType => PluginType.DevelopmentAutomation;
         public IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
-        public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
-        public string GetProcessWindowTitle(Guid aufgabeId) => "Fake KI";
+        public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameter = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
+        public string GetProcessWindowTitle(Guid workItemId) => "Fake KI";
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
-        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameter = null, CancellationToken ct = default)
             => Task.FromResult(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec { FileName = "cmd.exe", WorkingDirectory = localRepoPath, PluginName = PluginName });
         public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
         {
@@ -475,52 +475,52 @@ public sealed class IssueCreateDialogViewModelTests
         }
     }
 
-    private sealed class FakeFailingKiPlugin : IKiPlugin, IIssueTemplateTextGenerator
+    private sealed class FakeFailingAiPlugin : IAiPlugin, IIssueTemplateTextGenerator
     {
         public string PluginName => "Fail KI";
         public string PluginPrefix => "FailKi";
         public PluginType PluginType => PluginType.DevelopmentAutomation;
         public IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
-        public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
-        public string GetProcessWindowTitle(Guid aufgabeId) => "Fail KI";
+        public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameter = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
+        public string GetProcessWindowTitle(Guid workItemId) => "Fail KI";
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
-        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameter = null, CancellationToken ct = default)
             => Task.FromResult(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec { FileName = "cmd.exe", WorkingDirectory = localRepoPath, PluginName = PluginName });
         public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
             => throw new InvalidOperationException("Providerfehler");
     }
 
-    private sealed class FakeCancellingKiPlugin : IKiPlugin, IIssueTemplateTextGenerator
+    private sealed class FakeCancellingAiPlugin : IAiPlugin, IIssueTemplateTextGenerator
     {
         public string PluginName => "Cancel KI";
         public string PluginPrefix => "CancelKi";
         public PluginType PluginType => PluginType.DevelopmentAutomation;
         public IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
-        public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
-        public string GetProcessWindowTitle(Guid aufgabeId) => "Cancel KI";
+        public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameter = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
+        public string GetProcessWindowTitle(Guid workItemId) => "Cancel KI";
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
-        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameter = null, CancellationToken ct = default)
             => Task.FromResult(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec { FileName = "cmd.exe", WorkingDirectory = localRepoPath, PluginName = PluginName });
         public Task<string> FillIssueTemplateAsync(string templateBody, string? originalRequirement, CancellationToken ct = default)
             => throw new OperationCanceledException(ct);
     }
 
-    private sealed class FakePlainKiPlugin : IKiPlugin
+    private sealed class FakePlainAiPlugin : IAiPlugin
     {
         public string PluginName => "Plain KI";
         public string PluginPrefix => "PlainKi";
         public PluginType PluginType => PluginType.DevelopmentAutomation;
         public IReadOnlyList<PluginSettingGroup> GetSettingGroups() => [];
-        public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
-        public string GetProcessWindowTitle(Guid aufgabeId) => "Plain KI";
+        public Task<ProcessStartInfo> StartCliAsync(string localRepoPath, string? parameter = null, CancellationToken ct = default) => Task.FromResult(new ProcessStartInfo());
+        public string GetProcessWindowTitle(Guid workItemId) => "Plain KI";
         public bool SupportsSessionContinuation() => false;
         public Task<bool> CheckHealthAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Softwareschmiede.Domain.Enums.TerminalProviderCapabilities TerminalCapabilities => Softwareschmiede.Domain.Enums.TerminalProviderCapabilities.SupportsPty;
-        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameters = null, CancellationToken ct = default)
+        public Task<Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec> GetTerminalStartSpecAsync(string localRepoPath, string? parameter = null, CancellationToken ct = default)
             => Task.FromResult(new Softwareschmiede.Domain.ValueObjects.TerminalSessionStartSpec { FileName = "cmd.exe", WorkingDirectory = localRepoPath, PluginName = PluginName });
     }
 }

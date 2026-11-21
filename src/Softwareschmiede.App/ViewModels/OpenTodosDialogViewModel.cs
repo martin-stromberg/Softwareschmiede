@@ -9,8 +9,8 @@ public sealed class OpenTodosDialogViewModel : ViewModelBase
 {
     private readonly TodoService _todoService;
     private readonly ILogger<OpenTodosDialogViewModel> _logger;
-    private Guid _aufgabeId;
-    private string _aufgabenTitel = string.Empty;
+    private Guid _workItemId;
+    private string _workItemsTitle = string.Empty;
 
     /// <inheritdoc cref="OpenTodosDialogViewModel"/>
     public OpenTodosDialogViewModel(TodoService todoService, ILogger<OpenTodosDialogViewModel> logger)
@@ -20,17 +20,17 @@ public sealed class OpenTodosDialogViewModel : ViewModelBase
     }
 
     /// <summary>Eindeutige ID der Aufgabe.</summary>
-    public Guid AufgabeId
+    public Guid WorkItemId
     {
-        get => _aufgabeId;
-        private set => SetProperty(ref _aufgabeId, value);
+        get => _workItemId;
+        private set => SetProperty(ref _workItemId, value);
     }
 
     /// <summary>Titel der Aufgabe.</summary>
-    public string AufgabenTitel
+    public string WorkItemsTitle
     {
-        get => _aufgabenTitel;
-        private set => SetProperty(ref _aufgabenTitel, value);
+        get => _workItemsTitle;
+        private set => SetProperty(ref _workItemsTitle, value);
     }
 
     /// <summary>Offene To-Dos der Aufgabe.</summary>
@@ -43,15 +43,15 @@ public sealed class OpenTodosDialogViewModel : ViewModelBase
     public bool IsEmpty => !HasOpenTodos;
 
     /// <summary>Lädt die offenen To-Dos einer Aufgabe.</summary>
-    public async Task LoadAsync(Guid aufgabeId, string aufgabenTitel, CancellationToken ct = default)
+    public async Task LoadAsync(Guid workItemId, string workItemsTitle, CancellationToken ct = default)
     {
-        _logger.LogInformation("Offene To-Dos für Aufgabe {AufgabeId} laden.", aufgabeId);
+        _logger.LogInformation("Offene To-Dos für Aufgabe {AufgabeId} laden.", workItemId);
 
-        AufgabeId = aufgabeId;
-        AufgabenTitel = aufgabenTitel;
+        WorkItemId = workItemId;
+        WorkItemsTitle = workItemsTitle;
 
         Todos.Clear();
-        var todos = await _todoService.GetOpenTodosAsync(aufgabeId, ct);
+        var todos = await _todoService.GetOpenTodosAsync(workItemId, ct);
         foreach (var todo in todos)
         {
             Todos.Add(new TodoViewModel(todo));

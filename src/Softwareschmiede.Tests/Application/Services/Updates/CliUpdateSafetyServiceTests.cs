@@ -10,26 +10,26 @@ namespace Softwareschmiede.Tests.Application.Services.Updates;
 /// <summary>Tests für <see cref="CliUpdateSafetyService"/>.</summary>
 public sealed class CliUpdateSafetyServiceTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db = TestDbContextFactory.Create();
-    private readonly AufgabeService _aufgabeService;
-    private readonly KiPluginLimitService _kiPluginLimitService;
-    private readonly Guid _projektId = new("33333333-3333-3333-3333-333333333333");
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db = TestDbContextFactory.Create();
+    private readonly WorkItemService _workItemService;
+    private readonly AiPluginLimitService _aiPluginLimitService;
+    private readonly Guid _projectId = new("33333333-3333-3333-3333-333333333333");
 
     /// <summary>Initialisiert die Testdatenbank.</summary>
     public CliUpdateSafetyServiceTests()
     {
-        _aufgabeService = new AufgabeService(_db, NullLogger<AufgabeService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
-        _kiPluginLimitService = new KiPluginLimitService(
+        _workItemService = new WorkItemService(_db, NullLogger<WorkItemService>.Instance, new TodoService(_db, NullLogger<TodoService>.Instance));
+        _aiPluginLimitService = new AiPluginLimitService(
             _db,
-            new AppEinstellungService(_db, NullLogger<AppEinstellungService>.Instance),
-            new AufgabeLaufdatenChangedNotifier(),
-            NullLogger<KiPluginLimitService>.Instance);
-        _db.Projekte.Add(new Softwareschmiede.Domain.Entities.Projekt
+            new AppSettingService(_db, NullLogger<AppSettingService>.Instance),
+            new WorkItemRunDataChangedNotifier(),
+            NullLogger<AiPluginLimitService>.Instance);
+        _db.Projects.Add(new Softwareschmiede.Domain.Entities.Project
         {
-            Id = _projektId,
+            Id = _projectId,
             Name = "Projekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
         _db.SaveChanges();
     }
@@ -41,14 +41,14 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
     [Fact]
     public async Task CheckAsync_ShouldTreatTaskWithFreshHeartbeatAsRisky()
     {
-        var running = await CreateActiveTaskAsync("Laeuft", AufgabeLaufStatus.Laeuft);
-        var sut = new CliUpdateSafetyService(_aufgabeService, _kiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
+        var running = await CreateActiveTaskAsync("Laeuft", WorkItemRunStatus.Running);
+        var sut = new CliUpdateSafetyService(_workItemService, _aiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
 
         var result = await sut.CheckAsync(TestContext.Current.CancellationToken);
 
         result.RequiresConfirmation.Should().BeTrue();
         result.RiskyTaskCount.Should().Be(1);
-        result.RiskyTasks.Should().Contain(t => t.Contains(running.Titel, StringComparison.Ordinal));
+        result.RiskyTasks.Should().Contain(t => t.Contains(running.Title, StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -63,15 +63,15 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
     {
         var stale = await CreateActiveTaskAsync(
             "Stale",
-            AufgabeLaufStatus.Laeuft,
-            DateTimeOffset.UtcNow.AddMinutes(-(AufgabeRecoveryService.HeartbeatTimeoutMinutes + 1)));
-        var sut = new CliUpdateSafetyService(_aufgabeService, _kiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
+            WorkItemRunStatus.Running,
+            DateTimeOffset.UtcNow.AddMinutes(-(WorkItemRecoveryService.HeartbeatTimeoutMinutes + 1)));
+        var sut = new CliUpdateSafetyService(_workItemService, _aiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
 
         var result = await sut.CheckAsync(TestContext.Current.CancellationToken);
 
         result.RequiresConfirmation.Should().BeFalse();
         result.RiskyTaskCount.Should().Be(0);
-        result.RiskyTasks.Should().NotContain(t => t.Contains(stale.Titel, StringComparison.Ordinal));
+        result.RiskyTasks.Should().NotContain(t => t.Contains(stale.Title, StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -81,15 +81,15 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
     [Fact]
     public async Task CheckAsync_ShouldNotTreatTaskWithFutureSessionLimitAsRisky()
     {
-        var limited = await CreateActiveTaskAsync("Limitiert", AufgabeLaufStatus.Laeuft, kiPluginPrefix: "Test.Plugin");
-        await _kiPluginLimitService.VerarbeiteRateLimitAsync(limited.Id, DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);
-        var sut = new CliUpdateSafetyService(_aufgabeService, _kiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
+        var limited = await CreateActiveTaskAsync("Limitiert", WorkItemRunStatus.Running, aiPluginPrefix: "Test.Plugin");
+        await _aiPluginLimitService.ProcessRateLimitAsync(limited.Id, DateTimeOffset.UtcNow.AddHours(2), TestContext.Current.CancellationToken);
+        var sut = new CliUpdateSafetyService(_workItemService, _aiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
 
         var result = await sut.CheckAsync(TestContext.Current.CancellationToken);
 
         result.RequiresConfirmation.Should().BeFalse();
         result.RiskyTaskCount.Should().Be(0);
-        result.RiskyTasks.Should().NotContain(t => t.Contains(limited.Titel, StringComparison.Ordinal));
+        result.RiskyTasks.Should().NotContain(t => t.Contains(limited.Title, StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -99,34 +99,34 @@ public sealed class CliUpdateSafetyServiceTests : IDisposable
     [Fact]
     public async Task CheckAsync_ShouldTreatTaskWithExpiredSessionLimitAsRisky()
     {
-        var expired = await CreateActiveTaskAsync("Abgelaufen", AufgabeLaufStatus.Laeuft, kiPluginPrefix: "Test.Plugin");
-        await _kiPluginLimitService.VerarbeiteRateLimitAsync(expired.Id, DateTimeOffset.UtcNow.AddMinutes(-5), TestContext.Current.CancellationToken);
-        var sut = new CliUpdateSafetyService(_aufgabeService, _kiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
+        var expired = await CreateActiveTaskAsync("Abgelaufen", WorkItemRunStatus.Running, aiPluginPrefix: "Test.Plugin");
+        await _aiPluginLimitService.ProcessRateLimitAsync(expired.Id, DateTimeOffset.UtcNow.AddMinutes(-5), TestContext.Current.CancellationToken);
+        var sut = new CliUpdateSafetyService(_workItemService, _aiPluginLimitService, NullLogger<CliUpdateSafetyService>.Instance);
 
         var result = await sut.CheckAsync(TestContext.Current.CancellationToken);
 
         result.RequiresConfirmation.Should().BeTrue();
-        result.RiskyTasks.Should().Contain(t => t.Contains(expired.Titel, StringComparison.Ordinal));
+        result.RiskyTasks.Should().Contain(t => t.Contains(expired.Title, StringComparison.Ordinal));
     }
 
-    private async Task<Softwareschmiede.Domain.Entities.Aufgabe> CreateActiveTaskAsync(
+    private async Task<Softwareschmiede.Domain.Entities.WorkItem> CreateActiveTaskAsync(
         string title,
-        AufgabeLaufStatus? laufStatus,
+        WorkItemRunStatus? runStatus,
         DateTimeOffset? lastHeartbeatUtc = null,
-        string? kiPluginPrefix = null)
+        string? aiPluginPrefix = null)
     {
-        var aufgabe = await _aufgabeService.CreateAsync(_projektId, title, null);
-        await _aufgabeService.StartenAsync(aufgabe.Id, "feature/test", "C:/repo");
-        await _aufgabeService.AktivenLaufSetzenAsync(aufgabe.Id, Guid.NewGuid().ToString("N"));
-        var tracked = await _db.Aufgaben.FindAsync(aufgabe.Id);
-        tracked!.LaufStatus = laufStatus;
+        var workItem = await _workItemService.CreateAsync(_projectId, title, null);
+        await _workItemService.StartAsync(workItem.Id, "feature/test", "C:/repo");
+        await _workItemService.SetActiveRunAsync(workItem.Id, Guid.NewGuid().ToString("N"));
+        var tracked = await _db.WorkItems.FindAsync(workItem.Id);
+        tracked!.RunStatus = runStatus;
         if (lastHeartbeatUtc.HasValue)
         {
             tracked.LastHeartbeatUtc = lastHeartbeatUtc.Value;
         }
-        if (kiPluginPrefix is not null)
+        if (aiPluginPrefix is not null)
         {
-            tracked.KiPluginPrefix = kiPluginPrefix;
+            tracked.AiPluginPrefix = aiPluginPrefix;
         }
         await _db.SaveChangesAsync();
         return tracked;

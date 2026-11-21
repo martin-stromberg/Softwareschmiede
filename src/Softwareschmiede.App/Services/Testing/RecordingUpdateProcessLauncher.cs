@@ -11,33 +11,33 @@ namespace Softwareschmiede.App.Services.Testing;
 /// </summary>
 public sealed class RecordingUpdateProcessLauncher : IUpdateProcessLauncher
 {
-    private readonly UpdateE2ETestKontext _kontext;
+    private readonly UpdateE2ETestContext _context;
 
     /// <inheritdoc cref="RecordingUpdateProcessLauncher"/>
-    /// <param name="kontext">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
-    public RecordingUpdateProcessLauncher(UpdateE2ETestKontext kontext)
+    /// <param name="context">Der Laufzeitkontext der Update-E2E-Umgebung.</param>
+    public RecordingUpdateProcessLauncher(UpdateE2ETestContext context)
     {
-        _kontext = kontext;
+        _context = context;
     }
 
     /// <inheritdoc/>
     public bool Start(string fileName, IEnumerable<string> arguments, string workingDirectory, bool runElevated)
     {
-        var argumente = arguments.ToArray();
-        var ergebnis = _kontext.LeseSzenario()?.ProzessStart?.Ergebnis ?? "Erfolg";
+        var args = arguments.ToArray();
+        var result = _context.ReadScenario()?.ProcessStart?.Result ?? "Erfolg";
 
-        _kontext.Protokoll.Schreibe(
-            UpdateE2EEreignisse.UpdateProcessStartRecorded,
+        _context.Log.Write(
+            UpdateE2EEvents.UpdateProcessStartRecorded,
             new
             {
                 fileName,
-                arguments = argumente,
+                arguments = args,
                 workingDirectory,
                 runElevated,
-                result = ergebnis
+                result = result
             });
 
-        return ergebnis switch
+        return result switch
         {
             "Fehler" => false,
             "Ausnahme" => throw new InvalidOperationException("Kontrollierter Update-E2E-Launcherfehler."),

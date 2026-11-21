@@ -7,9 +7,9 @@ namespace Softwareschmiede.App.Controls;
 public sealed partial class RibbonGroup : UserControl
 {
     /// <summary>DependencyProperty für den Gruppennamen.</summary>
-    public static readonly DependencyProperty GruppenNameProperty =
+    public static readonly DependencyProperty GroupNameProperty =
         DependencyProperty.Register(
-            nameof(GruppenName),
+            nameof(GroupName),
             typeof(string),
             typeof(RibbonGroup),
             new PropertyMetadata(string.Empty));
@@ -23,10 +23,10 @@ public sealed partial class RibbonGroup : UserControl
             new PropertyMetadata(null));
 
     /// <summary>Name der Gruppe, der am unteren Rand des Rahmens angezeigt wird.</summary>
-    public string GruppenName
+    public string GroupName
     {
-        get => (string)GetValue(GruppenNameProperty);
-        set => SetValue(GruppenNameProperty, value);
+        get => (string)GetValue(GroupNameProperty);
+        set => SetValue(GroupNameProperty, value);
     }
 
     /// <summary>Inhalt der Gruppe (Buttons).</summary>

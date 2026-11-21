@@ -23,13 +23,13 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
     /// Inbox: Die Erwähnung in einem erreichbaren Repository wird trotzdem eingelesen, und das
     /// betroffene Repository wird mit verständlicher Diagnose ausgelassen.</summary>
     [Fact]
-    public async Task Monitor_SeparatesKonto_InaccessibleRepository_DoesNotBlockMentionsOfOtherRepositories()
+    public async Task Monitor_SeparatesAccount_InaccessibleRepository_DoesNotBlockMentionsOfOtherRepositories()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture, AccessibleUrl, "repo");
         await AddRepositoryAsync(fixture, InaccessibleUrl, "private-repo");
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
         ConfigureResolutionWithInaccessibleRepository(fixture);
         fixture.ConfigureMentionObservations();
         fixture.ConfigureIssue();
@@ -39,7 +39,7 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(27, ScmEventStore.Observation(item).Reference.Number);
         var inbox = await db.ScmObservationCheckpoints.SingleAsync(x => x.SourceKey == "notifications/test-scm/github.com", cancellationToken: TestContext.Current.CancellationToken);
@@ -59,14 +59,14 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
         await fixture.InitializeAsync();
         await AddRepositoryAsync(fixture, AccessibleUrl, "repo");
         await AddRepositoryAsync(fixture, InaccessibleUrl, "private-repo");
-        await fixture.SetKontoModusAsync(ScmKontoModus.SeparatesKonto);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
         ConfigureResolutionWithInaccessibleRepository(fixture);
         var before = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var failure = await db.ScmObservationCheckpoints.SingleAsync(x => x.SourceKey.StartsWith("repository/"), cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(failure.NextAttemptUtc);
         Assert.NotEqual(long.MaxValue, failure.NextAttemptUtc);
@@ -81,21 +81,21 @@ public sealed class ScmEventMonitoringServiceTests_RepositoryResolution
                 context.RepositoryId.Contains("private-repo", StringComparison.OrdinalIgnoreCase)
                     ? Task.FromException<ScmEventRepository>(new ScmProviderException(ScmProviderFailureKind.Permanent,
                         "GitHub-Anfrage fehlgeschlagen (HTTP 404, github.com/repos/owner/private-repo)."))
-                    : Task.FromResult(ScmDispatchFixture.BotRepository with { Konto = context.Konto }));
+                    : Task.FromResult(ScmDispatchFixture.BotRepository with { Account = context.Account }));
 
     private static async Task AddRepositoryAsync(ScmDispatchFixture fixture, string repositoryUrl, string repositoryName)
     {
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var project = new Projekt { Id = Guid.NewGuid(), Name = repositoryName };
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var project = new Project { Id = Guid.NewGuid(), Name = repositoryName };
         var repository = new GitRepository
         {
             Id = Guid.NewGuid(),
-            Projekt = project,
+            Project = project,
             RepositoryUrl = repositoryUrl,
             RepositoryName = repositoryName,
-            PluginTyp = fixture.Repository.ProviderPrefix,
-            Aktiv = true
+            PluginType = fixture.Repository.ProviderPrefix,
+            Active = true
         };
         db.AddRange(project, repository);
         await db.SaveChangesAsync();

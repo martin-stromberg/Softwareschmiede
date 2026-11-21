@@ -27,8 +27,8 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         var monitor = fixture.Monitor;
 
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
 
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
@@ -45,7 +45,7 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         Assert.Empty(fixture.Responses);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
             // Nur der Checkpoint der manuell eingespeisten Quelle existiert; der Monitor hat keine
             // eigenen Beobachtungs- oder Enumerations-Checkpoints angelegt.
@@ -54,8 +54,8 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         }
 
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
 
         await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
@@ -73,15 +73,15 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         var (_, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, cancellationToken: TestContext.Current.CancellationToken);
             item.DeliveryAttemptId = Guid.NewGuid();
             item.CliRunId = Guid.NewGuid().ToString("D");
             item.DeliveredUtc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             item.Status = "Zugestellt";
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
         }
         var exchange = new ScmEventExchangeService(fixture.Services.GetRequiredService<IServiceScopeFactory>(),
             TimeProvider.System, fixture.Services.GetRequiredService<ScmEventStartupGate>(),
@@ -93,8 +93,8 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
 
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
 
         await exchange.RunOnceAsync(TestContext.Current.CancellationToken);
 
@@ -112,15 +112,15 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         await AddTaskWithIssueAsync(fixture, 42);
         ConfigureObservations(fixture, number => number == 7 ? "!Bearbeite bitte" : "$Softwareschmiede bitte");
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetSettingAsync(AppEinstellungService.ScmTriggerKeywordKey, "!Bearbeite", TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetSettingAsync(AppSettingService.ScmTriggerKeywordKey, "!Bearbeite", TestContext.Current.CancellationToken);
 
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
         using var verification = fixture.Services.CreateScope();
-        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal(taskId, item.AufgabeId);
+        Assert.Equal(taskId, item.WorkItemId);
         Assert.Equal(7, ScmEventStore.Observation(item).Reference.Number);
         Assert.Contains(await db.ScmContentSnapshots.Where(x => x.ContentKey.Contains("Issue/42/")).ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
             x => x.Diagnostic == "Kein Trigger");
@@ -135,8 +135,8 @@ public sealed class ScmEventMonitoringServiceTests_Settings
         await fixture.InitializeAsync();
         var (_, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<AppEinstellungService>()
-                .SetBoolSettingAsync(AppEinstellungService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
+            await scope.ServiceProvider.GetRequiredService<AppSettingService>()
+                .SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
 
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
@@ -148,23 +148,23 @@ public sealed class ScmEventMonitoringServiceTests_Settings
     private static async Task<Guid> AddTaskWithIssueAsync(ScmDispatchFixture fixture, int number)
     {
         using var scope = fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var project = new Projekt { Id = Guid.NewGuid(), Name = "Repo-wide" };
-        var task = new Aufgabe
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var project = new Project { Id = Guid.NewGuid(), Name = "Repo-wide" };
+        var task = new WorkItem
         {
             Id = Guid.NewGuid(),
-            Projekt = project,
-            Titel = "Linked task",
-            Status = AufgabeStatus.Neu,
+            Project = project,
+            Title = "Linked task",
+            Status = WorkItemStatus.New,
             GitRepository = new GitRepository
             {
                 Id = Guid.NewGuid(),
-                Projekt = project,
+                Project = project,
                 RepositoryUrl = "https://github.com/owner/repo",
                 RepositoryName = "repo",
-                PluginTyp = fixture.Repository.ProviderPrefix
+                PluginType = fixture.Repository.ProviderPrefix
             },
-            IssueReferenz = new IssueReferenz { Id = Guid.NewGuid(), IssueNummer = number, Titel = "Issue" }
+            IssueReference = new IssueReference { Id = Guid.NewGuid(), IssueNumber = number, Title = "Issue" }
         };
         db.Add(task);
         await db.SaveChangesAsync();

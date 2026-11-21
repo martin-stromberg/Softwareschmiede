@@ -17,33 +17,33 @@ using Softwareschmiede.Infrastructure.Terminal;
 namespace Softwareschmiede.TestSupport;
 
 /// <summary>Terminal-Profil der gemockten KI-CLI: Prefix, Startargumente, Banner und Eingabezeile.</summary>
-internal sealed record ScmKiProfile(string Prefix, string Arguments, string Banner, string Prompt,
+internal sealed record ScmAiProfile(string Prefix, string Arguments, string Banner, string Prompt,
     IReadOnlyDictionary<string, string?> EnvironmentVariables, Func<string, Task>? OnWritePrompt = null)
 {
     /// <summary>Bisheriges Verhalten: deterministischer JSON-Simulator im SCM-Modus.</summary>
-    internal static ScmKiProfile Simulator => CreateSimulator();
+    internal static ScmAiProfile Simulator => CreateSimulator();
 
-    private static ScmKiProfile CreateSimulator() => new("Softwareschmiede.KiSimulator", string.Empty,
+    private static ScmAiProfile CreateSimulator() => new("Softwareschmiede.KiSimulator", string.Empty,
         "SCM_SIMULATOR_PROTOCOL_V1", "SCM_READY_V1",
         new Dictionary<string, string?> { ["SOFTWARESCHMIEDE_SCM_SIMULATOR"] = "1" });
 
     /// <summary>Devin-Startvertrag und Promptformat; das Banner ist auf den unterstützten Bereich v3000.x voreingestellt.</summary>
-    internal static ScmKiProfile Devin(string arguments = "--permission-mode accept-edits --respect-workspace-trust false",
+    internal static ScmAiProfile Devin(string arguments = "--permission-mode accept-edits --respect-workspace-trust false",
         Func<string, Task>? onWritePrompt = null, string banner = "Devin CLI\nv3000.11.92") => new("Softwareschmiede.Devin", arguments,
         banner, "❭", new Dictionary<string, string?>(), onWritePrompt);
 }
 
-/// <summary>Real SQLite and services with isolated SCM transport and deterministic terminal boundary.</summary>
+/// <summary>Echtes SQLite und echte Services mit isoliertem SCM-Transport und deterministischer Terminal-Grenze.</summary>
 internal sealed class ScmDispatchFixture : IAsyncDisposable
 {
-    internal const string KiPrefix = "Softwareschmiede.KiSimulator";
-    internal readonly ScmKiProfile KiProfile;
+    internal const string AiPrefix = "Softwareschmiede.KiSimulator";
+    internal readonly ScmAiProfile AiProfile;
     internal readonly string Root;
     internal readonly Mock<IGitPlugin> Git = new();
-    internal readonly Mock<IKiPlugin> Ki = new();
+    internal readonly Mock<IAiPlugin> Ai = new();
     /// <summary>Optionales zweites KI-Plugin (z. B. für Fallback-Tests mit deaktiviertem Prefix).</summary>
-    internal readonly Mock<IKiPlugin>? Ki2;
-    internal readonly ScmKiProfile? Ki2Profile;
+    internal readonly Mock<IAiPlugin>? Ki2;
+    internal readonly ScmAiProfile? Ki2Profile;
     internal readonly Dictionary<Guid, Mock<ITerminalSession>> Sessions = new();
     internal readonly List<TerminalSessionStartSpec> StartSpecs = [];
     internal readonly List<string> Prompts = [];
@@ -51,20 +51,20 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal readonly List<ScmNotification> Notifications = [];
     internal readonly ScmEventRepository Repository = new("test-scm", "github.com", "R_1", "owner", "repo", "U_1", "U_1", "owner", true);
     /// <summary>Repository-Darstellung des dedizierten Bot-Kontos, wie die Quelle sie im Modus
-    /// <see cref="ScmKontoModus.SeparatesKonto"/> nach der Auflösung liefert.</summary>
+    /// <see cref="ScmAccountMode.SeparateAccount"/> nach der Auflösung liefert.</summary>
     internal static readonly ScmEventRepository BotRepository = new("test-scm", "github.com", "R_1",
-        "owner", "repo", "U_1", "BOT", "scm-bot", true, ScmKontoModus.SeparatesKonto);
+        "owner", "repo", "U_1", "BOT", "scm-bot", true, ScmAccountMode.SeparateAccount);
     internal ServiceProvider Services { get; }
     internal Func<Task>? CloneGate { get; set; }
     internal string Prompt { get; set; }
     private readonly List<Process> _processes = [];
     private readonly bool _ownsRoot;
 
-    internal ScmDispatchFixture(string? root = null, TimeProvider? time = null, ScmKiProfile? ki = null, ScmKiProfile? ki2 = null)
+    internal ScmDispatchFixture(string? root = null, TimeProvider? time = null, ScmAiProfile? ai = null, ScmAiProfile? ki2 = null)
     {
-        KiProfile = ki ?? ScmKiProfile.Simulator;
+        AiProfile = ai ?? ScmAiProfile.Simulator;
         Ki2Profile = ki2;
-        Prompt = KiProfile.Prompt;
+        Prompt = AiProfile.Prompt;
         Root = root ?? Path.Combine(Path.GetTempPath(), "scm-dispatch-" + Guid.NewGuid().ToString("N"));
         _ownsRoot = root is null;
         Directory.CreateDirectory(Root);
@@ -83,7 +83,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
             .Returns((ScmResponseRequest request, CancellationToken _) => { Responses.Add(request); return Task.FromResult(new ScmResponseResult("remote", null, false)); });
         // As<> muss vor dem ersten Git.Object-Zugriff erfolgen; Tests können die leere
         // Standard-Anbindung mit eigenem Setup überschreiben.
-        Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmKontoModus>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        Git.As<IScmAgentAccess>().Setup(x => x.GetAgentEnvironmentAsync(It.IsAny<ScmAccountMode>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<string, string?>());
         Git.As<IScmNotificationSource>().Setup(x => x.EnumerateNotificationsAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .Returns((string _, DateTimeOffset? _, CancellationToken _) => Task.FromResult<IReadOnlyList<ScmNotification>>(Notifications.ToArray()));
@@ -94,21 +94,21 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                 InitGit(directory);
                 await File.WriteAllTextAsync(Path.Combine(directory, "owned.txt"), "preserve workspace");
             });
-        Ki.SetupGet(x => x.PluginPrefix).Returns(KiProfile.Prefix);
-        Ki.SetupGet(x => x.PluginName).Returns("Simulator");
-        Ki.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
-        Ki.Setup(x => x.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        Ai.SetupGet(x => x.PluginPrefix).Returns(AiProfile.Prefix);
+        Ai.SetupGet(x => x.PluginName).Returns("Simulator");
+        Ai.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        Ai.Setup(x => x.GetTerminalStartSpecAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Returns((string directory, string? _, CancellationToken _) => Task.FromResult(new TerminalSessionStartSpec
             {
                 FileName = "fixture",
-                Arguments = KiProfile.Arguments,
+                Arguments = AiProfile.Arguments,
                 WorkingDirectory = directory,
-                EnvironmentVariables = KiProfile.EnvironmentVariables
+                EnvironmentVariables = AiProfile.EnvironmentVariables
             }));
-        var kiPlugins = new List<IKiPlugin> { Ki.Object };
+        var aiPlugins = new List<IAiPlugin> { Ai.Object };
         if (ki2 is not null)
         {
-            Ki2 = new Mock<IKiPlugin>();
+            Ki2 = new Mock<IAiPlugin>();
             Ki2.SetupGet(x => x.PluginPrefix).Returns(ki2.Prefix);
             Ki2.SetupGet(x => x.PluginName).Returns(ki2.Prefix);
             Ki2.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
@@ -120,14 +120,14 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                     WorkingDirectory = directory,
                     EnvironmentVariables = ki2.EnvironmentVariables
                 }));
-            kiPlugins.Add(Ki2.Object);
+            aiPlugins.Add(Ki2.Object);
         }
         var plugins = new Mock<IPluginManager>();
         plugins.Setup(x => x.GetSourceCodeManagementPlugins()).Returns([Git.Object]);
         plugins.Setup(x => x.GetDefaultSourceCodeManagementPlugin()).Returns(Git.Object);
-        plugins.Setup(x => x.GetDevelopmentAutomationPlugins()).Returns(kiPlugins);
-        var directories = new Mock<IArbeitsverzeichnisResolver>();
-        directories.Setup(x => x.ResolveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new ArbeitsverzeichnisResolutionResult(Root, false, "test", Root));
+        plugins.Setup(x => x.GetDevelopmentAutomationPlugins()).Returns(aiPlugins);
+        var directories = new Mock<IWorkingDirectoryResolver>();
+        directories.Setup(x => x.ResolveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new WorkingDirectoryResolutionResult(Root, false, "test", Root));
         var factory = new Mock<ITerminalSessionFactory>();
         factory.Setup(x => x.StartAsync(It.IsAny<Guid>(), It.IsAny<TerminalSessionStartSpec>(), It.IsAny<ITerminalOutputSink?>(), It.IsAny<Func<CancellationToken, Task<bool>>?>(), It.IsAny<CancellationToken>()))
             .Returns((Guid taskId, TerminalSessionStartSpec spec, ITerminalOutputSink? _, Func<CancellationToken, Task<bool>>? _, CancellationToken _) =>
@@ -137,11 +137,11 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                 _processes.Add(process);
                 var session = new Mock<ITerminalSession>();
                 session.SetupGet(x => x.Process).Returns(process);
-                session.SetupGet(x => x.Buffer).Returns(Screen(KiProfile.Banner, Prompt));
+                session.SetupGet(x => x.Buffer).Returns(Screen(AiProfile.Banner, Prompt));
                 session.Setup(x => x.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                     .Returns(async (string prompt, CancellationToken _) =>
                     {
-                        if (KiProfile.OnWritePrompt is { } handler) await handler(prompt);
+                        if (AiProfile.OnWritePrompt is { } handler) await handler(prompt);
                         else Prompts.Add(prompt);
                     });
                 Sessions.Add(taskId, session);
@@ -149,7 +149,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
             });
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddDbContext<SoftwareschmiededDbContext>(options => options.UseSqlite($"Data Source={Path.Combine(Root, "events.db")};Pooling=False"));
+        services.AddDbContext<SoftwareschmiedeDbContext>(options => options.UseSqlite($"Data Source={Path.Combine(Root, "events.db")};Pooling=False"));
         services.AddSingleton(plugins.Object);
         services.AddSingleton(Git.Object);
         services.AddSingleton(directories.Object);
@@ -157,63 +157,63 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         services.AddSingleton(time ?? TimeProvider.System);
         services.AddSingleton<IOptions<TerminalSessionOptions>>(Options.Create(new TerminalSessionOptions()));
         services.AddSingleton<IOptions<ScmEventOptions>>(Options.Create(new ScmEventOptions()));
-        services.AddSingleton<KiAusfuehrungsService>();
-        services.AddSingleton<ICliExecutionLimitSource>(sp => sp.GetRequiredService<KiAusfuehrungsService>());
-        services.AddSingleton<IRunningAutomationStatusSource>(sp => sp.GetRequiredService<KiAusfuehrungsService>());
-        services.AddSingleton<PromptZeitVersandService>();
+        services.AddSingleton<AiExecutionService>();
+        services.AddSingleton<ICliExecutionLimitSource>(sp => sp.GetRequiredService<AiExecutionService>());
+        services.AddSingleton<IRunningAutomationStatusSource>(sp => sp.GetRequiredService<AiExecutionService>());
+        services.AddSingleton<PromptScheduleDispatchService>();
         services.AddSingleton<ScmEventStartupGate>();
         services.AddSingleton<ScmEventChangeNotifier>();
         services.AddSingleton<ScmEventExchangeProtocol>();
         services.AddSingleton<ScmEventMonitoringService>();
         services.AddSingleton<ScmBackmergeMonitoringService>();
-        services.AddSingleton<ScmIssueAufbereitungMonitoringService>();
+        services.AddSingleton<ScmIssuePreparationMonitoringService>();
         services.AddSingleton<ScmTaskCompletionMonitoringService>();
-        services.AddSingleton<ScmStartPruefungsAusloeser>();
-        services.AddSingleton<ScmStartPruefungsService>();
-        services.AddSingleton<AufgabeLaufdatenChangedNotifier>();
-        services.AddScoped<PullRequestReferenzService>();
+        services.AddSingleton<ScmStartCheckTrigger>();
+        services.AddSingleton<ScmStartCheckService>();
+        services.AddSingleton<WorkItemRunDataChangedNotifier>();
+        services.AddScoped<PullRequestReferenceService>();
         services.AddScoped<TodoService>();
-        services.AddScoped<AufgabeService>();
-        services.AddScoped<ProtokollService>();
-        services.AddScoped<AppEinstellungService>();
+        services.AddScoped<WorkItemService>();
+        services.AddScoped<LogService>();
+        services.AddScoped<AppSettingService>();
         services.AddScoped<PluginDefaultSettingsService>();
         services.AddScoped<PluginActivationService>();
         services.AddScoped<PluginSelectionService>();
-        services.AddScoped<KiPluginLimitService>();
+        services.AddScoped<AiPluginLimitService>();
         services.AddScoped<ScmEventStore>();
         services.AddScoped<ScmEventOutbox>();
         services.AddScoped<ScmEventOrchestrator>();
         // Jede Fixture erhält einen eigenen Reservierungsbestand — dadurch sind die
         // Reservierungen der Fixture vollständig von parallel laufenden Tests isoliert.
-        services.AddSingleton<ScmStartPlatzReservierungsPool>();
+        services.AddSingleton<ScmStartSlotReservationPool>();
         services.AddScoped<ScmEventExecutionLimitService>();
         services.AddScoped<ScmEventTaskResolver>();
-        services.AddScoped<ScmIssueAufbereitungsService>();
+        services.AddScoped<ScmIssuePreparationService>();
         services.AddScoped<ScmBackmergeService>();
-        services.AddScoped(sp => new EntwicklungsprozessService(sp.GetRequiredService<AufgabeService>(), sp.GetRequiredService<ProtokollService>(),
+        services.AddScoped(sp => new DevelopmentProcessService(sp.GetRequiredService<WorkItemService>(), sp.GetRequiredService<LogService>(),
             Git.Object, sp.GetRequiredService<PluginSelectionService>(), directories.Object,
-            new EntwicklungsprozessServiceOptions(KiAusfuehrungsService: sp.GetRequiredService<KiAusfuehrungsService>(),
-                PromptZeitVersandService: sp.GetRequiredService<PromptZeitVersandService>()), sp.GetRequiredService<ILogger<EntwicklungsprozessService>>()));
+            new DevelopmentProcessServiceOptions(AiExecutionService: sp.GetRequiredService<AiExecutionService>(),
+                PromptScheduleDispatchService: sp.GetRequiredService<PromptScheduleDispatchService>()), sp.GetRequiredService<ILogger<DevelopmentProcessService>>()));
         Services = services.BuildServiceProvider();
     }
 
     internal async Task InitializeAsync()
     {
         using var scope = Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().Database.EnsureCreatedAsync();
+        await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().Database.EnsureCreatedAsync();
         Services.GetRequiredService<ScmEventStartupGate>().Ready();
     }
 
-    internal async Task<(Guid TaskId, Guid EventId)> AddAsync(AufgabeStatus status = AufgabeStatus.Neu, bool configured = false, bool cloned = true,
+    internal async Task<(Guid TaskId, Guid EventId)> AddAsync(WorkItemStatus status = WorkItemStatus.New, bool configured = false, bool cloned = true,
         ScmReferenceKind referenceKind = ScmReferenceKind.Issue, ScmContentKind contentKind = ScmContentKind.IssueComment, string body = "$Softwareschmiede test",
-        ScmEventRepository? eventRepository = null, string? authorId = "U_1", string? authorLogin = "owner", string? kiPluginPrefix = null)
+        ScmEventRepository? eventRepository = null, string? authorId = "U_1", string? authorLogin = "owner", string? aiPluginPrefix = null)
     {
         using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
-        var project = new Projekt { Id = Guid.NewGuid(), Name = "SCM" };
-        var repository = new GitRepository { Id = Guid.NewGuid(), ProjektId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginTyp = Repository.ProviderPrefix, RepositoryName = "repo" };
-        var task = new Aufgabe { Id = Guid.NewGuid(), Titel = "SCM task", ProjektId = project.Id, GitRepositoryId = repository.Id, Status = status, KiPluginPrefix = configured ? (kiPluginPrefix ?? KiProfile.Prefix) : null };
-        if (cloned) { task.LokalerKlonPfad = Path.Combine(Root, task.Id.ToString("N")); InitGit(task.LokalerKlonPfad); }
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var project = new Project { Id = Guid.NewGuid(), Name = "SCM" };
+        var repository = new GitRepository { Id = Guid.NewGuid(), ProjectId = project.Id, RepositoryUrl = "https://github.com/owner/repo", PluginType = Repository.ProviderPrefix, RepositoryName = "repo" };
+        var task = new WorkItem { Id = Guid.NewGuid(), Title = "SCM task", ProjectId = project.Id, GitRepositoryId = repository.Id, Status = status, AiPluginPrefix = configured ? (aiPluginPrefix ?? AiProfile.Prefix) : null };
+        if (cloned) { task.LocalClonePath = Path.Combine(Root, task.Id.ToString("N")); InitGit(task.LocalClonePath); }
         db.AddRange(project, repository, task);
         await db.SaveChangesAsync();
         var time = DateTimeOffset.UtcNow;
@@ -223,7 +223,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         var observation = new ScmEventObservation(new(eventRepository ?? Repository, referenceKind, 7), contentKind, Guid.NewGuid().ToString(), "42",
             time, time, null, authorId, authorLogin, null, null, body, url, time);
         await scope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(task.Id, task.Id.ToString(), new(new(observation.Reference, observation.ContentKind, null, time), [observation]));
-        return (task.Id, await db.ScmIncomingEvents.Where(x => x.AufgabeId == task.Id).Select(x => x.Id).SingleAsync());
+        return (task.Id, await db.ScmIncomingEvents.Where(x => x.WorkItemId == task.Id).Select(x => x.Id).SingleAsync());
     }
 
     /// <summary>Registriert eine Inbox-Notification, die die gemockte <see cref="IScmNotificationSource"/> liefert.</summary>
@@ -257,27 +257,27 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal ScmEventMonitoringService Monitor => Services.GetRequiredService<ScmEventMonitoringService>();
 
     /// <summary>Der Auslöser der ereignisgesteuerten Startprüfung aus dem Service-Provider der Fixture.</summary>
-    internal ScmStartPruefungsAusloeser Ausloeser => Services.GetRequiredService<ScmStartPruefungsAusloeser>();
+    internal ScmStartCheckTrigger Trigger => Services.GetRequiredService<ScmStartCheckTrigger>();
 
     /// <summary>Der ereignisgesteuerte Startprüfungs-Dienst aus dem Service-Provider der Fixture.</summary>
-    internal ScmStartPruefungsService StartPruefung => Services.GetRequiredService<ScmStartPruefungsService>();
+    internal ScmStartCheckService StartCheck => Services.GetRequiredService<ScmStartCheckService>();
 
-    /// <summary>Setzt den Konto-Modus über den <see cref="AppEinstellungService"/>.</summary>
-    internal async Task SetKontoModusAsync(ScmKontoModus modus)
+    /// <summary>Setzt den Konto-Modus über den <see cref="AppSettingService"/>.</summary>
+    internal async Task SetAccountModeAsync(ScmAccountMode mode)
     {
         using var scope = Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().SetScmKontoModusAsync(modus);
+        await scope.ServiceProvider.GetRequiredService<AppSettingService>().SetScmAccountModeAsync(mode);
     }
 
     /// <summary>Schreibt eine generische Anwendungseinstellung (z. B. Ausführungslimits).</summary>
-    internal async Task SetSettingAsync(string schluessel, string? wert)
+    internal async Task SetSettingAsync(string key, string? value)
     {
         using var scope = Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<AppEinstellungService>().SetSettingAsync(schluessel, wert);
+        await scope.ServiceProvider.GetRequiredService<AppSettingService>().SetSettingAsync(key, value);
     }
 
     /// <summary>Der Singleton-Prozessverwalter der Fixture (für Start/Stop-Prüfungen).</summary>
-    internal KiAusfuehrungsService Cli => Services.GetRequiredService<KiAusfuehrungsService>();
+    internal AiExecutionService Cli => Services.GetRequiredService<AiExecutionService>();
 
     internal async Task DispatchAsync(Guid id)
     {
@@ -288,7 +288,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal async Task<ScmIncomingEvent> EventAsync(Guid id)
     {
         using var scope = Services.CreateScope();
-        return await scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>().ScmIncomingEvents.AsNoTracking().SingleAsync(x => x.Id == id);
+        return await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmIncomingEvents.AsNoTracking().SingleAsync(x => x.Id == id);
     }
 
     /// <summary>Vollzieht die Dateitool-Kanalprobe wie ein echtes CLI-Dateitool: Challenge lesen,
@@ -305,7 +305,7 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
 
     internal void SetPrompt(Guid task, string prompt)
     {
-        Sessions[task].SetupGet(x => x.Buffer).Returns(Screen(KiProfile.Banner, prompt));
+        Sessions[task].SetupGet(x => x.Buffer).Returns(Screen(AiProfile.Banner, prompt));
         Sessions[task].Raise(x => x.BufferChanged += null, EventArgs.Empty);
     }
 

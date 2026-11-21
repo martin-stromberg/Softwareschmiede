@@ -8,9 +8,9 @@ namespace Softwareschmiede.App.Converters;
 [ValueConversion(typeof(WorkspaceFileNode), typeof(string))]
 public sealed class WorkspaceFileNodeStatusIconConverter : IValueConverter
 {
-    private const string LoeschSymbol = "\U0001F5D1";
-    private const string NeuSymbol = "\U0001F195";
-    private const string AenderungsSymbol = "✏";
+    private const string DeleteGlyph = "\U0001F5D1";
+    private const string NewSymbol = "\U0001F195";
+    private const string ChangeSymbol = "✏";
 
     /// <inheritdoc/>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
@@ -19,20 +19,20 @@ public sealed class WorkspaceFileNodeStatusIconConverter : IValueConverter
             return string.Empty;
 
         if (node.IsDeleted)
-            return LoeschSymbol;
+            return DeleteGlyph;
 
         var status = node.Status;
         if (status is null)
             return string.Empty;
 
         if (status.IsDeleted)
-            return LoeschSymbol;
+            return DeleteGlyph;
 
         if (status.IsUntracked || status.IndexStatus == 'A')
-            return NeuSymbol;
+            return NewSymbol;
 
         if (status.IsDirty || status.IsStaged)
-            return AenderungsSymbol;
+            return ChangeSymbol;
 
         return string.Empty;
     }

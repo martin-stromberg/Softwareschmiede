@@ -8,26 +8,26 @@ namespace Softwareschmiede.Application.Services;
 
 /// <summary>
 /// Verwaltung von CLI-Prozessen: Start, Stop, Heartbeat-Tracking.
-/// Koordiniert <see cref="KiAusfuehrungsService"/> und <see cref="AufgabeService"/> für Heartbeat-Updates.
+/// Koordiniert <see cref="AiExecutionService"/> und <see cref="WorkItemService"/> für Heartbeat-Updates.
 /// </summary>
 public sealed class CliProcessManager : IDisposable
 {
-    private readonly KiAusfuehrungsService _kiService;
+    private readonly AiExecutionService _aiService;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<CliProcessManager> _logger;
-    private readonly AufgabeLaufdatenChangedNotifier _laufdatenChangedNotifier;
+    private readonly WorkItemRunDataChangedNotifier _runDataChangedNotifier;
 
     private readonly ConcurrentDictionary<Guid, Timer> _heartbeatTimers = new();
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
 
     // Letztes Sicherheitsnetz der Laufdaten-Selbstheilung: unabhängig von jeglicher Event-Zustellung
     // wird periodisch geprüft, ob für jeden laufenden Prozess die Laufdaten persistiert sind.
-    private static readonly TimeSpan AbgleichIntervall = HeartbeatInterval;
-    private readonly Timer _abgleichTimer;
+    private static readonly TimeSpan ReconcileInterval = HeartbeatInterval;
+    private readonly Timer _reconcileTimer;
 
     // Überlappungsschutz für den periodischen Abgleich: dauert ein Abgleich-Durchlauf länger als
     // das Timer-Intervall, werden weitere Ticks übersprungen statt sich aufzustauen (fire-and-forget).
-    private int _abgleichLaeuft;
+    private int _reconcileRunning;
 
     // Serialisiert alle mutierenden Zugriffe auf _heartbeatTimers, _updateSemaphores und
     // _runtimeStatusSubscriptions: Die Check-then-act-Sequenzen in StartHeartbeat/
@@ -49,7 +49,7 @@ public sealed class CliProcessManager : IDisposable
     // Hält pro Aufgabe die ITerminalSession und den dafür registrierten Event-Handler, damit
     // RuntimeStatusChanged beim Stopp/Fehler wieder sauber abgemeldet werden kann (siehe
     // UnsubscribeRuntimeStatus). Ohne dieses Tracking müsste GetTerminalSession(aufgabeId) erneut
-    // abgefragt werden — das Handle ist zu diesem Zeitpunkt aber bereits aus KiAusfuehrungsService._handles
+    // abgefragt werden — das Handle ist zu diesem Zeitpunkt aber bereits aus AiExecutionService._handles
     // entfernt (siehe HandleProcessExited), sodass die Session dort nicht mehr auffindbar wäre.
     private readonly ConcurrentDictionary<Guid, (ITerminalSession Session, EventHandler<CliRuntimeStatusChangedEventArgs> Handler)> _runtimeStatusSubscriptions = new();
 
@@ -60,29 +60,29 @@ public sealed class CliProcessManager : IDisposable
 
     /// <summary>Erstellt eine neue Instanz des <see cref="CliProcessManager"/>.</summary>
     public CliProcessManager(
-        KiAusfuehrungsService kiService,
+        AiExecutionService aiService,
         IServiceScopeFactory scopeFactory,
         ILogger<CliProcessManager> logger,
-        AufgabeLaufdatenChangedNotifier laufdatenChangedNotifier)
+        WorkItemRunDataChangedNotifier runDataChangedNotifier)
     {
-        _kiService = kiService;
+        _aiService = aiService;
         _scopeFactory = scopeFactory;
         _logger = logger;
-        _laufdatenChangedNotifier = laufdatenChangedNotifier;
+        _runDataChangedNotifier = runDataChangedNotifier;
 
-        _kiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
-        _kiService.CliLaufAktiv += OnCliLaufAktiv;
+        _aiService.CliProcessStatusChanged += OnCliProcessStatusChanged;
+        _aiService.CliRunActive += OnCliRunActive;
 
-        _abgleichTimer = new Timer(
-            _ => AbgleichTickAsync().SafeFireAndForget(_logger, "CliProcessManager.AbgleichTickAsync"),
+        _reconcileTimer = new Timer(
+            _ => ReconcileTickAsync().SafeFireAndForget(_logger, "CliProcessManager.ReconcileTickAsync"),
             null,
-            AbgleichIntervall,
-            AbgleichIntervall);
+            ReconcileInterval,
+            ReconcileInterval);
     }
 
     /// <summary>Startet den Heartbeat-Timer für eine Aufgabe.</summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
-    public void StartHeartbeat(Guid aufgabeId)
+    /// <param name="workItemId">ID der Aufgabe.</param>
+    public void StartHeartbeat(Guid workItemId)
     {
         lock (_lifecycleLock)
         {
@@ -91,54 +91,54 @@ public sealed class CliProcessManager : IDisposable
                 return;
             }
 
-            StopHeartbeatCore(aufgabeId);
-            StartHeartbeatCore(aufgabeId);
+            StopHeartbeatCore(workItemId);
+            StartHeartbeatCore(workItemId);
         }
     }
 
     /// <summary>Stoppt den Heartbeat-Timer für eine Aufgabe.</summary>
-    /// <param name="aufgabeId">ID der Aufgabe.</param>
-    public void StopHeartbeat(Guid aufgabeId)
+    /// <param name="workItemId">ID der Aufgabe.</param>
+    public void StopHeartbeat(Guid workItemId)
     {
         lock (_lifecycleLock)
         {
-            StopHeartbeatCore(aufgabeId);
+            StopHeartbeatCore(workItemId);
         }
     }
 
     // Aufrufer muss _lifecycleLock halten.
-    private void StartHeartbeatCore(Guid aufgabeId)
+    private void StartHeartbeatCore(Guid workItemId)
     {
-        _updateSemaphores[aufgabeId] = new SemaphoreSlim(1, 1);
+        _updateSemaphores[workItemId] = new SemaphoreSlim(1, 1);
 
         var timer = new Timer(
-            _ => AktualisierungAsync(aufgabeId).SafeFireAndForget(_logger, "CliProcessManager.AktualisierungAsync"),
+            _ => UpdateAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.UpdateAsync"),
             null,
             HeartbeatInterval,
             HeartbeatInterval);
 
-        _heartbeatTimers[aufgabeId] = timer;
-        _logger.LogDebug("Heartbeat-Timer für Aufgabe {AufgabeId} gestartet.", aufgabeId);
+        _heartbeatTimers[workItemId] = timer;
+        _logger.LogDebug("Heartbeat-Timer für Aufgabe {AufgabeId} gestartet.", workItemId);
     }
 
     // Aufrufer muss _lifecycleLock halten.
-    private void StopHeartbeatCore(Guid aufgabeId)
+    private void StopHeartbeatCore(Guid workItemId)
     {
-        if (_heartbeatTimers.TryRemove(aufgabeId, out var timer))
+        if (_heartbeatTimers.TryRemove(workItemId, out var timer))
         {
             timer.Dispose();
-            _logger.LogDebug("Heartbeat-Timer für Aufgabe {AufgabeId} gestoppt.", aufgabeId);
+            _logger.LogDebug("Heartbeat-Timer für Aufgabe {AufgabeId} gestoppt.", workItemId);
         }
 
-        if (_updateSemaphores.TryRemove(aufgabeId, out var semaphore))
+        if (_updateSemaphores.TryRemove(workItemId, out var semaphore))
         {
             semaphore.Dispose();
         }
     }
 
-    private async Task AktualisierungAsync(Guid aufgabeId)
+    private async Task UpdateAsync(Guid workItemId)
     {
-        if (!_updateSemaphores.TryGetValue(aufgabeId, out var semaphore))
+        if (!_updateSemaphores.TryGetValue(workItemId, out var semaphore))
         {
             // Heartbeat wurde zwischenzeitlich gestoppt (Semaphore bereits entfernt).
             return;
@@ -147,18 +147,18 @@ public sealed class CliProcessManager : IDisposable
         await semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (!_kiService.IsRunning(aufgabeId))
+            if (!_aiService.IsRunning(workItemId))
             {
-                StopHeartbeat(aufgabeId);
+                StopHeartbeat(workItemId);
                 return;
             }
 
-            _kiService.UpdateHeartbeat(aufgabeId);
-            await LaufdatenSicherstellenAsync(aufgabeId).ConfigureAwait(false);
+            _aiService.UpdateHeartbeat(workItemId);
+            await EnsureRunDataAsync(workItemId).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Heartbeat-Aktualisierung für Aufgabe {AufgabeId} fehlgeschlagen.", aufgabeId);
+            _logger.LogWarning(ex, "Heartbeat-Aktualisierung für Aufgabe {AufgabeId} fehlgeschlagen.", workItemId);
         }
         finally
         {
@@ -174,71 +174,71 @@ public sealed class CliProcessManager : IDisposable
         }
     }
 
-    private void OnCliProcessStatusChanged(Guid aufgabeId, CliProcessStatus status)
+    private void OnCliProcessStatusChanged(Guid workItemId, CliProcessStatus status)
     {
         try
         {
             switch (status)
             {
-                case CliProcessStatus.Gestartet:
-                    StartHeartbeat(aufgabeId);
-                    // AktiveRunId muss sofort persistiert werden (nicht erst beim ersten periodischen
+                case CliProcessStatus.Started:
+                    StartHeartbeat(workItemId);
+                    // ActiveRunId muss sofort persistiert werden (nicht erst beim ersten periodischen
                     // Heartbeat nach 30s) — sonst zeigt die Seitenleisten-Kachel (KiAusfuehrungsStatusConverter,
                     // Issue 108) für bis zu 30s nach dem Start weiterhin "✓ Bereit" statt "▶ Läuft" an.
-                    AktivenLaufSetzenAsync(aufgabeId).SafeFireAndForget(_logger, "CliProcessManager.AktivenLaufSetzenAsync");
-                    SubscribeRuntimeStatus(aufgabeId);
+                    SetActiveRunAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.SetActiveRunAsync");
+                    SubscribeRuntimeStatus(workItemId);
                     break;
-                case CliProcessStatus.Gestoppt:
-                case CliProcessStatus.Fehler:
-                    StopHeartbeat(aufgabeId);
-                    UnsubscribeRuntimeStatus(aufgabeId);
-                    AktivenLaufBeendenAsync(aufgabeId).SafeFireAndForget(_logger, "CliProcessManager.AktivenLaufBeendenAsync");
+                case CliProcessStatus.Stopped:
+                case CliProcessStatus.Error:
+                    StopHeartbeat(workItemId);
+                    UnsubscribeRuntimeStatus(workItemId);
+                    EndActiveRunAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.EndActiveRunAsync");
                     break;
             }
         }
         catch (Exception ex)
         {
             // Ein Fehler beim Start/Stop des Heartbeat-Timers darf die Multicast-Invoke-Kette von
-            // KiAusfuehrungsService.CliProcessStatusChanged nicht abbrechen, sonst würde der zweite
+            // AiExecutionService.CliProcessStatusChanged nicht abbrechen, sonst würde der zweite
             // Abonnent (TaskDetailViewModel.OnCliProcessStatusChanged) nicht mehr benachrichtigt.
-            _logger.LogError(ex, "Fehler bei der Verarbeitung des CLI-Prozess-Status {Status} für Aufgabe {AufgabeId}.", status, aufgabeId);
+            _logger.LogError(ex, "Fehler bei der Verarbeitung des CLI-Prozess-Status {Status} für Aufgabe {AufgabeId}.", status, workItemId);
         }
     }
 
     /// <summary>
-    /// Setzt <see cref="Domain.Entities.Aufgabe.AktiveRunId"/> und aktualisiert den Heartbeat sofort,
-    /// sobald ein CLI-Prozess gestartet wurde (siehe <see cref="AufgabeService.AktivenLaufSetzenAsync"/>).
+    /// Setzt <see cref="Domain.Entities.WorkItem.ActiveRunId"/> und aktualisiert den Heartbeat sofort,
+    /// sobald ein CLI-Prozess gestartet wurde (siehe <see cref="WorkItemService.SetActiveRunAsync"/>).
     /// </summary>
-    /// <param name="aufgabeId">ID der Aufgabe, deren CLI-Prozess gestartet wurde.</param>
-    private async Task AktivenLaufSetzenAsync(Guid aufgabeId)
+    /// <param name="workItemId">ID der Aufgabe, deren CLI-Prozess gestartet wurde.</param>
+    private async Task SetActiveRunAsync(Guid workItemId)
     {
-        await ExecuteWithAufgabeServiceAsync(
-            aufgabeId,
+        await ExecuteWithWorkItemServiceAsync(
+            workItemId,
             "Setzen des aktiven Laufs",
-            aufgabeService => aufgabeService.AktivenLaufSetzenAsync(
-                aufgabeId,
+            workItemService => workItemService.SetActiveRunAsync(
+                workItemId,
                 Guid.NewGuid().ToString("N"),
-                laeuftGuard: () => _kiService.IsRunning(aufgabeId))).ConfigureAwait(false);
+                runningGuard: () => _aiService.IsRunning(workItemId))).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Entfernt <see cref="Domain.Entities.Aufgabe.AktiveRunId"/>, sobald der CLI-Prozess einer Aufgabe
-    /// beendet wurde (regulär oder mit Fehler; siehe <see cref="AufgabeService.AktivenLaufBeendenAsync"/>).
+    /// Entfernt <see cref="Domain.Entities.WorkItem.ActiveRunId"/>, sobald der CLI-Prozess einer Aufgabe
+    /// beendet wurde (regulär oder mit Fehler; siehe <see cref="WorkItemService.EndActiveRunAsync"/>).
     /// </summary>
-    /// <param name="aufgabeId">ID der Aufgabe, deren CLI-Prozess beendet wurde.</param>
-    private async Task AktivenLaufBeendenAsync(Guid aufgabeId)
+    /// <param name="workItemId">ID der Aufgabe, deren CLI-Prozess beendet wurde.</param>
+    private async Task EndActiveRunAsync(Guid workItemId)
     {
-        await ExecuteWithAufgabeServiceAsync(
-            aufgabeId,
+        await ExecuteWithWorkItemServiceAsync(
+            workItemId,
             "Beenden des aktiven Laufs",
-            aufgabeService => aufgabeService.AktivenLaufBeendenAsync(aufgabeId)).ConfigureAwait(false);
+            workItemService => workItemService.EndActiveRunAsync(workItemId)).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Abonniert <see cref="ITerminalSession.RuntimeStatusChanged"/> für die Terminal-Sitzung einer
     /// Aufgabe (sofern vorhanden — beim klassischen, nicht-interaktiven Start existiert keine
     /// Sitzung), damit Wechsel zwischen "arbeitet" und "wartet auf Eingabe" über
-    /// <see cref="LaufdatenSicherstellenAsync"/> → <see cref="AufgabeService.AktivenLaufSicherstellenAsync"/>
+    /// <see cref="EnsureRunDataAsync"/> → <see cref="WorkItemService.EnsureActiveRunAsync"/>
     /// persistiert werden (Issue 108, Folgefehler des Rückwegs Läuft → Wartet: dieser Substatus wurde
     /// vorher ausschließlich lokal in der <see cref="ITerminalSession"/> gehalten und nie an die
     /// Datenbank weitergereicht). Wird aus allen Selbstheilungspfaden aufgerufen (Gestartet-Ereignis,
@@ -246,15 +246,15 @@ public sealed class CliProcessManager : IDisposable
     /// unter <c>_lifecycleLock</c> atomar, damit parallele Aufrufer keine doppelte, nicht mehr
     /// abmeldbare Subscription hinterlassen.
     /// </summary>
-    /// <param name="aufgabeId">ID der Aufgabe, für deren laufenden Prozess der Substatus beobachtet werden soll.</param>
-    private void SubscribeRuntimeStatus(Guid aufgabeId)
+    /// <param name="workItemId">ID der Aufgabe, für deren laufenden Prozess der Substatus beobachtet werden soll.</param>
+    private void SubscribeRuntimeStatus(Guid workItemId)
     {
-        var session = _kiService.GetTerminalSession(aufgabeId);
+        var session = _aiService.GetTerminalSession(workItemId);
         if (session is null)
         {
             // Klassischer Start ohne ConPTY: keine Sitzung, also kein Laufzeit-Substatus verfügbar.
             // KiAusfuehrungsStatusConverter fällt in diesem Fall auf das bisherige Verhalten zurück
-            // (LaufStatus bleibt null → "▶ Läuft", solange AktiveRunId gesetzt und Heartbeat aktuell ist).
+            // (LaufStatus bleibt null → "▶ Läuft", solange ActiveRunId gesetzt und Heartbeat aktuell ist).
             return;
         }
 
@@ -268,39 +268,39 @@ public sealed class CliProcessManager : IDisposable
             // Idempotent: Ist für die Aufgabe bereits dieselbe Session registriert (z. B. bei wiederholten
             // Aufrufen aus den Selbstheilungspfaden), wird nicht erneut registriert — sonst würde jeder
             // Statuswechsel den Persistierungsaufruf mehrfach auslösen.
-            if (_runtimeStatusSubscriptions.TryGetValue(aufgabeId, out var existing)
+            if (_runtimeStatusSubscriptions.TryGetValue(workItemId, out var existing)
                 && ReferenceEquals(existing.Session, session))
             {
                 return;
             }
 
             // Defensive Bereinigung einer eventuell noch vorhandenen alten Registrierung (z. B. wenn ein
-            // Gestoppt-Event für einen vorherigen Lauf derselben Aufgabe ausblieb) — verhindert doppelte
+            // Stopped-Event für einen vorherigen Lauf derselben Aufgabe ausblieb) — verhindert doppelte
             // Event-Registrierungen und einen dadurch überzähligen Persistierungsaufruf pro Statuswechsel.
-            UnsubscribeRuntimeStatusCore(aufgabeId);
+            UnsubscribeRuntimeStatusCore(workItemId);
 
             EventHandler<CliRuntimeStatusChangedEventArgs> handler = (_, e) =>
-                OnRuntimeStatusChanged(aufgabeId, e.Status);
+                OnRuntimeStatusChanged(workItemId, e.Status);
 
             session.RuntimeStatusChanged += handler;
-            _runtimeStatusSubscriptions[aufgabeId] = (session, handler);
+            _runtimeStatusSubscriptions[workItemId] = (session, handler);
         }
     }
 
     /// <summary>Meldet die Event-Registrierung aus <see cref="SubscribeRuntimeStatus"/> wieder ab.</summary>
-    /// <param name="aufgabeId">ID der Aufgabe, deren CLI-Prozess beendet wurde.</param>
-    private void UnsubscribeRuntimeStatus(Guid aufgabeId)
+    /// <param name="workItemId">ID der Aufgabe, deren CLI-Prozess beendet wurde.</param>
+    private void UnsubscribeRuntimeStatus(Guid workItemId)
     {
         lock (_lifecycleLock)
         {
-            UnsubscribeRuntimeStatusCore(aufgabeId);
+            UnsubscribeRuntimeStatusCore(workItemId);
         }
     }
 
     // Aufrufer muss _lifecycleLock halten.
-    private void UnsubscribeRuntimeStatusCore(Guid aufgabeId)
+    private void UnsubscribeRuntimeStatusCore(Guid workItemId)
     {
-        if (_runtimeStatusSubscriptions.TryRemove(aufgabeId, out var subscription))
+        if (_runtimeStatusSubscriptions.TryRemove(workItemId, out var subscription))
         {
             subscription.Session.RuntimeStatusChanged -= subscription.Handler;
         }
@@ -308,55 +308,55 @@ public sealed class CliProcessManager : IDisposable
 
     /// <summary>
     /// Übersetzt einen <see cref="CliRuntimeStatus"/>-Wechsel der <see cref="PseudoConsoleSession"/> in den
-    /// Domain-Substatus <see cref="AufgabeLaufStatus"/> und persistiert ihn. <see cref="CliRuntimeStatus.Inaktiv"/>
-    /// wird ignoriert: Das Beenden des Laufs (inkl. Zurücksetzen von <see cref="Domain.Entities.Aufgabe.LaufStatus"/>)
-    /// übernimmt bereits <see cref="AktivenLaufBeendenAsync"/> über das separate <see cref="CliProcessStatus.Gestoppt"/>-
-    /// bzw. <see cref="CliProcessStatus.Fehler"/>-Ereignis.
+    /// Domain-Substatus <see cref="WorkItemRunStatus"/> und persistiert ihn. <see cref="CliRuntimeStatus.Inactive"/>
+    /// wird ignoriert: Das Beenden des Laufs (inkl. Zurücksetzen von <see cref="Domain.Entities.WorkItem.RunStatus"/>)
+    /// übernimmt bereits <see cref="EndActiveRunAsync"/> über das separate <see cref="CliProcessStatus.Stopped"/>-
+    /// bzw. <see cref="CliProcessStatus.Error"/>-Ereignis.
     /// </summary>
-    /// <param name="aufgabeId">ID der Aufgabe, deren Laufzeit-Substatus sich geändert hat.</param>
+    /// <param name="workItemId">ID der Aufgabe, deren Laufzeit-Substatus sich geändert hat.</param>
     /// <param name="status">Der neue Laufzeitstatus der CLI-Sitzung.</param>
-    private void OnRuntimeStatusChanged(Guid aufgabeId, CliRuntimeStatus status)
+    private void OnRuntimeStatusChanged(Guid workItemId, CliRuntimeStatus status)
     {
-        if (status == CliRuntimeStatus.Inaktiv)
+        if (status == CliRuntimeStatus.Inactive)
             return;
 
-        LaufdatenSicherstellenAsync(aufgabeId).SafeFireAndForget(_logger, "CliProcessManager.LaufdatenSicherstellenAsync");
+        EnsureRunDataAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.EnsureRunDataAsync");
     }
 
-    /// <summary>Behandelt das <see cref="KiAusfuehrungsService.CliLaufAktiv"/>-Signal: ein laufender
+    /// <summary>Behandelt das <see cref="AiExecutionService.CliRunActive"/>-Signal: ein laufender
     /// Prozess ohne Gestartet-Ereignis (Wiederverwendungs-/Early-Return-Pfad) löst dieselbe
     /// Laufdaten-Sicherstellung aus wie ein regulärer Start.</summary>
-    /// <param name="aufgabeId">ID der Aufgabe, deren Lauf als aktiv gemeldet wurde.</param>
-    private void OnCliLaufAktiv(Guid aufgabeId)
-        => LaufdatenSicherstellenAsync(aufgabeId).SafeFireAndForget(_logger, "CliProcessManager.LaufdatenSicherstellenAsync");
+    /// <param name="workItemId">ID der Aufgabe, deren Lauf als aktiv gemeldet wurde.</param>
+    private void OnCliRunActive(Guid workItemId)
+        => EnsureRunDataAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.EnsureRunDataAsync");
 
     /// <summary>
     /// Zentraler Selbstheilungspunkt: Stellt für einen nachweislich laufenden Prozess die vollständige
     /// Beobachtungs- und Persistenzkette wieder her — Heartbeat-Timer (nur falls noch keiner läuft;
     /// atomar unter <c>_lifecycleLock</c>), RuntimeStatus-Subscription (idempotent, atomar) und
-    /// Laufdaten via <see cref="AufgabeService.AktivenLaufSicherstellenAsync"/> mit dem aktuellen
-    /// Live-Substatus (<see cref="CliRuntimeStatusExtensions.ToAufgabeLaufStatus"/>).
+    /// Laufdaten via <see cref="WorkItemService.EnsureActiveRunAsync"/> mit dem aktuellen
+    /// Live-Substatus (<see cref="CliRuntimeStatusExtensions.ToWorkItemRunStatus"/>).
     /// Läuft kein Prozess, ist der Aufruf eine No-Op — verwaiste oder beendete Zustände werden nie
     /// wieder als aktiv geschrieben.
     /// </summary>
     /// <remarks>
-    /// TOCTOU-Absicherung (Issue 342): Der <see cref="KiAusfuehrungsService.IsRunning"/>-Check wird
+    /// TOCTOU-Absicherung (Issue 342): Der <see cref="AiExecutionService.IsRunning"/>-Check wird
     /// zusätzlich als <c>laeuftGuard</c> mitgegeben und von
-    /// <see cref="AufgabeService.AktivenLaufSicherstellenAsync"/> innerhalb der prozessweiten
+    /// <see cref="WorkItemService.EnsureActiveRunAsync"/> innerhalb der prozessweiten
     /// Aufgabensperre (<c>LaufGates</c>) unmittelbar vor dem Schreiben erneut ausgewertet. Endet der
     /// Prozess zwischen der Vorprüfung und der Persistenz, schreibt die Sicherstellung nichts mehr —
-    /// und ein zeitgleich anstehender <see cref="AufgabeService.AktivenLaufBeendenAsync"/>-Save
+    /// und ein zeitgleich anstehender <see cref="WorkItemService.EndActiveRunAsync"/>-Save
     /// serialisiert unter derselben Sperre entweder davor (Guard wird false → kein Save) oder danach
     /// (Beenden hat das letzte Wort). Ein Phantom-Lauf kann so nicht wiederbelebt werden.
     /// Der Live-Substatus wird analog als Provider übergeben und von
-    /// <see cref="AufgabeService.AktivenLaufSicherstellenAsync"/> ebenfalls erst innerhalb der Sperre
+    /// <see cref="WorkItemService.EnsureActiveRunAsync"/> ebenfalls erst innerhalb der Sperre
     /// ausgewertet — sonst könnte ein vor dem Sperreintritt gelesener, veralteter Wert einen
     /// frischeren Substatus als letzter Schreiber überschreiben (Stale-Write).
     /// </remarks>
-    /// <param name="aufgabeId">ID der Aufgabe, deren Laufdaten sichergestellt werden sollen.</param>
-    private async Task LaufdatenSicherstellenAsync(Guid aufgabeId)
+    /// <param name="workItemId">ID der Aufgabe, deren Laufdaten sichergestellt werden sollen.</param>
+    private async Task EnsureRunDataAsync(Guid workItemId)
     {
-        if (!_kiService.IsRunning(aufgabeId))
+        if (!_aiService.IsRunning(workItemId))
         {
             return;
         }
@@ -368,71 +368,71 @@ public sealed class CliProcessManager : IDisposable
                 return;
             }
 
-            if (!_heartbeatTimers.ContainsKey(aufgabeId))
+            if (!_heartbeatTimers.ContainsKey(workItemId))
             {
-                StartHeartbeatCore(aufgabeId);
+                StartHeartbeatCore(workItemId);
             }
         }
 
-        SubscribeRuntimeStatus(aufgabeId);
+        SubscribeRuntimeStatus(workItemId);
 
-        await ExecuteWithAufgabeServiceAsync(
-            aufgabeId,
+        await ExecuteWithWorkItemServiceAsync(
+            workItemId,
             "Sicherstellen der Laufdaten",
-            aufgabeService => aufgabeService.AktivenLaufSicherstellenAsync(
-                aufgabeId,
-                laufStatusProvider: () => _kiService.GetTerminalSession(aufgabeId)?.RuntimeStatus.ToAufgabeLaufStatus(),
-                laeuftGuard: () => _kiService.IsRunning(aufgabeId))).ConfigureAwait(false);
+            workItemService => workItemService.EnsureActiveRunAsync(
+                workItemId,
+                runStatusProvider: () => _aiService.GetTerminalSession(workItemId)?.RuntimeStatus.ToWorkItemRunStatus(),
+                runningGuard: () => _aiService.IsRunning(workItemId))).ConfigureAwait(false);
     }
 
     /// <summary>Tick-Wrapper des <c>_abgleichTimer</c>: stellt sicher, dass sich bei einem
     /// über das Intervall hinaus laufenden Abgleich keine Durchläufe überlappen (fire-and-forget).</summary>
-    private async Task AbgleichTickAsync()
+    private async Task ReconcileTickAsync()
     {
-        if (Interlocked.Exchange(ref _abgleichLaeuft, 1) != 0)
+        if (Interlocked.Exchange(ref _reconcileRunning, 1) != 0)
         {
             return;
         }
 
         try
         {
-            await AbgleichAsync().ConfigureAwait(false);
+            await ReconcileAsync().ConfigureAwait(false);
         }
         finally
         {
-            Interlocked.Exchange(ref _abgleichLaeuft, 0);
+            Interlocked.Exchange(ref _reconcileRunning, 0);
         }
     }
 
     /// <summary>Periodischer Abgleich aller laufenden Aufgaben: iteriert
-    /// <see cref="KiAusfuehrungsService.GetLaufendeAufgabenIds"/> und stellt pro Aufgabe die
+    /// <see cref="AiExecutionService.GetRunningWorkItemIds"/> und stellt pro Aufgabe die
     /// Laufdaten sicher (fehlerisoliert — einzelne Fehlschläge werden nur geloggt).</summary>
-    private async Task AbgleichAsync()
+    private async Task ReconcileAsync()
     {
-        foreach (var aufgabeId in _kiService.GetLaufendeAufgabenIds())
+        foreach (var workItemId in _aiService.GetRunningWorkItemIds())
         {
             try
             {
-                await LaufdatenSicherstellenAsync(aufgabeId).ConfigureAwait(false);
+                await EnsureRunDataAsync(workItemId).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Abgleich der Laufdaten für Aufgabe {AufgabeId} fehlgeschlagen.", aufgabeId);
+                _logger.LogWarning(ex, "Abgleich der Laufdaten für Aufgabe {AufgabeId} fehlgeschlagen.", workItemId);
             }
         }
     }
 
-    private async Task ExecuteWithAufgabeServiceAsync(
-        Guid aufgabeId,
+    private async Task ExecuteWithWorkItemServiceAsync(
+        Guid workItemId,
         string operation,
-        Func<AufgabeService, Task> action)
+        Func<WorkItemService, Task> action)
     {
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
-            var aufgabeService = scope.ServiceProvider.GetRequiredService<AufgabeService>();
-            await action(aufgabeService).ConfigureAwait(false);
-            _laufdatenChangedNotifier.NotifyLaufdatenChanged(aufgabeId);
+            var workItemService = scope.ServiceProvider.GetRequiredService<WorkItemService>();
+            await action(workItemService).ConfigureAwait(false);
+            _runDataChangedNotifier.NotifyRunDataChanged(workItemId);
         }
         catch (ObjectDisposedException ex)
         {
@@ -440,7 +440,7 @@ public sealed class CliProcessManager : IDisposable
                 ex,
                 "ServiceScopeFactory ist bereits disposed; {Operation} wird fuer Aufgabe {AufgabeId} uebersprungen.",
                 operation,
-                aufgabeId);
+                workItemId);
         }
         catch (Exception ex)
         {
@@ -448,17 +448,17 @@ public sealed class CliProcessManager : IDisposable
                 ex,
                 "Fehler bei {Operation} fuer Aufgabe {AufgabeId}.",
                 operation,
-                aufgabeId);
+                workItemId);
         }
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        _abgleichTimer.Dispose();
+        _reconcileTimer.Dispose();
 
-        _kiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
-        _kiService.CliLaufAktiv -= OnCliLaufAktiv;
+        _aiService.CliProcessStatusChanged -= OnCliProcessStatusChanged;
+        _aiService.CliRunActive -= OnCliRunActive;
 
         lock (_lifecycleLock)
         {
@@ -466,7 +466,7 @@ public sealed class CliProcessManager : IDisposable
             // Event-Aufrufe) dürfen nach diesem Punkt keine Timer/Subscriptions mehr erzeugen.
             _disposed = true;
 
-            foreach (var (aufgabeId, timer) in _heartbeatTimers)
+            foreach (var (workItemId, timer) in _heartbeatTimers)
             {
                 timer.Dispose();
             }

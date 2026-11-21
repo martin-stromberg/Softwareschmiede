@@ -10,7 +10,7 @@ public sealed class WorkspaceFileNodeIconConverterTests
 {
     /// <summary>Für Verzeichnisknoten wird unabhängig vom Namen immer das Ordnersymbol geliefert.</summary>
     [Fact]
-    public void Convert_Verzeichnis_LiefertOrdnerSymbol()
+    public void Convert_Directory_ReturnsFolderSymbol()
     {
         var converter = new WorkspaceFileNodeIconConverter();
         var node = new WorkspaceFileNode { Name = "src", IsDirectory = true };
@@ -21,14 +21,14 @@ public sealed class WorkspaceFileNodeIconConverterTests
     }
 
     /// <summary>Für bekannte Dateitypen (hier: Quellcode) wird ein spezifisches statt des generischen Symbols geliefert.</summary>
-    /// <param name="dateiname">Der zu prüfende Dateiname mit Quellcode-Endung.</param>
+    /// <param name="fileName">Der zu prüfende Dateiname mit Quellcode-Endung.</param>
     [Theory]
     [InlineData("Program.cs")]
     [InlineData("View.xaml")]
-    public void Convert_QuellcodeDatei_LiefertSpezifischesSymbol(string dateiname)
+    public void Convert_SourcecodeFile_ReturnsSpecificSymbol(string fileName)
     {
         var converter = new WorkspaceFileNodeIconConverter();
-        var node = new WorkspaceFileNode { Name = dateiname, IsDirectory = false };
+        var node = new WorkspaceFileNode { Name = fileName, IsDirectory = false };
 
         var result = converter.Convert(node, typeof(string), null!, CultureInfo.InvariantCulture);
 
@@ -37,7 +37,7 @@ public sealed class WorkspaceFileNodeIconConverterTests
 
     /// <summary>Für unbekannte Dateitypen wird das generische Dateisymbol geliefert.</summary>
     [Fact]
-    public void Convert_UnbekannterDateityp_LiefertGenerischesDateiSymbol()
+    public void Convert_UnknownFiletype_ReturnsGenericFileSymbol()
     {
         var converter = new WorkspaceFileNodeIconConverter();
         var node = new WorkspaceFileNode { Name = "unbekannt.xyz", IsDirectory = false };
@@ -49,7 +49,7 @@ public sealed class WorkspaceFileNodeIconConverterTests
 
     /// <summary>Für einen ungültigen Eingabewert wird ein leerer String statt einer Ausnahme geliefert.</summary>
     [Fact]
-    public void Convert_KeinWorkspaceFileNode_LiefertLeerenString()
+    public void Convert_NoWorkspaceFileNode_ReturnsEmptyString()
     {
         var converter = new WorkspaceFileNodeIconConverter();
 

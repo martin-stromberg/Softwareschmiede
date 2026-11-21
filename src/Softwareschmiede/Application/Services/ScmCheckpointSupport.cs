@@ -25,7 +25,7 @@ internal static class ScmCheckpointSupport
         string diagnosticSuffix = "", bool retryPermanent = false)
     {
         using var failureScope = scopes.CreateScope();
-        var failureDb = failureScope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var failureDb = failureScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var checkpoint = await failureDb.ScmObservationCheckpoints.FindAsync([sourceKey], ct);
         if (checkpoint is null)
         {
@@ -71,7 +71,7 @@ internal static class ScmCheckpointSupport
     /// <param name="repository">Das kanonisch aufgelöste Ereignis-Repository.</param>
     /// <param name="checkpointKeyPrefix">Das Schlüssel-Präfix des Enumerations-Checkpoints.</param>
     /// <param name="enumerated">Bereits in diesem Lauf enumerierte Checkpoint-Schlüssel (Dedup).</param>
-    /// <param name="verarbeite">Verarbeitung der enumerierten Referenzen; läuft innerhalb des
+    /// <param name="handle">Verarbeitung der enumerierten Referenzen; läuft innerhalb des
     /// Watermark-Commits — Fehler verhindern den Commit und gelten als Enumerationsfehler.</param>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns><see langword="false"/>, wenn die Enumeration fehlschlug (Fehler wurde aufgezeichnet).</returns>
@@ -79,14 +79,14 @@ internal static class ScmCheckpointSupport
         IServiceScopeFactory scopes, TimeProvider time, TimeSpan pollInterval,
         IScmEventSource source, ScmEventRepository repository, string checkpointKeyPrefix,
         HashSet<string> enumerated,
-        Func<IReadOnlyList<ScmEventReference>, CancellationToken, Task> verarbeite,
+        Func<IReadOnlyList<ScmEventReference>, CancellationToken, Task> handle,
         CancellationToken ct)
     {
         var enumerationKey = string.Join('/', new[] { checkpointKeyPrefix, repository.ProviderPrefix.ToLowerInvariant(),
             repository.Host.ToLowerInvariant(), repository.RepositoryId }.Select(Uri.EscapeDataString));
         if (!enumerated.Add(enumerationKey)) return true;
         using var scope = scopes.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiededDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var checkpoint = await db.ScmObservationCheckpoints.FindAsync([enumerationKey], ct);
         var now = time.GetUtcNow();
         if (checkpoint?.NextAttemptUtc > now.ToUnixTimeMilliseconds()) return true;
@@ -96,7 +96,7 @@ internal static class ScmCheckpointSupport
                 ? DateTimeOffset.FromUnixTimeMilliseconds(watermark) - pollInterval * 2
                 : (DateTimeOffset?)null;
             var discovered = await source.EnumerateReferencesAsync(repository, sinceUtc, ct);
-            await verarbeite(discovered, ct);
+            await handle(discovered, ct);
             if (checkpoint is null)
             {
                 checkpoint = new ScmObservationCheckpoint { SourceKey = enumerationKey };

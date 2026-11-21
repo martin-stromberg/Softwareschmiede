@@ -18,15 +18,15 @@ public sealed partial class ProjectDetailView : UserControl
     public ProjectDetailView()
     {
         InitializeComponent();
-        Loaded += (_, _) => ProjektNameTextBox.Focus();
+        Loaded += (_, _) => ProjectNameTextBox.Focus();
     }
 
-    private void AufgabeDoubleClick(object sender, MouseButtonEventArgs e)
+    private void WorkItemDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (sender is ListBoxItem { DataContext: Aufgabe aufgabe }
+        if (sender is ListBoxItem { DataContext: WorkItem workItem }
             && DataContext is ProjectDetailViewModel vm)
         {
-            vm.AufgabeOeffnenCommand.Execute(aufgabe.Id);
+            vm.OpenWorkItemCommand.Execute(workItem.Id);
         }
     }
 
@@ -34,12 +34,12 @@ public sealed partial class ProjectDetailView : UserControl
     {
         try
         {
-            if (sender is ListBoxItem { DataContext: ScmRequirement anforderung }
+            if (sender is ListBoxItem { DataContext: ScmRequirement requirement }
                 && DataContext is ProjectDetailViewModel vm)
             {
-                vm.AufgabeAusAnforderungErstellenCommand.ExecuteAsync(anforderung)
+                vm.CreateWorkItemFromRequirementCommand.ExecuteAsync(requirement)
                     .SafeFireAndForget(_logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
-                        "ProjectDetailView.AufgabeAusAnforderungErstellenCommand");
+                        "ProjectDetailView.CreateWorkItemFromRequirementCommand");
             }
         }
         catch (Exception ex)

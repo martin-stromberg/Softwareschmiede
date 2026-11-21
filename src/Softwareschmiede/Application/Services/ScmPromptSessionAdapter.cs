@@ -186,9 +186,9 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
                     access = access with { Status = ScmExchangeAccessStatus.Unknown, Reason = ScmCliWaitReason.Describe(recognition) };
                 else if (access.Status == ScmExchangeAccessStatus.Supported)
                 {
-                    // A normal CLI parent says nothing about the token/sandbox of its file tools.
-                    // The simulator has an explicit in-process transport contract; real CLIs must
-                    // demonstrate actual I/O under the identical private channel ACL first.
+                    // Ein normaler CLI-Elternprozess sagt nichts über Token/Sandbox seiner Dateitools aus.
+                    // Der Simulator hat einen expliziten In-Process-Transportvertrag; echte CLIs müssen
+                    // zuerst tatsächliche I/O unter der identischen privaten Kanal-ACL nachweisen.
                     if (PluginPrefix != "Softwareschmiede.KiSimulator")
                     {
                         var capabilities = ScmRestrictedProcessAccess.CaptureWorkspaceCapabilities(WorkingDirectory);
@@ -210,10 +210,10 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
                                 _accessProbeSends < AccessProbeMaxSends &&
                                 _time.GetUtcNow() - _accessProbeSentUtc >= AccessProbeResendDelay)
                             {
-                                // A probe swallowed by a blocking dialog (for example the workspace trust
-                                // prompt) never reaches the file tool. The identical challenge is sent
-                                // again only while a real input prompt is visibly ready — still without
-                                // any event content before the channel proof.
+                                // Eine von einem blockierenden Dialog (z. B. dem Workspace-Trust-Prompt)
+                                // verschluckte Probe erreicht das Dateitool nie. Die identische Challenge
+                                // wird nur erneut gesendet, solange ein echtes Eingabe-Prompt sichtbar
+                                // bereit ist — weiterhin ohne Ereignisinhalt vor dem Kanalnachweis.
                                 await SendAccessProbeAsync(ct).ConfigureAwait(false);
                             }
                             access = access with
@@ -237,7 +237,7 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
     private async Task SendAccessProbeAsync(CancellationToken ct)
     {
         MarkInputStarted();
-        // No event text, event acknowledgement or external action is sent before proof.
+        // Vor dem Nachweis wird kein Ereignistext, keine Ereignisbestätigung und keine externe Aktion gesendet.
         await Session.WritePromptAsync(ScmEventExchangeProtocol.BuildAccessProbePrompt(_accessProbe!, _sessionName), ct).ConfigureAwait(false);
         _accessProbeSends++;
         _accessProbeSentUtc = _time.GetUtcNow();
@@ -250,9 +250,10 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
         lock (_sync)
         {
             RefreshScreen();
-            // Confirmation cannot turn a shell, unknown adapter, blocking dialog or known busy
-            // turn into an AI prompt. A recognized but out-of-range version may be confirmed
-            // explicitly: the file-tool channel probe remains the actual safety boundary.
+            // Eine Bestätigung kann weder eine Shell, einen unbekannten Adapter, einen blockierenden
+            // Dialog noch einen bekannt beschäftigten Turn in ein AI-Prompt verwandeln. Eine
+            // erkannte, aber außerhalb der Range liegende Version darf explizit bestätigt
+            // werden: Die Dateitool-Kanalprobe bleibt die eigentliche Sicherheitsgrenze.
             if (_cliRecognition.State == ScmCliRecognitionState.Unknown ||
                 _ready is ScmPromptReadyStatus.Busy or ScmPromptReadyStatus.TrustPrompt) return false;
             _manuallyConfirmed = true;
@@ -297,7 +298,7 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
 
     private void RecognizeStartup(string text)
     {
-        // Supported transcript formats are deliberately explicit. New/changed formats require a fixture.
+        // Unterstützte Transkript-Formate sind bewusst explizit. Neue/geänderte Formate erfordern ein Fixture.
         var match = ScmCliPromptProfile.TryMatch(PluginPrefix, text);
         // Die Erkennung ist monoton: Ein einmal unterstützt klassifizierter Lauf wird durch
         // Folgeanker nicht mehr herabgestuft. Der flüchtige Bildschirmpuffer kann den Anker ohne
@@ -306,8 +307,8 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
         if (match is null || _cliRecognition.State == ScmCliRecognitionState.Supported) return;
         if (match.Profile.VersionPattern is null)
         {
-            // The simulator contract is unversioned; only a run the start contract already granted
-            // or denied counts as an identified channel, never a plain shell.
+            // Der Simulatorvertrag ist versionslos; nur ein Lauf, dem der Startvertrag bereits gewährt
+            // oder verweigert hat, gilt als identifizierter Kanal, niemals eine einfache Shell.
             if (_access.Status is ScmExchangeAccessStatus.Supported or ScmExchangeAccessStatus.Denied)
                 _cliRecognition = new(ScmCliRecognitionState.Supported, match.Profile.DisplayName, null, match.Profile.SupportedVersionsText);
             else if (_cliRecognition.ChannelReason is null)
@@ -338,8 +339,9 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
             var lines = Enumerable.Range(0, Session.Buffer.Rows).Select(row => new string(Session.Buffer.GetRow(row).Select(cell => cell.Character).ToArray()).TrimEnd()).ToArray();
             var screen = string.Join('\n', lines);
             RecognizeStartup(screen);
-            // A confirmed out-of-range format keeps the regular prompt/busy evaluation so the
-            // channel probe lifecycle (send, resend, re-readiness) works like a supported version.
+            // Ein bestätigtes Out-of-Range-Format behält die reguläre Prompt/Busy-Auswertung bei,
+            // damit der Kanalproben-Lebenszyklus (Senden, erneutes Senden, erneute Bereitschaft)
+            // wie bei einer unterstützten Version funktioniert.
             if (_cliRecognition.State != ScmCliRecognitionState.Supported && !_formatUserConfirmed) return;
             if (_manuallyConfirmed) return;
             if (_inputRevision == _outputRevision) return;
@@ -350,13 +352,13 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
                 screen.Contains("esc again to interrupt", StringComparison.OrdinalIgnoreCase);
             if (TrustDialogMarkers.Any(marker => screen.Contains(marker, StringComparison.OrdinalIgnoreCase)))
             {
-                // A blocking trust dialog swallows submitted text; it is a distinct, resolvable
-                // wait state rather than an unknown or ready prompt.
+                // Ein blockierender Trust-Dialog verschluckt übermittelten Text; er ist ein eigener,
+                // auflösbarer Wartezustand und kein unbekanntes oder bereites Prompt.
                 SetReady(ScmPromptReadyStatus.TrustPrompt);
             }
             else if (PluginPrefix == "Softwareschmiede.KiSimulator")
             {
-                // Only the current cursor line is authoritative; old READY rows remain in scrollback.
+                // Nur die aktuelle Cursorzeile ist maßgeblich; alte READY-Zeilen bleiben im Scrollback.
                 if (prompt == "SCM_READY_V1") SetReady(ScmPromptReadyStatus.Ready);
                 else if (prompt == "SCM_BUSY_V1") SetReady(ScmPromptReadyStatus.Busy);
                 else SetReady(ScmPromptReadyStatus.Unknown);

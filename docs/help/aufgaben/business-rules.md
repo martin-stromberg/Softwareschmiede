@@ -5,13 +5,13 @@
 **Beschreibung:** Für eine Aufgabe kann immer nur ein KI-Lauf gleichzeitig aktiv sein.
 
 **Bedingungen:**
-- `KiAusfuehrungsService.IsRunning(aufgabeId)` gibt `true` zurück.
+- `AiExecutionService.IsRunning(workItemId)` gibt `true` zurück.
 
 **Verhalten:**
-- Wenn aktiv: Zweiter `StartKiLauf`-Aufruf wird mit `LogWarning` abgewiesen, kein zweiter Task gestartet.
+- Wenn aktiv: Zweiter `StartCliAsync`-Aufruf wird mit `LogWarning` abgewiesen, kein zweiter Task gestartet.
 - Wenn nicht aktiv: Neuer Lauf wird gestartet.
 
-**Umsetzung:** `KiAusfuehrungsService.StartKiLauf` — Guards gegen doppelte Ausführung im In-Memory-Dictionary.
+**Umsetzung:** `AiExecutionService.StartCliAsync` — Guards gegen doppelte Ausführung im In-Memory-Dictionary.
 
 ---
 
@@ -20,16 +20,16 @@
 **Beschreibung:** Die Aufgabenkachel (Seitenleiste, Dashboard) und die Fußzeile der Aufgabendetailansicht zeigen für denselben KI-Lauf stets denselben fachlichen Zustand. Maßgeblich ist der faktische Prozesszustand — nicht allein der zuletzt gespeicherte Datenstand.
 
 **Bedingungen:**
-- Für die Aufgabe läuft ein gehandelter CLI-Prozess (`KiAusfuehrungsService.IsRunning` bzw. `GetLaufendeAufgabenIds`).
+- Für die Aufgabe läuft ein gehandelter CLI-Prozess (`AiExecutionService.IsRunning` bzw. `GetRunningWorkItemIds`).
 
 **Verhalten:**
-- Läuft der Prozess nachweislich, zeigt die Kachel `▶ Läuft` bzw. `⏸ Wartet`: Der Live-Substatus (`AktiveAufgabePanelItem.LiveLaufStatus`, befüllt aus `IRunningAutomationStatusSource.GetLiveLaufStatus`) schlägt in `KiAusfuehrungsStatusKlassifikation` vor der Auswertung der persistierten Laufdaten immer aufwärts durch — niemals auf `Bereit`. `Pausiert` und `PromptInWartestellung` behalten Vorrang.
-- Fehlende persistierte Laufdaten werden durch `AufgabeService.AktivenLaufSicherstellenAsync` wiederhergestellt — ereignisgetrieben (`CliLaufAktiv` auf Session-Wiederverwendungspfaden, `RuntimeStatusChanged`, Heartbeat-Tick) und spätestens über den 30-s-Abgleich des `CliProcessManager`.
+- Läuft der Prozess nachweislich, zeigt die Kachel `▶ Läuft` bzw. `⏸ Wartet`: Der Live-Substatus (`ActiveWorkItemPanelItem.LiveRunStatus`, befüllt aus `IRunningAutomationStatusSource.GetLiveRunStatus`) schlägt in `AiExecutionStatusClassification` vor der Auswertung der persistierten Laufdaten immer aufwärts durch — niemals auf `Ready`. `Paused` und `PromptQueued` behalten Vorrang.
+- Fehlende persistierte Laufdaten werden durch `WorkItemService.EnsureActiveRunAsync` wiederhergestellt — ereignisgetrieben (`CliRunActive` auf Session-Wiederverwendungspfaden, `RuntimeStatusChanged`, Heartbeat-Tick) und spätestens über den 30-s-Abgleich des `CliProcessManager`.
 - Ein persistierter „aktiver" Lauf ohne laufenden Prozess verfällt weiterhin über die Heartbeat-Regel (älter als 5 Minuten → `✓ Bereit` + Recovery-Kandidat): Der Live-Zweig liefert ohne Prozess `null` und greift nicht — verwaiste Zustände erscheinen nicht wieder aktiv.
-- Alle Laufdaten-Mutationen laufen unter der prozessweiten `AufgabeService.LaufGates`-Sperre; `laeuftGuard`/`laufStatusProvider` werden innerhalb der Sperre ausgewertet, damit kein Phantom-Lauf nach einem Beenden entsteht und kein veralteter Substatus als letzter Schreiber landet.
-- Eine nicht beendbare CLI bleibt als laufend sichtbar: `CliStoppenAsync` beendet die Laufdaten nur bei tatsächlich beendetem Prozess — andernfalls erscheint eine Fehlermeldung und `KannCliStoppen` bleibt erneut auslösbar.
+- Alle Laufdaten-Mutationen laufen unter der prozessweiten `WorkItemService.RunGates`-Sperre; `runningGuard`/`runStatusProvider` werden innerhalb der Sperre ausgewertet, damit kein Phantom-Lauf nach einem Beenden entsteht und kein veralteter Substatus als letzter Schreiber landet.
+- Eine nicht beendbare CLI bleibt als laufend sichtbar: `StopCliAsync` beendet die Laufdaten nur bei tatsächlich beendetem Prozess — andernfalls erscheint eine Fehlermeldung und `CanStopCli` bleibt erneut auslösbar.
 
-**Umsetzung:** `KiAusfuehrungsService.GetLiveLaufStatus`/`CliLaufAktiv`/`NotifyLaufAktiv`/`GetLaufendeAufgabenIds`, `CliProcessManager.LaufdatenSicherstellenAsync`/`AbgleichAsync`, `AufgabeService.AktivenLaufSicherstellenAsync`/`LaufGates`, `MainWindowViewModel.MapAktiveAufgabePanelItem`, `KiAusfuehrungsStatusKlassifikation`, `TaskDetailViewModel.CliStoppenAsync`/`StartCliAndUpdateStateAsync`.
+**Umsetzung:** `AiExecutionService.GetLiveRunStatus`/`CliRunActive`/`NotifyRunActive`/`GetRunningWorkItemIds`, `CliProcessManager.EnsureRunDataAsync`/`ReconcileTickAsync`, `WorkItemService.EnsureActiveRunAsync`/`RunGates`, `MainWindowViewModel.MapActiveWorkItemPanelItem`, `AiExecutionStatusClassification`, `TaskDetailViewModel.StopCliAsync`/`StartCliAndUpdateStateAsync`.
 
 ---
 
@@ -38,13 +38,13 @@
 **Beschreibung:** Die Branch-Wahl hängt davon ab, ob ein vorhandener Remote-Branch angegeben wurde und ob dieser der Hauptbranch ist.
 
 **Bedingungen:**
-- `basisBranchName` leer oder null → immer neuer `task/`-Branch.
-- `basisBranchName` == Hauptbranch → neuer `task/`-Branch (kein direkter Commit auf Main).
-- `basisBranchName` != Hauptbranch → vorhandener Branch wird ausgecheckt.
-- Aufgabe mit `IssueReferenz.IssueNummer` → neuer Branch enthält die Issue-Nummer.
-- Aufgabe ohne `IssueReferenz` → neuer Branch enthält nur Aufgaben-ID und Titel-Slug.
+- `baseBranchName` leer oder null → immer neuer `task/`-Branch.
+- `baseBranchName` == Hauptbranch → neuer `task/`-Branch (kein direkter Commit auf Main).
+- `baseBranchName` != Hauptbranch → vorhandener Branch wird ausgecheckt.
+- Aufgabe mit `IssueReference.IssueNumber` → neuer Branch enthält die Issue-Nummer.
+- Aufgabe ohne `IssueReference` → neuer Branch enthält nur Aufgaben-ID und Titel-Slug.
 
-**Umsetzung:** `EntwicklungsprozessService.ProzessStartenAsync` — `nutzeExistierendenBranch`-Flag.
+**Umsetzung:** `DevelopmentProcessService.StartProcessAsync` — `useExistingBranch`-Flag.
 
 ---
 
@@ -53,16 +53,16 @@
 **Beschreibung:** Aufgaben, die aus einem Git-Plugin ohne verknüpftes Issue erstellt wurden, sind start- und ausführbar.
 
 **Bedingungen:**
-- Die Aufgabe hat keine `IssueReferenz`.
+- Die Aufgabe hat keine `IssueReference`.
 - Ein Repository kann über Aufgaben-, Projekt- oder eindeutigen Projektkontext aufgelöst werden.
 
 **Verhalten:**
 - Der Prozessstart setzt keine Issue-Referenz voraus.
-- Der Branchname wird im Format `task/{aufgabe.Id:N}-{slug}` erzeugt.
+- Der Branchname wird im Format `task/{workItem.Id:N}-{slug}` erzeugt.
 - Die lokale `issue.md` wird weiterhin erstellt; sie enthält die Aufgabenstammdaten und die Anforderungsbeschreibung, aber keine verpflichtende Issue-Verknüpfung.
 - Mehrdeutige Repository-Auflösung bleibt ein Fehlerfall.
 
-**Umsetzung:** `EntwicklungsprozessService.ErstelleTaskBranchName`, `ProzessStartenAsync` und `CreateIssueFileAsync`.
+**Umsetzung:** `DevelopmentProcessService.CreateTaskBranchName`, `StartProcessAsync` und `CreateIssueFileAsync`.
 
 ---
 
@@ -71,22 +71,22 @@
 **Beschreibung:** Beim Prozessstart wird die generierte `issue.md` um einen optionalen Abschnitt `## Verknüpftes Issue` ergänzt, wenn die Aufgabe eine Issue-Referenz mit gültiger Nummer trägt.
 
 **Bedingungen:**
-- `aufgabe.IssueReferenz != null`
-- `IssueReferenz.IssueNummer > 0`
+- `workItem.IssueReference != null`
+- `IssueReference.IssueNumber > 0`
 
 **Verhalten:**
-- Wenn beide Bedingungen erfüllt: Der Abschnitt `## Verknüpftes Issue` wird zwischen dem Metadaten-Block (`**Erstellt:**`) und dem Abschnitt `## Anforderung` eingefügt. Inhalt: `**Kennung:** #<IssueNummer>` und `**Titel:** <Titel>`.
-- Wenn `IssueReferenz` `null` ist: Kein Issue-Abschnitt wird ausgegeben; die Datei enthält nur Metadaten und Anforderung.
-- Wenn `IssueNummer` `null` oder ≤ 0 ist: Kein Issue-Abschnitt wird ausgegeben — auch wenn `IssueReferenz` selbst gesetzt ist.
+- Wenn beide Bedingungen erfüllt: Der Abschnitt `## Verknüpftes Issue` wird zwischen dem Metadaten-Block (`**Erstellt:**`) und dem Abschnitt `## Anforderung` eingefügt. Inhalt: `**Kennung:** #<IssueNumber>` und `**Title:** <Title>`.
+- Wenn `IssueReference` `null` ist: Kein Issue-Abschnitt wird ausgegeben; die Datei enthält nur Metadaten und Anforderung.
+- Wenn `IssueNumber` `null` oder ≤ 0 ist: Kein Issue-Abschnitt wird ausgegeben — auch wenn `IssueReference` selbst gesetzt ist.
 
-**Umsetzung:** `EntwicklungsprozessService.CreateIssueFileAsync` — wertet `aufgabe.IssueReferenz is { IssueNummer: > 0 }` aus und fügt den Block nur bei positivem Match ein. `IssueReferenz` wird bereits durch Eager Loading in `AufgabeService.GetDetailAsync` vollständig geladen, sodass kein zusätzliches Datenbankzugriff nötig ist.
+**Umsetzung:** `DevelopmentProcessService.CreateIssueFileAsync` — wertet `workItem.IssueReference is { IssueNumber: > 0 }` aus und fügt den Block nur bei positivem Match ein. `IssueReference` wird bereits durch Eager Loading in `WorkItemService.GetDetailAsync` vollständig geladen, sodass kein zusätzliches Datenbankzugriff nötig ist.
 
 ---
 
 **Beschreibung:** Ein neues Issue kann aus einer Aufgabe angelegt und anschließend genau einmal mit dieser Aufgabe verknüpft werden.
 
 **Bedingungen:**
-- Die Aufgabe besitzt noch keine `IssueReferenz`.
+- Die Aufgabe besitzt noch keine `IssueReference`.
 - Ein zugeordnetes Repository und ein Provider mit `IIssueCreateProvider` sind verfügbar.
 - Der Provider meldet die Issue-Anlage für das Repository als unterstützt.
 
@@ -95,11 +95,11 @@
 - Titel und Anforderungsbeschreibung werden als editierbare Initialwerte übernommen.
 - Provider-Templates sind optional. Bei einem ausgewählten Template werden Template-Inhalt, Trennlinie und `Originalanforderung:` zusammengesetzt; der Text bleibt bearbeitbar.
 - Die KI-Ausfüllhilfe ist optional und verwendet nur Provider mit `IIssueTemplateTextGenerator`.
-- Das externe Issue wird vor der lokalen Speicherung erstellt. Die lokale `IssueReferenz` wird nur bei erfolgreicher Anlage und erfolgreicher konkurrenzsicherer Zuordnung gespeichert.
+- Das externe Issue wird vor der lokalen Speicherung erstellt. Die lokale `IssueReference` wird nur bei erfolgreicher Anlage und erfolgreicher konkurrenzsicherer Zuordnung gespeichert.
 - Nach erfolgreicher Zuordnung wird die Aufgabe neu geladen; der Button „Issue anlegen" verschwindet.
 - Abbruch, nicht unterstützte Templates, Providerfehler und Validierungsfehler führen nicht zu einer lokalen Issue-Zuordnung. Ein Fehler bei der lokalen Speicherung nach externer Anlage wird mit Issue-URL oder -Nummer angezeigt; ein allgemeines Provider-Rollback ist nicht garantiert.
 
-**Umsetzung:** `TaskDetailViewModel.IssueAnlegenAsync`, `IssueCreateDialogViewModel`, `AufgabeService.TryAssignIssueReferenzIfNoneAsync` sowie `IIssueCreateProvider` und optionale Template-/KI-Fähigkeiten.
+**Umsetzung:** `TaskDetailViewModel.IssueAnlegenAsync`, `IssueCreateDialogViewModel`, `WorkItemService.TryAssignIssueReferenceIfNoneAsync` sowie `IIssueCreateProvider` und optionale Template-/KI-Fähigkeiten.
 
 ---
 
@@ -111,19 +111,19 @@
 - Das Projekt besitzt ein GitHub-Repository.
 - Das GitHub-Plugin liefert offene Code-Scanning-Alerts.
 - Das GitHub-Plugin unterstützt die Issue-Anlage für das Repository.
-- Für die `AlertReferenz.SourceKey` existiert noch keine lokale Aufgabe.
+- Für die `AlertReference.SourceKey` existiert noch keine lokale Aufgabe.
 
 **Verhalten:**
 - Code-Scanning-Alerts werden unter **Offene Anforderungen** gemeinsam mit normalen Issues angezeigt, aber als Alert gekennzeichnet.
-- Beim Auswählen eines Alerts wird ein GitHub-Issue mit deterministischem Titel `Code scanning alert: <Rule/Alert-Titel>` und einem Body aus Alert-Typ, Severity, Tool, Rule, Ort, URL und Beschreibung erstellt.
+- Beim Auswählen eines Alerts wird ein GitHub-Issue mit deterministischem Titel `Code scanning alert: <Rule/Alert-Title>` und einem Body aus Alert-Typ, Severity, Tool, Rule, Ort, URL und Beschreibung erstellt.
 - Erst nach erfolgreicher externer Issue-Anlage wird lokal eine Aufgabe erstellt.
-- Die lokale Aufgabe erhält eine `IssueReferenz` auf das neu erzeugte GitHub-Issue und eine `AlertReferenz` auf den ursprünglichen Alert.
-- Derselbe Alert wird über `AlertReferenz.SourceKey` lokal als konvertiert erkannt und nicht erneut angeboten.
+- Die lokale Aufgabe erhält eine `IssueReference` auf das neu erzeugte GitHub-Issue und eine `AlertReference` auf den ursprünglichen Alert.
+- Derselbe Alert wird über `AlertReference.SourceKey` lokal als konvertiert erkannt und nicht erneut angeboten.
 - Das ursprüngliche GitHub-Code-Scanning-Alert wird nicht geschlossen und nicht anderweitig verändert.
 - Dependabot- und Secret-Scanning-Alerts sind in dieser Ausbaustufe nicht angebunden.
 - Bitbucket/Jira und andere SCM-Plugins müssen keine Alerts liefern.
 
-**Umsetzung:** `ProjectDetailViewModel`, `AufgabeService.CreateFromAlertAsync`, `AlertReferenz`, `IScmAlertProvider`, `GitHubPlugin.GetAlertsAsync` und `IIssueCreateProvider.CreateIssueAsync`.
+**Umsetzung:** `ProjectDetailViewModel`, `WorkItemService.CreateFromAlertAsync`, `AlertReference`, `IScmAlertProvider`, `GitHubPlugin.GetAlertsAsync` und `IIssueCreateProvider.CreateIssueAsync`.
 
 ---
 
@@ -132,19 +132,19 @@
 **Beschreibung:** Wenn eine Aufgabe aus einem GitHub-Issue erstellt wurde, bleibt die Issue-Referenz an der Aufgabe erhalten und wird beim Erstellen eines Pull Requests automatisch in den Pull-Request-Body uebernommen.
 
 **Bedingungen:**
-- Die Aufgabe hat eine `IssueReferenz`.
-- `IssueReferenz.IssueNummer` ist groesser als 0.
+- Die Aufgabe hat eine `IssueReference`.
+- `IssueReference.IssueNumber` ist groesser als 0.
 - Fuer dieselbe Issue existiert im Pull-Request-Body noch keine Closing-Direktive.
 
 **Verhalten:**
 - Der Pull-Request-Body aus der Aufgabendetailansicht enthaelt primaer die Commits des Aufgabenbranches statt der urspruenglichen Anforderungsbeschreibung.
-- Der Pull-Request-Body wird um `Closes #<IssueNummer>` ergaenzt.
+- Der Pull-Request-Body wird um `Closes #<IssueNumber>` ergaenzt.
 - Ein leerer oder nur aus Whitespace bestehender Body wird durch die Closing-Direktive ersetzt.
 - Bereits vorhandene Direktiven fuer dieselbe Issue, z. B. `Fixes #17`, `Closed #17` oder `Fixes owner/repo#17`, werden nicht dupliziert.
 - Direktiven fuer andere Issues bleiben erhalten; die aktuelle Issue wird zusaetzlich ergaenzt.
 - Aufgaben ohne Issue-Referenz oder ohne gueltige Issue-Nummer behalten das bisherige Pull-Request-Verhalten.
 
-**Umsetzung:** `PullRequestBodyBuilder`, `GitOrchestrationService.PullRequestErstellenAsync` und der aeltere PR-Pfad `EntwicklungsprozessService.PullRequestErstellenAsync`.
+**Umsetzung:** `PullRequestBodyBuilder`, `GitOrchestrationService.PullRequestErstellenAsync` und der aeltere PR-Pfad `DevelopmentProcessService.PullRequestErstellenAsync`.
 
 ---
 
@@ -157,13 +157,13 @@
 - Der Provider unterstuetzt Status- und Workflow-Abfragen; initial ist das GitHub.
 
 **Verhalten:**
-- Nach erfolgreicher Erstellung wird eine `PullRequestReferenz` mit Aufgabe, Provider, Repository, Nummer, Branches, URL und Head-SHA gespeichert.
+- Nach erfolgreicher Erstellung wird eine `PullRequestReference` mit Aufgabe, Provider, Repository, Nummer, Branches, URL und Head-SHA gespeichert.
 - Mehrere Pull Requests koennen derselben Aufgabe zugeordnet sein.
 - Workflow-Runs werden ueber Provider-Run-ID upserted und bleiben der lokalen PR-Referenz zugeordnet.
 - Der PR-Bereich zeigt PR-Status, Merge-Status, Monitoring-Phase, letzte Pruefung, Workflow-Runs und sichtbare Fehler- oder Blockierungsgruende.
 - Ein fehlgeschlagener oder nicht berechtigter Statusabruf beendet die Aufgabe nicht; der Fehler wird am Pull Request sichtbar gespeichert.
 
-**Umsetzung:** `PullRequestReferenzService`, `PullRequestMonitoringService`, `TaskDetailViewModel` und `TaskDetailView`.
+**Umsetzung:** `PullRequestReferenceService`, `PullRequestMonitoringService`, `TaskDetailViewModel` und `TaskDetailView`.
 
 ---
 
@@ -194,17 +194,17 @@
 **Beschreibung:** Das CLI-Panel wird in der Aufgabendetailansicht angezeigt oder ausgeblendet, abhängig vom Aufgabenstatus und dem persistierten Ausführungsstatus.
 
 **Bedingungen:**
-- `Aufgabe.Status == Gestartet` oder `Wartend` (Aufgabe ist aktiv oder wartet)
-- `Aufgabe.AusfuehrungsStatus == Aktiv` oder `Beendet` (KI-Ausführung läuft oder wurde beendet)
+- `WorkItem.Status == Started` oder `Waiting` (Aufgabe ist aktiv oder wartet)
+- `WorkItem.ExecutionStatus == Active` oder `Completed` (KI-Ausführung läuft oder wurde beendet)
 
 **Verhalten:**
 - CLI-Panel wird sichtbar, wenn beide Bedingungen erfüllt sind.
-- CLI-Panel wird ausgeblendet, wenn `Aufgabe.Status == Neu`, `Beendet` oder `Archiviert` ist (unabhängig vom `AusfuehrungsStatus`).
-- CLI-Panel wird ausgeblendet, wenn `AusfuehrungsStatus == NichtGestartet` ist (unabhängig vom `Status`).
-- Nach Beendigung der CLI-Ausführung (natürlich oder durch Benutzer) bleibt das CLI-Panel sichtbar, solange die Aufgabe noch im Status `Gestartet` oder `Wartend` ist. Der Benutzer kann die letzte Ausgabe anschauen und die CLI manuell neu starten.
-- Bei Plugin-Wechsel wird die laufende CLI beendet (`AusfuehrungsStatus` → `Beendet`); das Panel bleibt sichtbar und wird mit der neuen Session neu befüllt.
+- CLI-Panel wird ausgeblendet, wenn `WorkItem.Status == New`, `Completed` oder `Archived` ist (unabhängig vom `ExecutionStatus`).
+- CLI-Panel wird ausgeblendet, wenn `ExecutionStatus == NotStarted` ist (unabhängig vom `Status`).
+- Nach Beendigung der CLI-Ausführung (natürlich oder durch Benutzer) bleibt das CLI-Panel sichtbar, solange die Aufgabe noch im Status `Started` oder `Waiting` ist. Der Benutzer kann die letzte Ausgabe anschauen und die CLI manuell neu starten.
+- Bei Plugin-Wechsel wird die laufende CLI beendet (`ExecutionStatus` → `Completed`); das Panel bleibt sichtbar und wird mit der neuen Session neu befüllt.
 
-**Umsetzung:** `AufgabeAusfuehrungsStatusExtensions.SollCliAnzeigen(AusfuehrungsStatus, AufgabeStatus)` — prüft beide Bedingungen und gibt `true` zurück, wenn die CLI-Ansicht angezeigt werden soll.
+**Umsetzung:** `WorkItemExecutionStatusExtensions.ShouldShowCli(ExecutionStatus, WorkItemStatus)` — prüft beide Bedingungen und gibt `true` zurück, wenn die CLI-Ansicht angezeigt werden soll.
 
 ---
 
@@ -222,7 +222,7 @@
 - Die Fußzeile zeigt den aktiven CLI-Namen nur während einer laufenden CLI-Ausführung.
 - Bei Stop, Fehler oder beendetem Prozess wird der CLI-Name aus der Fußzeile entfernt.
 
-**Umsetzung:** `MainWindowViewModel.Title`, `TaskDetailViewModel.DetailTitelAenderungAction` und `TaskDetailViewModel.AktiverCliName`.
+**Umsetzung:** `MainWindowViewModel.Title`, `TaskDetailViewModel.DetailTitleChangeAction` und `TaskDetailViewModel.ActiveCliName`.
 
 ---
 
@@ -238,50 +238,50 @@
 - Soft-Limit überschritten: `CompressContextAsync` startet einen separaten KI-Lauf mit Komprimierungsprompt. Das Ergebnis muss die Pflichtabschnitte „Ziel", „Offene Punkte" und „Letzte Entscheidungen" enthalten.
 - Pflichtabschnitte fehlen oder Ergebnis leer: Exception, KI-Lauf wird nicht gestartet.
 
-**Umsetzung:** `EntwicklungsprozessService.EnsureContextWithinLimitsAsync`, `CompressContextAsync`, `ContainsMandatoryCompressionSections`.
+**Umsetzung:** `DevelopmentProcessService.EnsureContextWithinLimitsAsync`, `CompressContextAsync`, `ContainsMandatoryCompressionSections`.
 
 ---
 
 ## Aufgaben-Pause
 
-**Beschreibung:** Eine reguläre Aufgabe kann bis zu einem frei wählbaren Zeitpunkt pausiert werden. Die Pause ist ein zeitbasiertes Overlay über `Aufgabe.PausiertBisUtc` — es gibt keinen eigenen Status `Pausiert`.
+**Beschreibung:** Eine reguläre Aufgabe kann bis zu einem frei wählbaren Zeitpunkt pausiert werden. Die Pause ist ein zeitbasiertes Overlay über `WorkItem.PausedUntilUtc` — es gibt keinen eigenen Status `Paused`.
 
 **Bedingungen:**
-- `Status` ist `Neu`, `Gestartet` oder `Wartend`.
+- `Status` ist `New`, `Started` oder `Waiting`.
 - Beim Setzen muss der gewählte Zeitpunkt in der Zukunft liegen; `null` hebt die Pause auf.
 
 **Verhalten:**
-- Eine Aufgabe gilt als pausiert, solange `PausiertBisUtc > UtcNow` gilt; abgelaufene Werte wirken nicht mehr (passives Ablaufen, kein Status-Übergang, kein automatischer Restart). Das Kriterium ist in der Extension `KiAusfuehrungsStatusKlassifikation.IstAktuellPausiert` als Referenzdefinition gebündelt — alle Pausen-Auswertungen (Kachel-Klassifikation, Start-/Neustart-Guards, Recovery, SCM-Limit-Belegung, SCM-Dispatch-`BlockReason`) verwenden dieselbe Prüfung `pausiertBisUtc > jetzt` (striktes Größer-als; `null` und abgelaufene Zeitpunkte gelten als nicht pausiert).
+- Eine Aufgabe gilt als pausiert, solange `PausedUntilUtc > UtcNow` gilt; abgelaufene Werte wirken nicht mehr (passives Ablaufen, kein Status-Übergang, kein automatischer Restart). Das Kriterium ist in der Extension `AiExecutionStatusClassification.IsCurrentlyPaused` als Referenzdefinition gebündelt — alle Pausen-Auswertungen (Kachel-Klassifikation, Start-/Neustart-Guards, Recovery, SCM-Limit-Belegung, SCM-Dispatch-`BlockReason`) verwenden dieselbe Prüfung `pausedUntilUtc > now` (striktes Größer-als; `null` und abgelaufene Zeitpunkte gelten als nicht pausiert).
 - Während einer aktiven Pause sind blockiert: Prozessstart, CLI-Neustart (inkl. Plugin-Wechsel-Pfad), automatische und manuelle Recovery, Senden und Planen von Prompts über die Detailansicht.
 - Ein bereits geplanter Prompt wird auf das Pausenende verschoben statt verworfen.
 - Ein laufender CLI-Prozess wird niemals durch die Pause unterbrochen.
-- Eine pausierte Aufgabe belegt keinen Platz in der SCM-Ausführungsbegrenzung — weder im globalen Zähler noch im Plugin-Zähler: `ScmEventExecutionLimitService.GetBelegungAsync` filtert sie trotz weiterlaufendem Prozess heraus; das nächste wartende SCM-Ereignis kann den frei werdenden Platz über die ereignisgesteuerte Startprüfung sofort übernehmen (Details: [GitHub-Ereignisüberwachung — Business Rules](../plugins/github-ereignisse/business-rules.md)). Nach Ablauf der Pause zählt die Aufgabe wieder als belegt.
-- UI: Buttons werden deaktiviert (`KannPausieren`, `!IstPausiert` in den CanExecute-Prüfungen); die Seitenleisten-Kachel zeigt das `⏸`-Glyph mit `Opacity = 0.55` (Countdown-Volltext im Tooltip/`HelpText`); im Ribbon steht `⏸ Pausiert bis …`.
-- Jede Setzen-/Aufheben-Operation schreibt einen `ProtokollTyp.SystemMeldung`-Eintrag und fordert anschließend die ereignisgesteuerte SCM-Startprüfung an (`ScmStartPruefungsAusloeser`), damit ein frei werdender Ausführungsplatz ohne Poll-Durchlauf nachgefüllt wird.
+- Eine pausierte Aufgabe belegt keinen Platz in der SCM-Ausführungsbegrenzung — weder im globalen Zähler noch im Plugin-Zähler: `ScmEventExecutionLimitService.GetOccupancyAsync` filtert sie trotz weiterlaufendem Prozess heraus; das nächste wartende SCM-Ereignis kann den frei werdenden Platz über die ereignisgesteuerte Startprüfung sofort übernehmen (Details: [GitHub-Ereignisüberwachung — Business Rules](../plugins/github-ereignisse/business-rules.md)). Nach Ablauf der Pause zählt die Aufgabe wieder als belegt.
+- UI: Buttons werden deaktiviert (`CanPause`, `!IsPaused` in den CanExecute-Prüfungen); die Seitenleisten-Kachel zeigt das `⏸`-Glyph mit `Opacity = 0.55` (Countdown-Volltext im Tooltip/`HelpText`); im Ribbon steht `⏸ Pausiert bis …`.
+- Jede Setzen-/Aufheben-Operation schreibt einen `LogEntryType.SystemMessage`-Eintrag und fordert anschließend die ereignisgesteuerte SCM-Startprüfung an (`ScmStartCheckTrigger`), damit ein frei werdender Ausführungsplatz ohne Poll-Durchlauf nachgefüllt wird.
 
-**Umsetzung:** `AufgabeService.SetPauseAsync`, `EntwicklungsprozessService.WirfWennPausiert`, `AufgabeRecoveryService`, `PromptZeitVersandService`, `TaskDetailViewModel.PauseEinstellenAsync`, `AufgabePausierenDialogViewModel`, `KiAusfuehrungsStatusConverter`, `KiAusfuehrungsStatusKlassifikation.IstAktuellPausiert` (Referenz-Pausenkriterium), `ScmStartPruefungsAusloeser`.
+**Umsetzung:** `WorkItemService.SetPauseAsync`, `DevelopmentProcessService.ThrowIfPaused`, `WorkItemRecoveryService`, `PromptScheduleDispatchService`, `TaskDetailViewModel.SetPauseAsync`, `PauseWorkItemDialogViewModel`, `AiExecutionStatusConverter`, `AiExecutionStatusClassification.IsCurrentlyPaused` (Referenz-Pausenkriterium), `ScmStartCheckTrigger`.
 
 ---
 
 ## Session-Limit-Erkennung und automatische Pause
 
-**Beschreibung:** Meldet ein KI-CLI ein Session-Limit über den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]`, wird der Reset-Zeitpunkt pro `KiPluginPrefix` persistiert und alle aktiv laufenden regulären Aufgaben desselben Plugins automatisch pausiert. Der Erkennungspfad läuft über `ProtokollService.AddCliOutputAsync` bzw. `CliOutputProtokollWriter` in der automatischen Terminal-Ausgabeprotokollierung.
+**Beschreibung:** Meldet ein KI-CLI ein Session-Limit über den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]`, wird der Reset-Zeitpunkt pro `AiPluginPrefix` persistiert und alle aktiv laufenden regulären Aufgaben desselben Plugins automatisch pausiert. Der Erkennungspfad läuft über `LogService.AddCliOutputAsync` bzw. `CliOutputLogWriter` in der automatischen Terminal-Ausgabeprotokollierung.
 
 **Bedingungen:**
 - Eine CLI-Ausgabezeile enthält den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` mit gültigem Zeitstempel.
-- Die auslösende Aufgabe besitzt ein `KiPluginPrefix`.
-- Kandidaten für die automatische Pause: `Status` aktiv oder wartend, `AusfuehrungsStatus == Aktiv`, identisches `KiPluginPrefix` (`OrdinalIgnoreCase`).
+- Die auslösende Aufgabe besitzt ein `AiPluginPrefix`.
+- Kandidaten für die automatische Pause: `Status` aktiv oder wartend, `ExecutionStatus == Active`, identisches `AiPluginPrefix` (`OrdinalIgnoreCase`).
 
 **Verhalten:**
-- Der Marker erzeugt an der auslösenden Aufgabe einen `ProtokollTyp.RateLimit`-Eintrag — auch ohne gültigen Zeitstempel.
-- Bei gültigem Zeitstempel wird der Wert als `AppEinstellung` unter `plugins.sessionlimit.<KiPluginPrefix>` (ISO-8601-Roundtrip, UTC) persistiert — Laufzeitstatus, keine Anwender-Konfiguration.
+- Der Marker erzeugt an der auslösenden Aufgabe einen `LogEntryType.RateLimit`-Eintrag — auch ohne gültigen Zeitstempel.
+- Bei gültigem Zeitstempel wird der Wert als `AppSetting` unter `plugins.sessionlimit.<AiPluginPrefix>` (ISO-8601-Roundtrip, UTC) persistiert — Laufzeitstatus, keine Anwender-Konfiguration.
 - Liegt der gemeldete Zeitpunkt in der Vergangenheit, wird er persistiert, löst aber keine Pause aus.
-- Max-Semantik: `PausiertBisUtc` wird auf `max(bisheriger Wert, resetUtc)` gesetzt — eine längere manuelle Pause wird nicht verkürzt.
-- Pro pausierter Aufgabe wird ein `SystemMeldung`-Eintrag geschrieben und die Seitenleiste über `AufgabeLaufdatenChangedNotifier` aktualisiert.
+- Max-Semantik: `PausedUntilUtc` wird auf `max(bisheriger Wert, resetUtc)` gesetzt — eine längere manuelle Pause wird nicht verkürzt.
+- Pro pausierter Aufgabe wird ein `SystemMessage`-Eintrag geschrieben und die Seitenleiste über `WorkItemRunDataChangedNotifier` aktualisiert.
 - Laufende CLI-Prozesse werden nicht angefasst; es findet kein automatischer Neustart nach Limit-Ablauf statt.
-- **Update-Sicherheit:** `CliUpdateSafetyService.CheckAsync` behandelt Aufgaben mit zukünftigem Plugin-Session-Limit als nicht riskant — die Heartbeat-Toleranz (`AufgabeLaufAktivitaet.IstAktiv`) entfällt für sie komplett. Aufgaben ohne bekanntes Limit werden wie bisher per Heartbeat bewertet.
+- **Update-Sicherheit:** `CliUpdateSafetyService.CheckAsync` behandelt Aufgaben mit zukünftigem Plugin-Session-Limit als nicht riskant — die Heartbeat-Toleranz (`WorkItemRunActivity.IsActive`) entfällt für sie komplett. Aufgaben ohne bekanntes Limit werden wie bisher per Heartbeat bewertet.
 
-**Umsetzung:** `ProtokollService.TryParseRateLimitMarker`/`AddCliOutputAsync`, `CliOutputProtokollWriter.PersistLineAsync`, `KiPluginLimitService.VerarbeiteRateLimitAsync`/`GetAktiveSessionLimitsAsync`, `CliUpdateSafetyService`.
+**Umsetzung:** `LogService.TryParseRateLimitMarker`/`AddCliOutputAsync`, `CliOutputLogWriter.PersistLineAsync`, `AiPluginLimitService.ProcessRateLimitAsync`/`GetActiveSessionLimitsAsync`, `CliUpdateSafetyService`.
 
 ---
 
@@ -290,19 +290,19 @@
 **Beschreibung:** CLI-Ausgaben einer Terminal-Sitzung (ConPTY oder diagnostizierter Pipe-Fallback) werden automatisch dem Protokoll der zugehörigen Aufgabe zugeordnet.
 
 **Bedingungen:**
-- Der CLI-Prozess wird über `KiAusfuehrungsService.StartTerminalSessionAsync` gestartet.
+- Der CLI-Prozess wird über `AiExecutionService.StartTerminalSessionAsync` gestartet.
 - Die `ITerminalSession` (Implementierung: `PseudoConsoleSession`) liefert Output-Bytes aus ihrer internen Leseschleife.
 
 **Verhalten:**
-- Pro Terminal-Session-Start wird ein `CliOutputProtokollWriter` für genau eine `aufgabeId` erzeugt.
-- Die Ausgabe wird zeilenweise als `ProtokollTyp.CliOutput` gespeichert.
+- Pro Terminal-Session-Start wird ein `CliOutputLogWriter` für genau eine `workItemId` erzeugt.
+- Die Ausgabe wird zeilenweise als `LogEntryType.CliOutput` gespeichert.
 - Die Reihenfolge innerhalb einer Session bleibt durch einen sequenziellen Hintergrund-Worker erhalten.
 - Die Protokollierung ist UI-unabhängig und läuft weiter, wenn kein `TerminalControl` gebunden ist.
 - Persistenzfehler werden geloggt, brechen den CLI-Prozess aber nicht ab.
 - Bei hoher Ausgaberate begrenzt eine bounded Queue den Speicherverbrauch und erzeugt Backpressure.
 - Beim Abschluss wartet die Senke auf die aktive Queue-Phase eines bereits dekodierten Chunks, bevor der Channel geschlossen wird.
 
-**Umsetzung:** `ITerminalOutputSink`, `CliOutputLineAccumulator`, `CliOutputProtokollWriter`, `PseudoConsoleSession.ReadLoopAsync`, `KiAusfuehrungsService.StartTerminalSessionAsync`, `ProtokollService.AddCliOutputAsync`.
+**Umsetzung:** `ITerminalOutputSink`, `CliOutputLineAccumulator`, `CliOutputLogWriter`, `PseudoConsoleSession.ReadLoopAsync`, `AiExecutionService.StartTerminalSessionAsync`, `LogService.AddCliOutputAsync`.
 
 ---
 
@@ -312,13 +312,13 @@
 
 **Bedingungen:**
 - Der Export wird aus der Aufgabendetailansicht gestartet.
-- Eine Aufgabe ist geladen und besitzt gespeicherte `ProtokollTyp.CliOutput`-Einträge.
+- Eine Aufgabe ist geladen und besitzt gespeicherte `LogEntryType.CliOutput`-Einträge.
 
 **Verhalten:**
 - Wenn der Speichern-Dialog abgebrochen wird: kein Export, keine Fehlermeldung.
 - Wenn der Zielpfad nicht auf `.raw` endet: das ViewModel bricht mit einer sichtbaren Fehlermeldung ab.
 - Wenn der Dateischreibvorgang fehlschlägt: der Fehler wird geloggt und dem Benutzer als Exportfehler angezeigt.
-- Andere Protokolltypen wie `Prompt`, `KiAntwort` oder `SystemMeldung` werden nicht exportiert.
+- Andere Protokolltypen wie `Prompt`, `KiAntwort` oder `SystemMessage` werden nicht exportiert.
 
 **Umsetzung:** `TaskDetailViewModel.ExportCliRawAsync` und `CliRawExportService.ExportCliRawAsync` — das ViewModel steuert Dialog und Validierung, der Service schreibt die gefilterten `CliOutput`-Zeilen in UTF-8 ohne BOM.
 
@@ -326,21 +326,21 @@
 
 ## CLI-Aufzeichnungs-Export (.clireplay)
 
-**Beschreibung:** Der Export-Button **Aufzeichnung exportieren** schreibt den automatisch mitgeschnittenen Rohbyte-Mitschnitt der letzten Terminal-Session der Aufgabe als `.clireplay`-Binärdatei. Er setzt einen vorhandenen Mitschnitt voraus — der Mitschnitt läuft beim Session-Start im `KiAusfuehrungsService` mit, nicht erst beim Export.
+**Beschreibung:** Der Export-Button **Aufzeichnung exportieren** schreibt den automatisch mitgeschnittenen Rohbyte-Mitschnitt der letzten Terminal-Session der Aufgabe als `.clireplay`-Binärdatei. Er setzt einen vorhandenen Mitschnitt voraus — der Mitschnitt läuft beim Session-Start im `AiExecutionService` mit, nicht erst beim Export.
 
 **Bedingungen:**
-- Der Export wird aus der Aufgabendetailansicht gestartet (`KannCliReplayExportieren` = Aufgabe geladen).
-- Für die Aufgabe liegt ein Mitschnitt vor (`CliReplayExportService.HatAufzeichnung`): mindestens ein Terminal-Session-Start mit aktivem `AufzeichnungByteBudget`, und die Aufgabe gehört zu den letzten 8 mit Mitschnitt.
+- Der Export wird aus der Aufgabendetailansicht gestartet (`ExportCanCliReplay` = Aufgabe geladen).
+- Für die Aufgabe liegt ein Mitschnitt vor (`CliReplayExportService.HasRecording`): mindestens ein Terminal-Session-Start mit aktivem `RecordingByteBudget`, und die Aufgabe gehört zu den letzten 8 mit Mitschnitt.
 
 **Verhalten:**
-- Wenn keine Aufzeichnung vorliegt: `FehlerMeldung` „Für diese Aufgabe liegt noch keine Aufzeichnung vor — sie wird während einer CLI-Ausführung automatisch mitgeschnitten." — der Speicherdialog wird nicht geöffnet.
+- Wenn keine Aufzeichnung vorliegt: `ErrorMessage` „Für diese Aufgabe liegt noch keine Aufzeichnung vor — sie wird während einer CLI-Ausführung automatisch mitgeschnitten." — der Speicherdialog wird nicht geöffnet.
 - Wenn der Speichern-Dialog abgebrochen wird: kein Export, keine Fehlermeldung.
-- Wenn der Zielpfad nicht auf `.clireplay` endet: `FehlerMeldung` „Export-Zielpfad muss auf .clireplay enden."
+- Wenn der Zielpfad nicht auf `.clireplay` endet: `ErrorMessage` „Export-Zielpfad muss auf .clireplay enden."
 - Wenn der Schreibvorgang fehlschlägt: der Fehler wird geloggt und als Exportfehler angezeigt.
-- Der Mitschnitt ist flüchtig: Budget-Überschreitung kürzt ihn auf das Präfix (`IstVollstaendig = false` im Datei-Header), nur die letzten 8 Aufgaben behalten einen Mitschnitt, App-Ende verwirft alle.
+- Der Mitschnitt ist flüchtig: Budget-Überschreitung kürzt ihn auf das Präfix (`IsComplete = false` im Datei-Header), nur die letzten 8 Aufgaben behalten einen Mitschnitt, App-Ende verwirft alle.
 - `.raw`- und `.clireplay`-Export bestehen parallel und decken unterschiedliche Zwecke ab (zeilennormalisierte Sicht vs. byte-exaktes, zeitreales Replay).
 
-**Umsetzung:** `TaskDetailViewModel.ExportCliReplayAsync` (Vorab-Prüfung, Dialog, Endungsvalidierung), `CliReplayExportService` (`HatAufzeichnung`/`ExportCliReplayAsync` über `KiAusfuehrungsService.GetCliAufzeichnung` + `CliReplayAufzeichnungStore`), `CliOutputRecorder` (Mitschnitt beim Session-Start).
+**Umsetzung:** `TaskDetailViewModel.ExportCliReplayAsync` (Vorab-Prüfung, Dialog, Endungsvalidierung), `CliReplayExportService` (`HasRecording`/`ExportCliReplayAsync` über `AiExecutionService.GetCliRecording` + `CliReplayRecordingStore`), `CliOutputRecorder` (Mitschnitt beim Session-Start).
 
 ---
 
@@ -349,16 +349,16 @@
 **Beschreibung:** Eine Aufgabe, deren KI-Ausführung hängen geblieben ist (Heartbeat abgelaufen, kein laufender Prozess), kann über das Recovery-Banner auf dem Dashboard wiederhergestellt werden.
 
 **Bedingungen (Recovery-Kandidat):**
-- `Status` ist `Gestartet` oder `Wartend` und `AusfuehrungsStatus == Aktiv`.
-- Kein aktiver KI-Lauf im `KiAusfuehrungsService` (Laufzeitprüfung).
-- `LastHeartbeatUtc` ist älter als `AufgabeRecoveryService.HeartbeatTimeoutMinutes` (5 Minuten).
-- Keine aktive Pause: `PausiertBisUtc` ist `null` oder liegt nicht in der Zukunft — pausierte Aufgaben wurden bewusst angehalten und gelten nicht als „festhängend".
+- `Status` ist `Started` oder `Waiting` und `ExecutionStatus == Active`.
+- Kein aktiver KI-Lauf im `AiExecutionService` (Laufzeitprüfung).
+- `LastHeartbeatUtc` ist älter als `WorkItemRecoveryService.HeartbeatTimeoutMinutes` (5 Minuten).
+- Keine aktive Pause: `PausedUntilUtc` ist `null` oder liegt nicht in der Zukunft — pausierte Aufgaben wurden bewusst angehalten und gelten nicht als „festhängend".
 
 **Verhalten:**
 - Wenn alle Bedingungen erfüllt: Die Aufgabe erscheint im Banner „X Aufgabe(n) benötigen Wiederherstellung"; **Wiederherstellen** setzt den Status zurück.
 - Bei der manuellen Recovery wird jede Ablehnung mit `TaskRecoveryRejected`-Logeintrag und `ReasonCode` (`NotFound`, `InvalidState`, `Paused`, `RunningStatusUnavailable`, …) protokolliert; eine aktive Pause führt zu `ReasonCode=Paused` und `InvalidOperationException`.
 
-**Umsetzung:** `AufgabeRecoveryService.ScanForRecoveryCandidatesAsync` und `RecoverManuellAsync`.
+**Umsetzung:** `WorkItemRecoveryService.ScanForRecoveryCandidatesAsync` und `RecoverManuellAsync`.
 
 ---
 
@@ -370,29 +370,29 @@
 - Vor dem Löschen werden alle Dateien im Verzeichnis auf `FileAttributes.Normal` gesetzt.
 - Danach erfolgt `Directory.Delete(path, recursive: true)`.
 
-**Umsetzung:** `EntwicklungsprozessService.DeleteDirectoryForce` — notwendig für `.git/objects/pack/*.idx`-Dateien unter Windows.
+**Umsetzung:** `DevelopmentProcessService.DeleteDirectoryForce` — notwendig für `.git/objects/pack/*.idx`-Dateien unter Windows.
 
 ---
 
 ## Aufgabenabschluss mit To-Do-Validierung
 
-**Beschreibung:** Eine Aufgabe kann nur beendet (Status: `Beendet`) werden, wenn alle ihre To-Dos erledigt sind.
+**Beschreibung:** Eine Aufgabe kann nur beendet (Status: `Completed`) werden, wenn alle ihre To-Dos erledigt sind.
 
 **Bedingungen:**
-- Aufgabe hat den Status `Gestartet` oder `Wartend` und ist ein Abschluss-Kandidat.
-- `Aufgabe.Todos` enthält eine Liste aller To-Dos.
+- Aufgabe hat den Status `Started` oder `Waiting` und ist ein Abschluss-Kandidat.
+- `WorkItem.Todos` enthält eine Liste aller To-Dos.
 
 **Verhalten:**
-- Benutzer klickt „Beenden"-Button im Ribbon → `AufgabeService.CanCompleteTaskAsync()` wird aufgerufen.
-- Methode prüft: Gibt es To-Dos mit `ErledaltAm == null` (offen)?
-  - Falls ja: Methode gibt `false` zurück; Abschluss wird blockiert; `FehlerMeldung` zeigt Anzahl offener To-Dos.
-  - Falls nein: Methode gibt `true` zurück; Abschluss wird erlaubt; `EntwicklungsprozessService.AbschliessenAsync()` wird aufgerufen.
+- Benutzer klickt „Beenden"-Button im Ribbon → `WorkItemService.CanCompleteTaskAsync()` wird aufgerufen.
+- Methode prüft: Gibt es To-Dos mit `CompletedAt == null` (offen)?
+  - Falls ja: Methode gibt `false` zurück; Abschluss wird blockiert; `ErrorMessage` zeigt Anzahl offener To-Dos.
+  - Falls nein: Methode gibt `true` zurück; Abschluss wird erlaubt; `DevelopmentProcessService.CompleteAsync()` wird aufgerufen.
 - Im Ribbon zeigt das Badge (Gruppe „Aufgabe") die Anzahl offener To-Dos (z. B. „⚠ 3 offen"). Badge ist verborgen wenn `OffeneTodoCount == 0`.
 - Erstellte To-Dos bleiben auch nach Aufgabenabschluss gespeichert und sind in der `Todos`-Ansicht einsehbar.
 
 **Umsetzung:**
-- `AufgabeService.CanCompleteTaskAsync(Guid aufgabeId, CancellationToken ct)` — prüft offene To-Dos vor dem Abschluss.
-- `TaskDetailViewModel.AufgabeAbschliessenAsync()` — prüft `CanCompleteTaskAsync()` vor dem Serviceaufruf.
+- `WorkItemService.CanCompleteTaskAsync(Guid workItemId, CancellationToken ct)` — prüft offene To-Dos vor dem Abschluss.
+- `TaskDetailViewModel.CompleteWorkItemAsync()` — prüft `CanCompleteTaskAsync()` vor dem Serviceaufruf.
 - `TaskDetailViewModel.OffeneTodoCount` — wird bei jedem To-Do-Wechsel aktualisiert und steuert Ribbon-Badge.
 
 ---
@@ -409,30 +409,30 @@
 
 **Verhalten:**
 - Liegt die Zielzeit in der Vergangenheit/Gegenwart: Prompt wird sofort versendet (kein Eintrag in der Warteschlange, kein persistierter Datensatz). Schlägt auch der Sofortversand fehl, wird der Plan persistiert und wartet auf die nächste Session.
-- Liegt die Zielzeit in der Zukunft: Der Plan wird zuerst als `ZeitgesteuerterPrompt`-Datensatz persistiert, danach wird ein Timer gestartet; bei Fälligkeit wird der Prompt automatisch versendet und der Datensatz gelöscht.
-- Ein bereits geplanter Prompt für dieselbe Aufgabe wird ersetzt (vorheriger Timer wird abgebrochen, Datensatz per Upsert überschrieben); die Ersetzungsregel ist datenbankseitig über einen Unique-Index auf `AufgabeId` abgesichert.
-- Ist die Aufgabe zum Planungs- oder Fälligkeitszeitpunkt pausiert (`PausiertBisUtc` in der Zukunft), wird die Zielzeit auf das Pausenende verschoben — der Prompt bleibt geplant, der persistierte Zielzeitpunkt wird mitaktualisiert.
-- Ist zum Fälligkeitszeitpunkt keine CLI-Session aktiv oder schlägt der Versand fehl, wird der Plan **nicht** verworfen: Er geht in den Zustand „wartet auf Session" über (Statusanzeige „Prompt wartet auf CLI-Start") und wird beim nächsten CLI-Start der Aufgabe zugestellt (`CliProcessStatusChanged` → `Gestartet`). Es gibt keinen Retry-Timer und keinen Verfall — ein wartender Plan bleibt unbegrenzt bestehen.
+- Liegt die Zielzeit in der Zukunft: Der Plan wird zuerst als `ScheduledPrompt`-Datensatz persistiert, danach wird ein Timer gestartet; bei Fälligkeit wird der Prompt automatisch versendet und der Datensatz gelöscht.
+- Ein bereits geplanter Prompt für dieselbe Aufgabe wird ersetzt (vorheriger Timer wird abgebrochen, Datensatz per Upsert überschrieben); die Ersetzungsregel ist datenbankseitig über einen Unique-Index auf `WorkItemId` abgesichert.
+- Ist die Aufgabe zum Planungs- oder Fälligkeitszeitpunkt pausiert (`PausedUntilUtc` in der Zukunft), wird die Zielzeit auf das Pausenende verschoben — der Prompt bleibt geplant, der persistierte Zielzeitpunkt wird mitaktualisiert.
+- Ist zum Fälligkeitszeitpunkt keine CLI-Session aktiv oder schlägt der Versand fehl, wird der Plan **nicht** verworfen: Er geht in den Zustand „wartet auf Session" über (Statusanzeige „Prompt wartet auf CLI-Start") und wird beim nächsten CLI-Start der Aufgabe zugestellt (`CliProcessStatusChanged` → `Started`). Es gibt keinen Retry-Timer und keinen Verfall — ein wartender Plan bleibt unbegrenzt bestehen.
 - Beim App-Start werden alle persistierten Pläne wiederhergestellt: zukünftige Zielzeiten armierten einen neuen Timer, verstrichene Zielzeiten gehen in „wartet auf Session" über (nach einem Neustart existiert noch keine Session). Datensätze zu nicht mehr vorhandenen Aufgaben werden verworfen.
 - Verlassen oder Schließen der Detailansicht sowie ein CLI-Stopp stornieren den Plan **nicht**. Storniert wird er über den Button „Wartestellung aufheben", durch Ersetzen, beim Aufgabenabschluss oder beim Löschen der Aufgabe (Cascade).
-- Versendet der Timer- oder Sofortpfad ohne geöffnete Detailansicht bzw. erfolgt eine Nachzustellung nach einem CLI-Start, wird ein `ProtokollTyp.SystemMeldung`-Eintrag auf der Aufgabe geschrieben; ein Fehler beim Protokollieren beeinflusst den erfolgreichen Versand nicht.
+- Versendet der Timer- oder Sofortpfad ohne geöffnete Detailansicht bzw. erfolgt eine Nachzustellung nach einem CLI-Start, wird ein `LogEntryType.SystemMessage`-Eintrag auf der Aufgabe geschrieben; ein Fehler beim Protokollieren beeinflusst den erfolgreichen Versand nicht.
 - Es findet **kein** Versand bei vollständig beendeter App statt und **kein** automatischer CLI-Start, um einen fälligen Plan zuzustellen; die Zielzeit bleibt auf eine Uhrzeit (HH:mm) des aktuellen Tages beschränkt (keine Datumsauswahl).
 
-**Umsetzung:** `PromptZeitVersandService` — verwaltet geplante Prompts pro Aufgabe in `Dictionary<Guid, ScheduledPromptEntry>` mit pro-Eintrag-Timer via `TimeProvider.CreateTimer`; persistiert über den scoped `ZeitgesteuerterPromptStore` (aufgelöst per `IServiceScopeFactory`), stellt beim App-Start via `RestoreScheduledPromptsAsync` wieder her und liefert wartende Pläne über ein `CliProcessStatusChanged`-Abonnement zu. `TaskDetailViewModel.SchedulePromptAsync` mit UI-Validierung; `CancelScheduledPromptCommand` für den Button „Wartestellung aufheben"; `ScheduledPromptChanged`-Event zur UI-Synchronisation.
+**Umsetzung:** `PromptScheduleDispatchService` — verwaltet geplante Prompts pro Aufgabe in `Dictionary<Guid, ScheduledPromptEntry>` mit pro-Eintrag-Timer via `TimeProvider.CreateTimer`; persistiert über den scoped `ScheduledPromptStore` (aufgelöst per `IServiceScopeFactory`), stellt beim App-Start via `RestoreScheduledPromptsAsync` wieder her und liefert wartende Pläne über ein `CliProcessStatusChanged`-Abonnement zu. `TaskDetailViewModel.SchedulePromptAsync` mit UI-Validierung; `CancelScheduledPromptCommand` für den Button „Wartestellung aufheben"; `ScheduledPromptChanged`-Event zur UI-Synchronisation.
 
 ## Anzeigemodus und Gruppierung der aktiven Aufgabenliste
 
 **Beschreibung:** Die aktive Aufgabenliste (Seitenleiste und Dashboard) lässt sich zwischen drei Anzeigemodi umschalten; Seitenleiste und Dashboard führen je einen eigenen, getrennt persistierten Modus-Zustand.
 
 **Bedingungen:**
-- Modusauswahl über die `RadioButton`s `AufgabenModus:{Datum|Repository|KI}` (Seitenleiste) bzw. `DashboardAufgabenModus:{…}` (Dashboard).
+- Modusauswahl über die `RadioButton`s `WorkItemsMode:{Datum|Repository|KI}` (Seitenleiste) bzw. `DashboardWorkItemsMode:{…}` (Dashboard).
 - Die Modus-Buttons in der Seitenleiste sind nur bei ausgeklappter Navigation sichtbar (`IsNavigationExpanded`).
 
 **Verhalten:**
-- Modus `Datum`: flache Liste, sortiert absteigend nach `SortierZeitpunkt` (`LetzterCliStartUtc ?? ErstellungsDatum`), Tie-Breaker `Titel`, `Id` — identisch zur Sortierung der Datenquelle `AufgabeService.GetAktiveAufgabenAsync`.
+- Modus `Datum`: flache Liste, sortiert absteigend nach `SortierZeitpunkt` (`LastCliStartUtc ?? CreatedAt`), Tie-Breaker `Title`, `Id` — identisch zur Sortierung der Datenquelle `WorkItemService.GetActiveWorkItemsAsync`.
 - Modus `Repository`: Gruppierung nach `GitRepository.RepositoryName`; Gruppen alphabetisch, Fallback-Gruppe `Ohne Repository` (Aufgaben ohne `GitRepository`-Verknüpfung) immer am Ende; innerhalb der Gruppe wie im Modus `Datum`.
-- Modus `Ki`: Gruppierung nach dem aufgelösten KI-Plugin-Namen aus `Aufgabe.KiPluginPrefix`; Gruppen alphabetisch, Fallback-Gruppe `Nicht ausgeführt` (leeres Prefix) immer am Ende; ein gesetzter, aber nicht auflösbarer Prefix (Plugin nicht installiert) bildet eine eigene Gruppe unter dem Prefix-Namen — er fällt **nicht** unter `Nicht ausgeführt`.
+- Modus `Ki`: Gruppierung nach dem aufgelösten KI-Plugin-Namen aus `WorkItem.AiPluginPrefix`; Gruppen alphabetisch, Fallback-Gruppe `Nicht ausgeführt` (leeres Prefix) immer am Ende; ein gesetzter, aber nicht auflösbarer Prefix (Plugin nicht installiert) bildet eine eigene Gruppe unter dem Prefix-Namen — er fällt **nicht** unter `Nicht ausgeführt`.
 - Der Untertitel der Kachel zeigt den Repository-Namen; bei Aufgaben ohne Repository-Verknüpfung der Projektname — analog bleibt `RepositoryGruppenName` aber die Fallback-Gruppe (der Projektname wird nicht als Gruppenname verwendet).
-- Modus-Persistenz: Jede Ansicht speichert ihren Modus unter einem eigenen `AppEinstellung`-Schlüssel (`aktiveaufgaben.listenmodus` bzw. `aktiveaufgaben.listenmodus.dashboard`, Wert = Enum-Name) und stellt ihn beim nächsten Start wieder her. Fehlender oder ungültiger Wert → Default `Datum`. Eine inzwischen erfolgte Benutzerumschaltung wird von einer verspäteten Wiederherstellung nicht überschrieben; der wiederhergestellte Wert wird nicht zurückgeschrieben.
+- Modus-Persistenz: Jede Ansicht speichert ihren Modus unter einem eigenen `AppSetting`-Schlüssel (`aktiveaufgaben.listenmodus` bzw. `aktiveaufgaben.listenmodus.dashboard`, Wert = Enum-Name) und stellt ihn beim nächsten Start wieder her. Fehlender oder ungültiger Wert → Default `Datum`. Eine inzwischen erfolgte Benutzerumschaltung wird von einer verspäteten Wiederherstellung nicht überschrieben; der wiederhergestellte Wert wird nicht zurückgeschrieben.
 
-**Umsetzung:** `AufgabenListenAnsicht` (Deskriptoren je Modus auf instanz-eigener `ListCollectionView` pro `ActiveTasksListControl` — die geteilte `AktiveAufgabenListe` darf keine gemeinsame Default-View gruppieren); `AufgabenListenModusBindung` (gemeinsame Zustands-/Race-Guard-Logik) + `AufgabenListenModusService` (Persistenz in eigenem DI-Scope, Muster `DarkModeService`); Mapping der Gruppenschlüssel in `MainWindowViewModel.MapAktiveAufgabePanelItem`.
+**Umsetzung:** `WorkItemListLayout` (Deskriptoren je Modus auf instanz-eigener `ListCollectionView` pro `ActiveTasksListControl` — die geteilte `ActiveWorkItemsList` darf keine gemeinsame Default-View gruppieren); `WorkItemListModeBinding` (gemeinsame Zustands-/Race-Guard-Logik) + `WorkItemListModeService` (Persistenz in eigenem DI-Scope, Muster `DarkModeService`); Mapping der Gruppenschlüssel in `MainWindowViewModel.MapActiveWorkItemPanelItem`.

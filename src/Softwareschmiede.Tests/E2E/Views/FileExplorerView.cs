@@ -4,7 +4,7 @@ namespace Softwareschmiede.Tests.E2E.Views;
 
 /// <summary>
 /// View für die Datei-Explorer-Unteransicht innerhalb der <see cref="TaskDetailView"/> (Reiter
-/// "DateiViewButton"). Sichtbar ist sie nur, wenn zuvor bereits eine Aufgabe geöffnet wurde.
+/// "FileViewButton"). Sichtbar ist sie nur, wenn zuvor bereits eine Aufgabe geöffnet wurde.
 /// </summary>
 public sealed class FileExplorerView : BaseWindowView
 {
@@ -14,7 +14,7 @@ public sealed class FileExplorerView : BaseWindowView
     }
 
     /// <inheritdoc/>
-    public override bool IsVisible => ElementExists(Window, cf => cf.ByName("FileExplorerBaum"));
+    public override bool IsVisible => ElementExists(Window, cf => cf.ByName("FileExplorerTree"));
 
     /// <inheritdoc/>
     public override FileExplorerView ForceShow()
@@ -22,8 +22,8 @@ public sealed class FileExplorerView : BaseWindowView
         if (IsVisible)
             return this;
 
-        WaitForElement(Window, cf => cf.ByName("DateiViewButton"), Short).AsButton().ClickInForeground();
-        WaitForElement(Window, cf => cf.ByName("FileExplorerBaum"), Medium);
+        WaitForElement(Window, cf => cf.ByName("FileViewButton"), Short).AsButton().ClickInForeground();
+        WaitForElement(Window, cf => cf.ByName("FileExplorerTree"), Medium);
 
         return this;
     }
@@ -37,13 +37,13 @@ public sealed class FileExplorerView : BaseWindowView
 
     /// <returns><c>true</c>, wenn alle Modus-Buttons (Standard/Vergleich/Aktualisieren/Öffnen) sichtbar sind.</returns>
     public bool HasModeButtons()
-        => ElementExists(Window, cf => cf.ByName("DateiStandard"))
-           && ElementExists(Window, cf => cf.ByName("DateiVergleich"))
-           && ElementExists(Window, cf => cf.ByName("DateiAktualisieren"))
-           && ElementExists(Window, cf => cf.ByName("DateiOeffnen"));
+        => ElementExists(Window, cf => cf.ByName("DefaultFile"))
+           && ElementExists(Window, cf => cf.ByName("FileDiff"))
+           && ElementExists(Window, cf => cf.ByName("RefreshFile"))
+           && ElementExists(Window, cf => cf.ByName("OpenFile"));
 
     /// <returns><c>true</c>, wenn die Ribbon-Gruppe "Dateien" (Standard-Button) sichtbar ist.</returns>
-    public bool HasFileRibbonGroup() => ElementExists(Window, cf => cf.ByName("DateiStandard"));
+    public bool HasFileRibbonGroup() => ElementExists(Window, cf => cf.ByName("DefaultFile"));
 
     /// <summary>Klappt den Baumknoten mit dem angegebenen Namen auf.</summary>
     /// <param name="nodeName">Der Automation-Name des Baumknotens.</param>

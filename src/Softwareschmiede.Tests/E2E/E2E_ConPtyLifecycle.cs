@@ -36,25 +36,25 @@ public partial class End2EndTest
     /// <c>exit</c>-Befehl (IsCliRunning=false, Status bleibt "Gestartet").
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit dem geöffneten, für ConPTY vorbereiteten Task.</param>
-    protected async Task ConPtyLifecycle_StartResizeTastatureingabeUndProzessende_E2E(Window mainWindow)
+    protected async Task ConPtyLifecycle_StartResizeKeyboardinputAndProcessend_E2E(Window mainWindow)
     {
         ConfirmLocalDirectoryGitInitInSourceDirectory();
 
-        SetupProjectMitNeuerAufgabe(mainWindow, "ConPty-Repo", "ConPty-Projekt");
+        SetupProjectWithNewWorkItem(mainWindow, "ConPty-Repo", "ConPty-Projekt");
         const string taskTitle = "ConPty-Aufzeichnung";
         var taskDetail = new TaskDetailView(mainWindow);
         taskDetail.SetTaskTitle(taskTitle).SaveTask().WaitForPersisted();
-        taskDetail.Start("Softwareschmiede.KiSimulator", fuerProjektVerwenden: false);
+        taskDetail.Start("Softwareschmiede.KiSimulator", forProjectUse: false);
 
-        await ConPtyStart_ZeigtTerminalPanelMitStoppenButtonUndBanner_E2E(mainWindow, taskDetail);
+        await ConPtyStart_ShowsTerminalPanelWithStopButtonAndBanner_E2E(mainWindow, taskDetail);
         await TerminalText_LiveMarkCopyAndKeepSelection(mainWindow, taskDetail);
-        await ConPtyKeyboardInput_EchoMarkerErscheintImCliOutputProtokoll_E2E(mainWindow, taskDetail);
-        await ConPtyAnsiBurst_TypeBefehlAusgabeImProtokoll_E2E(mainWindow, taskDetail);
-        await ConPtyPaste_CtrlVFuegtEchoBefehlEin_E2E(mainWindow, taskDetail);
-        ConPtyResize_NachFenstergroesseAendern_KeinFehlerUndCliNochAktiv_E2E(mainWindow, taskDetail);
-        ConPtyProcessEnd_NachExitBefehl_IsCliRunningFalse_E2E(mainWindow, taskDetail);
+        await ConPtyKeyboardInput_EchoMarkerAppearsInCliOutputLog_E2E(mainWindow, taskDetail);
+        await ConPtyAnsiBurst_TypeCommandOutputInLog_E2E(mainWindow, taskDetail);
+        await ConPtyPaste_CtrlVAddsEchoCommandA_E2E(mainWindow, taskDetail);
+        ConPtyResize_ChangeAfterWindowsize_NoErrorAndCliStillActive_E2E(mainWindow, taskDetail);
+        ConPtyProcessEnd_AfterExitCommand_IsCliRunningFalse_E2E(mainWindow, taskDetail);
 
-        await ConPtyCliReplayExport_ExportOeffnetKonsolenTestUndSpieltAb_E2E(mainWindow, taskDetail, taskTitle);
+        await ConPtyCliReplayExport_ExportOpensConsoleTestAndPlaysFrom_E2E(mainWindow, taskDetail, taskTitle);
 
         var dashboardAfterReplay = new MenuView(mainWindow).NavigateToDashboard();
         var projectDetail = dashboardAfterReplay.Menu.NavigateToProjects().OpenProject("ConPty-Projekt");
@@ -72,19 +72,19 @@ public partial class End2EndTest
     /// <param name="mainWindow">Das Hauptfenster.</param>
     /// <param name="taskDetail">Die Aufgabendetailansicht der beendeten ConPTY-Session.</param>
     /// <param name="taskTitle">Der vor dem Terminal-Lifecycle ermittelte Titel der Aufgabe.</param>
-    private async Task ConPtyCliReplayExport_ExportOeffnetKonsolenTestUndSpieltAb_E2E(Window mainWindow, TaskDetailView taskDetail, string taskTitle)
+    private async Task ConPtyCliReplayExport_ExportOpensConsoleTestAndPlaysFrom_E2E(Window mainWindow, TaskDetailView taskDetail, string taskTitle)
     {
-        var pfad = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
+        var path = Path.Combine(Path.GetTempPath(), $"softwareschmiede_e2e_{Guid.NewGuid():N}.clireplay");
         SettingsView? settings = null;
-        KonsolenTestDialogView? dialog = null;
+        ConsoleTestDialogView? dialog = null;
         try
         {
             // Abbruch-Subphase: Save-Dialog per ESC schließen — keine Datei, kein Fehlerbanner.
             taskDetail.ExportCliReplay(null);
-            Assert.False(File.Exists(pfad), "Der abgebrochene Export darf keine Datei erzeugen.");
+            Assert.False(File.Exists(path), "Der abgebrochene Export darf keine Datei erzeugen.");
             Assert.False(new ErrorView(mainWindow).IsVisible);
 
-            taskDetail.ExportCliReplay(pfad);
+            taskDetail.ExportCliReplay(path);
 
             // Der Export läuft nach dem Schließen des Save-Dialogs asynchron weiter -
             // erst auf Existenz und vollständige Schreibweise des Dateiheaders warten.
@@ -93,7 +93,7 @@ public partial class End2EndTest
             {
                 try
                 {
-                    if (File.Exists(pfad) && new FileInfo(pfad).Length >= 8)
+                    if (File.Exists(path) && new FileInfo(path).Length >= 8)
                         break;
                 }
                 catch (IOException)
@@ -103,10 +103,10 @@ public partial class End2EndTest
 
                 await Task.Delay(100);
             }
-            Assert.True(File.Exists(pfad), "Die .clireplay-Exportdatei wurde nicht erzeugt.");
+            Assert.True(File.Exists(path), "Die .clireplay-Exportdatei wurde nicht erzeugt.");
 
             var magic = new byte[8];
-            await using (var stream = File.OpenRead(pfad))
+            await using (var stream = File.OpenRead(path))
             {
                 await stream.ReadExactlyAsync(magic);
             }
@@ -114,45 +114,45 @@ public partial class End2EndTest
 
             // Konsolentestfenster über Einstellungen öffnen, Export laden und abspielen.
             settings = new Views.SettingsView(mainWindow).ForceShow();
-            dialog = settings.OpenKonsolenTestDialog();
-            dialog.SetZeitrafferSchwelle("0");
-            dialog.OeffneAufzeichnung(pfad);
-            dialog.WarteAufQuellEintraege(1);
+            dialog = settings.OpenConsoleTestDialog();
+            dialog.SetTimelapseThreshold("0");
+            dialog.OpenRecording(path);
+            dialog.WaitOnSourceEntries(1);
 
-            dialog.StartWiedergabe();
-            dialog.WarteAufStatus("Wiedergabe beendet.");
-            dialog.Schliessen();
+            dialog.StartReplay();
+            dialog.WaitOnStatus("Wiedergabe beendet.");
+            dialog.Close();
 
             settings.ForceClose(recurseToDashboard: false);
 
             // Nach Prozessende ist die Aufgabe nicht mehr in der Seitenleistenliste der aktiven
             // Aufgaben. Über die Projektdetailansicht wird sie unabhängig vom Laufstatus geöffnet.
             var dashboard = Assert.IsType<DashboardView>(mainWindow.CurrentView());
-            var projekt = dashboard.Menu.NavigateToProjects().OpenProject("ConPty-Projekt");
-            _ = projekt.OpenTask(taskTitle);
+            var project = dashboard.Menu.NavigateToProjects().OpenProject("ConPty-Projekt");
+            _ = project.OpenTask(taskTitle);
         }
         finally
         {
             // TryClose-Muster wie in E2E_KonsolenTestfenster: bei einem Assert-Fehler dürfen
             // das nicht-modale Konsolentestfenster und die Einstellungsansicht nicht offen
             // bleiben — sonst laufen Folge-Phasen gegen einen unerwarteten Fensterzustand.
-            TryCloseKonsolenTestfenster(dialog, settings);
+            TryCloseConsoleTestwindow(dialog, settings);
 
-            if (File.Exists(pfad))
-                File.Delete(pfad);
+            if (File.Exists(path))
+                File.Delete(path);
         }
     }
 
     /// <summary>
     /// Szenario: Aufgabe starten mit ConPTY. Nach erfolgreichem Start muss der Stoppen-Button
-    /// erscheinen (IsCliRunning=true — belegt, dass TerminalSessionGestartet gefeuert und die
+    /// erscheinen (IsCliRunning=true — belegt, dass TerminalSessionStarted gefeuert und die
     /// Session gesetzt wurde) und das <c>cmd.exe /k</c>-Banner der Simulator-Shell im
     /// CliOutput-Protokoll eingehen (direkter Prozessstart aus der TerminalSessionStartSpec —
     /// kein Befehls-Echo über eine 300-ms-Verzögerung mehr).
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit der bereits gestarteten ConPTY-Session.</param>
     /// <param name="taskDetail">Die Aufgabendetailansicht der gestarteten Aufgabe.</param>
-    private async Task ConPtyStart_ZeigtTerminalPanelMitStoppenButtonUndBanner_E2E(Window mainWindow, TaskDetailView taskDetail)
+    private async Task ConPtyStart_ShowsTerminalPanelWithStopButtonAndBanner_E2E(Window mainWindow, TaskDetailView taskDetail)
     {
         taskDetail.WaitForCliRunning();
 
@@ -160,7 +160,7 @@ public partial class End2EndTest
         Assert.False(new ErrorView(mainWindow).IsVisible);
 
         // Das /k-Banner der interaktiven Simulator-Shell muss auf dem echten Ausgabepfad ankommen.
-        await WarteAufCliOutputAsync("KI-Simulator läuft");
+        await WaitOnCliOutputAsync("KI-Simulator läuft");
     }
 
     /// <summary>
@@ -171,7 +171,7 @@ public partial class End2EndTest
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit der laufenden ConPTY-Session.</param>
     /// <param name="taskDetail">Die Aufgabendetailansicht der laufenden Aufgabe.</param>
-    private async Task ConPtyKeyboardInput_EchoMarkerErscheintImCliOutputProtokoll_E2E(Window mainWindow, TaskDetailView taskDetail)
+    private async Task ConPtyKeyboardInput_EchoMarkerAppearsInCliOutputLog_E2E(Window mainWindow, TaskDetailView taskDetail)
     {
         var marker = $"E2E_MARKER_{Guid.NewGuid():N}";
 
@@ -188,7 +188,7 @@ public partial class End2EndTest
         Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.BACK);
         Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
 
-        await WarteAufCliOutputAsync(marker);
+        await WaitOnCliOutputAsync(marker);
 
         Assert.False(new ErrorView(mainWindow).IsVisible);
         Assert.True(taskDetail.IsCliRunning());
@@ -207,7 +207,7 @@ public partial class End2EndTest
         // unabhängig von der festen ConPTY-Geometrie sicher am unteren Viewport-Rand landen.
         Keyboard.Type($"cls & for /L %i in (1,1,100) do @echo . & echo {marker}");
         Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
-        await WarteAufCliOutputAsync(marker);
+        await WaitOnCliOutputAsync(marker);
 
         // Der Protokolleintrag wird vor dem WPF-Renderpass geschrieben; erst danach ist die
         // Markerzeile auch zuverlässig im echten Terminal sichtbar.
@@ -227,18 +227,18 @@ public partial class End2EndTest
         // UIA kann den Custom-Renderer nicht als TextPattern lesen. Der gezielte Vorher/Nachher-
         // Vergleich des berechneten Zellrechtecks belegt daher das echte Auswahl-Overlay, ohne
         // eine helle Textzeile im Screenshot suchen zu müssen.
-        var vorAuswahl = taskDetail.ErfasseLiveZellPixel(geometry, markerViewportRow, 0, markerEndCol);
+        var beforeSelection = taskDetail.ErfasseLiveZellPixel(geometry, markerViewportRow, 0, markerEndCol);
         // Das Lock deckt Setzen, die in der App laufende Kopier-Geste und den Read-back ab —
         // eine parallele Test-Collection darf die systemweite Zwischenablage nicht dazwischen belegen.
         using (ClipboardTestLock.Halten())
         {
             SetClipboardText("E2E-Live-Clipboard-vor-Kopie");
-            taskDetail.MarkiereLiveTerminalZeile(geometry, markerViewportRow, 0, markerEndCol);
-            var nachAuswahl = taskDetail.ErfasseLiveZellPixel(geometry, markerViewportRow, 0, markerEndCol);
-            Assert.True(KonsolenTestDialogView.ZaehleAbweichendeReplayPixel(vorAuswahl, nachAuswahl) > 100,
+            taskDetail.MarkLiveTerminalLine(geometry, markerViewportRow, 0, markerEndCol);
+            var afterSelection = taskDetail.ErfasseLiveZellPixel(geometry, markerViewportRow, 0, markerEndCol);
+            Assert.True(ConsoleTestDialogView.CountDeviatingReplayPixel(beforeSelection, afterSelection) > 100,
                 "der Mausdrag muss im echten Live-Terminal ein sichtbares Auswahl-Overlay zeichnen");
 
-            taskDetail.KopiereLiveAuswahl();
+            taskDetail.CopyLiveSelection();
             var copiedMarker = GetClipboardText();
             Assert.True(string.Equals(marker, copiedMarker, StringComparison.Ordinal),
                 $"die Auswahl muss den Marker kopieren (tatsächlich '{copiedMarker}'). "
@@ -248,11 +248,11 @@ public partial class End2EndTest
 
         // Ausgabe auf einer anderen, aktuellen Promptzeile darf eine gültige Auswahl nicht
         // verwerfen. Der erneute Clipboard-Nachweis vermeidet eine Prüfung bloßer UI-Zustände.
-        var weitereAusgabe = $"LIVEOUT{Guid.NewGuid().ToString("N")[..12]}";
+        var furtherOutput = $"LIVEOUT{Guid.NewGuid().ToString("N")[..12]}";
         mainWindow.ClickInForeground();
-        Keyboard.Type($"echo {weitereAusgabe}");
+        Keyboard.Type($"echo {furtherOutput}");
         Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
-        await WarteAufCliOutputAsync(weitereAusgabe);
+        await WaitOnCliOutputAsync(furtherOutput);
         Assert.Contains("Selection=Valid", taskDetail.GetLiveTerminalStatus(), StringComparison.Ordinal);
 
         // Genügend neue Zeilen schieben den Marker garantiert ins Scrollback. Seine Zellen
@@ -261,7 +261,7 @@ public partial class End2EndTest
         mainWindow.ClickInForeground();
         Keyboard.Type($"for /L %i in (1,1,{geometry.Rows + 4}) do @echo {scrollEnd}");
         Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
-        await WarteAufCliOutputAsync(scrollEnd);
+        await WaitOnCliOutputAsync(scrollEnd);
         Thread.Sleep(150);
         Assert.Contains("Selection=Valid", taskDetail.GetLiveTerminalStatus(), StringComparison.Ordinal);
 
@@ -276,27 +276,27 @@ public partial class End2EndTest
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit der laufenden ConPTY-Session.</param>
     /// <param name="taskDetail">Die Aufgabendetailansicht der laufenden Aufgabe.</param>
-    private async Task ConPtyAnsiBurst_TypeBefehlAusgabeImProtokoll_E2E(Window mainWindow, TaskDetailView taskDetail)
+    private async Task ConPtyAnsiBurst_TypeCommandOutputInLog_E2E(Window mainWindow, TaskDetailView taskDetail)
     {
         var markerText = $"ANSIBURST_{Guid.NewGuid():N}";
-        var ansiDatei = Path.Combine(Path.GetTempPath(), $"ssm-ansi-{Guid.NewGuid():N}.txt");
+        var ansiFile = Path.Combine(Path.GetTempPath(), $"ssm-ansi-{Guid.NewGuid():N}.txt");
         await File.WriteAllTextAsync(
-            ansiDatei,
+            ansiFile,
             $"\x1b[31mROT\x1b[0m {markerText} \x1b[1mFETT\x1b[0m \x1b[32mGRUEN\x1b[0m\r\n");
         try
         {
             mainWindow.ClickInForeground();
-            Keyboard.Type($"type {ansiDatei}");
+            Keyboard.Type($"type {ansiFile}");
             Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
 
-            await WarteAufCliOutputAsync(markerText);
+            await WaitOnCliOutputAsync(markerText);
 
             Assert.False(new ErrorView(mainWindow).IsVisible);
             Assert.True(taskDetail.IsCliRunning());
         }
         finally
         {
-            File.Delete(ansiDatei);
+            File.Delete(ansiFile);
         }
     }
 
@@ -306,7 +306,7 @@ public partial class End2EndTest
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit der laufenden ConPTY-Session.</param>
     /// <param name="taskDetail">Die Aufgabendetailansicht der laufenden Aufgabe.</param>
-    private async Task ConPtyPaste_CtrlVFuegtEchoBefehlEin_E2E(Window mainWindow, TaskDetailView taskDetail)
+    private async Task ConPtyPaste_CtrlVAddsEchoCommandA_E2E(Window mainWindow, TaskDetailView taskDetail)
     {
         var marker = $"E2E_PASTE_{Guid.NewGuid():N}";
         // Das Lock wird bis zum Nachweis des eingefügten Befehls gehalten: ein paralleler
@@ -320,7 +320,7 @@ public partial class End2EndTest
             Keyboard.TypeSimultaneously(FlaUI.Core.WindowsAPI.VirtualKeyShort.CONTROL, FlaUI.Core.WindowsAPI.VirtualKeyShort.KEY_V);
             Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
 
-            await WarteAufCliOutputAsync(marker);
+            await WaitOnCliOutputAsync(marker);
         }
 
         Assert.False(new ErrorView(mainWindow).IsVisible);
@@ -334,19 +334,19 @@ public partial class End2EndTest
     /// doppelt erscheinen.
     /// </summary>
     /// <param name="taskDetail">Die Aufgabendetailansicht der laufenden Aufgabe.</param>
-    private async Task ConPtySessionReattach_WegUndZurueck_KeineDoppelausgabe_E2E(TaskDetailView taskDetail)
+    private async Task ConPtySessionReattach_PathAndBack_NoDoubleoutput_E2E(TaskDetailView taskDetail)
     {
         var marker = $"E2E_REATTACH_{Guid.NewGuid():N}";
         taskDetail.Window.ClickInForeground();
         Keyboard.Type($"echo {marker}");
         Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
-        await WarteAufCliOutputAsync(marker);
+        await WaitOnCliOutputAsync(marker);
         Thread.Sleep(300); // cmd protokolliert Eingabezeile und Echo-Ausgabe in getrennten Chunks.
 
         await using var db = OpenTestDbContext();
-        var aufgabe = await db.Aufgaben.OrderByDescending(a => a.ErstellungsDatum).FirstAsync();
-        var trefferVorReattach = await db.Protokolleintraege
-            .CountAsync(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.CliOutput && p.Inhalt.Contains(marker));
+        var workItem = await db.WorkItems.OrderByDescending(a => a.CreatedAt).FirstAsync();
+        var hitBeforeReattach = await db.LogEntries
+            .CountAsync(p => p.WorkItemId == workItem.Id && p.Type == LogEntryType.CliOutput && p.Content.Contains(marker));
 
         // Weg vom CLI-Panel (Info) und zurück (CLI) — TerminalControl wird neu an die Session gebunden.
         taskDetail.SwitchPanel("InfoCliToggle");
@@ -361,9 +361,9 @@ public partial class End2EndTest
         // Der Replay-Rebuild darf keine bereits vor dem Panelwechsel gespeicherten Chunks nochmals
         // protokollieren. Die konkrete Anzahl ist absichtlich nicht eins: cmd liefert sowohl
         // die eingegebene Echo-Zeile als auch deren Ausgabe.
-        var trefferNachReattach = await db.Protokolleintraege
-            .CountAsync(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.CliOutput && p.Inhalt.Contains(marker));
-        Assert.Equal(trefferVorReattach, trefferNachReattach);
+        var hitAfterReattach = await db.LogEntries
+            .CountAsync(p => p.WorkItemId == workItem.Id && p.Type == LogEntryType.CliOutput && p.Content.Contains(marker));
+        Assert.Equal(hitBeforeReattach, hitAfterReattach);
     }
 
     /// <summary>
@@ -373,7 +373,7 @@ public partial class End2EndTest
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit der laufenden ConPTY-Session.</param>
     /// <param name="taskDetail">Die Aufgabendetailansicht der laufenden Aufgabe.</param>
-    private void ConPtyResize_NachFenstergroesseAendern_KeinFehlerUndCliNochAktiv_E2E(Window mainWindow, TaskDetailView taskDetail)
+    private void ConPtyResize_ChangeAfterWindowsize_NoErrorAndCliStillActive_E2E(Window mainWindow, TaskDetailView taskDetail)
     {
         var currentBounds = mainWindow.BoundingRectangle;
         FlaUiApp.GetMainWindow(Automation)?.Patterns.Transform.Pattern.Resize(
@@ -399,7 +399,7 @@ public partial class End2EndTest
     /// </summary>
     /// <param name="mainWindow">Das Hauptfenster mit der laufenden ConPTY-Session.</param>
     /// <param name="taskDetail">Die Aufgabendetailansicht der laufenden Aufgabe.</param>
-    private void ConPtyProcessEnd_NachExitBefehl_IsCliRunningFalse_E2E(Window mainWindow, TaskDetailView taskDetail)
+    private void ConPtyProcessEnd_AfterExitCommand_IsCliRunningFalse_E2E(Window mainWindow, TaskDetailView taskDetail)
     {
         mainWindow.ClickInForeground();
         Keyboard.Type("exit");
@@ -413,21 +413,21 @@ public partial class End2EndTest
 
     /// <summary>Wartet, bis ein CliOutput-Protokolleintrag der jüngsten Aufgabe den erwarteten
     /// Text enthält (Nachweis, dass Ausgabe auf dem echten Ausgabepfad ankam).</summary>
-    private async Task WarteAufCliOutputAsync(string erwarteterInhalt)
+    private async Task WaitOnCliOutputAsync(string expectedContent)
     {
-        await WartenBisAsync(async () =>
+        await WaitUntilAsync(async () =>
         {
             await using var db = OpenTestDbContext();
-            var aufgabe = await db.Aufgaben.OrderByDescending(a => a.ErstellungsDatum).FirstAsync();
-            return await db.Protokolleintraege
-                .AnyAsync(p => p.AufgabeId == aufgabe.Id && p.Typ == ProtokollTyp.CliOutput && p.Inhalt.Contains(erwarteterInhalt));
+            var workItem = await db.WorkItems.OrderByDescending(a => a.CreatedAt).FirstAsync();
+            return await db.LogEntries
+                .AnyAsync(p => p.WorkItemId == workItem.Id && p.Type == LogEntryType.CliOutput && p.Content.Contains(expectedContent));
         });
     }
 
     /// <summary>Setzt Text in die Zwischenablage über einen STA-Thread (WPF-Clipboard ist STA-gebunden).</summary>
     private static void SetClipboardText(string text)
     {
-        Exception? fehler = null;
+        Exception? error = null;
         var thread = new Thread(() =>
         {
             // Clipboard kann unmittelbar nach dem Schließen einer UIA-/Screenshot-Operation
@@ -438,17 +438,17 @@ public partial class End2EndTest
             // Exception den haltenden Prozess.
             try
             {
-                ClipboardTestHelfer.SetTextMitRetry(text);
+                ClipboardTestHelper.SetTextWithRetry(text);
             }
             catch (Exception ex)
             {
-                fehler = ex;
+                error = ex;
             }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join();
-        if (fehler is not null)
-            throw fehler;
+        if (error is not null)
+            throw error;
     }
 }

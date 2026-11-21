@@ -14,7 +14,7 @@ public sealed class ScmEventDelayIntakeTests
     /// <summary>Eine gültige Direktive stellt die Zustellung zurück, pausiert die Aufgabe
     /// und legt den Empfangskommentar als wartende Hostaktion an.</summary>
     [Fact]
-    public async Task DelayDirective_DefersEventAndPausesTask()
+    public async Task DelayDirective_DefersEventAndPauseTask()
     {
         await using var db = await CreateDbAsync();
         var taskId = await SeedTaskAsync(db);
@@ -38,11 +38,11 @@ public sealed class ScmEventDelayIntakeTests
         var request = System.Text.Json.JsonSerializer.Deserialize<ScmResponseRequest>(action.RequestJson, ScmEventStore.JsonOptions)!;
         Assert.Contains("verzögert", request.Body, StringComparison.OrdinalIgnoreCase);
 
-        var task = await db.Aufgaben.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.NotNull(task.PausiertBisUtc);
-        Assert.Equal(item.NextAttemptUtc.Value, task.PausiertBisUtc.Value.ToUnixTimeMilliseconds());
-        Assert.Contains(await db.Protokolleintraege.Where(x => x.AufgabeId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
-            x => x.Inhalt.Contains("verzögerte SCM-Ausführung"));
+        var task = await db.WorkItems.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.NotNull(task.PausedUntilUtc);
+        Assert.Equal(item.NextAttemptUtc.Value, task.PausedUntilUtc.Value.ToUnixTimeMilliseconds());
+        Assert.Contains(await db.LogEntries.Where(x => x.WorkItemId == taskId).ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
+            x => x.Content.Contains("verzögerte SCM-Ausführung"));
     }
 
     /// <summary>Eine ungültige Angabe verzögert nichts; die Verwerfung wird remote quittiert.</summary>
@@ -58,7 +58,7 @@ public sealed class ScmEventDelayIntakeTests
         var item = await db.ScmIncomingEvents.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("Aufgenommen", item.Status);
         Assert.Null(item.NextAttemptUtc);
-        Assert.Null((await db.Aufgaben.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausiertBisUtc);
+        Assert.Null((await db.WorkItems.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausedUntilUtc);
         var action = await db.ScmOutgoingActions.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
         var request = System.Text.Json.JsonSerializer.Deserialize<ScmResponseRequest>(action.RequestJson, ScmEventStore.JsonOptions)!;
         Assert.Contains("ignoriert", request.Body, StringComparison.OrdinalIgnoreCase);
@@ -79,7 +79,7 @@ public sealed class ScmEventDelayIntakeTests
         Assert.Equal("Aufgenommen", item.Status);
         Assert.Null(item.NextAttemptUtc);
         Assert.Empty(await db.ScmOutgoingActions.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Null((await db.Aufgaben.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausiertBisUtc);
+        Assert.Null((await db.WorkItems.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausedUntilUtc);
     }
 
     /// <summary>Ein konfiguriertes Keyword ersetzt den Standard bei der Aufnahme.</summary>
@@ -104,7 +104,7 @@ public sealed class ScmEventDelayIntakeTests
         await using var db = await CreateDbAsync();
         var taskId = await SeedTaskAsync(db);
         var existing = DateTimeOffset.UtcNow.AddDays(10);
-        await db.Aufgaben.Where(x => x.Id == taskId).ExecuteUpdateAsync(x => x.SetProperty(p => p.PausiertBisUtc, existing), cancellationToken: TestContext.Current.CancellationToken);
+        await db.WorkItems.Where(x => x.Id == taskId).ExecuteUpdateAsync(x => x.SetProperty(p => p.PausedUntilUtc, existing), cancellationToken: TestContext.Current.CancellationToken);
         db.ChangeTracker.Clear();
         var store = new ScmEventStore(db, new(), TimeProvider.System);
 
@@ -112,7 +112,7 @@ public sealed class ScmEventDelayIntakeTests
 
         Assert.Equal("Verzögert", (await db.ScmIncomingEvents.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Status);
         Assert.Equal(existing.ToUnixTimeMilliseconds(),
-            (await db.Aufgaben.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausiertBisUtc!.Value.ToUnixTimeMilliseconds());
+            (await db.WorkItems.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausedUntilUtc!.Value.ToUnixTimeMilliseconds());
     }
 
     /// <summary>Die Zurückstellung übersteht einen Neustart, weil Zielzeitpunkt und
@@ -138,7 +138,7 @@ public sealed class ScmEventDelayIntakeTests
                 var item = await db.ScmIncomingEvents.SingleAsync(cancellationToken: TestContext.Current.CancellationToken);
                 Assert.Equal("Verzögert", item.Status);
                 nextAttempt = item.NextAttemptUtc!.Value;
-                pause = (await db.Aufgaben.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausiertBisUtc!.Value;
+                pause = (await db.WorkItems.SingleAsync(x => x.Id == taskId, cancellationToken: TestContext.Current.CancellationToken)).PausedUntilUtc!.Value;
             }
             Assert.True(nextAttempt > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             Assert.True(pause > DateTimeOffset.UtcNow);
@@ -146,25 +146,25 @@ public sealed class ScmEventDelayIntakeTests
         finally { File.Delete(path); }
     }
 
-    private static async Task<SoftwareschmiededDbContext> CreateFileDbAsync(string path)
+    private static async Task<SoftwareschmiedeDbContext> CreateFileDbAsync(string path)
     {
-        var db = new SoftwareschmiededDbContext(new DbContextOptionsBuilder<SoftwareschmiededDbContext>().UseSqlite($"Data Source={path};Pooling=False").Options);
+        var db = new SoftwareschmiedeDbContext(new DbContextOptionsBuilder<SoftwareschmiedeDbContext>().UseSqlite($"Data Source={path};Pooling=False").Options);
         await db.Database.EnsureCreatedAsync();
         return db;
     }
 
-    private static async Task<SoftwareschmiededDbContext> CreateDbAsync()
+    private static async Task<SoftwareschmiedeDbContext> CreateDbAsync()
     {
-        var db = new SoftwareschmiededDbContext(new DbContextOptionsBuilder<SoftwareschmiededDbContext>().UseSqlite("Data Source=:memory:").Options);
+        var db = new SoftwareschmiedeDbContext(new DbContextOptionsBuilder<SoftwareschmiedeDbContext>().UseSqlite("Data Source=:memory:").Options);
         await db.Database.OpenConnectionAsync();
         await db.Database.EnsureCreatedAsync();
         return db;
     }
 
-    private static async Task<Guid> SeedTaskAsync(SoftwareschmiededDbContext db)
+    private static async Task<Guid> SeedTaskAsync(SoftwareschmiedeDbContext db)
     {
-        var project = new Projekt { Id = Guid.NewGuid(), Name = "SCM" };
-        var task = new Aufgabe { Id = Guid.NewGuid(), Titel = "Aufgabe", ProjektId = project.Id, Status = AufgabeStatus.Gestartet };
+        var project = new Project { Id = Guid.NewGuid(), Name = "SCM" };
+        var task = new WorkItem { Id = Guid.NewGuid(), Title = "Aufgabe", ProjectId = project.Id, Status = WorkItemStatus.Started };
         db.AddRange(project, task);
         await db.SaveChangesAsync();
         return task.Id;

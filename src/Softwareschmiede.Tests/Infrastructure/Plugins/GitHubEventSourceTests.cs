@@ -295,7 +295,7 @@ public sealed class GitHubEventSourceTests
         Assert.False(error.OutcomeUncertain);
     }
 
-    /// <summary>Authentication recovery names the saved token and the actual settings path.</summary>
+    /// <summary>Die Wiederherstellungs-Hinweise bei Authentifizierungsfehlern nennen das gespeicherte Token und den tatsächlichen Einstellungspfad.</summary>
     [Theory]
     [InlineData(401, "Erneuern")]
     [InlineData(403, "Lese- und Schreibrechte")]
@@ -940,15 +940,15 @@ public sealed class GitHubEventSourceTests
     /// <summary>Die Beschreibungsaktualisierung folgt dem Konto der gespeicherten Referenz —
     /// inklusive Identitätsprüfung, Abgleichs-Read und eigentlichem PATCH.</summary>
     [Theory]
-    [InlineData(ScmKontoModus.Benutzerkonto)]
-    [InlineData(ScmKontoModus.SeparatesKonto)]
-    public async Task IssueBodyUpdate_RoutesByReferenceKonto(ScmKontoModus konto)
+    [InlineData(ScmAccountMode.UserAccount)]
+    [InlineData(ScmAccountMode.SeparateAccount)]
+    public async Task IssueBodyUpdate_RoutesByReferenceAccount(ScmAccountMode account)
     {
         var user = new FakeApi();
         var agent = new FakeApi();
-        var routed = konto == ScmKontoModus.SeparatesKonto ? agent : user;
-        var idle = konto == ScmKontoModus.SeparatesKonto ? user : agent;
-        var request = new ScmResponseRequest(Issue with { Repository = Repository with { Konto = konto } },
+        var routed = account == ScmAccountMode.SeparateAccount ? agent : user;
+        var idle = account == ScmAccountMode.SeparateAccount ? user : agent;
+        var request = new ScmResponseRequest(Issue with { Repository = Repository with { Account = account } },
             "action-1", ScmResponseKind.IssueBodyUpdate, "Neue Beschreibung.");
         Identity(routed);
         routed.Add("issues/7", new { id = 77, body = "alte Beschreibung" });
@@ -1060,8 +1060,8 @@ public sealed class GitHubEventSourceTests
         });
         var result = await Plugin(api).ReadIssueAsync(Issue, TestContext.Current.CancellationToken);
         Assert.NotNull(result);
-        Assert.Equal(7, result!.Nummer);
-        Assert.Equal("Fehler im Import", result.Titel);
+        Assert.Equal(7, result!.Number);
+        Assert.Equal("Fehler im Import", result.Title);
         Assert.Equal("Beschreibung", result.Body);
         Assert.Equal(new[] { "bug", "prio" }, result.Labels);
         Assert.Equal("v1", result.Milestone);
@@ -1097,7 +1097,7 @@ public sealed class GitHubEventSourceTests
         });
         var result = await Plugin(api).ReadPullRequestAsync(PullRequest, TestContext.Current.CancellationToken);
         Assert.NotNull(result);
-        Assert.Equal(8, result!.Nummer);
+        Assert.Equal(8, result!.Number);
         Assert.Equal("feature/x", result.BranchName);
         Assert.Equal("main", result.TargetBranch);
         Assert.Equal("abc", result.HeadSha);
@@ -1120,16 +1120,16 @@ public sealed class GitHubEventSourceTests
     /// <summary>Die Repository-Auflösung läuft im SeparatesKonto ausschließlich über den
     /// Agent-Client; der Benutzer-Client wird nicht berührt und das Ergebnis trägt das Konto.</summary>
     [Fact]
-    public async Task GetEventRepositoryAsync_SeparatesKonto_UsesAgentToken()
+    public async Task GetEventRepositoryAsync_SeparatesAccount_UsesAgentToken()
     {
         var user = new FakeApi();
         var agent = new FakeApi();
         Identity(agent);
         var plugin = Plugin(user, StoreWithAgentToken(), agent);
 
-        var result = await plugin.GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo", ScmKontoModus.SeparatesKonto), TestContext.Current.CancellationToken);
+        var result = await plugin.GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo", ScmAccountMode.SeparateAccount), TestContext.Current.CancellationToken);
 
-        Assert.Equal(Repository with { Konto = ScmKontoModus.SeparatesKonto }, result);
+        Assert.Equal(Repository with { Account = ScmAccountMode.SeparateAccount }, result);
         Assert.Empty(user.Requests);
         Assert.Equal(2, agent.Requests.Count);
     }
@@ -1137,17 +1137,17 @@ public sealed class GitHubEventSourceTests
     /// <summary>Reads folgen dem Konto der Referenz: SeparatesKonto → Agent-Client,
     /// Benutzerkonto → Benutzer-Client.</summary>
     [Theory]
-    [InlineData(ScmKontoModus.Benutzerkonto)]
-    [InlineData(ScmKontoModus.SeparatesKonto)]
-    public async Task ReadEventsAsync_RoutesByReferenceKonto(ScmKontoModus konto)
+    [InlineData(ScmAccountMode.UserAccount)]
+    [InlineData(ScmAccountMode.SeparateAccount)]
+    public async Task ReadEventsAsync_RoutesByReferenceAccount(ScmAccountMode account)
     {
         var user = new FakeApi();
         var agent = new FakeApi();
-        var routed = konto == ScmKontoModus.SeparatesKonto ? agent : user;
-        var idle = konto == ScmKontoModus.SeparatesKonto ? user : agent;
+        var routed = account == ScmAccountMode.SeparateAccount ? agent : user;
+        var idle = account == ScmAccountMode.SeparateAccount ? user : agent;
         routed.AddGraph(new { repository = new { issue = Node("I_7", "text") } });
         var plugin = Plugin(user, StoreWithAgentToken(), agent);
-        var reference = Issue with { Repository = Repository with { Konto = konto } };
+        var reference = Issue with { Repository = Repository with { Account = account } };
 
         var batch = await plugin.ReadEventsAsync(Read(reference, ScmContentKind.Description), TestContext.Current.CancellationToken);
 
@@ -1159,19 +1159,19 @@ public sealed class GitHubEventSourceTests
     /// <summary>Antworten folgen dem Konto der gespeicherten Referenz — inklusive
     /// Identitätsprüfung, Abgleichs-Reads und dem eigentlichen POST.</summary>
     [Theory]
-    [InlineData(ScmKontoModus.Benutzerkonto)]
-    [InlineData(ScmKontoModus.SeparatesKonto)]
-    public async Task Response_RoutesByReferenceKonto(ScmKontoModus konto)
+    [InlineData(ScmAccountMode.UserAccount)]
+    [InlineData(ScmAccountMode.SeparateAccount)]
+    public async Task Response_RoutesByReferenceAccount(ScmAccountMode account)
     {
         var user = new FakeApi();
         var agent = new FakeApi();
-        var routed = konto == ScmKontoModus.SeparatesKonto ? agent : user;
-        var idle = konto == ScmKontoModus.SeparatesKonto ? user : agent;
+        var routed = account == ScmAccountMode.SeparateAccount ? agent : user;
+        var idle = account == ScmAccountMode.SeparateAccount ? user : agent;
         Identity(routed);
         routed.Add("comments?", Array.Empty<object>());
         routed.Add("issues/7/comments", new { id = 99, html_url = "https://github.com/owner/repo/issues/7#issuecomment-99" });
         var plugin = Plugin(user, StoreWithAgentToken(), agent);
-        var reference = Issue with { Repository = Repository with { Konto = konto } };
+        var reference = Issue with { Repository = Repository with { Account = account } };
 
         var result = await plugin.ExecuteResponseAsync(new(reference, "action-1", ScmResponseKind.Comment, "Antwort"), TestContext.Current.CancellationToken);
 

@@ -11,9 +11,9 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>Tests für OpenTodosDialogViewModel.</summary>
 public sealed class OpenTodosDialogViewModelTests : IDisposable
 {
-    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiededDbContext _db;
+    private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly TodoService _todoService;
-    private readonly Guid _aufgabeId;
+    private readonly Guid _workItemId;
 
     /// <summary>OpenTodosDialogViewModelTests.</summary>
     public OpenTodosDialogViewModelTests()
@@ -21,23 +21,23 @@ public sealed class OpenTodosDialogViewModelTests : IDisposable
         _db = TestDbContextFactory.Create();
         _todoService = new TodoService(_db, NullLogger<TodoService>.Instance);
 
-        var projektId = Guid.NewGuid();
-        _db.Projekte.Add(new Projekt
+        var projectId = Guid.NewGuid();
+        _db.Projects.Add(new Project
         {
-            Id = projektId,
+            Id = projectId,
             Name = "Testprojekt",
-            ErstellungsDatum = DateTimeOffset.UtcNow,
-            Status = ProjektStatus.Aktiv
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = ProjectStatus.Active
         });
 
-        _aufgabeId = Guid.NewGuid();
-        _db.Aufgaben.Add(new Aufgabe
+        _workItemId = Guid.NewGuid();
+        _db.WorkItems.Add(new WorkItem
         {
-            Id = _aufgabeId,
-            ProjektId = projektId,
-            Titel = "Testaufgabe",
-            Status = AufgabeStatus.Neu,
-            ErstellungsDatum = DateTimeOffset.UtcNow
+            Id = _workItemId,
+            ProjectId = projectId,
+            Title = "Testaufgabe",
+            Status = WorkItemStatus.New,
+            CreatedAt = DateTimeOffset.UtcNow
         });
         _db.SaveChanges();
     }
@@ -50,19 +50,19 @@ public sealed class OpenTodosDialogViewModelTests : IDisposable
     public async Task LoadAsync_ShouldLoadOnlyOpenTodosAndSetTaskData()
     {
         // Arrange
-        var offen = await _todoService.CreateTodoAsync(_aufgabeId, "Offen", TestContext.Current.CancellationToken);
-        var erledigt = await _todoService.CreateTodoAsync(_aufgabeId, "Erledigt", TestContext.Current.CancellationToken);
-        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id, TestContext.Current.CancellationToken);
+        var open = await _todoService.CreateTodoAsync(_workItemId, "Offen", TestContext.Current.CancellationToken);
+        var completed = await _todoService.CreateTodoAsync(_workItemId, "Erledigt", TestContext.Current.CancellationToken);
+        await _todoService.MarkTodoAsCompletedAsync(completed.Id, TestContext.Current.CancellationToken);
         var sut = new OpenTodosDialogViewModel(_todoService, NullLogger<OpenTodosDialogViewModel>.Instance);
 
         // Act
-        await sut.LoadAsync(_aufgabeId, "Aufgabentitel", TestContext.Current.CancellationToken);
+        await sut.LoadAsync(_workItemId, "Aufgabentitel", TestContext.Current.CancellationToken);
 
         // Assert
-        sut.AufgabeId.Should().Be(_aufgabeId);
-        sut.AufgabenTitel.Should().Be("Aufgabentitel");
+        sut.WorkItemId.Should().Be(_workItemId);
+        sut.WorkItemsTitle.Should().Be("Aufgabentitel");
         sut.Todos.Should().ContainSingle();
-        sut.Todos[0].Id.Should().Be(offen.Id);
+        sut.Todos[0].Id.Should().Be(open.Id);
         sut.HasOpenTodos.Should().BeTrue();
         sut.IsEmpty.Should().BeFalse();
     }
@@ -72,12 +72,12 @@ public sealed class OpenTodosDialogViewModelTests : IDisposable
     public async Task LoadAsync_ShouldSetEmptyState_WhenNoOpenTodosExist()
     {
         // Arrange
-        var erledigt = await _todoService.CreateTodoAsync(_aufgabeId, "Erledigt", TestContext.Current.CancellationToken);
-        await _todoService.MarkTodoAsCompletedAsync(erledigt.Id, TestContext.Current.CancellationToken);
+        var completed = await _todoService.CreateTodoAsync(_workItemId, "Erledigt", TestContext.Current.CancellationToken);
+        await _todoService.MarkTodoAsCompletedAsync(completed.Id, TestContext.Current.CancellationToken);
         var sut = new OpenTodosDialogViewModel(_todoService, NullLogger<OpenTodosDialogViewModel>.Instance);
 
         // Act
-        await sut.LoadAsync(_aufgabeId, "Leere Aufgabe", TestContext.Current.CancellationToken);
+        await sut.LoadAsync(_workItemId, "Leere Aufgabe", TestContext.Current.CancellationToken);
 
         // Assert
         sut.Todos.Should().BeEmpty();

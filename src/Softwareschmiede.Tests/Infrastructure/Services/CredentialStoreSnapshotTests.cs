@@ -8,7 +8,7 @@ public sealed class CredentialStoreSnapshotTests
 {
     /// <summary>Ein vor dem Snapshot vorhandener Wert wird nach Überschreiben durch Restore() auf den Originalwert zurückgesetzt.</summary>
     [Fact]
-    public void Restore_StelltVorhandenenWertWiederHer()
+    public void Restore_SetsExistingValueReStore()
     {
         var credentialStore = new InMemoryCredentialStoreForSnapshotTests();
         credentialStore.SetCredential("Softwareschmiede.Codex.CommandLineParameters", "--produktiv-flag");
@@ -23,7 +23,7 @@ public sealed class CredentialStoreSnapshotTests
 
     /// <summary>Ein beim Snapshot nicht vorhandener Schlüssel, der während des Tests gesetzt wurde, wird durch Restore() wieder entfernt.</summary>
     [Fact]
-    public void Restore_LoeschtUrspruenglichFehlendenWert()
+    public void Restore_DeletesOriginalMissingValue()
     {
         var credentialStore = new InMemoryCredentialStoreForSnapshotTests();
 
