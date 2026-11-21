@@ -1,0 +1,4 @@
+{
+  "pullRequestNumber": 437,
+  "report": "Codesprache finalisiert (Issue #5). Sechs Projektsschritte abgeschlossen und gemergt: (1) Domänenmodell & Persistenz, (2) Application/Infrastructure, (3) Plugin-Verträge & Plugins, (4) App-Schicht inkl. XAML, (5) Testprojekte & Rest-Sweep, (6) Kommentar- & Doku-Sprache. Bezeichner im Programmcode durchgängig englisch; XML-Kommentare, UI-Texte und Dokumentation deutsch. Kompatibilität verifiziert unverändert: DB-Schema/-Spalten, persistierte Enum- und Settings-Werte, Protokoll-Literale, Plugin-Prefixe und externe API-Namen. Verifikation: Build 0 Fehler, Format-Check sauber, stabile Testlane 2721/0/3, IntegrationTests 357/0. PR #437 gegen staging mit Closes #5 (Issue schließt bei Promotion in den Default-Branch)."
+}
