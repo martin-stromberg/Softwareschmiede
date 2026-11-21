@@ -257,6 +257,19 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         File.Move(PathValue("challengePath"), PathValue("readChallengePath"));
     }
 
+    /// <summary>Wartet bis zu 30 s in 100-ms-Intervallen auf die Bedingung und schlägt
+    /// danach mit <paramref name="because"/> fehl.</summary>
+    internal static async Task WaitForAsync(Func<Task<bool>> condition, string because)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await condition()) return;
+            await Task.Delay(100);
+        }
+        Assert.True(await condition(), because);
+    }
+
     internal void SetPrompt(Guid task, string prompt)
     {
         Sessions[task].SetupGet(x => x.Buffer).Returns(Screen(AiProfile.Banner, prompt));
