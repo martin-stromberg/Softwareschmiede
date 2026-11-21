@@ -365,7 +365,7 @@ internal static class ElementWaitHelper
         => ClickInForeground(element, e => e.Click());
 
     /// <summary>
-    /// Wie <see cref="ClickInForeground"/>, nur als Doppelklick (z. B. zum Öffnen von Listeneinträgen).
+    /// Wie <see cref="ClickInForeground(FlaUI.Core.AutomationElements.AutomationElement)"/>, nur als Doppelklick (z. B. zum Öffnen von Listeneinträgen).
     /// Beim Invoke-Fallback entspricht ein einzelner Invoke dem Aktivieren des Elements.
     /// </summary>
     /// <param name="element">Das zu doppelklickende Element.</param>
