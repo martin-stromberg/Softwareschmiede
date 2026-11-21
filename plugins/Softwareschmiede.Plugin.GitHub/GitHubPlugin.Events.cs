@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Softwareschmiede.Domain.Enums;
@@ -10,6 +12,23 @@ public sealed partial class GitHubPlugin
 {
     private readonly IGitHubEventApiClient _eventApiClient;
     private readonly IGitHubEventApiClient _agentEventApiClient;
+    /// <summary>Plugin-interner Auflösungscache: kanonischer Schlüssel
+    /// <c>{clientId}|{host}|{owner}|{name}</c> (lowercased, Client-Instanz als Konto-Dimension) auf
+    /// das unveränderliche <see cref="ScmEventRepository"/> samt Verfallszeitpunkt. Nur erfolgreiche
+    /// Auflösungen werden eingetragen; Eviction erfolgt bei <c>Authentication</c>- (ganzes Konto) und
+    /// <c>Permission</c>-Fehlern (Konto+Host) sowie implizit per TTL.</summary>
+    private readonly ConcurrentDictionary<string, (ScmEventRepository Value, DateTimeOffset ExpiresUtc)> _resolutionCache = new(StringComparer.Ordinal);
+    /// <summary>Fail-fast-Sperrtabelle nach Rate-Limit: <c>(Client-Instanz, Host, BudgetTyp)</c> auf den
+    /// Sperr-bis-Zeitpunkt. Die Budget-Typ-Dimension (<see langword="true"/> = GraphQL-Kontingent)
+    /// trennt die Kontingente: eine REST-Erschöpfung sperrt die GraphQL-Auflösung nicht mit.</summary>
+    private readonly ConcurrentDictionary<(IGitHubEventApiClient Client, string Host, bool GraphQl), DateTimeOffset> _rateLimitGates = new();
+    private readonly TimeProvider _timeProvider;
+    private readonly TimeSpan _resolutionTtl;
+    /// <summary>Feste lokale Fallback-Sperre für Rate-Limit-Fehler ohne serverseitigen
+    /// Reset-Zeitpunkt: GraphQL-<c>RATE_LIMITED</c> aus <c>errors[]</c> sowie HTTP-429/403 mit
+    /// <c>X-RateLimit-Remaining: 0</c>, aber ohne auswertbare <c>Retry-After</c>-/
+    /// <c>X-RateLimit-Reset</c>-Header.</summary>
+    private static readonly TimeSpan RateLimitLockFallbackDuration = TimeSpan.FromSeconds(60);
     private const string TextFields = "id body createdAt updatedAt lastEditedAt url author { login ... on Node { id } } editor { login ... on Node { id } } reactionGroups { content viewerHasReacted }";
 
     /// <summary>Sicherheitsabstand für den serverseitigen <c>since</c>-Filter. GitHub vergleicht Zeitpunkte
@@ -26,12 +45,73 @@ public sealed partial class GitHubPlugin
         => "&since=" + Uri.EscapeDataString((since - SinceSafetyMargin).ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
 
     /// <inheritdoc />
+    /// <remarks>Auflösungspfad mit Rate-Limit-Schonung: erfolgreiche Ergebnisse werden TTL-basiert
+    /// im plugin-internen <see cref="_resolutionCache"/> gehalten (Schlüssel je Client-Instanz,
+    /// Host, Owner und Name), sodass zyklische Auflösungen (Poll, Dispatch, Outbox) keinen
+    /// Transport-Call mehr erzeugen. Der Primärtransport ist eine einzige GraphQL-Abfrage
+    /// (Viewer + Repository + <c>viewerPermission</c>) auf dem freien GraphQL-Kontingent; die
+    /// bisherige Zwei-Call-REST-Auflösung bleibt als Fallback ausschließlich bei
+    /// <see cref="ScmProviderFailureKind.Temporary"/>- und
+    /// <see cref="ScmProviderFailureKind.RateLimit"/>-GraphQL-Fehlern bestehen. Fehlschläge werden
+    /// niemals gecacht.</remarks>
     public async Task<ScmEventRepository> GetEventRepositoryAsync(ScmRepositoryContext repository, CancellationToken ct = default)
     {
         if (!repository.PluginPrefix.Equals(PluginPrefix, StringComparison.OrdinalIgnoreCase))
             throw Permanent("Der Repository-Provider stimmt nicht überein.");
         var client = ClientFor(repository.Account);
         var (host, owner, name) = ParseEventRepository(repository.RepositoryId);
+        var cacheKey = ResolutionCacheKey(client, host, owner, name);
+        if (_resolutionCache.TryGetValue(cacheKey, out var cached) && cached.ExpiresUtc > _timeProvider.GetUtcNow())
+            return cached.Value;
+        ScmEventRepository resolved;
+        try { resolved = await ResolveEventRepositoryGraphQlAsync(client, host, owner, name, repository.Account, ct); }
+        catch (ScmProviderException ex) when (ex.FailureKind is ScmProviderFailureKind.Temporary or ScmProviderFailureKind.RateLimit)
+        { resolved = await ResolveEventRepositoryRestAsync(client, host, owner, name, repository.Account, ct); }
+        _resolutionCache[cacheKey] = (resolved, _timeProvider.GetUtcNow().Add(_resolutionTtl));
+        return resolved;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>Die kanonische Form (<c>https://{host}/{owner}/{name}</c>) ist selbst ein parsebarer
+    /// Alias und dient hostseitig als Gruppierungs- und Checkpoint-Schlüssel.</remarks>
+    public string NormalizeRepositoryAlias(string alias)
+    {
+        var (host, owner, name) = ParseEventRepository(alias);
+        return $"https://{host}/{owner}/{name}";
+    }
+
+    /// <summary>Primärer Auflösungstransport: eine GraphQL-Abfrage liefert Viewer-Identität,
+    /// Repository-Metadaten und <c>viewerPermission</c> in einem Call.
+    /// <c>repository: null</c> bzw. ein <c>NOT_FOUND</c>-Fehler (aus <see cref="GraphAsync"/> bereits
+    /// <see cref="ScmProviderFailureKind.Permanent"/> klassifiziert) bedeutet „für das Konto nicht
+    /// sichtbar" und ist permanent.</summary>
+    private async Task<ScmEventRepository> ResolveEventRepositoryGraphQlAsync(IGitHubEventApiClient client,
+        string host, string owner, string name, ScmAccountMode account, CancellationToken ct)
+    {
+        var data = await GraphAsync(client, host,
+            "query($owner:String!,$name:String!){viewer{login id} repository(owner:$owner,name:$name){id databaseId name owner{login id} viewerPermission}}",
+            new Dictionary<string, object?> { ["owner"] = owner, ["name"] = name }, false, ct);
+        var remote = Object(data, "repository");
+        if (remote.ValueKind != JsonValueKind.Object)
+            throw Permanent("Das GitHub-Repository ist für das Konto nicht sichtbar.");
+        var remoteOwner = Object(remote, "owner");
+        var canonicalOwner = Required(remoteOwner, "login");
+        var canonicalName = Required(remote, "name");
+        ValidateSegment(canonicalOwner);
+        ValidateSegment(canonicalName);
+        var viewer = Object(data, "viewer");
+        return new(PluginPrefix, host, Required(remote, "id"), canonicalOwner, canonicalName,
+            Required(remoteOwner, "id"), Required(viewer, "id"), Required(viewer, "login"),
+            String(remote, "viewerPermission") is "ADMIN" or "MAINTAIN" or "WRITE",
+            account, String(remote, "databaseId"));
+    }
+
+    /// <summary>Fallback-Auflösungstransport (GHES-Kompatibilität und GraphQL-Störungen):
+    /// die bisherige Zwei-Call-REST-Auflösung <c>GET user</c> + <c>GET repos/{owner}/{name}</c>
+    /// mit unverändertem Mapping.</summary>
+    private async Task<ScmEventRepository> ResolveEventRepositoryRestAsync(IGitHubEventApiClient client,
+        string host, string owner, string name, ScmAccountMode account, CancellationToken ct)
+    {
         var viewer = await EventApiAsync(client, host, "GET", "user", null, false, ct);
         var metadata = await EventApiAsync(client, host, "GET", $"repos/{owner}/{name}", null, false, ct);
         var remoteOwner = Object(metadata, "owner");
@@ -43,7 +123,28 @@ public sealed partial class GitHubPlugin
         return new(PluginPrefix, host, Required(metadata, "node_id"), canonicalOwner, canonicalName,
             String(remoteOwner, "node_id"), Required(viewer, "node_id"), Required(viewer, "login"),
             Boolean(permissions, "push") || Boolean(permissions, "admin") || Boolean(permissions, "maintain"),
-            repository.Account, String(metadata, "id"));
+            account, String(metadata, "id"));
+    }
+
+    /// <summary>Kanonischer Cache-Schlüssel der Auflösung: Identitäts-Hash der Client-Instanz als
+    /// Konto-Dimension plus lowercased <c>{host}|{owner}|{name}</c>. Host- und Segmentzeichen
+    /// enthalten durch <see cref="ParseEventRepository"/> bzw. <see cref="ValidateSegment"/> nie
+    /// <c>|</c>, sodass das Format eindeutig bleibt.</summary>
+    private static string ResolutionCacheKey(IGitHubEventApiClient client, string host, string owner, string name)
+        => string.Join('|', RuntimeHelpers.GetHashCode(client), host.ToLowerInvariant(),
+            owner.ToLowerInvariant(), name.ToLowerInvariant());
+
+    /// <summary>Verwirft gecachte Auflösungen: <paramref name="host"/> <see langword="null"/> → alle
+    /// Einträge des Konto-Clients (bei <c>Authentication</c>; Token abgelaufen/gewechselt →
+    /// <c>ViewerId</c> potenziell falsch), sonst die Einträge des (Client, Host)-Paars (bei
+    /// <c>Permission</c> → <c>CanWrite</c> wird frisch geladen).</summary>
+    private void EvictResolutions(IGitHubEventApiClient client, string? host)
+    {
+        var clientPrefix = RuntimeHelpers.GetHashCode(client) + "|";
+        var prefix = host is null ? clientPrefix : clientPrefix + host.ToLowerInvariant() + "|";
+        foreach (var key in _resolutionCache.Keys)
+            if (key.StartsWith(prefix, StringComparison.Ordinal))
+                _resolutionCache.TryRemove(key, out _);
     }
 
     /// <inheritdoc />
@@ -313,8 +414,21 @@ public sealed partial class GitHubPlugin
         {
             var types = errors.EnumerateArray().Select(e => String(e, "type") ?? String(Object(e, "extensions"), "code")).ToArray();
             var kind = types.Contains("RATE_LIMITED") ? ScmProviderFailureKind.RateLimit
+                : types.Contains("NOT_FOUND") ? ScmProviderFailureKind.Permanent
                 : types.Contains("FORBIDDEN") ? ScmProviderFailureKind.Permission
                 : types.Contains("UNAUTHORIZED") ? ScmProviderFailureKind.Authentication : ScmProviderFailureKind.Temporary;
+            // Dieselbe Eviction-Semantik wie auf HTTP-Ebene (siehe SendEventApiAsync):
+            // Konto-Token ungültig → alle Einträge des Clients; Berechtigung → (Client, Host).
+            if (kind == ScmProviderFailureKind.Authentication) EvictResolutions(client, null);
+            else if (kind == ScmProviderFailureKind.Permission) EvictResolutions(client, host);
+            if (kind == ScmProviderFailureKind.RateLimit)
+            {
+                // GraphQL-Fehler tragen keinen Server-Reset: kurze lokale Sperre (ein Poll-Intervall)
+                // verhindert Feuer frei, ohne das Kontingent länger als nötig zu blockieren.
+                var lockedUntil = _timeProvider.GetUtcNow().Add(RateLimitLockFallbackDuration);
+                ArmRateLimitGate((client, host.ToLowerInvariant(), true), lockedUntil);
+                throw new ScmProviderException(kind, EventFailureMessage(kind, "GitHub-GraphQL-Abfrage"), lockedUntil, mutation);
+            }
             throw new ScmProviderException(kind, EventFailureMessage(kind, "GitHub-GraphQL-Abfrage"), outcomeUncertain: mutation);
         }
         var data = Object(result, "data");
@@ -345,21 +459,69 @@ public sealed partial class GitHubPlugin
     private static string CredentialKeyFor(ScmAccountMode account)
         => account == ScmAccountMode.SeparateAccount ? GitHubAgentTokenCredentialKey : GitHubTokenCredentialKey;
 
+    /// <summary>Zentraler Ereignis-Transport: prüft vor jedem Call die Rate-Limit-Sperrtabelle
+    /// <see cref="_rateLimitGates"/> (Fail-fast ohne HTTP-Request, solange der Sperrzeitpunkt nicht
+    /// erreicht ist) und wendet auf jeden typisierten Fehler — ob direkt vom Transport geworfen
+    /// oder von <see cref="EvaluateResponse"/> aus einer Antwort klassifiziert — dieselbe
+    /// Behandlung an (<see cref="OnTransportFailure"/>): <see cref="ScmProviderFailureKind.RateLimit"/>
+    /// trägt eine Sperre ein — mit <c>RetryAfterUtc</c> oder, wenn der Server keinen
+    /// Reset-Zeitpunkt liefert, mit der lokalen <see cref="RateLimitLockFallbackDuration"/> —;
+    /// <c>Authentication</c>- (Konto) bzw. <c>Permission</c>-Fehler (Client+Host) verwerfen
+    /// gecachte Auflösungen. Der Host im Gate-Schlüssel ist normalisiert, wie in Cache-Schlüssel
+    /// und Eviction.</summary>
     private async Task<GitHubEventApiResponse> SendEventApiAsync(IGitHubEventApiClient client, GitHubEventApiRequest request, bool mutation, CancellationToken ct)
     {
+        var gateKey = (client, request.Host.ToLowerInvariant(), request.Endpoint.Split('?')[0].Equals("graphql", StringComparison.Ordinal));
+        if (_rateLimitGates.TryGetValue(gateKey, out var lockedUntil) && lockedUntil > _timeProvider.GetUtcNow())
+            throw new ScmProviderException(ScmProviderFailureKind.RateLimit,
+                "GitHub-Kontingent erschöpft; nächster Versuch nach dem Rate-Limit-Reset.", lockedUntil);
         GitHubEventApiResponse response;
         try { response = await client.SendAsync(request, ct); }
         catch (ScmProviderException ex) when (mutation && ex.FailureKind == ScmProviderFailureKind.Temporary && !ex.OutcomeUncertain)
         { throw new ScmProviderException(ex.FailureKind, ex.Message, ex.RetryAfterUtc, true); }
+        catch (ScmProviderException ex)
+        {
+            // Direkt vom Transport typisiert geworfene Fehler durchlaufen dieselbe
+            // Sperr-/Eviction-Behandlung wie aus Antworten klassifizierte Fehler.
+            OnTransportFailure(ex, client, gateKey, request.Host);
+            throw;
+        }
         catch (Exception ex) when (ex is IOException or HttpRequestException or TimeoutException || (mutation && ex is OperationCanceledException))
         { throw new ScmProviderException(ScmProviderFailureKind.Temporary, "GitHub-Verbindung unterbrochen.", outcomeUncertain: mutation); }
-        return EvaluateResponse(response, $"HTTP {response.StatusCode}, {request.Host}/{request.Endpoint.Split('?')[0]}", mutation);
+        try { return EvaluateResponse(response, $"HTTP {response.StatusCode}, {request.Host}/{request.Endpoint.Split('?')[0]}", mutation); }
+        catch (ScmProviderException ex)
+        {
+            OnTransportFailure(ex, client, gateKey, request.Host);
+            throw;
+        }
     }
+
+    /// <summary>Sperr-/Eviction-Behandlung typisierter Fehler aus beiden Fehlerpfaden:
+    /// <c>RateLimit</c> armiert das Gate — Rate-Limit ohne Server-Reset armiert die lokale
+    /// Fallback-Sperre, ohne die jeder Folgeaufruf desselben Gate-Schlüssels weiter auf den
+    /// Transport ginge —; <c>Authentication</c> verwirft alle Auflösungen des Kontos,
+    /// <c>Permission</c> die des (Client, Host)-Paars.</summary>
+    private void OnTransportFailure(ScmProviderException ex, IGitHubEventApiClient client,
+        (IGitHubEventApiClient Client, string Host, bool GraphQl) gateKey, string host)
+    {
+        if (ex.FailureKind == ScmProviderFailureKind.RateLimit)
+            ArmRateLimitGate(gateKey, ex.RetryAfterUtc ?? _timeProvider.GetUtcNow().Add(RateLimitLockFallbackDuration));
+        else if (ex.FailureKind == ScmProviderFailureKind.Authentication)
+            EvictResolutions(client, null);
+        else if (ex.FailureKind == ScmProviderFailureKind.Permission)
+            EvictResolutions(client, host);
+    }
+
+    /// <summary>Trägt einen Sperr-bis-Zeitpunkt in <see cref="_rateLimitGates"/> ein; bei
+    /// konkurrierenden Einträgen desselben Schlüssels gewinnt der späteste Zeitpunkt, damit
+    /// eine kürzere Sperre eine bereits längere nicht überschreibt.</summary>
+    private void ArmRateLimitGate((IGitHubEventApiClient Client, string Host, bool GraphQl) gateKey, DateTimeOffset lockedUntil)
+        => _rateLimitGates.AddOrUpdate(gateKey, lockedUntil, (_, existing) => existing > lockedUntil ? existing : lockedUntil);
 
     /// <summary>Einheitliche Status→<see cref="ScmProviderFailureKind"/>-Matrix und Backoff-Auswertung;
     /// <paramref name="uncertain"/> gilt ausschließlich für sicher wiederholbare Aufrufe (Mutationen),
     /// niemals für den Attachment-Upload-Teilschritt.</summary>
-    private static GitHubEventApiResponse EvaluateResponse(GitHubEventApiResponse response, string detail, bool uncertain)
+    private GitHubEventApiResponse EvaluateResponse(GitHubEventApiResponse response, string detail, bool uncertain)
     {
         if (response.StatusCode is >= 200 and < 300) return response;
         var rateLimited = response.StatusCode == 429 || (response.StatusCode == 403
@@ -373,7 +535,7 @@ public sealed partial class GitHubPlugin
         };
         DateTimeOffset? retry = null;
         if (double.TryParse(Header(response, "Retry-After"), NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds))
-            retry = DateTimeOffset.UtcNow.AddSeconds(Math.Clamp(seconds, 0, 86400));
+            retry = _timeProvider.GetUtcNow().AddSeconds(Math.Clamp(seconds, 0, 86400));
         else if (DateTimeOffset.TryParse(Header(response, "Retry-After"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var retryDate)) retry = retryDate;
         else if (long.TryParse(Header(response, "X-RateLimit-Reset"), out var reset) && reset is >= 0 and <= 253402300799)
             retry = DateTimeOffset.FromUnixTimeSeconds(reset);

@@ -76,18 +76,21 @@ public sealed class ScmEventMonitoringService(
             var inboxMode = accountMode == ScmAccountMode.SeparateAccount && plugin is IScmNotificationSource;
             // Die gesamte lokale Referenzmenge auflösen, bevor irgendein eingehendes Ereignis zugeordnet
             // wird. Rohe HTTPS/SSH-Adressen und Plugin-Anzeigenamen sind keine Repository-Identitäten.
-            var aliasGroups = linked.Where(x => ScmPluginMatcher.MatchesPlugin(plugin, x.Repository))
-                .GroupBy(x => x.RepositoryId, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(x => x.Key, x => (Repository: x.First().Repository, Linked: x.ToList()), StringComparer.OrdinalIgnoreCase);
-            foreach (var repository in repositories.Where(x => ScmPluginMatcher.MatchesPlugin(plugin, x)
-                && !string.IsNullOrWhiteSpace(x.RepositoryUrl)))
-                if (!aliasGroups.ContainsKey(repository.RepositoryUrl))
-                    aliasGroups[repository.RepositoryUrl] = (repository, []);
+            // Die Gruppierung läuft über den kanonischen Alias-Schlüssel der Quelle: HTTPS-/SSH-URL,
+            // owner/name- und .git-Formen desselben Remote laufen auf eine Gruppe, einen Checkpoint
+            // und eine Auflösung zusammen; der Gruppenwert sammelt alle beteiligten lokalen
+            // Repositories und verknüpften Referenzen.
+            var aliasGroups = BuildAliasGroups(plugin, source, linked, repositories);
+            // Verwaiste Auflösungs-Checkpoints (Alt-Alias-Keys, entfernte Repositories) entfernen,
+            // bevor die aktuellen Gruppen aufgelöst werden.
+            await ScmCheckpointSupport.PruneResolutionCheckpointsAsync(scopes,
+                $"repository/{plugin.PluginPrefix.ToLowerInvariant()}/", aliasGroups.Keys, ct);
             foreach (var (alias, aliasGroup) in aliasGroups)
             {
                 using var resolutionScope = scopes.CreateScope();
                 var resolutionDb = resolutionScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
-                var resolutionKey = $"repository/{plugin.PluginPrefix.ToLowerInvariant()}/{Uri.EscapeDataString(alias.ToLowerInvariant())}";
+                var resolutionKey = ScmCheckpointSupport.ResolutionKey(
+                    $"repository/{plugin.PluginPrefix.ToLowerInvariant()}/", alias);
                 var checkpoint = await resolutionDb.ScmObservationCheckpoints.FindAsync([resolutionKey], ct);
                 if (checkpoint?.NextAttemptUtc > _time.GetUtcNow().ToUnixTimeMilliseconds())
                 {
@@ -97,12 +100,13 @@ public sealed class ScmEventMonitoringService(
                 }
                 try
                 {
-                    var repository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(aliasGroup.Repository.Id, plugin.PluginPrefix, alias, accountMode), ct);
+                    var repository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(aliasGroup.Repositories[0].Id, plugin.PluginPrefix, alias, accountMode), ct);
                     resolved.AddRange(aliasGroup.Linked.Select(x => ((Guid?)x.TaskId, new ScmEventReference(repository, x.Kind, x.Number))));
                     if (!localRepositories.TryGetValue(repository, out var candidates))
                         localRepositories[repository] = candidates = [];
-                    if (candidates.All(x => x.Id != aliasGroup.Repository.Id))
-                        candidates.Add(aliasGroup.Repository);
+                    foreach (var local in aliasGroup.Repositories)
+                        if (candidates.All(x => x.Id != local.Id))
+                            candidates.Add(local);
                     if (checkpoint is not null)
                     {
                         resolutionDb.Remove(checkpoint);
@@ -245,6 +249,46 @@ public sealed class ScmEventMonitoringService(
         // führen exakt dieselbe priorisierte Auswahl fälliger Ereignisse aus; der Poll bleibt
         // als langsamere Sicherheitsnetz-Wiederholung bestehen.
         await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchDueEventsAsync(ct);
+    }
+
+    /// <summary>Zweistufige Alias-Gruppenbildung eines Provider-Durchlaufs: verknüpfte Referenzen
+    /// und aktive Projekt-Repositories desselben Plugins laufen je kanonischem Alias-Schlüssel der
+    /// Quelle (<see cref="ScmRepositoryAliasKey.CanonicalOrRaw"/>) in eine Gruppe zusammen. Der
+    /// Gruppenwert sammelt dedupliziert alle beteiligten lokalen Repositories sowie die
+    /// verknüpften Referenzen.</summary>
+    /// <param name="plugin">Das Plugin der aktuellen Runde (Zuordnung über
+    /// <see cref="ScmPluginMatcher.MatchesPlugin"/>).</param>
+    /// <param name="source">Die Ereignisquelle des Plugins (Alias-Normalisierung).</param>
+    /// <param name="linked">Alle verknüpften Referenzen des Laufes.</param>
+    /// <param name="repositories">Alle aktiven Projekt-Repositories.</param>
+    private Dictionary<string, (List<GitRepository> Repositories,
+        List<(Guid TaskId, GitRepository Repository, ScmReferenceKind Kind, int Number, string RepositoryId)> Linked)>
+        BuildAliasGroups(IGitPlugin plugin, IScmEventSource source,
+            List<(Guid TaskId, GitRepository Repository, ScmReferenceKind Kind, int Number, string RepositoryId)> linked,
+            List<GitRepository> repositories)
+    {
+        var aliasGroups = new Dictionary<string, (List<GitRepository> Repositories,
+            List<(Guid TaskId, GitRepository Repository, ScmReferenceKind Kind, int Number, string RepositoryId)> Linked)>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in linked.Where(x => ScmPluginMatcher.MatchesPlugin(plugin, x.Repository)))
+        {
+            var key = ScmRepositoryAliasKey.CanonicalOrRaw(source, entry.RepositoryId, logger);
+            if (!aliasGroups.TryGetValue(key, out var group))
+                aliasGroups[key] = group = ([], []);
+            group.Linked.Add(entry);
+            if (group.Repositories.All(x => x.Id != entry.Repository.Id))
+                group.Repositories.Add(entry.Repository);
+        }
+        foreach (var repository in repositories.Where(x => ScmPluginMatcher.MatchesPlugin(plugin, x)
+            && !string.IsNullOrWhiteSpace(x.RepositoryUrl)))
+        {
+            var key = ScmRepositoryAliasKey.CanonicalOrRaw(source, repository.RepositoryUrl, logger);
+            if (!aliasGroups.TryGetValue(key, out var group))
+                aliasGroups[key] = group = ([], []);
+            if (group.Repositories.All(x => x.Id != repository.Id))
+                group.Repositories.Add(repository);
+        }
+        return aliasGroups;
     }
 
     /// <summary>Liest die Notifications-Inbox eines Hosts und leitet Referenzen auf registrierte

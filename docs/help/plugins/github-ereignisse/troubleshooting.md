@@ -50,6 +50,17 @@
 
 **Lösung:** Öffne **Einstellungen → Plugins → GitHub → Authentifizierung**, aktualisiere den **Personal Access Token**, speichere die Änderung und wähle beim Ereignis **Erneut prüfen**. Prüfe auch Repositoryzugriff sowie Lese- und Schreibrechte für Issues und Pull Requests. Im Überwachungsmodus „Separates Konto" gilt dieselbe Prüfung für den Token des separaten Kontos — das Bot-Konto benötigt Collaborator-Schreibrecht auf den überwachten Repositories.
 
+## Die Integrationshinweise melden ein erschöpftes GitHub-Kontingent
+
+**Ursache:** GitHub begrenzt die Zahl der API-Aufrufe pro Konto und Zeitraum (Rate-Limit). Wenn das Kontingent erschöpft ist — etwa durch sehr viele überwachte Repositories oder weil der Token parallel von anderen Werkzeugen (z. B. `gh`-Aufrufe der CLI-Agenten) genutzt wird — stellt die Anwendung weitere Aufrufe des betroffenen Kontos und Zugriffswegs bis zum von GitHub gemeldeten Reset-Zeitpunkt ein, statt weiter gegen das Limit zu laufen. Der Hinweis „GitHub-Kontingent erschöpft; nächster Versuch nach dem Rate-Limit-Reset." in den **Integrationshinweisen** der Ereignisübersicht nennt die betroffene Quelle; in dieser Zeit kommen keine neuen Ereignisse aus dem betroffenen Kontingent an, wartende Ereignisse bleiben aber erhalten.
+
+**Lösung:**
+1. Zunächst den Reset-Zeitpunkt abwarten — die Überwachung setzt danach automatisch fort, ein manueller Eingriff ist nicht nötig.
+2. Wiederholt sich das Problem regelmäßig, prüfe, ob weitere Werkzeuge denselben Token nutzen — im Modus **„Separates Konto"** verwenden auch die `gh`-Aufrufe der Agenten-CLIs das Kontingent des separaten Kontos.
+3. Viele überwachte Repositories erhöhen den Grundverbrauch; deaktiviere nicht benötigte Projekt-Repositories.
+
+> **Hinweis:** Die Anwendung schont das Kontingent bereits aktiv — Repository-Auflösungen laufen gecacht und über das eigene, meist freie GraphQL-Kontingent. Eine tatsächliche Erschöpfung deutet daher meist auf externe Verbraucher desselben Tokens oder eine sehr große überwachte Repository-Menge hin.
+
 ## Das Speichern meldet einen fehlenden Token des separaten Kontos
 
 **Ursache:** Unter **Einstellungen → Automatisierung → Aufgaben ausführen** wurde der **Überwachungsmodus „Separates Konto"** gewählt, ohne dass ein Token des separaten Kontos hinterlegt ist.

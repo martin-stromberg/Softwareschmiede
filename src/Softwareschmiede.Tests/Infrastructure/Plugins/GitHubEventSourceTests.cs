@@ -2,9 +2,11 @@ using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.Options;
 using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Infrastructure.Plugins;
 using Softwareschmiede.TestSupport;
@@ -21,7 +23,8 @@ public sealed class GitHubEventSourceTests
     private static readonly ScmEventReference Issue = new(Repository, ScmReferenceKind.Issue, 7);
     private static readonly ScmEventReference PullRequest = new(Repository, ScmReferenceKind.PullRequest, 8);
 
-    /// <summary>Identitäten benutzen dieselben Node-IDs wie die GraphQL-Autoren.</summary>
+    /// <summary>Identitäten benutzen dieselben Node-IDs wie die GraphQL-Autoren; alle Alias-Formen
+    /// lösen über genau einen GraphQL-Call mit <c>viewerPermission</c> auf.</summary>
     [Theory]
     [InlineData("https://github.com/owner/repo.git")]
     [InlineData("git@github.com:owner/repo.git")]
@@ -33,7 +36,10 @@ public sealed class GitHubEventSourceTests
         Identity(api);
         var result = await Plugin(api).GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, remote), TestContext.Current.CancellationToken);
         Assert.Equal(Repository, result);
-        Assert.All(api.Requests, request => Assert.Equal("GET", request.Method));
+        var request = Assert.Single(api.Requests);
+        Assert.Equal("POST", request.Method);
+        Assert.Equal("graphql", request.Endpoint);
+        Assert.Contains("viewerPermission", request.JsonBody);
     }
 
     /// <summary>Alle REST-Seiten und der aktuelle GraphQL-Text werden vor Rückgabe vollständig gelesen.</summary>
@@ -286,7 +292,12 @@ public sealed class GitHubEventSourceTests
     public async Task Failures_AreTypedAndSanitized(int status, ScmProviderFailureKind expected)
     {
         var api = new FakeApi();
-        api.AddStatus("user", status, new() { ["Retry-After"] = "90" });
+        api.AddStatus("graphql", status, new() { ["Retry-After"] = "90" });
+        // Temporary/RateLimit auf dem GraphQL-Primärpfad lösen den REST-Fallback aus; der
+        // REST-Aufruf scheitert mit demselben Status — die Typisierung bleibt identisch.
+        // (429 und 5xx sind immer Temporary/RateLimit; 403 ist hier RateLimit wegen Retry-After.)
+        if (status is 403 or 429 or >= 500)
+            api.AddStatus("user", status, new() { ["Retry-After"] = "90" });
         var before = DateTimeOffset.UtcNow;
         var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo"), TestContext.Current.CancellationToken));
         Assert.Equal(status == 403 ? ScmProviderFailureKind.RateLimit : expected, error.FailureKind);
@@ -302,7 +313,7 @@ public sealed class GitHubEventSourceTests
     public async Task AccessFailures_ExplainTokenSettingsAndRecovery(int status, string instruction)
     {
         var api = new FakeApi();
-        api.AddStatus("user", status);
+        api.AddStatus("graphql", status);
         var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo"), TestContext.Current.CancellationToken));
         Assert.Contains("Einstellungen → Plugins → GitHub", error.Message);
         Assert.Contains("Authentifizierung", error.Message);
@@ -321,6 +332,12 @@ public sealed class GitHubEventSourceTests
         var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.Description), TestContext.Current.CancellationToken));
         Assert.Equal(ScmProviderFailureKind.Permission, error.FailureKind);
         Assert.DoesNotContain("secret", error.Message);
+        // NOT_FOUND ist permanent (Referenz/Repository existiert nicht), kein wiederholter
+        // Temporary-Versuch — die Zuordnung ist Teil der errors[]-Typ-Matrix.
+        var notFound = new FakeApi();
+        notFound.Add("graphql", new { data = new { repository = new { issue = (object?)null } }, errors = new[] { new { type = "NOT_FOUND" } } });
+        var notFoundError = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(notFound).ReadEventsAsync(Read(Issue, ScmContentKind.Description), TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.Permanent, notFoundError.FailureKind);
     }
 
     /// <summary>Vorhandene Viewer-Reaktion auf Folgeseite verhindert einen zweiten POST.</summary>
@@ -336,7 +353,9 @@ public sealed class GitHubEventSourceTests
             Reaction: "eyes", ContentKind: ScmContentKind.IssueComment, RemoteCommentId: "42"), TestContext.Current.CancellationToken);
         Assert.True(result.AlreadyExisted);
         Assert.Equal("2", result.RemoteId);
-        Assert.All(api.Requests, x => Assert.Equal("GET", x.Method));
+        // Ein GraphQL-Auflösungs-POST (Cache-Miss), danach nur Lese-GETs.
+        Assert.Single(api.Requests, x => x.Method == "POST");
+        Assert.All(api.Requests.Where(x => x.Method != "POST"), x => Assert.Equal("GET", x.Method));
     }
 
     /// <summary>Ungewisser Kommentar-POST wird danach per Marker wiedergefunden, nicht wiederholt.</summary>
@@ -357,7 +376,8 @@ public sealed class GitHubEventSourceTests
         Assert.Contains(request.Marker, JsonDocument.Parse(posted.JsonBody!).RootElement.GetProperty("body").GetString());
         api.Add("comments?", new[] { new { id = 23, body = "Wartet\n" + request.Marker, user = new { node_id = "U_1", login = "owner" } } });
         Assert.Equal("23", (await plugin.ReconcileResponseAsync(request, TestContext.Current.CancellationToken))!.RemoteId);
-        Assert.Single(api.Requests, x => x.Method == "POST");
+        // Genau ein Schreib-POST (der Kommentar): der GraphQL-Auflösungs-POST zählt nicht als Mutation.
+        Assert.Single(api.Requests, x => x.Method == "POST" && x.Endpoint != "graphql");
     }
 
     /// <summary>Anhänge werden vor dem Kommentar-POST hochgeladen und als eingebettete Bilder
@@ -441,7 +461,8 @@ public sealed class GitHubEventSourceTests
 
             Assert.True(result.AlreadyExisted);
             Assert.Empty(api.UploadRequests);
-            Assert.All(api.Requests, x => Assert.Equal("GET", x.Method));
+            // Ein GraphQL-Auflösungs-POST (Cache-Miss), danach nur der Abgleichs-GET.
+            Assert.Single(api.Requests, x => x.Method == "POST");
         }
         finally { File.Delete(path); }
     }
@@ -812,7 +833,9 @@ public sealed class GitHubEventSourceTests
         Identity(api, "U_2");
         var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).ExecuteResponseAsync(new(Issue, "action-1", ScmResponseKind.Comment, "Antwort"), TestContext.Current.CancellationToken));
         Assert.Equal(ScmProviderFailureKind.Permission, error.FailureKind);
-        Assert.All(api.Requests, x => Assert.Equal("GET", x.Method));
+        // Die Identitätsprüfung scheitert direkt am einzigen Auflösungs-Call (GraphQL-POST).
+        Assert.Single(api.Requests);
+        Assert.Equal("POST", api.Requests[0].Method);
     }
 
     /// <summary>PR-Antworten bleiben am gespeicherten Repository und werden per Marker abgeglichen.</summary>
@@ -875,7 +898,9 @@ public sealed class GitHubEventSourceTests
         Assert.True(result.AlreadyExisted);
         Assert.Equal("77", result.RemoteId);
         Assert.Equal("https://github.com/owner/repo/issues/7", result.Url);
-        Assert.All(api.Requests, x => Assert.Equal("GET", x.Method));
+        // Ein GraphQL-Auflösungs-POST (Cache-Miss) plus der Abgleichs-GET — kein PATCH.
+        Assert.Single(api.Requests, x => x.Method == "POST");
+        Assert.All(api.Requests.Where(x => x.Method != "POST"), x => Assert.Equal("GET", x.Method));
         api.AssertComplete();
     }
 
@@ -1131,7 +1156,9 @@ public sealed class GitHubEventSourceTests
 
         Assert.Equal(Repository with { Account = ScmAccountMode.SeparateAccount }, result);
         Assert.Empty(user.Requests);
-        Assert.Equal(2, agent.Requests.Count);
+        // Ein einziger GraphQL-Call löst Viewer + Repository des separaten Kontos auf.
+        Assert.Single(agent.Requests);
+        Assert.Contains("viewerPermission", agent.Requests[0].JsonBody);
     }
 
     /// <summary>Reads folgen dem Konto der Referenz: SeparatesKonto → Agent-Client,
@@ -1181,11 +1208,467 @@ public sealed class GitHubEventSourceTests
         routed.AssertComplete();
     }
 
-    private static GitHubPlugin Plugin(FakeApi api) => new(Mock.Of<ICliRunner>(), Mock.Of<ICredentialStore>(), NullLogger<GitHubPlugin>.Instance, api,
-        null, netrcPath: GitHubPluginTests.CreateMissingNetrcPath());
-    private static GitHubPlugin Plugin(FakeApi api, ICredentialStore store, FakeApi agent)
+    /// <summary>Zweite Auflösung desselben Alias kommt aus dem TTL-Cache — kein weiterer
+    /// Transportaufruf, die eingeplante Antwort bleibt unberührt.</summary>
+    [Fact]
+    public async Task Resolution_CacheHit_ServesWithoutTransport()
+    {
+        var api = new FakeApi();
+        Identity(api);
+        var plugin = Plugin(api);
+        var context = new ScmRepositoryContext(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo");
+
+        var first = await plugin.GetEventRepositoryAsync(context, TestContext.Current.CancellationToken);
+        var second = await plugin.GetEventRepositoryAsync(context, TestContext.Current.CancellationToken);
+
+        Assert.Equal(first, second);
+        Assert.Single(api.Requests);
+        api.AssertComplete();
+    }
+
+    /// <summary>Alle Alias-Schreibweisen treffen denselben kanonischen Cache-Eintrag — nur eine
+    /// Remote-Auflösung für alle Formen.</summary>
+    [Fact]
+    public async Task Resolution_AliasForms_ShareCacheEntry()
+    {
+        var api = new FakeApi();
+        Identity(api);
+        var plugin = Plugin(api);
+        foreach (var remote in new[] { "https://github.com/owner/repo.git", "git@github.com:owner/repo.git",
+                 "ssh://git@github.com/owner/repo.git", "owner/repo" })
+        {
+            var result = await plugin.GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, remote), TestContext.Current.CancellationToken);
+            Assert.Equal(Repository, result);
+        }
+        Assert.Single(api.Requests);
+        api.AssertComplete();
+    }
+
+    /// <summary>Nach Ablauf der konfigurierten TTL wird die Auflösung erneut transportiert.</summary>
+    [Fact]
+    public async Task Resolution_CacheExpires_AfterTtl()
+    {
+        var time = new FakeTimeProvider();
+        var api = new FakeApi();
+        Identity(api);
+        Identity(api);
+        var plugin = Plugin(api, new ScmResolutionCacheOptions { RepositoryResolutionCacheTtl = TimeSpan.FromSeconds(30) }, time);
+        var context = new ScmRepositoryContext(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo");
+
+        await plugin.GetEventRepositoryAsync(context, TestContext.Current.CancellationToken);
+        time.Advance(TimeSpan.FromSeconds(31));
+        var result = await plugin.GetEventRepositoryAsync(context, TestContext.Current.CancellationToken);
+
+        Assert.Equal(Repository, result);
+        Assert.Equal(2, api.Requests.Count);
+        api.AssertComplete();
+    }
+
+    /// <summary>Fehlgeschlagene Auflösungen werden nicht gecacht: Der nächste Aufruf versucht
+    /// den Transport erneut und kann erfolgreich sein.</summary>
+    [Fact]
+    public async Task Resolution_Failure_IsNotCached()
+    {
+        var api = new FakeApi();
+        api.AddStatus("graphql", 503);
+        api.AddStatus("user", 503);
+        var plugin = Plugin(api);
+        var context = new ScmRepositoryContext(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo");
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.GetEventRepositoryAsync(context, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.Temporary, error.FailureKind);
+
+        Identity(api);
+        var result = await plugin.GetEventRepositoryAsync(context, TestContext.Current.CancellationToken);
+
+        Assert.Equal(Repository, result);
+        Assert.Equal(3, api.Requests.Count);
+        api.AssertComplete();
+    }
+
+    /// <summary>Anmelde- und Berechtigungsfehler des GraphQL-Primärpfads werden direkt
+    /// durchgereicht — kein REST-Fallback.</summary>
+    [Theory]
+    [InlineData(401, ScmProviderFailureKind.Authentication)]
+    [InlineData(403, ScmProviderFailureKind.Permission)]
+    public async Task Resolution_AuthenticationAndPermission_ArePropagated(int status, ScmProviderFailureKind expected)
+    {
+        var api = new FakeApi();
+        api.AddStatus("graphql", status);
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => Plugin(api).GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo"), TestContext.Current.CancellationToken));
+        Assert.Equal(expected, error.FailureKind);
+        Assert.Single(api.Requests);
+        api.AssertComplete();
+    }
+
+    /// <summary>Ein Temporary-GraphQL-Fehler (errors[] ohne Typ) fällt auf die bisherige
+    /// REST-Zweischritt-Auflösung zurück und liefert ein identisches Ergebnis.</summary>
+    [Fact]
+    public async Task Resolution_GraphQLTemporary_FallsBackToRest()
+    {
+        var api = new FakeApi();
+        api.Add("graphql", new { data = new { repository = (object?)null }, errors = new[] { new { message = "boom" } } });
+        IdentityRest(api);
+        var result = await Plugin(api).GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo"), TestContext.Current.CancellationToken);
+        Assert.Equal(Repository, result);
+        Assert.Equal(3, api.Requests.Count);
+        Assert.All(api.Requests.Skip(1), x => Assert.Equal("GET", x.Method));
+        api.AssertComplete();
+    }
+
+    /// <summary>Eine Rate-Limit-Antwort des GraphQL-Primärpfads fällt ebenfalls auf den
+    /// REST-Fallback zurück (eigenes REST-Kontingent).</summary>
+    [Fact]
+    public async Task Resolution_GraphQLRateLimit_FallsBackToRest()
+    {
+        var api = new FakeApi();
+        api.AddStatus("graphql", 429, new() { ["Retry-After"] = "60" });
+        IdentityRest(api);
+        var result = await Plugin(api).GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo"), TestContext.Current.CancellationToken);
+        Assert.Equal(Repository, result);
+        Assert.Equal(3, api.Requests.Count);
+        api.AssertComplete();
+    }
+
+    /// <summary>Ein für das Konto unsichtbares Repository (repository: null bzw. NOT_FOUND) ist
+    /// permanent: kein REST-Fallback, kein Cache-Eintrag — der nächste Aufruf versucht erneut.</summary>
+    [Fact]
+    public async Task Resolution_NotFound_IsPermanent()
+    {
+        var api = new FakeApi();
+        api.AddGraph(new { viewer = new { id = "U_1", login = "owner" }, repository = (object?)null });
+        var plugin = Plugin(api);
+        var context = new ScmRepositoryContext(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo");
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.GetEventRepositoryAsync(context, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.Permanent, error.FailureKind);
+        Assert.Single(api.Requests);
+
+        api.Add("graphql", new { data = new { repository = (object?)null }, errors = new[] { new { type = "NOT_FOUND" } } });
+        var second = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.GetEventRepositoryAsync(context, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.Permanent, second.FailureKind);
+        Assert.Equal(2, api.Requests.Count);
+        api.AssertComplete();
+    }
+
+    /// <summary>Eine REST-Rate-Limit-403 (Remaining: 0 + Reset) sperrt Folge-REST-Calls fail-fast:
+    /// Die Exception trägt RetryAfterUtc, ohne dass ein weiterer HTTP-Request entsteht.</summary>
+    [Fact]
+    public async Task RateLimit_Rest403_GatesSubsequentRestCalls()
+    {
+        var api = new FakeApi();
+        var reset = DateTimeOffset.UtcNow.AddSeconds(90).ToUnixTimeSeconds();
+        api.AddStatus("issues/7", 403, new() { ["X-RateLimit-Remaining"] = "0", ["X-RateLimit-Reset"] = reset.ToString(System.Globalization.CultureInfo.InvariantCulture) });
+        var plugin = Plugin(api);
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.RateLimit, error.FailureKind);
+
+        var calls = api.Requests.Count;
+        var gated = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+
+        Assert.Equal(ScmProviderFailureKind.RateLimit, gated.FailureKind);
+        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(reset), gated.RetryAfterUtc);
+        Assert.Equal(calls, api.Requests.Count);
+        api.AssertComplete();
+    }
+
+    /// <summary>Die Budget-Trennung hält: Eine REST-Sperre blockiert die GraphQL-Auflösung nicht.</summary>
+    [Fact]
+    public async Task RateLimit_GraphQL_ContinuesDuringRestGate()
+    {
+        var api = new FakeApi();
+        var reset = DateTimeOffset.UtcNow.AddSeconds(90).ToUnixTimeSeconds();
+        api.AddStatus("issues/7", 403, new() { ["X-RateLimit-Remaining"] = "0", ["X-RateLimit-Reset"] = reset.ToString(System.Globalization.CultureInfo.InvariantCulture) });
+        Identity(api);
+        var plugin = Plugin(api);
+        await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+
+        var result = await plugin.GetEventRepositoryAsync(new(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo"), TestContext.Current.CancellationToken);
+
+        Assert.Equal(Repository, result);
+        var calls = api.Requests.Count;
+        var gated = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.RateLimit, gated.FailureKind);
+        Assert.Equal(calls, api.Requests.Count);
+        api.AssertComplete();
+    }
+
+    /// <summary>Nach Ablauf des Reset-Zeitpunkts verfällt die Sperre — der nächste Call geht wieder durch.</summary>
+    [Fact]
+    public async Task RateLimit_Gate_ExpiresAfterReset()
+    {
+        var time = new FakeTimeProvider();
+        var api = new FakeApi();
+        var reset = time.GetUtcNow().AddSeconds(90).ToUnixTimeSeconds();
+        api.AddStatus("issues/7", 403, new() { ["X-RateLimit-Remaining"] = "0", ["X-RateLimit-Reset"] = reset.ToString(System.Globalization.CultureInfo.InvariantCulture) });
+        var plugin = Plugin(api, timeProvider: time);
+        await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+        Assert.Single(api.Requests);
+
+        time.Advance(TimeSpan.FromSeconds(91));
+        api.Add("issues/7", new { number = 7, title = "t", body = (string?)null });
+
+        var issue = await plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(issue);
+        Assert.Equal(2, api.Requests.Count);
+        api.AssertComplete();
+    }
+
+    /// <summary>GraphQL-RATE_LIMITED aus errors[] (ohne Server-Reset) sperrt den GraphQL-Transport
+    /// für 60 Sekunden; die Exception trägt die lokale Sperrfrist als RetryAfterUtc.</summary>
+    [Fact]
+    public async Task RateLimit_GraphQlErrors_ShortLockout()
+    {
+        var time = new FakeTimeProvider();
+        var api = new FakeApi();
+        api.Add("graphql", new { data = new { repository = (object?)null }, errors = new[] { new { type = "RATE_LIMITED" } } });
+        var plugin = Plugin(api, timeProvider: time);
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadEventsAsync(Read(Issue, ScmContentKind.Description), TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.RateLimit, error.FailureKind);
+        Assert.Equal(time.GetUtcNow().AddSeconds(60), error.RetryAfterUtc);
+
+        var gated = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadEventsAsync(Read(Issue, ScmContentKind.Description), TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.RateLimit, gated.FailureKind);
+        Assert.Single(api.Requests);
+
+        time.Advance(TimeSpan.FromSeconds(61));
+        api.AddGraph(new { repository = new { issue = Node("I_7", "text") } });
+        var batch = await plugin.ReadEventsAsync(Read(Issue, ScmContentKind.Description), TestContext.Current.CancellationToken);
+        Assert.Single(batch.Observations);
+        api.AssertComplete();
+    }
+
+    /// <summary>Das Rate-Limit-Gate wirkt je Client-Instanz (Konto): Die Sperre des Agent-Clients
+    /// lässt den Benutzer-Client desselben Hosts ungehindert weiterlaufen.</summary>
+    [Fact]
+    public async Task RateLimit_Gate_IsolatesAccountClients()
+    {
+        var user = new FakeApi();
+        var agent = new FakeApi();
+        var reset = DateTimeOffset.UtcNow.AddSeconds(90).ToUnixTimeSeconds();
+        agent.AddStatus("issues/7", 403, new() { ["X-RateLimit-Remaining"] = "0", ["X-RateLimit-Reset"] = reset.ToString(System.Globalization.CultureInfo.InvariantCulture) });
+        user.Add("issues/7", new { number = 7, title = "t", body = (string?)null });
+        var plugin = Plugin(user, StoreWithAgentToken(), agent);
+        var agentIssue = Issue with { Repository = Repository with { Account = ScmAccountMode.SeparateAccount } };
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(agentIssue, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.RateLimit, error.FailureKind);
+
+        var issue = await plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(issue);
+        Assert.Single(user.Requests);
+        var gated = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(agentIssue, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.RateLimit, gated.FailureKind);
+        Assert.Single(agent.Requests);
+        user.AssertComplete();
+        agent.AssertComplete();
+    }
+
+    /// <summary>Rate-Limit ohne serverseitigen Reset (429 ohne Header; 403 nur mit
+    /// <c>X-RateLimit-Remaining: 0</c>) armiert die lokale 60-s-Fallback-Sperre:
+    /// Folgecalls sind fail-fast, nach Ablauf geht der Transport wieder durch.</summary>
+    [Theory]
+    [InlineData(429)]
+    [InlineData(403)]
+    public async Task RateLimit_RestWithoutReset_GatesWithFallbackLock(int status)
+    {
+        var time = new FakeTimeProvider();
+        var api = new FakeApi();
+        api.AddStatus("issues/7", status, status == 403 ? new() { ["X-RateLimit-Remaining"] = "0" } : null);
+        var plugin = Plugin(api, timeProvider: time);
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.RateLimit, error.FailureKind);
+
+        var gated = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.RateLimit, gated.FailureKind);
+        Assert.Equal(time.GetUtcNow().AddSeconds(60), gated.RetryAfterUtc);
+        Assert.Single(api.Requests);
+
+        time.Advance(TimeSpan.FromSeconds(61));
+        api.Add("issues/7", new { number = 7, title = "t", body = (string?)null });
+        var issue = await plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken);
+        Assert.NotNull(issue);
+        Assert.Equal(2, api.Requests.Count);
+        api.AssertComplete();
+    }
+
+    /// <summary>Der Gate-Schlüssel normalisiert den Host wie der Auflösungscache: Eine unter
+    /// gemischt geschriebenem Host eingetragene Sperre greift auch für die Kleinschreib-Form.</summary>
+    [Fact]
+    public async Task RateLimit_Gate_NormalizesHost()
+    {
+        var api = new FakeApi();
+        var reset = DateTimeOffset.UtcNow.AddSeconds(90).ToUnixTimeSeconds();
+        api.AddStatus("issues/7", 403, new() { ["X-RateLimit-Remaining"] = "0", ["X-RateLimit-Reset"] = reset.ToString(System.Globalization.CultureInfo.InvariantCulture) });
+        var plugin = Plugin(api);
+        var mixedCaseIssue = Issue with { Repository = Repository with { Host = "GHE.Example.com" } };
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(mixedCaseIssue, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.RateLimit, error.FailureKind);
+
+        var lowerCaseIssue = Issue with { Repository = Repository with { Host = "ghe.example.com" } };
+        var gated = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(lowerCaseIssue, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.RateLimit, gated.FailureKind);
+        Assert.Single(api.Requests);
+        api.AssertComplete();
+    }
+
+    /// <summary>Ein typisierter Rate-Limit-Fehler, den der Transport direkt aus <c>SendAsync</c>
+    /// wirft (statt als HTTP-Antwort klassifiziert zu werden), armiert dasselbe Gate:
+    /// Folgecalls sind fail-fast und tragen den RetryAfterUtc-Zeitpunkt der Sperre.</summary>
+    [Fact]
+    public async Task RateLimit_TransportException_GatesSubsequentCalls()
+    {
+        var time = new FakeTimeProvider();
+        var api = new FakeApi();
+        var retry = time.GetUtcNow().AddSeconds(90);
+        api.AddFailure("issues/7", new ScmProviderException(ScmProviderFailureKind.RateLimit, "typed", retry));
+        var plugin = Plugin(api, timeProvider: time);
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.RateLimit, error.FailureKind);
+
+        var gated = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.RateLimit, gated.FailureKind);
+        Assert.Equal(retry, gated.RetryAfterUtc);
+        Assert.Single(api.Requests);
+        api.AssertComplete();
+    }
+
+    /// <summary>Ein Authentication-Fehler verwirft sämtliche Cache-Einträge des betroffenen Kontos
+    /// (neue Auflösung geht auf den Transport); die Einträge des anderen Kontos bleiben.</summary>
+    [Fact]
+    public async Task Cache_Authentication_EvictsAccountEntries()
+    {
+        var user = new FakeApi();
+        var agent = new FakeApi();
+        Identity(user);
+        Identity(agent);
+        var plugin = Plugin(user, StoreWithAgentToken(), agent);
+        var userContext = new ScmRepositoryContext(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo");
+        var agentContext = new ScmRepositoryContext(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo", ScmAccountMode.SeparateAccount);
+        await plugin.GetEventRepositoryAsync(userContext, TestContext.Current.CancellationToken);
+        await plugin.GetEventRepositoryAsync(agentContext, TestContext.Current.CancellationToken);
+        Assert.Single(user.Requests);
+        Assert.Single(agent.Requests);
+
+        user.AddStatus("issues/7", 401);
+        Identity(user);
+        await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+
+        // Benutzer-Eintrag verworfen → Transport; Agent-Eintrag unberührt → Cache-Hit.
+        var reloaded = await plugin.GetEventRepositoryAsync(userContext, TestContext.Current.CancellationToken);
+        var agentResult = await plugin.GetEventRepositoryAsync(agentContext, TestContext.Current.CancellationToken);
+        Assert.Equal(Repository, reloaded);
+        Assert.Equal(Repository with { Account = ScmAccountMode.SeparateAccount }, agentResult);
+        Assert.Equal(3, user.Requests.Count);
+        Assert.Single(agent.Requests);
+        user.AssertComplete();
+        agent.AssertComplete();
+    }
+
+    /// <summary>Ein Permission-Fehler verwirft nur die Einträge des betroffenen (Client, Host)-Paars;
+    /// andere Hosts desselben Kontos und das andere Konto bleiben gecacht.</summary>
+    [Fact]
+    public async Task Cache_Permission_EvictsClientHostEntries()
+    {
+        var user = new FakeApi();
+        var agent = new FakeApi();
+        Identity(user);
+        Identity(user);
+        Identity(agent);
+        var plugin = Plugin(user, StoreWithAgentToken(), agent);
+        var gitHub = new ScmRepositoryContext(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo");
+        var ghe = new ScmRepositoryContext(Guid.NewGuid(), Repository.ProviderPrefix, "https://ghe.example.com/owner/repo");
+        var agentContext = new ScmRepositoryContext(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo", ScmAccountMode.SeparateAccount);
+        await plugin.GetEventRepositoryAsync(gitHub, TestContext.Current.CancellationToken);
+        await plugin.GetEventRepositoryAsync(ghe, TestContext.Current.CancellationToken);
+        await plugin.GetEventRepositoryAsync(agentContext, TestContext.Current.CancellationToken);
+        Assert.Equal(2, user.Requests.Count);
+
+        user.AddStatus("issues/7", 403);
+        Identity(user);
+        await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+
+        // github.com-Eintrag des Benutzer-Clients verworfen → Transport; ghe.example.com und das
+        // Agent-Konto bleiben Cache-Hits ohne Transport.
+        await plugin.GetEventRepositoryAsync(gitHub, TestContext.Current.CancellationToken);
+        var gheResult = await plugin.GetEventRepositoryAsync(ghe, TestContext.Current.CancellationToken);
+        var agentResult = await plugin.GetEventRepositoryAsync(agentContext, TestContext.Current.CancellationToken);
+        Assert.Equal("ghe.example.com", gheResult.Host);
+        Assert.Equal(ScmAccountMode.SeparateAccount, agentResult.Account);
+        Assert.Equal(4, user.Requests.Count);
+        Assert.Single(agent.Requests);
+        user.AssertComplete();
+        agent.AssertComplete();
+    }
+
+    /// <summary>Ein typisierter Authentication-Fehler direkt aus dem Transport (statt als
+    /// HTTP-Antwort klassifiziert) verwirft ebenfalls die gecachten Auflösungen des Kontos.</summary>
+    [Fact]
+    public async Task Cache_TransportAuthentication_EvictsAccountEntries()
+    {
+        var api = new FakeApi();
+        Identity(api);
+        var plugin = Plugin(api);
+        var context = new ScmRepositoryContext(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo");
+        await plugin.GetEventRepositoryAsync(context, TestContext.Current.CancellationToken);
+        Assert.Single(api.Requests);
+
+        api.AddFailure("issues/7", new ScmProviderException(ScmProviderFailureKind.Authentication, "typed"));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.Authentication, error.FailureKind);
+
+        // Cache-Eintrag verworfen → die Neuauflösung geht erneut auf den Transport (3. Request).
+        Identity(api);
+        var reloaded = await plugin.GetEventRepositoryAsync(context, TestContext.Current.CancellationToken);
+        Assert.Equal(Repository, reloaded);
+        Assert.Equal(3, api.Requests.Count);
+        api.AssertComplete();
+    }
+
+    /// <summary>Ein typisierter Permission-Fehler direkt aus dem Transport verwirft die
+    /// Einträge des (Client, Host)-Paars — dieselbe Eviction wie ein klassifizierter 403.</summary>
+    [Fact]
+    public async Task Cache_TransportPermission_EvictsClientHostEntries()
+    {
+        var api = new FakeApi();
+        Identity(api);
+        var plugin = Plugin(api);
+        var context = new ScmRepositoryContext(Guid.NewGuid(), Repository.ProviderPrefix, "owner/repo");
+        await plugin.GetEventRepositoryAsync(context, TestContext.Current.CancellationToken);
+        Assert.Single(api.Requests);
+
+        api.AddFailure("issues/7", new ScmProviderException(ScmProviderFailureKind.Permission, "typed"));
+        var error = await Assert.ThrowsAsync<ScmProviderException>(() => plugin.ReadIssueAsync(Issue, TestContext.Current.CancellationToken));
+        Assert.Equal(ScmProviderFailureKind.Permission, error.FailureKind);
+
+        // Cache-Eintrag verworfen → die Neuauflösung geht erneut auf den Transport (3. Request).
+        Identity(api);
+        var reloaded = await plugin.GetEventRepositoryAsync(context, TestContext.Current.CancellationToken);
+        Assert.Equal(Repository, reloaded);
+        Assert.Equal(3, api.Requests.Count);
+        api.AssertComplete();
+    }
+
+    /// <summary>Die optionale Normalisierer-Schnittstelle bildet alle Alias-Formen auf dieselbe
+    /// kanonische HTTPS-Form ab und lehnt unparsebare Werte typisiert ab.</summary>
+    [Fact]
+    public void NormalizeRepositoryAlias_CanonicalizesAllForms()
+    {
+        var plugin = Plugin(new FakeApi());
+        Assert.Equal("https://github.com/owner/repo", plugin.NormalizeRepositoryAlias("https://github.com/owner/repo.git"));
+        Assert.Equal("https://github.com/owner/repo", plugin.NormalizeRepositoryAlias("git@github.com:owner/repo.git"));
+        Assert.Equal("https://github.com/owner/repo", plugin.NormalizeRepositoryAlias("ssh://git@github.com/owner/repo.git"));
+        Assert.Equal("https://github.com/owner/repo", plugin.NormalizeRepositoryAlias("owner/repo"));
+        var error = Assert.Throws<ScmProviderException>(() => plugin.NormalizeRepositoryAlias("kein-alias"));
+        Assert.Equal(ScmProviderFailureKind.Permanent, error.FailureKind);
+    }
+
+    private static GitHubPlugin Plugin(FakeApi api, ScmResolutionCacheOptions? options = null, TimeProvider? timeProvider = null)
+        => new(Mock.Of<ICliRunner>(), Mock.Of<ICredentialStore>(), NullLogger<GitHubPlugin>.Instance, api,
+            null, netrcPath: GitHubPluginTests.CreateMissingNetrcPath(), resolutionOptions: options, timeProvider: timeProvider);
+    private static GitHubPlugin Plugin(FakeApi api, ICredentialStore store, FakeApi agent, ScmResolutionCacheOptions? options = null, TimeProvider? timeProvider = null)
         => new(Mock.Of<ICliRunner>(), store, NullLogger<GitHubPlugin>.Instance, api, agent,
-            netrcPath: GitHubPluginTests.CreateMissingNetrcPath());
+            netrcPath: GitHubPluginTests.CreateMissingNetrcPath(), resolutionOptions: options, timeProvider: timeProvider);
     private static ICredentialStore StoreWithAgentToken()
     {
         var store = new Mock<ICredentialStore>();
@@ -1193,7 +1676,28 @@ public sealed class GitHubEventSourceTests
         return store.Object;
     }
     private static ScmEventReadRequest Read(ScmEventReference reference, ScmContentKind kind) => new(reference, kind, null, Created.AddHours(1));
+    /// <summary>Plant die GraphQL-Auflösungsantwort (Viewer + Repository + <c>viewerPermission</c>
+    /// in einem Call); <paramref name="numericId"/> entspricht dem REST-<c>id</c>-Feld und landet
+    /// als <c>databaseId</c> in <see cref="ScmEventRepository.NumericRepositoryId"/>.</summary>
     private static void Identity(FakeApi api, string viewer = "U_1", long? numericId = null)
+    {
+        api.AddGraph(new
+        {
+            viewer = new { id = viewer, login = "owner" },
+            repository = new
+            {
+                id = "R_1",
+                databaseId = numericId,
+                name = "repo",
+                owner = new { id = "U_1", login = "owner" },
+                viewerPermission = "WRITE"
+            }
+        });
+    }
+
+    /// <summary>Plant die REST-Fallback-Auflösung (<c>GET user</c> + <c>GET repos/…</c>) mit
+    /// demselben Identitätsbild wie <see cref="Identity"/>.</summary>
+    private static void IdentityRest(FakeApi api, string viewer = "U_1", long? numericId = null)
     {
         api.Add("user", new { node_id = viewer, login = "owner" });
         api.Add("repos/owner/repo", numericId is { } id
