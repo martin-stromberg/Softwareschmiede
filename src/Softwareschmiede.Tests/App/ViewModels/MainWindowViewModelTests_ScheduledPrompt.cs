@@ -12,7 +12,7 @@ using Softwareschmiede.Tests.Helpers;
 namespace Softwareschmiede.Tests.App.ViewModels;
 
 /// <summary>Unit-Tests für MainWindowViewModel im Zusammenhang mit zeitgesteuerten Prompts: Die Seitenleisten-Liste
-/// muss den "Prompt in Wartestellung"-Status eines aktiven PromptZeitVersandService-Eintrags übernehmen.</summary>
+/// muss den "Prompt in Wartestellung"-Status eines aktiven PromptScheduleDispatchService-Eintrags übernehmen.</summary>
 public sealed class MainWindowViewModelTests_ScheduledPrompt : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
@@ -77,7 +77,7 @@ public sealed class MainWindowViewModelTests_ScheduledPrompt : IDisposable
             new MainWindowOptionalServices(DispatcherInvoke: action => action()));
     }
 
-    /// <summary>Ist für eine Aufgabe ein zeitgesteuerter Prompt beim PromptZeitVersandService geplant, muss das
+    /// <summary>Ist für eine Aufgabe ein zeitgesteuerter Prompt beim PromptScheduleDispatchService geplant, muss das
     /// entsprechende AktiveAufgabePanelItem in der Seitenleisten-Liste HasScheduledPrompt=true tragen.</summary>
     [Fact]
     public async Task RefreshActiveWorkItemsAsync_WithPlannedPrompt_SetsHasScheduledPrompt()

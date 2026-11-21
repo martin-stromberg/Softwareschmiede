@@ -432,7 +432,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <summary>True wenn Status == Beendet, sonst false.</summary>
     public bool ShowDiffPanel => _workItem?.Status == Domain.Enums.WorkItemStatus.Completed;
 
-    /// <summary>True wenn Aufgabe.LokalerKlonPfad gesetzt ist und das Verzeichnis existiert. Wird beim Setzen von <see cref="WorkItem"/> einmalig ermittelt und gecacht, um wiederholte synchrone Dateisystemzugriffe bei jedem Property-Zugriff zu vermeiden.</summary>
+    /// <summary>True wenn Aufgabe.LocalClonePath gesetzt ist und das Verzeichnis existiert. Wird beim Setzen von <see cref="WorkItem"/> einmalig ermittelt und gecacht, um wiederholte synchrone Dateisystemzugriffe bei jedem Property-Zugriff zu vermeiden.</summary>
     public bool ShowFileExplorerPanel => _showFileExplorerPanel;
 
     /// <summary>
@@ -465,7 +465,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         && !_isCliRunning
         && !string.IsNullOrEmpty(_editTitle);
 
-    /// <summary>CanExecute für LoeschenCommand: Status ∉ {Archiviert} &amp;&amp; !IsCliRunning.</summary>
+    /// <summary>CanExecute für DeleteCommand: Status ∉ {Archiviert} &amp;&amp; !IsCliRunning.</summary>
     /// <value>true wenn die Aufgabe gelöscht werden kann.</value>
     public bool DeleteCan => _workItem?.Status is not Domain.Enums.WorkItemStatus.Archived
         && _workItem != null
@@ -790,8 +790,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     private async Task LoadLogAsync(CancellationToken ct)
     {
         LogEntries.Clear();
-        var protokolleintraege = await _logService.GetByWorkItemAsync(_workItemId, ct);
-        foreach (var entry in protokolleintraege)
+        var logEntries = await _logService.GetByWorkItemAsync(_workItemId, ct);
+        foreach (var entry in logEntries)
             LogEntries.Add(entry);
     }
 
@@ -923,7 +923,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 // Der Prozess konnte nicht beendet werden (Beendigungsfehler werden in StopCliAsync
                 // nur geloggt): Laufdaten und Session-Anbindung bleiben bestehen, damit Fußzeile
                 // und Kachel den tatsächlich weiterlaufenden Prozess zeigen statt fälschlich
-                // "Bereit" (Issue 342, Divergenzpfad F1). KannCliStoppen bleibt erneut auslösbar.
+                // "Bereit" (Issue 342, Divergenzpfad F1). CanStopCli bleibt erneut auslösbar.
                 ErrorMessage = "Der CLI-Prozess konnte nicht beendet werden und läuft weiter. Bitte erneut versuchen.";
                 return;
             }
@@ -2115,8 +2115,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 var (plugin, entryPoints) = await ResolveIdeEntryPointsAsync(effectiveWorkdir, ct);
 
                 // Zusätzlich: KannIdeAuswaehlen aus der aggregierten Ermittlung über alle kompatiblen Plugins aktualisieren.
-                var aggregierteEntries = await ResolveAggregatedIdeEntryPointsAsync(effectiveWorkdir, ct);
-                SelectCanIde = CalculateCanIdeSelect(aggregierteEntries.Count);
+                var aggregatedEntries = await ResolveAggregatedIdeEntryPointsAsync(effectiveWorkdir, ct);
+                SelectCanIde = CalculateCanIdeSelect(aggregatedEntries.Count);
 
                 if (entryPoints.Count == 0)
                     throw new FileNotFoundException($"Keine Einstiegspunkte im Repository gefunden: {effectiveWorkdir}");

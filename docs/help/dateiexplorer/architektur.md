@@ -232,7 +232,7 @@ Inline-Runs für geänderte Wortteile
 - **UI-Rendering:** TreeView ist virtualisiert; DiffViewer ist nicht virtualisiert (kann bei 1000+ Zeilen langsam werden)
 - **Speicher:** Lazy-Loading spielt bei tiefen Navigationen gut — pro Knoten ist maximal eine Ebene mehr geladen als angezeigt; Zuklappen-Bereinigung gibt Speicher frei
 
-## Zuverlässigkeit und Fehlertoleranz
+## Zuverlässigkeit und FehlertoleranceMinutes
 
 - **Git-Fehler** beim Snapshot-Laden: Exception wird geloggt; `CommitGruppen` wird nicht gefüllt, Hinweis wird angezeigt
 - **Nicht existierender Pfad**: `LoadWorkingTreeAsync()` liefert leere Liste; UI zeigt leeren Baum

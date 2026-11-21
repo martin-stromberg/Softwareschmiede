@@ -259,7 +259,7 @@ public sealed class ScmEventExchangeAttachmentTests : IDisposable
         return output;
     }
 
-    /// <summary>Removes only the newly created isolated test repository; Junction-Punkte
+    /// <summary>Entfernt nur das neu erstellte isolierte Test-Repository; Junction-Punkte
     /// aus dem Reparse-Test werden als Verknüpfung gelöscht statt rekursiv verfolgt.</summary>
     public void Dispose()
     {

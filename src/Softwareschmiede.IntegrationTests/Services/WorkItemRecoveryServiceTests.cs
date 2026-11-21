@@ -101,10 +101,10 @@ public sealed class WorkItemRecoveryServiceTests
         await using var context1 = db.CreateNewContext();
         await using var context2 = db.CreateNewContext();
 
-        // The barrier ensures both tasks complete their initial entity read (RecoveryVersion=0)
-        // before either proceeds to the transaction and update. Without it, one task may finish
-        // vollständig vor den anderen liest, sodass die zweite Aufgabe eine andere RecoveryVersion als Ausgang erhält.
-        // and allowing both to succeed.
+        // Die Barriere stellt sicher, dass beide Tasks ihren initialen Entity-Read (RecoveryVersion=0)
+        // abgeschlossen haben, bevor einer mit Transaktion und Update fortfährt. Ohne sie kann ein Task
+        // vollständig beendet sein, bevor der andere liest, sodass die zweite Aufgabe eine andere
+        // RecoveryVersion als Ausgang erhält und fälschlich beide Updates erfolgreich wären.
         var runningStatus = new BarrieredNotRunningStatusSource(participantCount: 2);
         var recovery1 = new WorkItemRecoveryService(context1, runningStatus, NullLogger<WorkItemRecoveryService>.Instance);
         var recovery2 = new WorkItemRecoveryService(context2, runningStatus, NullLogger<WorkItemRecoveryService>.Instance);
@@ -177,9 +177,9 @@ public sealed class WorkItemRecoveryServiceTests
         public WorkItemRunStatus? GetLiveRunStatus(Guid workItemId) => null;
     }
 
-    // Ensures all participant tasks have completed their initial DB read before any proceeds to
-    // the transaction and UPDATE. SignalAndWait blocks synchronously, so Task.Run is required in
-    // the calling test to avoid deadlock on a single-threaded context.
+    // Stellt sicher, dass alle Teilnehmer-Tasks ihren initialen DB-Read abgeschlossen haben, bevor einer
+    // mit der Transaktion und dem UPDATE fortfährt. SignalAndWait blockiert synchron, daher muss der
+    // aufrufende Test Task.Run verwenden, um keinen Deadlock im Single-Threaded-Kontext zu erzeugen.
     private sealed class BarrieredNotRunningStatusSource(int participantCount) : IRunningAutomationStatusSource
     {
         private readonly Barrier _barrier = new(participantCount);
@@ -208,7 +208,7 @@ public sealed class WorkItemRecoveryServiceTests
         {
             // Aktiven Ausführungsstatus direkt auf der Entity setzen (das frühere
             // AufgabeService.AusfuehrungAktivSetzenAsync wurde entfernt): simuliert den Zustand
-            // einer gestarteten Aufgabe ohne zugehörige Laufdaten (AktiveRunId bleibt null).
+            // einer gestarteten Aufgabe ohne zugehörige Laufdaten (ActiveRunId bleibt null).
             workItem.ExecutionStatus = WorkItemExecutionStatus.Active;
             await db.Context.SaveChangesAsync();
         }

@@ -13,14 +13,14 @@ namespace Softwareschmiede.Tests.App.ViewModels;
 /// <summary>
 /// Unit-Tests für das Split-Button-Verhalten der IDE-Öffnen-Funktion in TaskDetailViewModel:
 /// <see cref="TaskDetailViewModel.OpenIdeSelectionCommand"/>, <see cref="TaskDetailViewModel.SelectCanIde"/>
-/// und den waehleEntryPointAsync-Callback.
+/// und den SelectEntryPointAsync-Callback.
 /// </summary>
 public sealed class TaskDetailViewModelTests_IdeSelection : TaskDetailViewModelTestBase
 {
     /// <summary>Präfix für über CreateTempDirectory() erzeugte temporäre Verzeichnisse.</summary>
     protected override string TempDirectoryPrefix => "tdvm_ide_auswahl_tests";
 
-    /// <summary>Bei mehreren Solutions ruft OeffneIdeAuswahlCommand OeffneIdeAuswahlAsync auf, das - anders als OeffneIdeCommand - den Auswahl-Dialog anzeigt.</summary>
+    /// <summary>Bei mehreren Solutions ruft OeffneIdeAuswahlCommand OpenIdeSelectionAsync auf, das - anders als OeffneIdeCommand - den Auswahl-Dialog anzeigt.</summary>
     [Fact]
     public async Task OpenIdeSelectionCommand_ExecuteAsync_CallsOpenIdeSelectionAsyncOn()
     {
@@ -186,7 +186,7 @@ public sealed class TaskDetailViewModelTests_IdeSelection : TaskDetailViewModelT
         sut.ErrorMessage.Should().NotBeNullOrEmpty();
     }
 
-    /// <summary>Bei mehreren Einstiegspunkten zeigt der waehleEntryPointAsync-Callback (über OeffneIdeAuswahlCommand) den Auswahl-Dialog an und öffnet den dort gewählten Einstiegspunkt.</summary>
+    /// <summary>Bei mehreren Einstiegspunkten zeigt der SelectEntryPointAsync-Callback (über OeffneIdeAuswahlCommand) den Auswahl-Dialog an und öffnet den dort gewählten Einstiegspunkt.</summary>
     [Fact]
     public async Task SelectEntryPointAsync_WithMultipleEntryPoints_ShowsDialogAndReturnsSelected()
     {
@@ -219,7 +219,7 @@ public sealed class TaskDetailViewModelTests_IdeSelection : TaskDetailViewModelT
             Times.Once);
     }
 
-    /// <summary>Bricht der Anwender den Auswahl-Dialog ab (Rückgabe null), öffnet der waehleEntryPointAsync-Callback nichts.</summary>
+    /// <summary>Bricht der Anwender den Auswahl-Dialog ab (Rückgabe null), öffnet der SelectEntryPointAsync-Callback nichts.</summary>
     [Fact]
     public async Task SelectEntryPointAsync_WithDialogAbort_ReturnsNull()
     {
@@ -244,7 +244,7 @@ public sealed class TaskDetailViewModelTests_IdeSelection : TaskDetailViewModelT
         sut.ErrorMessage.Should().BeNullOrEmpty("ein Abbruch des Auswahl-Dialogs ist kein Fehler");
     }
 
-    /// <summary>Der waehleEntryPointAsync-Callback nutzt IdeEntryPoint.DisplayName (statt Path) für die Anzeige im Auswahl-Dialog, sofern gesetzt.</summary>
+    /// <summary>Der SelectEntryPointAsync-Callback nutzt IdeEntryPoint.DisplayName (statt Path) für die Anzeige im Auswahl-Dialog, sofern gesetzt.</summary>
     [Fact]
     public async Task SelectEntryPointAsync_UsesDisplayNameInDialog()
     {
@@ -305,7 +305,7 @@ public sealed class TaskDetailViewModelTests_IdeSelection : TaskDetailViewModelT
         sut.SelectCanIde.Should().BeTrue("die Anzahl der gefundenen Einstiegspunkte hat sich durch den Öffnen-Fehler nicht geändert");
     }
 
-    /// <summary>Ohne gefundene Einstiegspunkte zeigt OeffneIdeAuswahlAsync dieselbe Fehlermeldung wie OeffneIdeAsync.</summary>
+    /// <summary>Ohne gefundene Einstiegspunkte zeigt OpenIdeSelectionAsync dieselbe Fehlermeldung wie OpenIdeAsync.</summary>
     [Fact]
     public async Task OpenIdeSelectionAsync_WithNoEntryPoints_ShowsError()
     {

@@ -42,7 +42,7 @@ public partial class End2EndTest
         taskDetail.SaveTask();
         taskDetail.WaitForPersisted();
 
-        // Aufgabe direkt in der Test-DB auf Gestartet/Aktiv setzen, damit sie als aktive Aufgabe
+        // Aufgabe direkt in der Test-DB auf Started/Aktiv setzen, damit sie als aktive Aufgabe
         // in der Seitenleiste erscheint (über die UI nicht abbildbar ohne echten CLI-Start).
         await using (var db = OpenTestDbContext())
         {

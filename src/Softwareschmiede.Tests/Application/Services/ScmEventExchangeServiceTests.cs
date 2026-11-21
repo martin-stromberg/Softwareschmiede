@@ -20,7 +20,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
         Git("init", "--quiet");
     }
 
-    /// <summary>The full original text is JSON data and never terminal control bytes.</summary>
+    /// <summary>Der vollständige Originaltext ist JSON-Dateninhalt und niemals Terminal-Steuerbytes.</summary>
     [Fact]
     public async Task Prepare_ExcludesChannelAndEscapesAllTerminalControls()
     {
@@ -105,7 +105,7 @@ public sealed class ScmEventExchangeServiceTests : IDisposable
         document.RootElement.GetProperty("instruction").GetString().Should().NotContain("sessionName");
     }
 
-    /// <summary>An occupied or tracked channel is never overwritten.</summary>
+    /// <summary>Ein belegter oder verfolgter Kanal wird niemals überschrieben.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

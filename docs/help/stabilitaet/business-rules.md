@@ -86,7 +86,7 @@
 **Beschreibung:** Alle persistierten Laufdaten einer Aufgabe (`ActiveRunId`, `LastHeartbeatUtc`, `LastCliStartUtc`, `RunStatus`, `ExecutionStatus`) werden ausschließlich in `RunGates`-serialisierten Schreibphasen verändert — unabhängig davon, aus welchem Pfad (Laufdaten-Selbstheilung, Prozess-Exit, ViewModel, Lebenszyklus) die Schreiboperation kommt.
 
 **Bedingungen:**
-- Ein `WorkItemService`-Aufruf mutiert Laufdaten (`StartenAsync`, `CompleteAsync`, `ResetStartAsync`, `SetActiveRunAsync`, `EndActiveRunAsync`, `EnsureActiveRunAsync`).
+- Ein `WorkItemService`-Aufruf mutiert Laufdaten (`StartAsync`, `CompleteAsync`, `ResetStartAsync`, `SetActiveRunAsync`, `EndActiveRunAsync`, `EnsureActiveRunAsync`).
 
 **Verhalten:**
 - Pro Aufgabe wird ein `SemaphoreSlim(1,1)` aus der statischen `ConcurrentDictionary` `RunGates` gehalten — die Sperre gilt prozessweit über alle (scoped) `WorkItemService`-Instanzen und deren getrennte DbContexts hinweg.

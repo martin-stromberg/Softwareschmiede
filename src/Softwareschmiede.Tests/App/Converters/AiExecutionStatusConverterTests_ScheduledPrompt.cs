@@ -29,7 +29,7 @@ public sealed class AiExecutionStatusConverterTests_ScheduledPrompt
         result.Should().Be("⏳ Prompt in Wartestellung");
     }
 
-    /// <summary>HasScheduledPrompt hat Vorrang vor dem sonst aus AktiveRunId/LaufStatus abgeleiteten "▶ Läuft".</summary>
+    /// <summary>HasScheduledPrompt hat Vorrang vor dem sonst aus ActiveRunId/LaufStatus abgeleiteten "▶ Läuft".</summary>
     [Fact]
     public void Convert_ShouldReturnPromptInQueue_EvenWhenCliIsRunning()
     {

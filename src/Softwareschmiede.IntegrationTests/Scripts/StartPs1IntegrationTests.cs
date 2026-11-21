@@ -103,7 +103,7 @@ public sealed class StartPs1IntegrationTests : IDisposable
     }
 
     /// <summary>
-    /// Validates fallback to a project profile when no http profile exists.
+    /// Prüft den Rückfall auf ein Projektprofil, wenn kein HTTP-Profil existiert.
     /// </summary>
     [Fact]
     public async Task StartScript_ShouldUseProjectProfile_WhenHttpProfileIsMissing()

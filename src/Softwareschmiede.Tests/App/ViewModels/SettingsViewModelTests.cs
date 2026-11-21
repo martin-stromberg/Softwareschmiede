@@ -495,7 +495,7 @@ public sealed class SettingsViewModelTests : IDisposable
         savedStatus.Should().BeTrue();
     }
 
-    /// <summary>LadenCommand fällt bei fehlenden oder unbekannten gespeicherten Update-Werten auf die Defaults zurück.</summary>
+    /// <summary>LoadCommand fällt bei fehlenden oder unbekannten gespeicherten Update-Werten auf die Defaults zurück.</summary>
     [Fact]
     public async Task UpdateSettings_DefaultsAndInvalidValues()
     {
@@ -631,7 +631,7 @@ public sealed class SettingsViewModelTests : IDisposable
                 "Verwerfen darf keine Update-Werte schreiben");
     }
 
-    /// <summary>LadenCommand füllt die SCM--Einstellungen mit den Defaults: Überwachung aktiv, Standard-Trigger.</summary>
+    /// <summary>LoadCommand füllt die SCM--Einstellungen mit den Defaults: Überwachung aktiv, Standard-Trigger.</summary>
     [Fact]
     public async Task LoadCommand_LoadsScmMonitoringDefaults()
     {
@@ -784,7 +784,7 @@ public sealed class SettingsViewModelTests : IDisposable
         changes.Should().Contain(nameof(sut.WorkItemsExitStatusText));
     }
 
-    /// <summary>LadenCommand lädt den Backmerge-Modus; ohne gespeicherten Eintrag gilt „Deaktiviert“.</summary>
+    /// <summary>LoadCommand lädt den Backmerge-Modus; ohne gespeicherten Eintrag gilt „Deaktiviert“.</summary>
     [Fact]
     public async Task LoadCommand_LoadsBackmergeModeDefaults()
     {
@@ -817,7 +817,7 @@ public sealed class SettingsViewModelTests : IDisposable
         sut.SelectedBackmergeMode.Should().Be(ScmBackmergeModeOption.ForMode(ScmBackmergeMode.ProjectScoped));
     }
 
-    /// <summary>LadenCommand füllt die fünf SCM-Prompt-Anhänge mit leeren Feldern, wenn nichts gespeichert ist.</summary>
+    /// <summary>LoadCommand füllt die fünf SCM-Prompt-Anhänge mit leeren Feldern, wenn nichts gespeichert ist.</summary>
     [Fact]
     public async Task LoadCommand_LoadsScmPromptAppendixDefaults()
     {
@@ -911,7 +911,7 @@ public sealed class SettingsViewModelTests : IDisposable
         return mock;
     }
 
-    /// <summary>LadenCommand lädt den Konto-Modus; ohne Eintrag gilt „Benutzerkonto“.</summary>
+    /// <summary>LoadCommand lädt den Konto-Modus; ohne Eintrag gilt „Benutzerkonto“.</summary>
     [Fact]
     public async Task LoadCommand_LoadsAccountModeDefaults()
     {
@@ -1002,7 +1002,7 @@ public sealed class SettingsViewModelTests : IDisposable
         _credentialStore.GetCredential("Softwareschmiede.GitHub.AgentToken").Should().Be("bot-token");
     }
 
-    /// <summary>LadenCommand lädt den Prüfmodus der Abschlussüberwachung; ohne Eintrag gilt „Ereignisgesteuert“.</summary>
+    /// <summary>LoadCommand lädt den Prüfmodus der Abschlussüberwachung; ohne Eintrag gilt „Ereignisgesteuert“.</summary>
     [Fact]
     public async Task LoadCommand_LoadsCheckmodeDefaults()
     {
@@ -1051,7 +1051,7 @@ public sealed class SettingsViewModelTests : IDisposable
         (await _settingService.GetScmTaskCompletionCheckModeAsync(TestContext.Current.CancellationToken)).Should().Be(ScmTaskCompletionCheckMode.EventDriven);
     }
 
-    /// <summary>LadenCommand lädt die Backmerge-Optionen; ohne Eintrag sind beide deaktiviert.</summary>
+    /// <summary>LoadCommand lädt die Backmerge-Optionen; ohne Eintrag sind beide deaktiviert.</summary>
     [Fact]
     public async Task LoadCommand_LoadsBackmergeOptionsDefaults()
     {

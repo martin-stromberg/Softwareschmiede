@@ -16,7 +16,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// (<c>echo [[...]]</c>) auf dem echten Ausgabepfad <c>PseudoConsoleSession → CliOutputProtokollWriter</c>
 /// einer laufenden KiSimulator-Aufgabe emittiert. Erwartet: RateLimit-Protokolleintrag an der
 /// auslösenden Aufgabe, persistiertes Plugin-Limit unter
-/// <c>plugins.sessionlimit.Softwareschmiede.KiSimulator</c>, PausiertBisUtc auf allen laufenden
+/// <c>plugins.sessionlimit.Softwareschmiede.KiSimulator</c>, PausedUntilUtc auf allen laufenden
 /// Aufgaben desselben Prefix, pausierte Kacheln — ohne Unterbrechung der laufenden CLI.
 /// Zusätzlich wird die Update-Sicherheitsprüfung (<see cref="CliUpdateSafetyService"/>) mit einem
 /// in-Test instanziierten Service gegen die laufende Test-DB geprüft.
@@ -42,7 +42,7 @@ public partial class End2EndTest
     /// Szenario: Zwei Aufgaben laufen mit dem KiSimulator; über die UI wird an Aufgabe B ein
     /// zeitgesteuerter Prompt mit vergangener Zielzeit (→ Sofortversand) gesendet, der den
     /// Rate-Limit-Marker per <c>echo</c> auf die CLI-Ausgabe schreibt. Anschließend werden
-    /// Protokolleintrag, App-Einstellung, PausiertBisUtc beider Aufgaben und die pausierten
+    /// Protokolleintrag, App-Einstellung, PausedUntilUtc beider Aufgaben und die pausierten
     /// Seitenleisten-Kacheln geprüft — bei weiterlaufender CLI von B (kein Unterbrechen). Danach
     /// wird die Update-Sicherheitsprüfung verifiziert: Limit-Aufgaben trotz frischem Heartbeat
     /// nicht riskant, Fremd-Prefix-Aufgabe riskant, nach Ablauf des Limits wieder riskant.
@@ -118,7 +118,7 @@ public partial class End2EndTest
         WaitForElement(mainWindow, cf => cf.ByName("ScheduledSend"), Short).AsButton().Click();
 
         // Warten, bis der Marker auf dem echten Ausgabepfad verarbeitet wurde:
-        // RateLimit-Protokolleintrag an Aufgabe B + PausiertBisUtc an beiden Aufgaben.
+        // RateLimit-Protokolleintrag an Aufgabe B + PausedUntilUtc an beiden Aufgaben.
         // Die interaktive /k-Shell des KiSimulators (Issue #271) führt den echo-Befehl sofort aus —
         // kein 30-s-Blocker durch ein Einmal-Kommando mehr.
         await WaitUntilAsync(async () =>
@@ -150,7 +150,7 @@ public partial class End2EndTest
             AssertPausedUntilUtc(a.PausedUntilUtc, resetUtc, LimitTitleA);
             AssertPausedUntilUtc(b.PausedUntilUtc, resetUtc, LimitTitleB);
 
-            // Kein Unterbrechen: AktiveRunId von B ist unverändert, Status weiterhin Gestartet/Aktiv.
+            // Kein Unterbrechen: ActiveRunId von B ist unverändert, Status weiterhin Gestartet/Aktiv.
             Assert.Equal(runIdB, b.ActiveRunId);
             Assert.Equal(WorkItemExecutionStatus.Active, b.ExecutionStatus);
         }

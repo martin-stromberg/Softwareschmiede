@@ -11,18 +11,18 @@ Der technische Ablauf beschreibt die Ausführungsschritte, wenn der Benutzer ein
 ### 1. IDE-Öffnen auslösen
 
 Der Split-Button „IDE öffnen" in der Aufgabendetailansicht (TaskDetailView) besteht aus zwei Teilen, die unterschiedliche Plugin-Auflösungen verwenden:
-1. **Haupt-Button:** Ruft `TaskDetailViewModel.OpenIdeCommand.OeffneIdeAsync()` auf — löst über `PluginSelectionService.ResolveIdePluginAsync()` genau **ein** priorisiertes IDE-Plugin auf und öffnet direkt dessen ersten Einstiegspunkt (unverändert gegenüber dem Single-Plugin-Verhalten vor der Multi-Plugin-Aggregation)
-2. **Dropdown-Button:** Ruft `TaskDetailViewModel.OpenIdeSelectionCommand.OeffneIdeAuswahlAsync()` auf — löst über `PluginSelectionService.ResolveAllCompatibleIdePluginsAsync()` **alle** aktivierten, zum Repository `Explicit`- oder `Fallback`-kompatiblen IDE-Plugins auf, ermittelt je Plugin dessen Einstiegspunkte und aggregiert sie zu einer gemeinsamen Liste; zeigt einen Auswahl-Dialog, sobald diese aggregierte Liste mehr als einen Eintrag enthält
+1. **Haupt-Button:** Ruft `TaskDetailViewModel.OpenIdeCommand.OpenIdeAsync()` auf — löst über `PluginSelectionService.ResolveIdePluginAsync()` genau **ein** priorisiertes IDE-Plugin auf und öffnet direkt dessen ersten Einstiegspunkt (unverändert gegenüber dem Single-Plugin-Verhalten vor der Multi-Plugin-Aggregation)
+2. **Dropdown-Button:** Ruft `TaskDetailViewModel.OpenIdeSelectionCommand.OpenIdeSelectionAsync()` auf — löst über `PluginSelectionService.ResolveAllCompatibleIdePluginsAsync()` **alle** aktivierten, zum Repository `Explicit`- oder `Fallback`-kompatiblen IDE-Plugins auf, ermittelt je Plugin dessen Einstiegspunkte und aggregiert sie zu einer gemeinsamen Liste; zeigt einen Auswahl-Dialog, sobald diese aggregierte Liste mehr als einen Eintrag enthält
 
 Beide verwenden `IIdePlugin.FindEntryPointsAsync()`/`OpenEntryPointAsync()` zum Ermitteln bzw. Öffnen der Einstiegspunkte (siehe [Dateisystem-Integration](../dateisystem-integration/ablauf-technisch.md) für die vollständige Ablaufbeschreibung). Der Dialog wird nur beim Dropdown-Button angezeigt und zeigt dann plugin-qualifizierte Anzeigewerte (Format „{PluginName}: {Einstiegspunkt-Bezeichnung}"), da die Liste Einträge aus mehreren Plugins gleichzeitig enthalten kann.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.OeffneIdeAsync()` — Wird vom Haupt-Button aufgerufen; öffnet direkt ohne Dialog, basierend auf genau einem aufgelösten Plugin
-- `TaskDetailViewModel.OeffneIdeAuswahlAsync()` — Wird vom Dropdown-Button aufgerufen; zeigt Dialog bei mehreren aggregierten Einstiegspunkten aus allen kompatiblen Plugins
+- `TaskDetailViewModel.OpenIdeAsync()` — Wird vom Haupt-Button aufgerufen; öffnet direkt ohne Dialog, basierend auf genau einem aufgelösten Plugin
+- `TaskDetailViewModel.OpenIdeSelectionAsync()` — Wird vom Dropdown-Button aufgerufen; zeigt Dialog bei mehreren aggregierten Einstiegspunkten aus allen kompatiblen Plugins
 - `TaskDetailViewModel.ResolveIdeEntryPointsAsync()` — Single-Plugin-Ermittlung für den Haupt-Button (nutzt `ResolveIdePluginAsync()`)
 - `TaskDetailViewModel.ResolveAggregatedIdeEntryPointsAsync()` — Multi-Plugin-Ermittlung für den Dropdown-Button (nutzt `ResolveAllCompatibleIdePluginsAsync()`), auch für die Berechnung von `SelectCanIde` genutzt
 - `TaskDetailViewModel.FormatDisplayValue()` — Formatiert einen Einstiegspunkt plugin-qualifiziert für die Dialog-Anzeige
-- `TaskDetailViewModel.waehleEntryPointAsync()` — Callback-Methode für den Dialog-Service
+- `TaskDetailViewModel.SelectEntryPointAsync()` — Callback-Methode für den Dialog-Service
 - `PluginSelectionService.ResolveIdePluginAsync()` — Löst das eine zuständige, priorisierte IDE-Plugin auf (Haupt-Button)
 - `PluginSelectionService.ResolveAllCompatibleIdePluginsAsync()` — Löst alle aktivierten, kompatiblen IDE-Plugins auf, sortiert Explicit- vor Fallback-Plugins (jeweils in konfigurierter Reihenfolge) (Dropdown-Button)
 - `RibbonSplitButton` — Neue WPF-Komponente für den Split-Button mit Haupt- und Dropdown-Button
@@ -81,7 +81,7 @@ Das eine über `ResolveIdePluginAsync()` aufgelöste Plugin wird mit `plugin.Fin
 Alle über `ResolveAllCompatibleIdePluginsAsync()` aufgelösten Plugins werden **nacheinander** nach ihren Einstiegspunkten gefragt (`plugin.FindEntryPointsAsync()` je Plugin); Fehler bei einem einzelnen Plugin werden geloggt und übersprungen, statt die gesamte Ermittlung abzubrechen. Die Ergebnisse werden zu einer gemeinsamen Liste von `(Plugin, EntryPoint)`-Tupeln aggregiert (Plugin-Reihenfolge und Einstiegspunkt-Reihenfolge je Plugin bleiben erhalten):
 - **0 aggregierte Einstiegspunkte:** `FileNotFoundException` wird geworfen.
 - **Genau 1 aggregierter Einstiegspunkt:** wird direkt geöffnet, ohne Dialog.
-- **Mehr als 1 aggregierter Einstiegspunkt:** Der Callback (`waehleEntryPointAsync`) wird mit allen `(Plugin, EntryPoint)`-Tupeln aufgerufen; jeder Eintrag wird über `FormatDisplayValue()` plugin-qualifiziert formatiert (Format „{PluginName}: {Bezeichnung}", oder nur „{PluginName}", falls Bezeichnung == PluginName); zeigt den Dialog an und liefert das gewählte `(Plugin, EntryPoint)`-Tupel oder `null` (Abbruch). Geöffnet wird anschließend über das zum gewählten Tupel gehörende Plugin — nicht zwingend dasselbe, das für den Haupt-Button aufgelöst würde.
+- **Mehr als 1 aggregierter Einstiegspunkt:** Der Callback (`SelectEntryPointAsync`) wird mit allen `(Plugin, EntryPoint)`-Tupeln aufgerufen; jeder Eintrag wird über `FormatDisplayValue()` plugin-qualifiziert formatiert (Format „{PluginName}: {Bezeichnung}", oder nur „{PluginName}", falls Bezeichnung == PluginName); zeigt den Dialog an und liefert das gewählte `(Plugin, EntryPoint)`-Tupel oder `null` (Abbruch). Geöffnet wird anschließend über das zum gewählten Tupel gehörende Plugin — nicht zwingend dasselbe, das für den Haupt-Button aufgelöst würde.
 
 **Falls Visual Studio Plugin beteiligt:**
 - `VisualStudioIdePlugin.FindEntryPointsAsync()` ermittelt alle `.sln`/`.slnx`-Dateien (via `FindSolutionFiles()`) und liefert je Datei einen `IdeEntryPoint`
@@ -100,7 +100,7 @@ Beteiligte Komponenten:
 - `TaskDetailViewModel.ResolveAggregatedIdeEntryPointsAsync()` — aggregiert `(Plugin, EntryPoint)`-Tupel über alle kompatiblen Plugins
 - `TaskDetailViewModel.FormatDisplayValue()` — plugin-qualifizierte Anzeige-Formatierung
 - `VisualStudioIdePlugin.OpenSolutionFile()`, `VisualStudioCodeIdePlugin.OpenDirectory()` — Hilfsmethoden
-- `IProzessStarter` — Startet externe Prozesse (Visual Studio/VS Code)
+- `IProcessStarter` — Startet externe Prozesse (Visual Studio/VS Code)
 - `IVisualStudioCodeLocator` — Ermittelt VS Code Installationspfad
 
 > **Hinweis:** Die frühere, in `OpenIdeService` per Typ-Prüfung (`plugin is VisualStudioIdePlugin`) umgesetzte Sonderbehandlung für mehrere Visual-Studio-Solutions entfällt vollständig. Die Verzweigung nach Anzahl der Einstiegspunkte ist für alle `IIdePlugin`-Implementierungen einheitlich — beim Dropdown-Button zusätzlich über die Grenzen einzelner Plugins hinweg aggregiert.
@@ -117,7 +117,7 @@ flowchart TD
     D -->|Nein| E["GetDefaultIdePlugin<br/>Standardplugin verwenden"]
     D -->|Ja| G["Plugin-Schleife"]
     G --> H["CheckCompatibilityAsync"]
-    H --> I{Ergebnis}
+    H --> I{Result}
     I -->|Explicit| J["Plugin ausgewählt,<br/>Schleife bricht ab"]
     I -->|Fallback| K{Fallback<br/>bereits<br/>gemerkt?}
     K -->|Nein| L["Fallback merken,<br/>nächstes Plugin"]
@@ -135,13 +135,13 @@ flowchart TD
     Q -->|0| Q0["FileNotFoundException"]
     Q -->|"≥1"| Q3["OpenEntryPointAsync<br/>ersten Einstiegspunkt öffnen<br/>kein Dialog"]
 
-    AB -->|Dropdown-Button| B2["ResolveAlleKompatiblenIdePluginsAsync<br/>repositoryPath"]
+    AB -->|Dropdown-Button| B2["ResolveAllCompatibleIdePluginsAsync<br/>repositoryPath"]
     B2 --> C2["GetOrderedEnabledIdePluginsAsync<br/>aktivierte Plugins laden + sortieren<br/>gleiche Hilfsmethode wie oben"]
     C2 --> D2{Plugins<br/>aktiv?}
     D2 -->|Nein| E2["Einelementige Liste<br/>mit GetDefaultIdePlugin"]
     D2 -->|Ja| G2["Plugin-Schleife<br/>ohne frühen Abbruch"]
     G2 --> H2["CheckCompatibilityAsync<br/>je Plugin"]
-    H2 --> I2{Ergebnis}
+    H2 --> I2{Result}
     I2 -->|Explicit| J2["zu explicitPlugins<br/>hinzufügen"]
     I2 -->|Fallback| K2["zu fallbackPlugins<br/>hinzufügen"]
     I2 -->|Incompatible| L2["ignorieren"]
@@ -158,7 +158,7 @@ flowchart TD
     P2a --> Q2{Anzahl<br/>aggregierter<br/>Einstiegspunkte}
     Q2 -->|0| Q0
     Q2 -->|1| Q1["OpenEntryPointAsync<br/>direkt, ohne Rückfrage"]
-    Q2 -->|">1"| QD["FormatiereAnzeigeWert je Tupel<br/>Auswahl-Dialog anzeigen"]
+    Q2 -->|">1"| QD["FormatDisplayValue je Tupel<br/>Auswahl-Dialog anzeigen"]
     QD --> QDa{Benutzer<br/>wählt?}
     QDa -->|Abbruch / null| QDb["Nichts öffnen"]
     QDa -->|"(Plugin, EntryPoint) gewählt"| Q4["OpenEntryPointAsync<br/>über das zum Tupel gehörende Plugin"]
@@ -168,7 +168,7 @@ flowchart TD
     Q4 --> R
     R -->|Visual Studio| S["OpenSolutionFile"]
     R -->|VS Code| T["OpenDirectory"]
-    S --> V["IProcessStarter.Start<br/>mit ShellAusfuehren"]
+    S --> V["IProcessStarter.Start<br/>mit UseShellExecute"]
     T --> V
     V --> W[IDE startet]
 ```
@@ -182,14 +182,14 @@ flowchart TD
 
 ### Fehler beim IDE-Öffnen
 
-**Generisch (`TaskDetailViewModel.OeffneIdeInternAsync`):**
+**Generisch (`TaskDetailViewModel.OpenIdeInternalAsync`):**
 - Haupt-Button: Falls `plugin.FindEntryPointsAsync()` (des einen aufgelösten Plugins) eine leere Liste liefert: `FileNotFoundException` wird geworfen (keine Kandidaten zum Öffnen vorhanden)
 - Dropdown-Button: Falls die aggregierte Liste aus `ResolveAggregatedIdeEntryPointsAsync()` über alle kompatiblen Plugins hinweg leer ist (kein Plugin liefert Einstiegspunkte): `FileNotFoundException` wird geworfen
 
 **Visual Studio:**
-- Falls keine `.sln`-Datei gefunden: `FindEntryPointsAsync()` liefert eine leere Liste (löst die generische `FileNotFoundException` in `TaskDetailViewModel.OeffneIdeInternAsync()` aus; sollte nicht passieren, da `Explicit` nur bei Fund gemeldet wird)
-- Falls `.sln`-Öffnen fehlschlägt: `IProzessStarter` ist verantwortlich (normalerweise Shell-Fehler)
+- Falls keine `.sln`-Datei gefunden: `FindEntryPointsAsync()` liefert eine leere Liste (löst die generische `FileNotFoundException` in `TaskDetailViewModel.OpenIdeInternalAsync()` aus; sollte nicht passieren, da `Explicit` nur bei Fund gemeldet wird)
+- Falls `.sln`-Öffnen fehlschlägt: `IProcessStarter` ist verantwortlich (normalerweise Shell-Fehler)
 
 **Visual Studio Code:**
 - Falls `code`-CLI nicht verfunden: `InvalidOperationException` mit Nachricht "Visual Studio Code wurde nicht gefunden." (geworfen aus `OpenEntryPointAsync()`)
-- Falls Verzeichnis-Öffnen fehlschlägt: `IProzessStarter` ist verantwortlich
+- Falls Verzeichnis-Öffnen fehlschlägt: `IProcessStarter` ist verantwortlich

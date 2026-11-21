@@ -70,7 +70,7 @@ public sealed class VisualStudioCodeIdePluginTests
         entryPoints[0].DisplayName.Should().Be("Visual Studio Code");
     }
 
-    /// <summary>OpenEntryPointAsync ruft IProzessStarter mit dem aufgelösten VS-Code-Befehl und dem Pfad des Einstiegspunkts auf.</summary>
+    /// <summary>OpenEntryPointAsync ruft IProcessStarter mit dem aufgelösten VS-Code-Befehl und dem Pfad des Einstiegspunkts auf.</summary>
     [Fact]
     public async Task OpenEntryPointAsync_CallsOpenDirectoryOn()
     {

@@ -89,7 +89,7 @@ public sealed class E2E_IdePluginSelection : IDisposable
     }
 
     /// <summary>
-    /// Bildet den Resolve/Find/Open-Ablauf nach, den auch <c>TaskDetailViewModel.OeffneIdeInternAsync</c>
+    /// Bildet den Resolve/Find/Open-Ablauf nach, den auch <c>TaskDetailViewModel.OpenIdeInternalAsync</c>
     /// nutzt: Plugin über <see cref="PluginSelectionService.ResolveIdePluginAsync"/> auflösen, dessen
     /// Einstiegspunkte ermitteln und den ersten öffnen. Alle Szenarien dieser Klasse liefern genau einen
     /// Einstiegspunkt, daher wird hier bewusst keine Mehrfach-Auswahl-Verzweigung nachgebildet.

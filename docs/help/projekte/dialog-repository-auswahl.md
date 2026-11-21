@@ -90,7 +90,7 @@ Das ausgewählte `SelectedWorkingDirectory` wird mit der `RepositoryStartKonfigu
 - Path-Traversal-Angriffe zu verhindern (Validierung, dass normalisierter Pfad innerhalb normalisierten Roots liegt)
 - Existenz des Zielverzeichnisses zu prüfen
 
-Der resultierende Pfad wird an `AiExecutionService.StartCliAsync()` / `StartTerminalSessionAsync()` als `ProcessStartInfo.WorkingDirectory` übergeben. Zusätzlich validiert `GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(...)` das konfigurierte Arbeitsverzeichnis bereits direkt nach dem Git-Klon (aufgerufen aus `DevelopmentProcessService.ProzessStartenAsync`), sodass ein fehlendes oder ungültiges Verzeichnis früher und mit einem klareren Fehlerbild erkannt wird als erst beim CLI-Start.
+Der resultierende Pfad wird an `AiExecutionService.StartCliAsync()` / `StartTerminalSessionAsync()` als `ProcessStartInfo.WorkingDirectory` übergeben. Zusätzlich validiert `GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(...)` das konfigurierte Arbeitsverzeichnis bereits direkt nach dem Git-Klon (aufgerufen aus `DevelopmentProcessService.StartProcessAsync`), sodass ein fehlendes oder ungültiges Verzeichnis früher und mit einem klareren Fehlerbild erkannt wird als erst beim CLI-Start.
 
 Das einmal zugewiesene Arbeitsverzeichnis kann jederzeit nachträglich geändert werden, ohne das Repository neu zuzuweisen — siehe [Dialog „Arbeitsverzeichnis bearbeiten"](dialog-arbeitsverzeichnis-bearbeiten.md).
 
@@ -209,7 +209,7 @@ Der Dialog unterstützt beide Themes (Light und Dark) vollständig:
 | SCM-Plugin-Liste leer | Keine Plugins verfügbar | Hilfe-Panel zeigen; Dialog deaktivieren |
 | Plugin nicht gewählt | `SelectedScmPlugin == null` | Repository-Liste bleibt leer; „Zuweisen"-Button deaktiviert |
 | Repository nicht gewählt | `SelectedRepository == null` | „Zuweisen"-Button deaktiviert |
-| Plugin-Typ-Vergleich | `GitRepository.PluginTyp` muss mit `IGitPlugin.PluginType.ToString()` exakt übereinstimmen (case-sensitive) | Repositories mit nicht übereinstimmendem PluginTyp werden gefiltert |
+| Plugin-Typ-Vergleich | `GitRepository.PluginType` muss mit `IGitPlugin.PluginType.ToString()` exakt übereinstimmen (case-sensitive) | Repositories mit nicht übereinstimmendem PluginTyp werden gefiltert |
 | Manuelles Arbeitsverzeichnis leer | `WorkingDirectoryInputText` ist leer oder Whitespace | Wird als `"."` normalisiert |
 | Manuelles Arbeitsverzeichnis absolut | `Path.IsPathRooted(...) == true` | „Zuweisen"-Button bleibt deaktiviert und `WorkingDirectoryInputError` wird gesetzt |
 | Manuelles Arbeitsverzeichnis verlässt Repository | Pfad enthält ein Segment `..` | „Zuweisen"-Button bleibt deaktiviert und `WorkingDirectoryInputError` wird gesetzt |
@@ -243,8 +243,8 @@ Der Dialog unterstützt beide Themes (Light und Dark) vollständig:
 | `SelectedScmPluginChanged_ShouldClearRepositories_WhenPluginUnselected` | Überprüft, dass Repositories geleert werden wenn Plugin deselektiert |
 | `SelectedScmPluginChanged_ShouldSetIsLoading_FlagDuringReload` | Überprüft, dass `IsLoading` während Reload gesetzt wird |
 | `ReloadRepositoriesForSelectedPlugin_ShouldLogError_WhenServiceThrows` | Überprüft Error-Handling und Logging |
-| `RepositorySelection_ShouldEnableBestaetigenCommand_WhenRepositorySelected` | Überprüft, dass Command aktiviert wird bei Auswahl |
-| `RepositorySelection_ShouldDisableBestaetigenCommand_WhenRepositoryUnselected` | Überprüft, dass Command deaktiviert wird ohne Auswahl |
+| `RepositorySelection_ShouldEnableConfirmCommand_WhenRepositorySelected` | Überprüft, dass Command aktiviert wird bei Auswahl |
+| `RepositorySelection_ShouldDisableConfirmCommand_WhenRepositoryUnselected` | Überprüft, dass Command deaktiviert wird ohne Auswahl |
 | `SelectedRepositoryChanged_ShouldLoadDirectoryStructure` | Überprüft, dass `LoadDirectoryStructureAsync()` aufgerufen wird bei Repository-Änderung |
 | `SelectedRepositoryChanged_ShouldResetSelectedWorkingDirectory` | Überprüft, dass `SelectedWorkingDirectory` auf `null` gesetzt wird |
 | `SelectedRepositoryChanged_ShouldCancelPreviousLoad` | Überprüft, dass alte CancellationTokenSource abgebrochen wird |
@@ -254,7 +254,7 @@ Der Dialog unterstützt beide Themes (Light und Dark) vollständig:
 | `LoadDirectoryStructureAsync_ShouldHandleNullRepository` | Überprüft, dass Collection geleert wird bei `SelectedRepository = null` |
 | `LoadDirectoryStructureAsync_ShouldEnableManualInput_WhenDirectoryLoadFails` | Überprüft, dass bei Service-Fehler der manuelle Eingabemodus mit `"."` aktiviert und Fehler geloggt wird |
 | `LoadDirectoryStructureAsync_ShouldKeepSelectionMode_WhenRepositoryIsEmpty` | Überprüft, dass ein erfolgreicher leerer Abruf die ComboBox mit `"."` zeigt |
-| `BestaetigenCommand_ShouldUseManualWorkingDirectoryInput` | Überprüft, dass die manuelle Eingabe normalisiert nach `SelectedWorkingDirectory` übernommen wird |
+| `ConfirmCommand_ShouldUseManualWorkingDirectoryInput` | Überprüft, dass die manuelle Eingabe normalisiert nach `SelectedWorkingDirectory` übernommen wird |
 
 ### Unit-Tests in `DirectoryStructureBrowserServiceTests`
 
@@ -274,12 +274,12 @@ Der Dialog unterstützt beide Themes (Light und Dark) vollständig:
 
 Die Repository-Filterung erfolgt über String-Vergleich:
 ```
-r.PluginTyp == SelectedScmPlugin.PluginType.ToString()
+r.PluginType == SelectedScmPlugin.PluginType.ToString()
 ```
 
 Dies ist case-sensitiv. Beispiele:
-- `GitRepository.PluginTyp = "SourceCodeManagement"` ✓ matched `IGitPlugin.PluginType = PluginType.SourceCodeManagement`
-- `GitRepository.PluginTyp = "DevelopmentAutomation"` ✓ matched `IGitPlugin.PluginType = PluginType.DevelopmentAutomation`
+- `GitRepository.PluginType = "SourceCodeManagement"` ✓ matched `IGitPlugin.PluginType = PluginType.SourceCodeManagement`
+- `GitRepository.PluginType = "DevelopmentAutomation"` ✓ matched `IGitPlugin.PluginType = PluginType.DevelopmentAutomation`
 
 ### Fire-and-Forget Async
 

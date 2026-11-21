@@ -43,7 +43,7 @@ Ablauf:
 1. Eine Codestelle löst einen asynchronen Aufruf aus, dessen Ergebnis nicht abgewartet werden soll (z. B. `CliProcessManager.StartHeartbeat`, `AiExecutionService.PersistFailureAsync`, die `CurrentView`-/`ProjectId`-/`WorkItemId`-Setter der ViewModels, `ProjectDetailView.IssueDoubleClick`). `PseudoConsoleSession.ReadLoopAsync` bildet eine Ausnahme: Sie fängt alle Exceptions bereits intern ab und läuft als eigenständiger, ab Konstruktion gestarteter Hintergrund-Task (`_readLoopTask`), unabhängig vom UI-Lebenszyklus.
 2. Statt `_ = task;` wird `task.SafeFireAndForget(_logger, "Bezeichnung")` aufgerufen.
 3. `SafeFireAndForget` registriert `task.ContinueWith(...)` auf `TaskScheduler.Default` (läuft also nicht zwingend auf dem UI-Thread):
-   - Ist der Task fehlgeschlagen (`t.IsFaulted`): `logger.LogError(t.Exception, "Unerwarteter Fehler in {OperationName}", operationName)`.
+   - Ist der Task fehlgeschlagen (`t.IsFaulted`): `logger.LogError(t.Exception, "Unexpecteder Fehler in {OperationName}", operationName)`.
    - Ist der Task abgebrochen (`t.IsCanceled`): `logger.LogInformation("Operation {OperationName} wurde abgebrochen", operationName)`.
    - Bei Erfolg: keine Aktion.
 4. Die aufrufende Methode kehrt sofort zurück; die Exception wird niemals zum Aufrufer propagiert.
@@ -78,7 +78,7 @@ Beteiligte Komponenten:
 - `CliProcessManager._lifecycleLock` / `_disposed` — atomare, dispose-sichere Anlage von Heartbeat-Timern und `RuntimeStatusChanged`-Subscriptions aus allen parallelen Auslösepfaden
 - `AiExecutionService.GetRunningWorkItemIds` — IDs aller Aufgaben mit laufendem Handle (`!HasExited`, Exception-tolerant)
 - `AiExecutionService.CliRunActive` / `NotifyRunActive` — Signal „laufender Prozess ohne Started-Ereignis" (Wiederverwendungspfade)
-- `WorkItemService.RunGates` — statische `ConcurrentDictionary<Guid, SemaphoreSlim>`; serialisiert prozessweit alle Laufdaten-Mutationen einer Aufgabe (`StartenAsync`, `CompleteAsync`, `ResetStartAsync`, `SetActiveRunAsync/EndActiveRunAsync/EnsureActiveRunAsync`)
+- `WorkItemService.RunGates` — statische `ConcurrentDictionary<Guid, SemaphoreSlim>`; serialisiert prozessweit alle Laufdaten-Mutationen einer Aufgabe (`StartAsync`, `CompleteAsync`, `ResetStartAsync`, `SetActiveRunAsync/EndActiveRunAsync/EnsureActiveRunAsync`)
 - `WorkItemService.EnsureActiveRunAsync` — idempotente Persistenzoperation; `runningGuard` und `runStatusProvider` werden erst innerhalb der gehaltenen Sperre ausgewertet
 - `CliRuntimeStatusExtensions.ToWorkItemRunStatus` — zentrales Mapping `CliRuntimeStatus` → `WorkItemRunStatus?`
 
@@ -95,7 +95,7 @@ Ablauf:
 ### 5. Geschützte Prozessende-Behandlung (klassischer Start und Terminal-Session)
 
 Beteiligte Komponenten:
-- `AiExecutionService.HandleExitedCoreAsync(Guid workItemId, CliProcessHandle handle, int? exitCode, string logKontext, Func<Task>? vorAufraeumenAsync)` — gemeinsame Implementierung für beide Start-Varianten
+- `AiExecutionService.HandleExitedCoreAsync(Guid workItemId, CliProcessHandle handle, int? exitCode, string logContext, Func<Task>? vorAufraeumenAsync)` — gemeinsame Implementierung für beide Start-Varianten
 - `AiExecutionService.StartCliAsync` (klassischer Pipe-Start) — registriert `process.Exited += (_, _) => HandleProcessExitedAsync(workItemId, process, handle, "Standard");` (Exit-Code via `TryGetExitCode`)
 - `AiExecutionService.StartTerminalSessionAsync` — registriert `session.Exited += (_, e) => HandleSessionEndedAsync(workItemId, handle, e.ExitCode, "Terminal")` und `session.Failed += (_, e) => HandleSessionFailedAsync(workItemId, handle, e)`; die Session erkennt das Prozessende selbst (`Process.Exited` bzw. Ende des Output-Streams) und ermittelt den Exit-Code PID-wiederverwendungs-sicher über `GetExitCodeProcess` auf dem nativen Prozess-Handle (ConPTY) bzw. `Process.ExitCode` (Pipe)
 

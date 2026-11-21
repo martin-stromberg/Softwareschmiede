@@ -295,7 +295,7 @@ public sealed class GitHubEventSourceTests
         Assert.False(error.OutcomeUncertain);
     }
 
-    /// <summary>Authentication recovery names the saved token and the actual settings path.</summary>
+    /// <summary>Die Wiederherstellungs-Hinweise bei Authentifizierungsfehlern nennen das gespeicherte Token und den tatsächlichen Einstellungspfad.</summary>
     [Theory]
     [InlineData(401, "Erneuern")]
     [InlineData(403, "Lese- und Schreibrechte")]

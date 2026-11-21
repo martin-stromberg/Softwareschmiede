@@ -15,9 +15,9 @@
 | `PluginManager` | Service | Registry für alle Plugins; registriert IDE-Plugins beim Start (`GetIdePlugins()`, `GetDefaultIdePlugin()`) |
 | `AppSettingService` | Service | Persistiert Einstellungen in der Datenbank (Aktivierungsstatus und Reihenfolge) |
 | `IdePluginOrderResolver` | Service-Klasse | Hilfsmethode zum Sortieren von Plugins nach `plugins.ide.order` Setting |
-| `TaskDetailViewModel.OeffneIdeAsync` | Methode | Public API für den Haupt-Button des Split-Buttons; delegiert (über `ResolveIdeEntryPointsAsync()`) an `PluginSelectionService.ResolveIdePluginAsync()` (ein priorisiertes Plugin) und nutzt `IIdePlugin.FindEntryPointsAsync()`/`OpenEntryPointAsync()` direkt — unabhängig von der konkreten Plugin-Implementierung |
-| `TaskDetailViewModel.OeffneIdeAuswahlAsync` | Methode | Public API für den Dropdown-Teil des Split-Buttons; delegiert (über `ResolveAggregatedIdeEntryPointsAsync()`) an `PluginSelectionService.ResolveAllCompatibleIdePluginsAsync()` (alle aktivierten, kompatiblen Plugins) und aggregiert deren `IIdePlugin.FindEntryPointsAsync()`-Ergebnisse zu `(Plugin, EntryPoint)`-Tupeln, plugin-qualifiziert formatiert über `FormatDisplayValue()` |
-| `IProzessStarter` | Interface | Startet externe Prozesse (Visual Studio/VS Code); wird von beiden Plugin-Klassen verwendet |
+| `TaskDetailViewModel.OpenIdeAsync` | Methode | Public API für den Haupt-Button des Split-Buttons; delegiert (über `ResolveIdeEntryPointsAsync()`) an `PluginSelectionService.ResolveIdePluginAsync()` (ein priorisiertes Plugin) und nutzt `IIdePlugin.FindEntryPointsAsync()`/`OpenEntryPointAsync()` direkt — unabhängig von der konkreten Plugin-Implementierung |
+| `TaskDetailViewModel.OpenIdeSelectionAsync` | Methode | Public API für den Dropdown-Teil des Split-Buttons; delegiert (über `ResolveAggregatedIdeEntryPointsAsync()`) an `PluginSelectionService.ResolveAllCompatibleIdePluginsAsync()` (alle aktivierten, kompatiblen Plugins) und aggregiert deren `IIdePlugin.FindEntryPointsAsync()`-Ergebnisse zu `(Plugin, EntryPoint)`-Tupeln, plugin-qualifiziert formatiert über `FormatDisplayValue()` |
+| `IProcessStarter` | Interface | Startet externe Prozesse (Visual Studio/VS Code); wird von beiden Plugin-Klassen verwendet |
 | `IVisualStudioCodeLocator` | Interface | Ermittelt den VS Code Installationspfad; wird von `VisualStudioCodeIdePlugin` verwendet |
 
 ## Abhängigkeiten
@@ -64,7 +64,7 @@
 ```
 User klickt "IDE öffnen" Split-Button (Ribbon in Aufgabendetailansicht)
     │
-    ├─ Haupt-Button: TaskDetailViewModel.OpenIdeCommand.OeffneIdeAsync()
+    ├─ Haupt-Button: TaskDetailViewModel.OpenIdeCommand.OpenIdeAsync()
     │      │
     │      ▼
     │  PluginSelectionService.ResolveIdePluginAsync()  ← EIN priorisiertes Plugin
@@ -106,10 +106,10 @@ User klickt "IDE öffnen" Split-Button (Ribbon in Aufgabendetailansicht)
        über alle kompatiblen Plugins ≥2 ist — siehe SelectCanIde):
            │
            ▼
-       TaskDetailViewModel.OpenIdeSelectionCommand.OeffneIdeAuswahlAsync()
+       TaskDetailViewModel.OpenIdeSelectionCommand.OpenIdeSelectionAsync()
            │
            ▼
-       PluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync()
+       PluginSelectionService.ResolveAllCompatibleIdePluginsAsync()
        ← ALLE aktivierten, kompatiblen Plugins (nicht nur das priorisierte)
            │
        ┌───┴───────────────┐
@@ -151,7 +151,7 @@ User klickt "IDE öffnen" Split-Button (Ribbon in Aufgabendetailansicht)
              │
              ├─ 1 → sofort OpenEntryPointAsync (kein Dialog)
              │
-             └─ >1 → FormatiereAnzeigeWert() je Tupel
+             └─ >1 → FormatDisplayValue() je Tupel
                       ("{PluginName}: {Bezeichnung}" bzw. nur "{PluginName}")
                       → Dialog zeigt alle aggregierten, plugin-qualifizierten
                         Einstiegspunkte
@@ -163,7 +163,7 @@ User klickt "IDE öffnen" Split-Button (Ribbon in Aufgabendetailansicht)
                               priorisierte Plugin) oder nichts tun (Abbruch)
     │
     ▼
-IProzessStarter startet die IDE
+IProcessStarter startet die IDE
 ```
 
 > **Hinweis:** Der frühere Sonderfall, bei dem eine eigene `OpenIdeService`-Klasse per Typ-Prüfung (`plugin is VisualStudioIdePlugin`) erkannte, ob ein Solution-Auswahl-Dialog nötig ist, wurde entfernt (die Klasse selbst existiert nicht mehr). Stattdessen liefert jedes `IIdePlugin` über `FindEntryPointsAsync()` generisch 0..n `IdeEntryPoint`-Kandidaten. Seit der Multi-Plugin-Aggregation lösen Haupt- und Dropdown-Button außerdem unterschiedlich viele Plugins auf: Der Haupt-Button verwendet weiterhin unverändert `PluginSelectionService.ResolveIdePluginAsync()` (genau ein priorisiertes Plugin, `TaskDetailViewModel.ResolveIdeEntryPointsAsync()`) und öffnet dessen ersten Einstiegspunkt direkt; der Dropdown-Button verwendet `PluginSelectionService.ResolveAllCompatibleIdePluginsAsync()` (alle aktivierten, `Explicit`- oder `Fallback`-kompatiblen Plugins, `TaskDetailViewModel.ResolveAggregatedIdeEntryPointsAsync()`) und übergibt die plugin-qualifiziert aggregierten Kandidaten an den Auswahl-Callback (`SelectEntryPointAsync`), der den bestehenden Solution-Auswahl-Dialog anzeigt (siehe [Dateisystem-Integration](../dateisystem-integration/architektur.md)).
@@ -231,7 +231,7 @@ nutzt neue Reihenfolge
 - **Kompatibilitätsprüfung:** Die Prüfung ist schnell (Datei-Existenz-Check oder sofortiger Fallback). Keine Caching oder Optimierungen erforderlich bei normaler Nutzung.
 - **Plugin-Registry:** IDE-Plugins werden beim Programmstart einmalig registriert. Keine dynamischen Änderungen zur Laufzeit.
 
-### Fehlertoleranz
+### FehlertoleranceMinutes
 
 - **Fehlende Aktivierungen:** Falls keine IDE-Plugins aktiv sind, wird das Standardplugin verwendet (Fallback zur Systemkonfiguration).
 - **Fehlende IDEs:** Falls keine IDE installiert ist, wird eine aussagekräftige Fehlermeldung angezeigt.
@@ -242,6 +242,6 @@ nutzt neue Reihenfolge
 Das System ist für neue IDE-Plugins konzipiert:
 1. Implementiere `IIdePlugin` vollständig, inklusive der drei erzwungenen Methoden `CheckCompatibilityAsync`, `FindEntryPointsAsync` und `OpenEntryPointAsync` (letztere beiden liefern/öffnen die konkreten `IdeEntryPoint`-Kandidaten des Plugins, z. B. mehrere Workspace-Dateien) — der Compiler erzwingt die Implementierung aller drei Methoden
 2. Registriere das Plugin in `PluginManager`
-3. Das neue Plugin wird automatisch in Settings, in der generischen Mehreinstiegspunkt-Logik des Haupt-Buttons (`TaskDetailViewModel.OeffneIdeInternAsync`/`ResolveIdeEntryPointsAsync`) sowie in der aggregierten Mehrplugin-Logik des Dropdown-Buttons (`ResolveAggregatedIdeEntryPointsAsync`/`PluginSelectionService.ResolveAllCompatibleIdePluginsAsync`) berücksichtigt, ohne dass dort Sonderfälle für das neue Plugin ergänzt werden müssen
+3. Das neue Plugin wird automatisch in Settings, in der generischen Mehreinstiegspunkt-Logik des Haupt-Buttons (`TaskDetailViewModel.OpenIdeInternalAsync`/`ResolveIdeEntryPointsAsync`) sowie in der aggregierten Mehrplugin-Logik des Dropdown-Buttons (`ResolveAggregatedIdeEntryPointsAsync`/`PluginSelectionService.ResolveAllCompatibleIdePluginsAsync`) berücksichtigt, ohne dass dort Sonderfälle für das neue Plugin ergänzt werden müssen
 
 Beispiel für zukünftige Plugins: JetBrains Rider, Neovim, Sublime Text, etc.

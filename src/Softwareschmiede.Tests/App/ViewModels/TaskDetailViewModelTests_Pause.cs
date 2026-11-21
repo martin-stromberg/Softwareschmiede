@@ -168,7 +168,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         sut.SetPauseCommand.CanExecute(null).Should().BeFalse();
     }
 
-    /// <summary>IsPaused und PauseDisplayText spiegeln den geladenen PausiertBisUtc-Wert wider.</summary>
+    /// <summary>IsPaused und PauseDisplayText spiegeln den geladenen PausedUntilUtc-Wert wider.</summary>
     [Fact]
     public async Task IsPaused_AndPauseDisplayText_ReflectLoadedValue()
     {
@@ -210,7 +210,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
         sut.RestartCliCommand.CanExecute(null).Should().BeFalse();
     }
 
-    /// <summary>Bei aktiver Pause sind KannPromptVorlageSenden und KannPromptPlanen false — trotz laufender CLI, vorhandener Vorlagen und ausgefüllter Zeitfelder (Issue 151).</summary>
+    /// <summary>Bei aktiver Pause sind SendCanPromptTemplate und CanPromptPlan false — trotz laufender CLI, vorhandener Vorlagen und ausgefüllter Zeitfelder (Issue 151).</summary>
     [Fact]
     public async Task PromptGuards_False_WhenWorkItemPaused()
     {
@@ -263,7 +263,7 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
             Times.Once);
     }
 
-    /// <summary>PauseEinstellenCommand mit Aufheben-Ergebnis leert PausiertBisUtc.</summary>
+    /// <summary>PauseEinstellenCommand mit Aufheben-Ergebnis leert PausedUntilUtc.</summary>
     [Fact]
     public async Task SetPauseCommand_RaisesPauseOn_AtLiftResult()
     {

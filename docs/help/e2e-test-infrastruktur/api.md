@@ -225,7 +225,7 @@ public void OpenProject(string projectName)
 
 ### ProjectDetailView : BaseWindowView
 
-Projektdetail-Ansicht. Erkannt über "ProjektName"-Feld und "AufgabeNeu"-Button.
+Projektdetail-Ansicht. Erkannt über "ProjectName"-Feld und "AufgabeNeu"-Button.
 
 #### Methoden
 
@@ -386,10 +386,10 @@ Bricht die Löschung ab.
 
 Nicht-modales Konsolentestfenster (`DialogTitle = "Konsolentest"`) für das CLI-Ausgabe-Replay.
 
-##### `OeffneAufzeichnung(string pfad)`
+##### `OpenRecording(string pfad)`
 
 ```csharp
-public ConsoleTestDialogView OeffneAufzeichnung(string pfad)
+public ConsoleTestDialogView OpenRecording(string pfad)
 ```
 
 Klickt „Aufzeichnung öffnen…" und bedient den nativen Öffnen-Dialog per Tastatur (Dateiname eintippen, Autocomplete-Liste per ESC schließen, dann Enter — die eigene `OpenDialogCondition` erkennt „Öffnen"/„Open"/„CLI-Aufzeichnung öffnen").
@@ -398,10 +398,10 @@ Klickt „Aufzeichnung öffnen…" und bedient den nativen Öffnen-Dialog per Ta
 
 Steuern die Wiedergabe (Abspielen, Neu starten, Pausieren/Fortsetzen, Einzelschritt vorwärts/rückwärts, Zeitraffer-Schwelle, Schließen); Button-Klicks warten jeweils auf die CanExecute-Aktivierung, `Schliessen` nutzt das Invoke-Pattern.
 
-##### `IstSchaltflaecheAktiviert(string automationName)` / `GetSelectsSourceEntryIndex()`
+##### `IsButtonEnabled(string automationName)` / `GetSelectsSourceEntryIndex()`
 
 ```csharp
-public bool IstSchaltflaecheAktiviert(string automationName)
+public bool IsButtonEnabled(string automationName)
 public int GetSelektierterQuellEintragIndex()
 ```
 

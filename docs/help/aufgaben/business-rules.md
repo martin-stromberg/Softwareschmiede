@@ -44,7 +44,7 @@
 - Aufgabe mit `IssueReference.IssueNumber` → neuer Branch enthält die Issue-Nummer.
 - Aufgabe ohne `IssueReference` → neuer Branch enthält nur Aufgaben-ID und Titel-Slug.
 
-**Umsetzung:** `DevelopmentProcessService.ProzessStartenAsync` — `useExistingBranch`-Flag.
+**Umsetzung:** `DevelopmentProcessService.StartProcessAsync` — `useExistingBranch`-Flag.
 
 ---
 
@@ -58,11 +58,11 @@
 
 **Verhalten:**
 - Der Prozessstart setzt keine Issue-Referenz voraus.
-- Der Branchname wird im Format `task/{aufgabe.Id:N}-{slug}` erzeugt.
+- Der Branchname wird im Format `task/{workItem.Id:N}-{slug}` erzeugt.
 - Die lokale `issue.md` wird weiterhin erstellt; sie enthält die Aufgabenstammdaten und die Anforderungsbeschreibung, aber keine verpflichtende Issue-Verknüpfung.
 - Mehrdeutige Repository-Auflösung bleibt ein Fehlerfall.
 
-**Umsetzung:** `DevelopmentProcessService.CreateTaskBranchName`, `ProzessStartenAsync` und `CreateIssueFileAsync`.
+**Umsetzung:** `DevelopmentProcessService.CreateTaskBranchName`, `StartProcessAsync` und `CreateIssueFileAsync`.
 
 ---
 
@@ -71,7 +71,7 @@
 **Beschreibung:** Beim Prozessstart wird die generierte `issue.md` um einen optionalen Abschnitt `## Verknüpftes Issue` ergänzt, wenn die Aufgabe eine Issue-Referenz mit gültiger Nummer trägt.
 
 **Bedingungen:**
-- `aufgabe.IssueReference != null`
+- `workItem.IssueReference != null`
 - `IssueReference.IssueNumber > 0`
 
 **Verhalten:**
@@ -79,7 +79,7 @@
 - Wenn `IssueReference` `null` ist: Kein Issue-Abschnitt wird ausgegeben; die Datei enthält nur Metadaten und Anforderung.
 - Wenn `IssueNumber` `null` oder ≤ 0 ist: Kein Issue-Abschnitt wird ausgegeben — auch wenn `IssueReference` selbst gesetzt ist.
 
-**Umsetzung:** `DevelopmentProcessService.CreateIssueFileAsync` — wertet `aufgabe.IssueReference is { IssueNumber: > 0 }` aus und fügt den Block nur bei positivem Match ein. `IssueReference` wird bereits durch Eager Loading in `WorkItemService.GetDetailAsync` vollständig geladen, sodass kein zusätzliches Datenbankzugriff nötig ist.
+**Umsetzung:** `DevelopmentProcessService.CreateIssueFileAsync` — wertet `workItem.IssueReference is { IssueNumber: > 0 }` aus und fügt den Block nur bei positivem Match ein. `IssueReference` wird bereits durch Eager Loading in `WorkItemService.GetDetailAsync` vollständig geladen, sodass kein zusätzliches Datenbankzugriff nötig ist.
 
 ---
 
@@ -195,16 +195,16 @@
 
 **Bedingungen:**
 - `WorkItem.Status == Started` oder `Waiting` (Aufgabe ist aktiv oder wartet)
-- `WorkItem.ExecutionStatus == Aktiv` oder `Completed` (KI-Ausführung läuft oder wurde beendet)
+- `WorkItem.ExecutionStatus == Active` oder `Completed` (KI-Ausführung läuft oder wurde beendet)
 
 **Verhalten:**
 - CLI-Panel wird sichtbar, wenn beide Bedingungen erfüllt sind.
 - CLI-Panel wird ausgeblendet, wenn `WorkItem.Status == New`, `Completed` oder `Archived` ist (unabhängig vom `ExecutionStatus`).
-- CLI-Panel wird ausgeblendet, wenn `ExecutionStatus == NichtStarted` ist (unabhängig vom `Status`).
+- CLI-Panel wird ausgeblendet, wenn `ExecutionStatus == NotStarted` ist (unabhängig vom `Status`).
 - Nach Beendigung der CLI-Ausführung (natürlich oder durch Benutzer) bleibt das CLI-Panel sichtbar, solange die Aufgabe noch im Status `Started` oder `Waiting` ist. Der Benutzer kann die letzte Ausgabe anschauen und die CLI manuell neu starten.
 - Bei Plugin-Wechsel wird die laufende CLI beendet (`ExecutionStatus` → `Completed`); das Panel bleibt sichtbar und wird mit der neuen Session neu befüllt.
 
-**Umsetzung:** `WorkItemExecutionStatusExtensions.SollCliAnzeigen(ExecutionStatus, WorkItemStatus)` — prüft beide Bedingungen und gibt `true` zurück, wenn die CLI-Ansicht angezeigt werden soll.
+**Umsetzung:** `WorkItemExecutionStatusExtensions.ShouldShowCli(ExecutionStatus, WorkItemStatus)` — prüft beide Bedingungen und gibt `true` zurück, wenn die CLI-Ansicht angezeigt werden soll.
 
 ---
 
@@ -251,15 +251,15 @@
 - Beim Setzen muss der gewählte Zeitpunkt in der Zukunft liegen; `null` hebt die Pause auf.
 
 **Verhalten:**
-- Eine Aufgabe gilt als pausiert, solange `PausedUntilUtc > UtcNow` gilt; abgelaufene Werte wirken nicht mehr (passives Ablaufen, kein Status-Übergang, kein automatischer Restart). Das Kriterium ist in der Extension `AiExecutionStatusClassification.IsCurrentlyPaused` als Referenzdefinition gebündelt — alle Pausen-Auswertungen (Kachel-Klassifikation, Start-/Neustart-Guards, Recovery, SCM-Limit-Belegung, SCM-Dispatch-`BlockReason`) verwenden dieselbe Prüfung `pausiertBisUtc > jetzt` (striktes Größer-als; `null` und abgelaufene Zeitpunkte gelten als nicht pausiert).
+- Eine Aufgabe gilt als pausiert, solange `PausedUntilUtc > UtcNow` gilt; abgelaufene Werte wirken nicht mehr (passives Ablaufen, kein Status-Übergang, kein automatischer Restart). Das Kriterium ist in der Extension `AiExecutionStatusClassification.IsCurrentlyPaused` als Referenzdefinition gebündelt — alle Pausen-Auswertungen (Kachel-Klassifikation, Start-/Neustart-Guards, Recovery, SCM-Limit-Belegung, SCM-Dispatch-`BlockReason`) verwenden dieselbe Prüfung `pausedUntilUtc > now` (striktes Größer-als; `null` und abgelaufene Zeitpunkte gelten als nicht pausiert).
 - Während einer aktiven Pause sind blockiert: Prozessstart, CLI-Neustart (inkl. Plugin-Wechsel-Pfad), automatische und manuelle Recovery, Senden und Planen von Prompts über die Detailansicht.
 - Ein bereits geplanter Prompt wird auf das Pausenende verschoben statt verworfen.
 - Ein laufender CLI-Prozess wird niemals durch die Pause unterbrochen.
 - Eine pausierte Aufgabe belegt keinen Platz in der SCM-Ausführungsbegrenzung — weder im globalen Zähler noch im Plugin-Zähler: `ScmEventExecutionLimitService.GetOccupancyAsync` filtert sie trotz weiterlaufendem Prozess heraus; das nächste wartende SCM-Ereignis kann den frei werdenden Platz über die ereignisgesteuerte Startprüfung sofort übernehmen (Details: [GitHub-Ereignisüberwachung — Business Rules](../plugins/github-ereignisse/business-rules.md)). Nach Ablauf der Pause zählt die Aufgabe wieder als belegt.
-- UI: Buttons werden deaktiviert (`CanPause`, `!IstPausiert` in den CanExecute-Prüfungen); die Seitenleisten-Kachel zeigt das `⏸`-Glyph mit `Opacity = 0.55` (Countdown-Volltext im Tooltip/`HelpText`); im Ribbon steht `⏸ Pausiert bis …`.
+- UI: Buttons werden deaktiviert (`CanPause`, `!IsPaused` in den CanExecute-Prüfungen); die Seitenleisten-Kachel zeigt das `⏸`-Glyph mit `Opacity = 0.55` (Countdown-Volltext im Tooltip/`HelpText`); im Ribbon steht `⏸ Pausiert bis …`.
 - Jede Setzen-/Aufheben-Operation schreibt einen `LogEntryType.SystemMessage`-Eintrag und fordert anschließend die ereignisgesteuerte SCM-Startprüfung an (`ScmStartCheckTrigger`), damit ein frei werdender Ausführungsplatz ohne Poll-Durchlauf nachgefüllt wird.
 
-**Umsetzung:** `WorkItemService.SetPauseAsync`, `DevelopmentProcessService.ThrowIfPaused`, `WorkItemRecoveryService`, `PromptTimeDispatchService`, `TaskDetailViewModel.SetPauseAsync`, `WorkItemPauseDialogViewModel`, `AiExecutionStatusConverter`, `AiExecutionStatusClassification.IsCurrentlyPaused` (Referenz-Pausenkriterium), `ScmStartCheckTrigger`.
+**Umsetzung:** `WorkItemService.SetPauseAsync`, `DevelopmentProcessService.ThrowIfPaused`, `WorkItemRecoveryService`, `PromptScheduleDispatchService`, `TaskDetailViewModel.SetPauseAsync`, `PauseWorkItemDialogViewModel`, `AiExecutionStatusConverter`, `AiExecutionStatusClassification.IsCurrentlyPaused` (Referenz-Pausenkriterium), `ScmStartCheckTrigger`.
 
 ---
 
@@ -270,7 +270,7 @@
 **Bedingungen:**
 - Eine CLI-Ausgabezeile enthält den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` mit gültigem Zeitstempel.
 - Die auslösende Aufgabe besitzt ein `AiPluginPrefix`.
-- Kandidaten für die automatische Pause: `Status` aktiv oder wartend, `ExecutionStatus == Aktiv`, identisches `AiPluginPrefix` (`OrdinalIgnoreCase`).
+- Kandidaten für die automatische Pause: `Status` aktiv oder wartend, `ExecutionStatus == Active`, identisches `AiPluginPrefix` (`OrdinalIgnoreCase`).
 
 **Verhalten:**
 - Der Marker erzeugt an der auslösenden Aufgabe einen `LogEntryType.RateLimit`-Eintrag — auch ohne gültigen Zeitstempel.
@@ -279,9 +279,9 @@
 - Max-Semantik: `PausedUntilUtc` wird auf `max(bisheriger Wert, resetUtc)` gesetzt — eine längere manuelle Pause wird nicht verkürzt.
 - Pro pausierter Aufgabe wird ein `SystemMessage`-Eintrag geschrieben und die Seitenleiste über `WorkItemRunDataChangedNotifier` aktualisiert.
 - Laufende CLI-Prozesse werden nicht angefasst; es findet kein automatischer Neustart nach Limit-Ablauf statt.
-- **Update-Sicherheit:** `CliUpdateSafetyService.CheckAsync` behandelt Aufgaben mit zukünftigem Plugin-Session-Limit als nicht riskant — die Heartbeat-Toleranz (`WorkItemRunActivity.IstAktiv`) entfällt für sie komplett. Aufgaben ohne bekanntes Limit werden wie bisher per Heartbeat bewertet.
+- **Update-Sicherheit:** `CliUpdateSafetyService.CheckAsync` behandelt Aufgaben mit zukünftigem Plugin-Session-Limit als nicht riskant — die Heartbeat-Toleranz (`WorkItemRunActivity.IsActive`) entfällt für sie komplett. Aufgaben ohne bekanntes Limit werden wie bisher per Heartbeat bewertet.
 
-**Umsetzung:** `LogService.TryParseRateLimitMarker`/`AddCliOutputAsync`, `CliOutputLogWriter.PersistLineAsync`, `AiPluginLimitService.VerarbeiteRateLimitAsync`/`GetAktiveSessionLimitsAsync`, `CliUpdateSafetyService`.
+**Umsetzung:** `LogService.TryParseRateLimitMarker`/`AddCliOutputAsync`, `CliOutputLogWriter.PersistLineAsync`, `AiPluginLimitService.ProcessRateLimitAsync`/`GetActiveSessionLimitsAsync`, `CliUpdateSafetyService`.
 
 ---
 
@@ -330,17 +330,17 @@
 
 **Bedingungen:**
 - Der Export wird aus der Aufgabendetailansicht gestartet (`ExportCanCliReplay` = Aufgabe geladen).
-- Für die Aufgabe liegt ein Mitschnitt vor (`CliReplayExportService.HasRecording`): mindestens ein Terminal-Session-Start mit aktivem `AufzeichnungByteBudget`, und die Aufgabe gehört zu den letzten 8 mit Mitschnitt.
+- Für die Aufgabe liegt ein Mitschnitt vor (`CliReplayExportService.HasRecording`): mindestens ein Terminal-Session-Start mit aktivem `RecordingByteBudget`, und die Aufgabe gehört zu den letzten 8 mit Mitschnitt.
 
 **Verhalten:**
 - Wenn keine Aufzeichnung vorliegt: `ErrorMessage` „Für diese Aufgabe liegt noch keine Aufzeichnung vor — sie wird während einer CLI-Ausführung automatisch mitgeschnitten." — der Speicherdialog wird nicht geöffnet.
 - Wenn der Speichern-Dialog abgebrochen wird: kein Export, keine Fehlermeldung.
 - Wenn der Zielpfad nicht auf `.clireplay` endet: `ErrorMessage` „Export-Zielpfad muss auf .clireplay enden."
 - Wenn der Schreibvorgang fehlschlägt: der Fehler wird geloggt und als Exportfehler angezeigt.
-- Der Mitschnitt ist flüchtig: Budget-Überschreitung kürzt ihn auf das Präfix (`IstVollstaendig = false` im Datei-Header), nur die letzten 8 Aufgaben behalten einen Mitschnitt, App-Ende verwirft alle.
+- Der Mitschnitt ist flüchtig: Budget-Überschreitung kürzt ihn auf das Präfix (`IsComplete = false` im Datei-Header), nur die letzten 8 Aufgaben behalten einen Mitschnitt, App-Ende verwirft alle.
 - `.raw`- und `.clireplay`-Export bestehen parallel und decken unterschiedliche Zwecke ab (zeilennormalisierte Sicht vs. byte-exaktes, zeitreales Replay).
 
-**Umsetzung:** `TaskDetailViewModel.ExportCliReplayAsync` (Vorab-Prüfung, Dialog, Endungsvalidierung), `CliReplayExportService` (`HasRecording`/`ExportCliReplayAsync` über `AiExecutionService.GetCliAufzeichnung` + `CliReplayRecordingStore`), `CliOutputRecorder` (Mitschnitt beim Session-Start).
+**Umsetzung:** `TaskDetailViewModel.ExportCliReplayAsync` (Vorab-Prüfung, Dialog, Endungsvalidierung), `CliReplayExportService` (`HasRecording`/`ExportCliReplayAsync` über `AiExecutionService.GetCliRecording` + `CliReplayRecordingStore`), `CliOutputRecorder` (Mitschnitt beim Session-Start).
 
 ---
 
@@ -349,7 +349,7 @@
 **Beschreibung:** Eine Aufgabe, deren KI-Ausführung hängen geblieben ist (Heartbeat abgelaufen, kein laufender Prozess), kann über das Recovery-Banner auf dem Dashboard wiederhergestellt werden.
 
 **Bedingungen (Recovery-Kandidat):**
-- `Status` ist `Started` oder `Waiting` und `ExecutionStatus == Aktiv`.
+- `Status` ist `Started` oder `Waiting` und `ExecutionStatus == Active`.
 - Kein aktiver KI-Lauf im `AiExecutionService` (Laufzeitprüfung).
 - `LastHeartbeatUtc` ist älter als `WorkItemRecoveryService.HeartbeatTimeoutMinutes` (5 Minuten).
 - Keine aktive Pause: `PausedUntilUtc` ist `null` oder liegt nicht in der Zukunft — pausierte Aufgaben wurden bewusst angehalten und gelten nicht als „festhängend".
@@ -418,14 +418,14 @@
 - Versendet der Timer- oder Sofortpfad ohne geöffnete Detailansicht bzw. erfolgt eine Nachzustellung nach einem CLI-Start, wird ein `LogEntryType.SystemMessage`-Eintrag auf der Aufgabe geschrieben; ein Fehler beim Protokollieren beeinflusst den erfolgreichen Versand nicht.
 - Es findet **kein** Versand bei vollständig beendeter App statt und **kein** automatischer CLI-Start, um einen fälligen Plan zuzustellen; die Zielzeit bleibt auf eine Uhrzeit (HH:mm) des aktuellen Tages beschränkt (keine Datumsauswahl).
 
-**Umsetzung:** `PromptTimeDispatchService` — verwaltet geplante Prompts pro Aufgabe in `Dictionary<Guid, ScheduledPromptEntry>` mit pro-Eintrag-Timer via `TimeProvider.CreateTimer`; persistiert über den scoped `ScheduledPromptStore` (aufgelöst per `IServiceScopeFactory`), stellt beim App-Start via `RestoreScheduledPromptsAsync` wieder her und liefert wartende Pläne über ein `CliProcessStatusChanged`-Abonnement zu. `TaskDetailViewModel.SchedulePromptAsync` mit UI-Validierung; `CancelScheduledPromptCommand` für den Button „Wartestellung aufheben"; `ScheduledPromptChanged`-Event zur UI-Synchronisation.
+**Umsetzung:** `PromptScheduleDispatchService` — verwaltet geplante Prompts pro Aufgabe in `Dictionary<Guid, ScheduledPromptEntry>` mit pro-Eintrag-Timer via `TimeProvider.CreateTimer`; persistiert über den scoped `ScheduledPromptStore` (aufgelöst per `IServiceScopeFactory`), stellt beim App-Start via `RestoreScheduledPromptsAsync` wieder her und liefert wartende Pläne über ein `CliProcessStatusChanged`-Abonnement zu. `TaskDetailViewModel.SchedulePromptAsync` mit UI-Validierung; `CancelScheduledPromptCommand` für den Button „Wartestellung aufheben"; `ScheduledPromptChanged`-Event zur UI-Synchronisation.
 
 ## Anzeigemodus und Gruppierung der aktiven Aufgabenliste
 
 **Beschreibung:** Die aktive Aufgabenliste (Seitenleiste und Dashboard) lässt sich zwischen drei Anzeigemodi umschalten; Seitenleiste und Dashboard führen je einen eigenen, getrennt persistierten Modus-Zustand.
 
 **Bedingungen:**
-- Modusauswahl über die `RadioButton`s `AufgabenModus:{Datum|Repository|KI}` (Seitenleiste) bzw. `DashboardAufgabenModus:{…}` (Dashboard).
+- Modusauswahl über die `RadioButton`s `WorkItemsMode:{Datum|Repository|KI}` (Seitenleiste) bzw. `DashboardWorkItemsMode:{…}` (Dashboard).
 - Die Modus-Buttons in der Seitenleiste sind nur bei ausgeklappter Navigation sichtbar (`IsNavigationExpanded`).
 
 **Verhalten:**
@@ -435,4 +435,4 @@
 - Der Untertitel der Kachel zeigt den Repository-Namen; bei Aufgaben ohne Repository-Verknüpfung der Projektname — analog bleibt `RepositoryGruppenName` aber die Fallback-Gruppe (der Projektname wird nicht als Gruppenname verwendet).
 - Modus-Persistenz: Jede Ansicht speichert ihren Modus unter einem eigenen `AppSetting`-Schlüssel (`aktiveaufgaben.listenmodus` bzw. `aktiveaufgaben.listenmodus.dashboard`, Wert = Enum-Name) und stellt ihn beim nächsten Start wieder her. Fehlender oder ungültiger Wert → Default `Datum`. Eine inzwischen erfolgte Benutzerumschaltung wird von einer verspäteten Wiederherstellung nicht überschrieben; der wiederhergestellte Wert wird nicht zurückgeschrieben.
 
-**Umsetzung:** `WorkItemListLayout` (Deskriptoren je Modus auf instanz-eigener `ListCollectionView` pro `ActiveTasksListControl` — die geteilte `ActiveWorkItemsList` darf keine gemeinsame Default-View gruppieren); `WorkItemListModeBindung` (gemeinsame Zustands-/Race-Guard-Logik) + `WorkItemListModeService` (Persistenz in eigenem DI-Scope, Muster `DarkModeService`); Mapping der Gruppenschlüssel in `MainWindowViewModel.MapActiveWorkItemPanelItem`.
+**Umsetzung:** `WorkItemListLayout` (Deskriptoren je Modus auf instanz-eigener `ListCollectionView` pro `ActiveTasksListControl` — die geteilte `ActiveWorkItemsList` darf keine gemeinsame Default-View gruppieren); `WorkItemListModeBinding` (gemeinsame Zustands-/Race-Guard-Logik) + `WorkItemListModeService` (Persistenz in eigenem DI-Scope, Muster `DarkModeService`); Mapping der Gruppenschlüssel in `MainWindowViewModel.MapActiveWorkItemPanelItem`.

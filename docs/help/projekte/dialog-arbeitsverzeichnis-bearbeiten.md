@@ -26,7 +26,7 @@ Modales WPF-Window analog zum Repository-Auswahl-Dialog, mit:
 - **TextBox für manuelle Eingabe:** sichtbar, wenn die Verzeichnisstruktur nicht geladen werden kann oder
   vom Plugin nicht unterstützt wird.
 - **Lade-Indikator:** sichtbar während `IsLoadingDirectoryStructure == true`.
-- **Buttons:** „Speichern" (`BestaetigenCommand`) und „Abbrechen" (`AbbrechenCommand`).
+- **Buttons:** „Speichern" (`ConfirmCommand`) und „Abbrechen" (`AbbrechenCommand`).
 
 ### ViewModel (`WorkingDirectoryEditViewModel`)
 
@@ -93,7 +93,7 @@ Ladelogik über die statische Hilfsklasse `DirectoryStructureLoadHelper`
 
 ## Speichern
 
-Bestätigt der Benutzer den Dialog (`BestaetigenCommand`), wird im manuellen Modus zuerst
+Bestätigt der Benutzer den Dialog (`ConfirmCommand`), wird im manuellen Modus zuerst
 `WorkingDirectoryInputText` validiert, normalisiert und nach `SelectedWorkingDirectory` synchronisiert.
 Danach ruft `ProjectDetailViewModel.WorkingDirectoryEditAsync`
 `ProjectService.SaveRepositoryWorkingDirectoryAsync(repository.Id, vm.SelectedWorkingDirectory, ct)` auf,
@@ -112,7 +112,7 @@ Das gespeicherte Arbeitsverzeichnis wird — wie bei der Erstzuweisung — beim 
 für dieses Repository verwendet:
 
 1. Direkt nach dem Git-Klon validiert `GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(...)`
-   (aufgerufen aus `DevelopmentProcessService.ProzessStartenAsync`), dass das konfigurierte
+   (aufgerufen aus `DevelopmentProcessService.StartProcessAsync`), dass das konfigurierte
    Unterverzeichnis im geklonten Repository existiert — liefert bei einem Problem ein frühes, klares
    Fehlerbild direkt nach dem Klon, noch bevor Branch-Erstellung oder Repository-Startskript versucht
    werden.

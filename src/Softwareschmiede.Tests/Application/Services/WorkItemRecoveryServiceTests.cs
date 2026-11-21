@@ -221,7 +221,7 @@ public sealed class WorkItemRecoveryServiceTests : IDisposable
         candidates.Should().BeEmpty();
     }
 
-    /// <summary>ScanForRecoveryCandidatesAsync ignoriert pausierte Aufgaben (PausiertBisUtc in der Zukunft), auch bei abgelaufenem Heartbeat (Issue 151).</summary>
+    /// <summary>ScanForRecoveryCandidatesAsync ignoriert pausierte Aufgaben (PausedUntilUtc in der Zukunft), auch bei abgelaufenem Heartbeat (Issue 151).</summary>
     [Fact]
     public async Task ScanForRecoveryCandidates_ShouldExcludePausedTasks()
     {

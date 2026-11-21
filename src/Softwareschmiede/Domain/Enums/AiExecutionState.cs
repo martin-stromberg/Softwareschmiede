@@ -3,7 +3,7 @@ namespace Softwareschmiede.Domain.Enums;
 /// <summary>Fachliche Zustandsklassifikation der KI-Ausführung (gemeinsame Basis der Status-Converter und der Lauf-Zählung).</summary>
 public enum AiExecutionState
 {
-    /// <summary>Aufgabe ist pausiert (PausiertBisUtc in der Zukunft).</summary>
+    /// <summary>Aufgabe ist pausiert (PausedUntilUtc in der Zukunft).</summary>
     Paused,
 
     /// <summary>Ein zeitgesteuerter Prompt steht in der Warteschlange.</summary>

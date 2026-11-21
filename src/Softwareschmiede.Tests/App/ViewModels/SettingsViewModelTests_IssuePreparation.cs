@@ -29,7 +29,7 @@ public sealed class SettingsViewModelTests_IssuePreparation : IDisposable
     private readonly PluginSettingsService _pluginSettingsService;
     private readonly PromptTemplateService _promptTemplatesService;
 
-    /// <summary>SettingsViewModelTests_IssueAufbereitung.</summary>
+    /// <summary>SettingsViewModelTests_IssuePreparation.</summary>
     public SettingsViewModelTests_IssuePreparation()
     {
         _db = TestDbContextFactory.Create();

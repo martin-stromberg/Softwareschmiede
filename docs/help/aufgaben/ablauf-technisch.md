@@ -2,7 +2,7 @@
 
 ## Übersicht
 
-Der Entwicklungsprozess wird durch `DevelopmentProcessService.ProzessStartenAsync` eingeleitet. Das CLI des KI-Tools wird als nativer Prozess gestartet und via Win32 `SetParent` in die WPF-Aufgabendetailansicht eingebettet. `AiExecutionService` verwaltet den Prozess-Lifecycle als Singleton.
+Der Entwicklungsprozess wird durch `DevelopmentProcessService.StartProcessAsync` eingeleitet. Das CLI des KI-Tools wird als nativer Prozess gestartet und via Win32 `SetParent` in die WPF-Aufgabendetailansicht eingebettet. `AiExecutionService` verwaltet den Prozess-Lifecycle als Singleton.
 
 Der fachliche Aufgabenstatus (`WorkItem.Status`) und der persistente Lebenszyklus der KI-Ausführung (`WorkItem.ExecutionStatus`) sind getrennt. Ein gestoppter oder natürlich beendeter CLI-Prozess setzt die KI-Ausführung auf `Completed`, lässt die Aufgabe aber im Gesamtstatus `Started` oder `Waiting`. Erst `DevelopmentProcessService.CompleteAsync` beendet die Aufgabe fachlich und bereinigt den lokalen Klon — als einziger produktiver Einstieg des Geschäftsvorgangs unter der `ScmTaskCoordinator`-Aufgabensperre (CLI-Stopp → Prompt-Abbruch → To-do-Prüfung → Klon-Löschung → Status `Completed` → Protokoll).
 
@@ -16,22 +16,22 @@ Ausgelöst durch Doppelklick auf Aufgabe in der Aufgabenliste oder durch Klick a
 
 Beteiligte Komponenten:
 - `ProjectDetailView.xaml.cs` — Code-Behind mit `MouseDoubleClick` Event-Handler auf Aufgabenliste
-- `ProjectDetailViewModel.AufgabeOeffnenCommand` — RelayCommand<Guid> mit `OeffneAufgabe(id)` Methode
+- `ProjectDetailViewModel.OpenWorkItemCommand` — RelayCommand<Guid> mit `OpenWorkItem(id)` Methode
 - `ProjectDetailViewModel.NavigateToTaskViewCallback` — Action<TaskDetailViewModel>, gesetzt durch `ProjectListViewModel`
-- `ProjectListViewModel.ZeigeTaskDetailView` — Private Methode, setzt `DetailViewModel = vm`
+- `ProjectListViewModel.ShowTaskDetailView` — Private Methode, setzt `DetailViewModel = vm`
 - `MainWindow.xaml` — DataTemplate für `TaskDetailViewModel` rendert `TaskDetailView`
 
 Ablauf:
-1. Nutzer doppelklickt auf Aufgabe in `ProjectDetailView.Aufgabenliste`
+1. Nutzer doppelklickt auf Aufgabe in `ProjectDetailView.WorkItemsList`
 2. `WorkItemDoubleClick()` in Code-Behind wird ausgelöst
-3. `ProjectDetailViewModel.AufgabeOeffnenCommand.Execute(workItemId)` wird aufgerufen
-4. `OeffneAufgabe(id)` wird ausgeführt:
+3. `ProjectDetailViewModel.OpenWorkItemCommand.Execute(workItemId)` wird aufgerufen
+4. `OpenWorkItem(id)` wird ausgeführt:
    - Neues `TaskDetailViewModel` wird aus DI-Container erstellt
-   - `TaskDetailViewModel.ZurueckAction = () => NavigateBackToProjectCallback?.Invoke()` wird gesetzt
+   - `TaskDetailViewModel.BackAction = () => NavigateBackToProjectCallback?.Invoke()` wird gesetzt
    - `TaskDetailViewModel.DetailTitleChangeAction` wird gesetzt, damit der Fenstertitel nach dem Laden auf den Aufgabentitel wechseln kann
    - `TaskDetailViewModel.RefreshWorkItemListCallback = ReloadAufgabenListAsync` wird gesetzt
    - `TaskDetailViewModel.WorkItemId = id` wird gesetzt (triggert Laden)
-5. `NavigateToTaskViewCallback?.Invoke(vm)` wird aufgerufen → `ProjectListViewModel.ZeigeTaskDetailView(vm)`
+5. `NavigateToTaskViewCallback?.Invoke(vm)` wird aufgerufen → `ProjectListViewModel.ShowTaskDetailView(vm)`
 6. `ProjectListViewModel.DetailViewModel = vm` wird gesetzt
 7. MainWindow wechselt DataTemplate: `TaskDetailViewModel` → `TaskDetailView` wird gerendert
 8. `TaskDetailViewModel` lädt die Aufgabe und meldet den Titel über `DetailTitleChangeAction`
@@ -50,8 +50,8 @@ Beim Laden der Aufgabendetailansicht werden die Aufgabenbasisinformation schnell
 **Beteiligte Komponenten:**
 - `WorkItemService.GetDetailAsync` — Ohne `Include(a => a.LogEntries)` und `ThenInclude(p => p.TestResults)`
 - `TaskDetailViewModel.LoadAsync` — Orchestriert Lade-Sequenz mit Fire-and-Forget
-- `TaskDetailViewModel.LadeProtokolleAsync` — Private async Methode für Hintergrund-Laden
-- `LogService.GetByAufgabeAsync` — Lädt Protokolleinträge asynchron ab
+- `TaskDetailViewModel.LoadLogAsync` — Private async Methode für Hintergrund-Laden
+- `LogService.GetByWorkItemAsync` — Lädt Protokolleinträge asynchron ab
 - `TaskDetailViewModel.LogEntries` — ObservableCollection wird durch Fire-and-Forget gefüllt
 
 **Ablauf:**
@@ -63,11 +63,11 @@ Beim Laden der Aufgabendetailansicht werden die Aufgabenbasisinformation schnell
    - `WorkItem.LogEntries` ist null oder leer
 4. UI bindet auf `WorkItem.Title`, `WorkItem.Status`, etc. und zeigt Basisinformation sofort an
 5. Fußzeile und Ribbon werden aktualisiert; die Ansicht wird responsive
-6. **Fire-and-Forget für Protokoll:** `_ = LadeProtokolleAsync(_protokollLadenCts.Token)` wird aufgerufen **ohne Await**
+6. **Fire-and-Forget für Protokoll:** `_ = LoadLogAsync(_logLoadCts.Token)` wird aufgerufen **ohne Await**
    - Diese Zeile gibt sofort zurück; der Hintergrund-Task läuft unabhängig
    - `IsLoading` wird nicht beeinflusst durch diesen Task
-7. `LadeProtokolleAsync(ct)` läuft parallel im Hintergrund:
-   - `var protokollentries = await _protokollService.GetByAufgabeAsync(_workItemId, ct)`
+7. `LoadLogAsync(ct)` läuft parallel im Hintergrund:
+   - `var logEntries = await _logService.GetByWorkItemAsync(_workItemId, ct)`
    - Protokolleinträge werden abrufen (kann mehrere Sekunden dauern bei großen Protokollen)
    - `LogEntries.Clear()` und dann alle Einträge hinzufügen
    - Fehlerbehandlung:
@@ -88,7 +88,7 @@ Beim Laden der Aufgabendetailansicht werden die Aufgabenbasisinformation schnell
 
 - Wenn der Anwender zur nächsten Aufgabe navigiert (AufgabeId ändert sich):
   - Neuer `CancellationTokenSource` wird erstellt (`_logLoadCts`)
-  - Alter Token wird abgebrochen → `LadeProtokolleAsync` wirft `OperationCanceledException`, das stillschweigend ignoriert wird
+  - Alter Token wird abgebrochen → `LoadLogAsync` wirft `OperationCanceledException`, das stillschweigend ignoriert wird
   - Der alte Hintergrund-Task lädt die Protokolle der alten Aufgabe nicht mehr; die Einträge werden nicht in die neue Aufgabe geschrieben
 - Wenn das ViewModel disposed wird (Fenster geschlossen):
   - `_logLoadCts` wird disposed → alle laufenden `await`-Aufrufe werden abgebrochen
@@ -99,15 +99,15 @@ Beim Laden der Aufgabendetailansicht werden die Aufgabenbasisinformation schnell
 Ausgelöst durch Klick auf „Zurück"-Button im Ribbon der `TaskDetailView`.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.ZurueckCommand` — RelayCommand mit `ZurueckAction?.Invoke()`
+- `TaskDetailViewModel.BackCommand` — RelayCommand mit `BackAction?.Invoke()`
 - `ProjectDetailViewModel.NavigateBackToProjectCallback` — Action, gesetzt durch `ProjectListViewModel`
-- `ProjectListViewModel.KehreZuProjectZurueck` — Private Methode, setzt `DetailViewModel = _currentProjectDetailViewModel`
+- `ProjectListViewModel.NavigateBackToProject` — Private Methode, setzt `DetailViewModel = _currentProjectDetailViewModel`
 
 Ablauf:
 1. Nutzer klickt „Zurück" Button im Ribbon von `TaskDetailView`
-2. `TaskDetailViewModel.ZurueckCommand.Execute()` wird aufgerufen
-3. `ZurueckAction?.Invoke()` wird aufgerufen → `NavigateBackToProjectCallback?.Invoke()`
-4. `ProjectListViewModel.KehreZuProjectZurueck()` wird aufgerufen
+2. `TaskDetailViewModel.BackCommand.Execute()` wird aufgerufen
+3. `BackAction?.Invoke()` wird aufgerufen → `NavigateBackToProjectCallback?.Invoke()`
+4. `ProjectListViewModel.NavigateBackToProject()` wird aufgerufen
 5. `DetailViewModel = _currentProjectDetailViewModel` wird gesetzt
 6. MainWindow wechselt DataTemplate: `ProjectDetailViewModel` → `ProjectDetailView` wird gerendert
 7. `TaskDetailView` wird nicht mehr angezeigt
@@ -118,17 +118,17 @@ Ausgelöst durch den „Starten"-Button im Ribbon der `TaskDetailView`. Der Comm
 
 Beteiligte Komponenten:
 - `TaskDetailViewModel.StartCommand` — RelayCommand mit CanExecute-Bedingung auf Gesamtstatus, Ausführungsstatus und `!IsCliRunning`
-- `TaskDetailViewModel.StartenAsync` — Orchestriert Plugin-Dialog, Klonen und CLI-Start
+- `TaskDetailViewModel.StartAsync` — Orchestriert Plugin-Dialog, Klonen und CLI-Start
 - `PluginSelectionService.ResolveSourceCodeManagementPluginAsync` — Wählt das Git-Plugin
 - `PluginSelectionDialogService.ShowPluginSelectionDialogAsync` — Zeigt KI-Plugin-Dialog (falls nicht als Projekt-Standard gespeichert)
 - `PluginDefaultSettingsService.GetProjectDefaultPluginPrefixAsync` / `SaveProjectDefaultPluginPrefixAsync` — Projekt-Level Plugin-Speicherung
-- `DevelopmentProcessService.ProzessStartenAsync` — Klont Repository und legt Branch an
+- `DevelopmentProcessService.StartProcessAsync` — Klont Repository und legt Branch an
 - `AiExecutionService.StartCliAsync` — Startet den KI-CLI-Prozess
 - `PluginSelectionResult` — DTO mit ausgewähltem Plugin-Prefix und SaveAsProjectDefault-Flag
 
 Ablauf:
 1. Anwender klickt „Starten" Button im Ribbon
-2. `TaskDetailViewModel.StartenAsync()` wird aufgerufen
+2. `TaskDetailViewModel.StartAsync()` wird aufgerufen
 3. Prüfung: Gesamtstatus ist nicht terminal und Ausführungsstatus erlaubt einen Start
 4. `PluginSelectionService.ResolveSourceCodeManagementPluginAsync` ermittelt Git-Plugin
 5. `PluginDefaultSettingsService.GetProjectDefaultPluginPrefixAsync(projectId, PluginType.KiAutomation)` prüft Projekt-Standard für KI-Plugin
@@ -136,10 +136,10 @@ Ablauf:
    - `PluginSelectionDialogService.ShowPluginSelectionDialogAsync` zeigt Dialog mit verfügbaren KI-Plugins
    - Benutzer wählt Plugin und optional Checkbox „Für dieses Projekt verwenden"
    - Falls Checkbox aktiviert: `PluginDefaultSettingsService.SaveProjectDefaultPluginPrefixAsync` speichert als Projekt-Standard
-7. Bei `WorkItem.ExecutionStatus == NichtStarted` wird `DevelopmentProcessService.ProzessStartenAsync(workItemId, repositoryUrl, basisBranch, gitPlugin)` aufgerufen:
+7. Bei `WorkItem.ExecutionStatus == NotStarted` wird `DevelopmentProcessService.StartProcessAsync(workItemId, repositoryUrl, basisBranch, gitPlugin)` aufgerufen:
    - Arbeitsverzeichnis wird ermittelt
    - Repository wird geklont in `{workdir}/softwareschmiede/{workItemId}`
-   - Branch wird erstellt oder checked out; ohne `IssueReference` wird ein Branch im Format `task/{aufgabe.Id:N}-{slug}` erzeugt, mit Issue-Nummer im Format `task/issue-{nummer}-{aufgabe.Id:N}-{slug}`
+   - Branch wird erstellt oder checked out; ohne `IssueReference` wird ein Branch im Format `task/{workItem.Id:N}-{slug}` erzeugt, mit Issue-Nummer im Format `task/issue-{nummer}-{workItem.Id:N}-{slug}`
    - Status wird auf `Started` gesetzt (nicht zwischendurch auf andere Status)
 8. Bei `WorkItem.ExecutionStatus == Completed` wird der vorhandene lokale Klon über `DevelopmentProcessService.RestartCliAsync` weiterverwendet; Repository-Klon und Branch-Erstellung werden nicht erneut ausgeführt.
 9. `AiExecutionService.StartTerminalSessionAsync(workItemId, kiPlugin, ...)` startet die interaktive Terminal-Session:
@@ -173,18 +173,18 @@ Beteiligte Komponenten:
 - `ILogger<DevelopmentProcessService>` — Protokolliert erfolgreiche Operationen und Fehler
 
 Ablauf:
-1. Nach `gitPlugin.CloneRepositoryAsync()` wird `CreateIssueFileAsync(lokalerKlonPfad, aufgabe, branchName, startKonfiguration, ct)` aufgerufen
-   - Pfad-Ermittlung via `EnsureEffectiveWorkingDirectory(lokalerKlonPfad, startKonfiguration)`:
-     - Falls `startKonfiguration?.WorkingDirectoryRelativePath` gesetzt: Effektiver Pfad = `Path.Combine(lokalerKlonPfad, relativePath)`
+1. Nach `gitPlugin.CloneRepositoryAsync()` wird `CreateIssueFileAsync(localClonePath, aufgabe, branchName, startConfiguration, ct)` aufgerufen
+   - Pfad-Ermittlung via `EnsureEffectiveWorkingDirectory(localClonePath, startConfiguration)`:
+     - Falls `startConfiguration?.WorkingDirectoryRelativePath` gesetzt: Effektiver Pfad = `Path.Combine(localClonePath, relativePath)`
      - Andernfalls (null, leer, oder `"."` ): Effektiver Pfad = Repository-Root
      - Verzeichnis wird mit `Directory.CreateDirectory` sichergestellt
-   - Markdown-Datei `{effektiverPfad}/issue.md` wird erstellt
+   - Markdown-Datei `{effectivePath}/issue.md` wird erstellt
    - Inhalt: `# WorkItem: [Title]`; Metadaten (Aufgaben-ID, Branch-Name, Erstellungsdatum); `## Anforderung` mit Aufgabenbeschreibung
    - Falls `RequirementDescription` null oder leer: Fallback-Text `[Keine Anforderungsbeschreibung verfügbar]` wird verwendet
    - Bei Exception (z. B. IOException): Warnung wird geloggt via `_logger.LogWarning`, Prozess wird nicht unterbrochen
-2. Danach wird `UpdateGitignoreAsync(lokalerKlonPfad, startKonfiguration, ct)` aufgerufen
+2. Danach wird `UpdateGitignoreAsync(localClonePath, startConfiguration, ct)` aufgerufen
    - Pfad-Ermittlung (analog zu Schritt 1) via `EnsureEffectiveWorkingDirectory`
-   - `.gitignore`-Datei wird in `{effektiverPfad}/.gitignore` gelesen (oder neue Datei erstellt falls nicht vorhanden)
+   - `.gitignore`-Datei wird in `{effectivePath}/.gitignore` gelesen (oder neue Datei erstellt falls nicht vorhanden)
    - Prüfung: Ist `issue.md` bereits als Eintrag vorhanden? (Case-insensitive)
    - Falls nicht vorhanden: Zeile `issue.md` am Ende der Datei hinzufügen (Newline-safe)
    - Geschrieben via `File.WriteAllTextAsync` mit UTF8-Encoding ohne BOM
@@ -213,7 +213,7 @@ Ablauf:
 3. Der Writer dekodiert die Bytes als UTF-8 und trennt Zeilen auf LF, CRLF und einzelnem CR.
 4. Abgeschlossene Zeilen landen in einer bounded Queue. Bei voller Queue wartet der Output-Reader, bis der Hintergrund-Worker wieder Kapazität schafft.
 5. Der Hintergrund-Worker schreibt Zeilen in Stream-Reihenfolge über `LogService.AddCliOutputAsync`.
-6. Enthält eine Zeile den Session-Limit-Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` mit gültigem Zeitstempel, ruft `PersistLineAsync` anschließend `AiPluginLimitService.VerarbeiteRateLimitAsync` auf — siehe „5.6. Automatische Pause bei Session-Limit-Marker".
+6. Enthält eine Zeile den Session-Limit-Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` mit gültigem Zeitstempel, ruft `PersistLineAsync` anschließend `AiPluginLimitService.ProcessRateLimitAsync` auf — siehe „5.6. Automatische Pause bei Session-Limit-Marker".
 7. Beim Prozessende oder Cleanup wird die Senke idempotent abgeschlossen; `CompleteAsync` wartet begrenzt auf bereits angenommene Queue-Einträge.
 
 Die Protokollierung ist UI-unabhängig. Neue `CliOutput`-Einträge müssen nicht live in der Info-Ansicht auftauchen; nach erneutem Laden der Aufgabe werden sie über den normalen Protokollabruf sichtbar.
@@ -228,7 +228,7 @@ Beteiligte Komponenten:
 - `TaskDetailViewModel.ExportCliRawAsync` — orchestriert Dialog, Validierung und Export
 - `IDialogService.ShowSaveFileDialogAsync` — liefert den Zielpfad oder `null` bei Abbruch
 - `ICliRawExportService.ExportCliRawAsync` — liest `CliOutput`-Einträge und schreibt die `.raw`-Datei
-- `LogService.GetByAufgabeAsync` — lädt den persistierten Protokoll-Snapshot
+- `LogService.GetByWorkItemAsync` — lädt den persistierten Protokoll-Snapshot
 
 Ablauf:
 1. Nutzer klickt in der CLI-Ribbon-Gruppe auf **Rohausgabe exportieren**.
@@ -236,8 +236,8 @@ Ablauf:
 3. Das ViewModel öffnet über `IDialogService.ShowSaveFileDialogAsync(...)` einen nativen Save-Dialog mit Filter `Raw files (*.raw)|*.raw` und einem Default-Dateinamen auf Basis der Aufgaben-ID.
 4. Bricht der Nutzer den Dialog ab, endet der Ablauf ohne Fehler und ohne Dateioperation.
 5. Gibt der Dialog einen Zielpfad zurück, prüft das ViewModel, ob der Pfad auf `.raw` endet.
-6. Anschließend ruft das ViewModel `_cliRawExportService.ExportCliRawAsync(_workItemId, zielPfad, ct)` auf.
-7. `CliRawExportService` lädt die Protokolle der Aufgabe über `LogService.GetByAufgabeAsync(...)`.
+6. Anschließend ruft das ViewModel `_cliRawExportService.ExportCliRawAsync(_workItemId, targetPath, ct)` auf.
+7. `CliRawExportService` lädt die Protokolle der Aufgabe über `LogService.GetByWorkItemAsync(...)`.
 8. Der Service filtert auf `LogEntryType.CliOutput`, übernimmt nur `Inhalt` und verbindet die Zeilen mit `Environment.NewLine`.
 9. Die resultierende Textdatei wird mit UTF-8 ohne BOM geschrieben.
 10. Schlägt der Schreibvorgang fehl, wird die Ausnahme im ViewModel geloggt und als Benutzerfehler angezeigt; der restliche UI-Zustand bleibt unverändert.
@@ -251,7 +251,7 @@ Beteiligte Komponenten:
 - `TaskDetailViewModel.ExportCliReplayCommand` / `ExportCliReplayAsync` — orchestriert Vorab-Prüfung, Dialog, Validierung und Export
 - `IDialogService.ShowSaveFileDialogAsync` — liefert den Zielpfad oder `null` bei Abbruch (Filter `CLI-Replay-Dateien (*.clireplay)|*.clireplay`)
 - `ICliReplayExportService` / `CliReplayExportService` — `HasRecording` (Vorab-Prüfung) und `ExportCliReplayAsync` (schreibt via `CliReplayRecordingStore`)
-- `AiExecutionService.GetCliAufzeichnung` — liefert den im Speicher gehaltenen `CliOutputRecording`-Mitschnitt der letzten Terminal-Session der Aufgabe (Registry: letzte 8 Aufgaben)
+- `AiExecutionService.GetCliRecording` — liefert den im Speicher gehaltenen `CliOutputRecording`-Mitschnitt der letzten Terminal-Session der Aufgabe (Registry: letzte 8 Aufgaben)
 - `CliReplayRecordingStore` — `.clireplay`-Binärformat: Header (Magic `SWCLRPLY`, Version, Aufgabe/Plugin/Geometrie/`IsComplete`) + Chunk-Records `[OffsetTicks][Length][Bytes]`
 
 Ablauf:
@@ -259,7 +259,7 @@ Ablauf:
 2. `ExportCliReplayAsync(ct)` prüft `ExportCanCliReplay` und ruft `HasRecording(workItemId)` auf — ohne Mitschnitt endet der Ablauf mit `ErrorMessage` „Für diese Aufgabe liegt noch keine Aufzeichnung vor — sie wird während einer CLI-Ausführung automatisch mitgeschnitten." (der Speicherdialog wird nicht geöffnet).
 3. Save-Dialog mit Default-Dateiname `cli-replay-{workItemId:N}.clireplay`; Abbruch → kein Export, kein Fehler.
 4. Endungsprüfung `.clireplay` → sonst `ErrorMessage` „Export-Zielpfad muss auf .clireplay enden."
-5. `CliReplayExportService.ExportCliReplayAsync` holt die Aufzeichnung über `GetCliAufzeichnung` (`null` → `InvalidOperationException`) und schreibt Header + Records via `CliReplayRecordingStore.SaveAsync`.
+5. `CliReplayExportService.ExportCliReplayAsync` holt die Aufzeichnung über `GetCliRecording` (`null` → `InvalidOperationException`) und schreibt Header + Records via `CliReplayRecordingStore.SaveAsync`.
 6. Schreibfehler werden im ViewModel geloggt und als `ErrorMessage` angezeigt.
 
 Der Mitschnitt selbst entsteht beim Session-Start im `AiExecutionService` über den `CliOutputRecorder` (als zweite Senke der `CompositeTerminalOutputSink`) — Details im [technischen Ablauf der Terminal-Integration](../terminal/ablauf-technisch.md).
@@ -277,7 +277,7 @@ Beteiligte Komponenten:
 Ablauf:
 1. Anwender gibt Titel und optional Anforderungsbeschreibung ein
 2. Two-Way-Binding aktualisiert `EditTitle` und `EditRequirementDescription` in ViewModel
-3. ViewModel berechnet `KannSpeichern` basierend auf nicht-leerem Titel
+3. ViewModel berechnet `SaveCan` basierend auf nicht-leerem Titel
 4. Anwender klickt „Speichern" → `SaveCommand.Execute()`
 5. `WorkItemService.UpdateAsync()` wird aufgerufen
 6. Bei Erfolg: `LoadAsync()` neu laden, Aufgabenliste per Callback aktualisieren und die aktuelle Aufgabendetailansicht geöffnet lassen; bei Fehler: `ErrorMessage` anzeigen
@@ -289,13 +289,13 @@ Beim Laden einer Aufgabe wertet die Detailansicht zuerst den persistenten `Execu
 Beteiligte Komponenten:
 - `TaskDetailViewModel.LoadAsync` — Lädt Aufgabe, prüft Status und Prozess-Zustand
 - `AiExecutionService.IsRunning(workItemId)` — Prüft, ob Prozess läuft
-- `WorkItemRecoveryService` — betrachtet nur Aufgaben mit `ExecutionStatus.Aktiv` als Recovery-Kandidaten
+- `WorkItemRecoveryService` — betrachtet nur Aufgaben mit `ExecutionStatus.Active` als Recovery-Kandidaten
 
 Ablauf:
 1. Benutzer navigiert zu Aufgabendetailansicht
 2. `LoadAsync` wird aufgerufen (registriert in AufgabeId-Property-Setter)
 3. Aufgabe wird mit `WorkItemService.GetDetailAsync` geladen
-4. Prüfung: `WorkItem.ExecutionStatus == Aktiv`
+4. Prüfung: `WorkItem.ExecutionStatus == Active`
 5. Falls eine Session läuft: Session wird aus `AiExecutionService.GetTerminalSession(workItemId)` geholt und eingebettet
 6. Falls keine Session läuft: keine implizite neue CLI wird gestartet; Recovery betrachtet nur aktive, wiederherstellbare Laufdaten
 7. Bei `NotStarted` oder `Completed`: `ShowCliPanel` bleibt aus, `StartCommand` kann abhängig vom Gesamtstatus aktiv sein
@@ -306,7 +306,7 @@ Ausgelöst durch den „Plugin ändern"-Button im Ribbon (nur aktiv wenn `IsCliR
 
 Beteiligte Komponenten:
 - `TaskDetailViewModel.SwitchPluginCommand` — RelayCommand mit CanExecute-Bedingung: IsCliRunning && Status ∈ {Started, Waiting}
-- `TaskDetailViewModel.PluginWechselAsync` — Orchestriert Dialog, Stop, Restart
+- `TaskDetailViewModel.SwitchPluginAsync` — Orchestriert Dialog, Stop, Restart
 - `PluginSelectionDialogService.ShowPluginSelectionDialogAsync` — Zeigt Dialog mit aktuellem Plugin vorselektiert
 - `AiExecutionService.StopCliAsync` — Beendet aktuellen Prozess
 - `AiExecutionService.StartCliAsync` — Startet neuen Prozess mit gewähltem Plugin
@@ -314,7 +314,7 @@ Beteiligte Komponenten:
 
 Ablauf:
 1. Anwender klickt „Plugin ändern" Button im Ribbon
-2. `PluginWechselAsync()` wird aufgerufen
+2. `SwitchPluginAsync()` wird aufgerufen
 3. `PluginSelectionDialogService.ShowPluginSelectionDialogAsync` zeigt Dialog mit verfügbaren Plugins
 4. Benutzer wählt neues Plugin und optional Checkbox „Für dieses Projekt verwenden"
 5. `AiExecutionService.StopCliAsync()` wird aufgerufen (mit Timeout ~5s)
@@ -365,7 +365,7 @@ Beteiligte Komponenten:
 - `TaskDetailViewModel.CanSchedulePrompt` — Bedingung: CLI läuft, Vorlage gewählt, gültige Zeit eingegeben
 - `TaskDetailViewModel.SchedulePromptCommand` — AsyncRelayCommand zum Planen des Prompts
 - `TaskDetailViewModel.SchedulePromptAsync` — Private Methode mit Validierung und Planungslogik
-- `PromptTimeDispatchService.SchedulePromptAsync` — Plant Prompt mit Timer oder sendet sofort
+- `PromptScheduleDispatchService.SchedulePromptAsync` — Plant Prompt mit Timer oder sendet sofort
 - `PromptTemplatePlaceholderService.Resolve` — Löst Platzhalter im Prompttext auf
 - `PseudoConsoleSession.WritePromptAsync` — Schreibt Prompt auf InputStream
 
@@ -382,7 +382,7 @@ Ablauf:
    - Falls ungültig: `ErrorMessage` wird gesetzt, Abbruch
 7. `TargetTime` wird berechnet: heutiges Datum + eingegebene Uhrzeit (lokal via `DateTime.Now`)
 8. Prompt wird aufgelöst via `PromptTemplatePlaceholderService.Resolve(_workItem)` (benötigt die geladene Aufgabe)
-9. `_promptZeitVersandService.SchedulePromptAsync(workItemId, promptText, targetTime)` wird aufgerufen:
+9. `_promptScheduleDispatchService.SchedulePromptAsync(workItemId, promptText, targetTime)` wird aufgerufen:
    - Aktive Pause (`PausedUntilUtc` > jetzt und > `targetTime`): die Zielzeit wird zunächst auf das Pausenende verschoben
    - Liegt `targetTime` in der Vergangenheit/Gegenwart: `SendPromptAsync()` wird sofort aufgerufen, Prompt versendet, keine Warteschlange und **kein** persistierter Datensatz im Erfolgsfall; schlägt auch der Sofortversand fehl, geht der Plan in „wartet auf Session" über und wird persistiert (Lost-Update-geschützt via `UpsertIfMatchingAsync`)
    - Sonst: `ScheduledPromptStore.UpsertAsync` schreibt zuerst den Datensatz (ersetzt einen vorhandenen Plan derselben Aufgabe), danach wird `ScheduledPromptInfo` im internen Dictionary abgelegt (alter Timer wird abgebrochen) und ein `ITimer` via `TimeProvider.CreateTimer` mit der Restlaufzeit gestartet
@@ -392,17 +392,17 @@ Ablauf:
 
 ### 5.2. Automatischer Prompt-Versand bei Erreichen der Zielzeit
 
-Ausgelöst durch Timer-Fälligkeit im `PromptTimeDispatchService` für einen geplanten Prompt.
+Ausgelöst durch Timer-Fälligkeit im `PromptScheduleDispatchService` für einen geplanten Prompt.
 
 Beteiligte Komponenten:
-- `PromptTimeDispatchService._scheduledPrompts` — Dictionary<Guid, ScheduledPromptEntry> mit aktiven Prompts pro Aufgabe (Eintrag optional im Zustand `WartetAufSession` ohne Timer)
+- `PromptScheduleDispatchService._scheduledPrompts` — Dictionary<Guid, ScheduledPromptEntry> mit aktiven Prompts pro Aufgabe (Eintrag optional im Zustand `WaitingForSession` ohne Timer)
 - `ITimer` — Timer pro Eintrag, erstellt via `TimeProvider.CreateTimer`
-- `PromptTimeDispatchService.HandleTimerElapsedAsync` — Callback wird bei Fälligkeit aufgerufen (Thread-Pool-Thread)
-- `PromptTimeDispatchService.SendPromptAsync` — Schreibt Prompt an Session oder überführt den Plan in „wartet auf Session"
+- `PromptScheduleDispatchService.HandleTimerElapsedAsync` — Callback wird bei Fälligkeit aufgerufen (Thread-Pool-Thread)
+- `PromptScheduleDispatchService.SendPromptAsync` — Schreibt Prompt an Session oder überführt den Plan in „wartet auf Session"
 - `ScheduledPromptStore` — Scoped Service für die Datensatz-Löschung nach erfolgreichem Versand bzw. die Zielzeit-Aktualisierung bei Pause
 - `LogService` — schreibt den `SystemMessage`-Eintrag bei Hintergrundversand (per `IServiceScopeFactory` aufgelöst)
-- `PromptTimeDispatchService.PromptSent` — Event, ausgelöst nach erfolgreichem Versand
-- `PromptTimeDispatchService.ScheduledPromptChanged` — Event bei jedem Wartestellungs-Zustandswechsel (Planen, Storno, Versand, „wartet auf Session")
+- `PromptScheduleDispatchService.PromptSent` — Event, ausgelöst nach erfolgreichem Versand
+- `PromptScheduleDispatchService.ScheduledPromptChanged` — Event bei jedem Wartestellungs-Zustandswechsel (Planen, Storno, Versand, „wartet auf Session")
 - `AiExecutionService.GetTerminalSession` — Holt aktive Session für die Aufgabe
 - `PseudoConsoleSession.WritePromptAsync` — Schreibt Prompt mit Encoding und Flushing
 - `TaskDetailViewModel` — abonniert `PromptSent`- und `ScheduledPromptChanged`-Events
@@ -412,14 +412,14 @@ Ablauf:
 2. `HandleTimerElapsedAsync(workItemId)` wird aufgerufen
 3. Lock wird akquiriert; Eintrag wird aus Dictionary entfernt; Info gespeichert
 4. Aktive Pause: Bei `PausedUntilUtc` > jetzt wird der Eintrag mit `TargetTime = Pausenende` zurückgelegt, der Timer neu armiert und der persistierte Zielzeitpunkt via `ScheduledPromptStore.UpdateTargetTimeAsync` aktualisiert — kein Versand vor dem Pausenende
-5. `SendPromptAsync(workItemId, promptText, nachzustellung: false, entry.Info)` wird aufgerufen (außerhalb des Locks)
-6. `_kiService.GetTerminalSession(workItemId)` holt die aktive Session:
+5. `SendPromptAsync(workItemId, promptText, redelivery: false, entry.Info)` wird aufgerufen (außerhalb des Locks)
+6. `_aiService.GetTerminalSession(workItemId)` holt die aktive Session:
    - Session vorhanden: `PseudoConsoleSession.WritePromptAsync(promptText, ct)` wird aufgerufen
      - Prompt wird zu UTF-8-Bytes + Newline konvertiert
      - Bytes werden auf `InputStream` geschrieben, Stream wird geflusht
      - `MarkInputActivity()` wird aufgerufen (Status-Erkennung)
      - Nach erfolgreicher Schreiboperation: der persistierte Datensatz wird via `DeleteAfterDispatchAsync` gelöscht (Lost-Update-Schutz: ein zwischenzeitlich persistierter neuerer Plan bleibt erhalten), `PromptSent?.Invoke(workItemId)` und `ScheduledPromptChanged?.Invoke(workItemId)` werden ausgelöst
-   - Session `null` (CLI zwischenzeitlich beendet oder gewechselt): Log-Warnung, Rückgabe `false` — `MarkiereWartetAufSession` legt den Eintrag im Zustand „wartet auf Session" zurück (Datensatz bleibt persistiert, kein Verwerfen)
+   - Session `null` (CLI zwischenzeitlich beendet oder gewechselt): Log-Warnung, Rückgabe `false` — `MarkWaitingForSession` legt den Eintrag im Zustand „wartet auf Session" zurück (Datensatz bleibt persistiert, kein Verwerfen)
    - `ObjectDisposedException` oder sonstiger `WritePromptAsync`-Fehler: gleiche Behandlung — Plan + Datensatz bleiben erhalten, „wartet auf Session"
 7. Protokolleintrag: `WriteDispatchLogAsync` schreibt nach erfolgreichem Versand einen `LogEntryType.SystemMessage`-Eintrag („Zeitgesteuerter Prompt versendet."), **wenn** `PromptSent` keinen Abonnenten hat (keine geöffnete Detailansicht = Hintergrundversand); Fehler beim Protokollieren werden nur geloggt und beeinflussen den Versand nicht
 8. `TaskDetailViewModel` (falls abonniert und workItemId trifft zu) empfängt `PromptSent`-Event über `_dispatcherInvoke`:
@@ -432,13 +432,13 @@ Ablauf:
 Ausgelöst durch den Button „Wartestellung aufheben" in der `TaskDetailView`, durch den Aufgabenabschluss, durch das Löschen der Aufgabe oder wenn der Anwender einen neuen Prompt plant (Ersetzung). Das Verlassen der Detailansicht (`Dispose`), ein Aufgabenwechsel und ein CLI-Stopp stornieren **nicht** mehr — der persistierte Plan bleibt bestehen.
 
 Beteiligte Komponenten:
-- `PromptTimeDispatchService.CancelScheduledPromptAsync` — Storniert einen geplanten Prompt (In-Memory-Eintrag + persistierter Datensatz)
-- `TaskDetailViewModel.CancelScheduledPromptCommand` — `AsyncRelayCommand` hinter dem Button „Wartestellung aufheben" (`AutomationProperties.Name="WartestellungAufheben"` im Status-`StackPanel`; erbt dessen `Visibility`-Binding und ist nur sichtbar, solange `ScheduledPromptStatus` gesetzt ist)
+- `PromptScheduleDispatchService.CancelScheduledPromptAsync` — Storniert einen geplanten Prompt (In-Memory-Eintrag + persistierter Datensatz)
+- `TaskDetailViewModel.CancelScheduledPromptCommand` — `AsyncRelayCommand` hinter dem Button „Wartestellung aufheben" (`AutomationProperties.Name="ReleaseWaiting"` im Status-`StackPanel`; erbt dessen `Visibility`-Binding und ist nur sichtbar, solange `ScheduledPromptStatus` gesetzt ist)
 - `DevelopmentProcessService.CompleteCoordinatedAsync` — ruft `await CancelScheduledPromptAsync` als Schritt des einheitlichen Abschluss-Passes auf (gilt für UI- und Monitoring-Abschluss gleichermaßen)
 - `TaskDetailViewModel.OnScheduledPromptChanged` — synchronisiert die Statusanzeige nach externen Stornos (Abschluss) und nach dem manuellen Storno über `UpdateQueueDisplay`
 
 Ablauf beim Stornieren:
-1. `await _promptZeitVersandService.CancelScheduledPromptAsync(workItemId)` wird aufgerufen
+1. `await _promptScheduleDispatchService.CancelScheduledPromptAsync(workItemId)` wird aufgerufen
 2. Lock wird akquiriert; Eintrag wird aus Dictionary entfernt; Timer wird disposed
 3. `ScheduledPromptStore.DeleteAsync` entfernt den persistierten Datensatz (über `WithStoreAsync` im eigenen Scope)
 4. `ScheduledPromptChanged` feuert → `UpdateQueueDisplay` leert `ScheduledPromptStatus`/`ScheduledPromptTimeDisplay`; Statusanzeige und „Wartestellung aufheben"-Button verschwinden über den `NullOrEmptyToVisibilityConverter`
@@ -449,9 +449,9 @@ Ablauf beim Stornieren:
 Ausgelöst durch `App.OnStartup` nach `db.Database.MigrateAsync()` sowie durch `AiExecutionService.CliProcessStatusChanged` mit Status `Started`.
 
 Beteiligte Komponenten:
-- `PromptTimeDispatchService.RestoreScheduledPromptsAsync` — lädt alle persistierten Pläne via `ScheduledPromptStore.GetAllAsync` (in `App.OnStartup` aufgerufen; der Aufruf steht bewusst nach `MigrateAsync`, damit die Tabelle bei einem Update bereits existiert)
+- `PromptScheduleDispatchService.RestoreScheduledPromptsAsync` — lädt alle persistierten Pläne via `ScheduledPromptStore.GetAllAsync` (in `App.OnStartup` aufgerufen; der Aufruf steht bewusst nach `MigrateAsync`, damit die Tabelle bei einem Update bereits existiert)
 - `ScheduledPromptStore` — Scoped Service für `GetAllAsync`, `UpdateTargetTimeAsync`, `DeleteAsync` (aufgelöst per `IServiceScopeFactory`)
-- `PromptTimeDispatchService.OnCliProcessStatusChanged` / `DeliverAfterSessionStartAsync` — Abonnent von `CliProcessStatusChanged`; liefert wartende bzw. fällige Pläne beim Session-Start zu
+- `PromptScheduleDispatchService.OnCliProcessStatusChanged` / `DeliverAfterSessionStartAsync` — Abonnent von `CliProcessStatusChanged`; liefert wartende bzw. fällige Pläne beim Session-Start zu
 - `LogService` — schreibt bei Nachzustellung immer einen `SystemMessage`-Eintrag („Zeitgesteuerter Prompt nach CLI-Start zugestellt.")
 - `WorkItemService` — Existenz- und `PausedUntilUtc`-Prüfung beim Re-Arm
 
@@ -460,13 +460,13 @@ Ablauf beim App-Start (`RestoreScheduledPromptsAsync`):
 2. Aufgabe existiert nicht mehr → Datensatz wird defensiv gelöscht (durch FK-Cascade praktisch nicht vorkommend).
 3. Aktive Pause jenseits der Zielzeit → Zielzeit wird auf das Pausenende vorgeladen und der Datensatz via `UpdateTargetTimeAsync` aktualisiert.
 4. Zielzeit in Zukunft → `ScheduledPromptEntry` anlegen + Timer auf die Restdauer armieren.
-5. Zielzeit verstrichen → `ScheduledPromptEntry` im Zustand `WartetAufSession` anlegen (kein Timer): Nach einem Neustart existiert noch keine CLI-Session (Kindprozesse sterben mit der App), ein Sofortversand wäre wirkungslos — der Plan wird beim nächsten CLI-Start zugestellt statt verworfen.
+5. Zielzeit verstrichen → `ScheduledPromptEntry` im Zustand `WaitingForSession` anlegen (kein Timer): Nach einem Neustart existiert noch keine CLI-Session (Kindprozesse sterben mit der App), ein Sofortversand wäre wirkungslos — der Plan wird beim nächsten CLI-Start zugestellt statt verworfen.
 
 Ablauf bei CLI-Start (`CliProcessStatusChanged` → `Started`):
-1. `DeliverAfterSessionStartAsync(workItemId)` prüft den In-Memory-Eintrag: liegt ein Eintrag mit `WartetAufSession` oder verstrichener `TargetTime` vor, wird er entnommen und `SendPromptAsync(..., nachzustellung: true)` aufgerufen.
+1. `DeliverAfterSessionStartAsync(workItemId)` prüft den In-Memory-Eintrag: liegt ein Eintrag mit `WaitingForSession` oder verstrichener `TargetTime` vor, wird er entnommen und `SendPromptAsync(..., redelivery: true)` aufgerufen.
 2. Bei Erfolg: Datensatz löschen, `PromptSent` + `ScheduledPromptChanged` feuern und **immer** einen `SystemMessage`-Protokolleintrag schreiben — auch bei geöffneter Detailansicht, da die Zustellung nicht vom Anwender ausgelöst wurde.
 3. Liegt ein Eintrag mit zukünftiger `TargetTime` vor → nichts zu tun (Timer bereits armiert).
-4. Schlägt die Zustellung erneut fehl → `MarkiereWartetAufSession` legt den Eintrag zurück; ein persistenter Sendefehler kann sich so bei jedem CLI-Start wiederholen (Log + „Prompt wartet auf CLI-Start" bleiben sichtbar; auflösbar über „Wartestellung aufheben").
+4. Schlägt die Zustellung erneut fehl → `MarkWaitingForSession` legt den Eintrag zurück; ein persistenter Sendefehler kann sich so bei jedem CLI-Start wiederholen (Log + „Prompt wartet auf CLI-Start" bleiben sichtbar; auflösbar über „Wartestellung aufheben").
 
 ### 5.5. Manuelle Pause setzen und aufheben
 
@@ -475,17 +475,17 @@ Ausgelöst durch den Button **Pause einstellen** (`AutomationName="PauseEinstell
 Beteiligte Komponenten:
 - `TaskDetailViewModel.SetPauseCommand` — `AsyncRelayCommand` mit CanExecute `CanPause` (`Status` ∈ {`New`, `Started`, `Waiting`} ∧ `!IsLoading`); der Button ist über `Visibility`-Binding ausgeblendet, wenn `CanPause` nicht gilt
 - `TaskDetailViewModel.SetPauseAsync` — erzeugt das Dialog-ViewModel, ruft den Dialog und übergibt das Ergebnis an den Service
-- `WorkItemPauseDialogViewModel` — Dialog-Zustand: `PausedDate`/`PausedHour`/`PausedMinute` (Vorbelegung: `GetLocalNow().AddMinutes(1)`, da die laufende Minute durch den Sekundenabschnitt bereits in der Vergangenheit läge), `CurrentPauseDisplay`, `IsCurrentlyPaused`, `ValidationError`/`KannBestaetigen`; `Initialize(currentPauseUtc)` übernimmt eine bestehende Pause als Vorbelegung
-- `PauseWorkItemResult` — Record mit `PausedUntilUtc` und `Aufheben`
+- `PauseWorkItemDialogViewModel` — Dialog-Zustand: `PausedDate`/`PausedHour`/`PausedMinute` (Vorbelegung: `GetLocalNow().AddMinutes(1)`, da die laufende Minute durch den Sekundenabschnitt bereits in der Vergangenheit läge), `CurrentPauseDisplay`, `IsCurrentlyPaused`, `ValidationError`/`CanConfirm`; `Initialize(currentPauseUtc)` übernimmt eine bestehende Pause als Vorbelegung
+- `PauseWorkItemResult` — Record mit `PausedUntilUtc` und `Lift`
 - `IDialogService.ShowWorkItemPauseDialogAsync` / `WpfDialogService` — zeigt `WorkItemPauseDialog` modal über `ShowDialogAsync`
 - `WorkItemService.SetPauseAsync` — persistiert `WorkItem.PausedUntilUtc` (oder `null` zum Aufheben) mit Validierung und `LogEntryType.SystemMessage`-Eintrag; fordert anschließend über `ScmStartCheckTrigger` die SCM-Startprüfung an (frei werdender Ausführungsplatz)
 - `WorkItemRunDataChangedNotifier` — löst die sofortige Aktualisierung der Seitenleisten-Kachel aus
 
 Ablauf:
-1. `SetPauseAsync` löst `WorkItemPauseDialogViewModel` aus DI auf und initialisiert es mit dem aktuellen `PausedUntilUtc`.
-2. `ShowWorkItemPauseDialogAsync` öffnet den modalen Dialog. Er validiert fortlaufend: Datum gewählt, Stunde 0–23, Minute 0–59, Ergebnis (in lokale Zeit interpretiert, nach UTC normalisiert) muss in der Zukunft liegen — sonst ist `KannBestaetigen == false` und `ValidationError` wird angezeigt.
-3. Ergebnis-Varianten: **Übernehmen** → `PauseWorkItemResult(pausiertBisUtc, Aufheben: false)`; **Pause aufheben** (nur aktiv bei `IsCurrentlyPaused`) → `Ergebnis(null, Aufheben: true)`; **Abbrechen** → `null`, keine Änderung.
-4. Bei `Aufheben` ruft das ViewModel `SetPauseAsync(workItemId, null)`, sonst `SetPauseAsync(workItemId, ergebnis.PausedUntilUtc)`.
+1. `SetPauseAsync` löst `PauseWorkItemDialogViewModel` aus DI auf und initialisiert es mit dem aktuellen `PausedUntilUtc`.
+2. `ShowWorkItemPauseDialogAsync` öffnet den modalen Dialog. Er validiert fortlaufend: Datum gewählt, Stunde 0–23, Minute 0–59, Ergebnis (in lokale Zeit interpretiert, nach UTC normalisiert) muss in der Zukunft liegen — sonst ist `CanConfirm == false` und `ValidationError` wird angezeigt.
+3. Ergebnis-Varianten: **Übernehmen** → `PauseWorkItemResult(pausedUntilUtc, Lift: false)`; **Pause aufheben** (nur aktiv bei `IsCurrentlyPaused`) → `PauseWorkItemResult(null, Lift: true)`; **Abbrechen** → `null`, keine Änderung.
+4. Bei `Lift` ruft das ViewModel `SetPauseAsync(workItemId, null)`, sonst `SetPauseAsync(workItemId, result.PausedUntilUtc)`.
 5. `WorkItemService.SetPauseAsync` lehnt Status außerhalb `New`/`Started`/`Waiting` und nicht-zukünftige Zeitpunkte mit `InvalidOperationException` ab; andernfalls wird `PausedUntilUtc` gespeichert und ein `SystemMessage`-Eintrag („Aufgabe pausiert bis …" / „Pause aufgehoben") geschrieben.
 6. `LoadAsync` lädt die Aufgabe neu; `NotifyRunDataChanged` stößt den sofortigen Refresh der Seitenleiste an.
 
@@ -497,15 +497,15 @@ Beteiligte Komponenten:
 - `PseudoConsoleSession` / `CliOutputLogWriter.PersistLineAsync` — zeilenbasierter Persistenzpfad; erzeugt pro Zeile einen `IServiceScope`
 - `LogService.AddCliOutputAsync` — speichert den `CliOutput`-Eintrag und bei Marker-Fund den `LogEntryType.RateLimit`-Eintrag an der auslösenden Aufgabe
 - `LogService.TryParseRateLimitMarker` — statische, seitenfreie Parsing-Funktion; liefert `resetUtc` auch `null` (Marker ohne gültigen Zeitstempel)
-- `AiPluginLimitService.VerarbeiteRateLimitAsync` — orchestriert Limit-Persistenz und Peer-Pause (scoped; wird via `GetService` aufgelöst, damit Scopes ohne Registrierung fehlertolerant bleiben)
+- `AiPluginLimitService.ProcessRateLimitAsync` — orchestriert Limit-Persistenz und Peer-Pause (scoped; wird via `GetService` aufgelöst, damit Scopes ohne Registrierung fehlertolerant bleiben)
 - `AppSettingService.SetSettingAsync` — persistiert den Limit-Zeitpunkt unter `plugins.sessionlimit.<AiPluginPrefix>` (ISO-8601-Roundtrip, UTC)
 - `WorkItemRunDataChangedNotifier` — Benachrichtigung pro pausierter Aufgabe
 
 Ablauf:
-1. Nach `AddCliOutputAsync` prüft `PersistLineAsync` die Zeile erneut mit `TryParseRateLimitMarker`. Nur bei `resetUtc.HasValue` wird `KiPluginLimitService.VerarbeiteRateLimitAsync(workItemId, resetUtc)` aufgerufen — ein Marker ohne Zeitstempel erzeugt also nur den `RateLimit`-Protokolleintrag.
-2. `VerarbeiteRateLimitAsync` lädt die auslösende Aufgabe; bei fehlendem `AiPluginPrefix` wird ohne Aktion abgebrochen.
+1. Nach `AddCliOutputAsync` prüft `PersistLineAsync` die Zeile erneut mit `TryParseRateLimitMarker`. Nur bei `resetUtc.HasValue` wird `AiPluginLimitService.ProcessRateLimitAsync(workItemId, resetUtc)` aufgerufen — ein Marker ohne Zeitstempel erzeugt also nur den `RateLimit`-Protokolleintrag.
+2. `ProcessRateLimitAsync` lädt die auslösende Aufgabe; bei fehlendem `AiPluginPrefix` wird ohne Aktion abgebrochen.
 3. Der Zeitpunkt wird als `AppSetting` unter `plugins.sessionlimit.<Prefix>` gespeichert. Liegt er in der Vergangenheit, endet der Ablauf hier (kein Pausieren).
-4. Es werden alle Aufgaben mit `Status.IsActiveOrWaiting()`, `ExecutionStatus == Aktiv` und mit gesetztem `AiPluginPrefix` geladen und clientseitig per `StringComparison.OrdinalIgnoreCase` auf dasselbe Prefix gefiltert.
+4. Es werden alle Aufgaben mit `Status.IsActiveOrWaiting()`, `ExecutionStatus == Active` und mit gesetztem `AiPluginPrefix` geladen und clientseitig per `StringComparison.OrdinalIgnoreCase` auf dasselbe Prefix gefiltert.
 5. Pro betroffener Aufgabe gilt **Max-Semantik**: `PausedUntilUtc` wird auf `max(bisheriger Wert, resetUtc)` gesetzt — eine länger laufende manuelle Pause wird nicht verkürzt. Pro Aufgabe entsteht ein `SystemMessage`-Eintrag („Aufgabe pausiert bis … (Session-Limit des KI-Plugins '…')").
 6. Nach `SaveChangesAsync` wird pro Aufgabe `NotifyRunDataChanged` aufgerufen → die Kacheln zeigen sofort „⏸ Pausiert (noch …)".
 7. Es werden **keine** Methoden von `AiExecutionService`/`CliProcessManager` aufgerufen — laufende CLI-Prozesse bleiben unangetastet.
@@ -514,9 +514,9 @@ Ablauf:
 
 Eine aktive Pause (`PausedUntilUtc > UtcNow`, Referenzkriterium `AiExecutionStatusClassification.IsCurrentlyPaused`) blockiert neu ausgelöste Aktionen an mehreren Stellen; laufende Prozesse werden nie angefasst:
 
-- **Manueller Start / Neustart:** `DevelopmentProcessService.ProzessStartenAsync`, `ProzessStartenUndCliStartenAsync` und `RestartCliAsync` rufen nach dem Laden der Aufgabe `ThrowIfPaused` auf → `InvalidOperationException` („Die Aufgabe ist bis … pausiert."). Der Guard in `ProzessStartenUndCliStartenAsync` steht bewusst vor dem `try`-Block, damit die Pause nicht den Rollback-Pfad (Klon löschen, Status-Reset) auslöst. `RestartCliAsync` deckt auch den Plugin-Wechsel-Pfad (`PluginWechselAsync`) ab. In der UI verhindern `StartCommand`, `KannCliNeuStarten`, `KannPromptVorlageSenden` und `KannPromptPlanen` die Aktionen bereits über `!IstPausiert`.
+- **Manueller Start / Neustart:** `DevelopmentProcessService.StartProcessAsync`, `StartProcessAndCliAsync` und `RestartCliAsync` rufen nach dem Laden der Aufgabe `ThrowIfPaused` auf → `InvalidOperationException` („Die Aufgabe ist bis … pausiert."). Der Guard in `StartProcessAndCliAsync` steht bewusst vor dem `try`-Block, damit die Pause nicht den Rollback-Pfad (Klon löschen, Status-Reset) auslöst. `RestartCliAsync` deckt auch den Plugin-Wechsel-Pfad (`SwitchPluginAsync`) ab. In der UI verhindern `StartCommand`, `CanStartCli`, `SendCanPromptTemplate` und `CanPromptPlan` die Aktionen bereits über `!IsPaused`.
 - **Recovery:** `WorkItemRecoveryService.ScanForRecoveryCandidatesAsync` filtert Aufgaben mit zukünftigem `PausedUntilUtc` aus; `RecoverManuellAsync` lehnt mit `TaskRecoveryRejected ReasonCode=Paused` und `InvalidOperationException` ab.
-- **Zeitgesteuerte Prompts:** `PromptTimeDispatchService` lädt über die optionale `IServiceScopeFactory` + `WorkItemService` den aktuellen `PausedUntilUtc`-Wert — sowohl in `SchedulePromptAsync` (Verschiebung der Zielzeit auf das Pausenende, falls später) als auch in `HandleTimerElapsedAsync` (Timer wird mit `timer.Change(pausiertBis - now)` neu auf das Pausenende scharf gemacht statt zu senden; die `TargetTime` in `ScheduledPromptInfo` und der persistierte `ZielZeitpunktUtc` via `ScheduledPromptStore.UpdateTargetTimeAsync` werden mitaktualisiert). Beim Re-Arm (`RestoreScheduledPromptsAsync`) wird eine aktive Pause jenseits der Zielzeit ebenfalls vorverlegt. Zwischenzeitlich neu geplante Prompts gewinnen (`_scheduledPrompts.ContainsKey`-Prüfung). Ohne Scope-Factory (Unit-Tests) entfällt die Prüfung.
+- **Zeitgesteuerte Prompts:** `PromptScheduleDispatchService` lädt über die optionale `IServiceScopeFactory` + `WorkItemService` den aktuellen `PausedUntilUtc`-Wert — sowohl in `SchedulePromptAsync` (Verschiebung der Zielzeit auf das Pausenende, falls später) als auch in `HandleTimerElapsedAsync` (Timer wird mit `timer.Change(pausedUntil - now)` neu auf das Pausenende scharf gemacht statt zu senden; die `TargetTime` in `ScheduledPromptInfo` und der persistierte `ZielZeitpunktUtc` via `ScheduledPromptStore.UpdateTargetTimeAsync` werden mitaktualisiert). Beim Re-Arm (`RestoreScheduledPromptsAsync`) wird eine aktive Pause jenseits der Zielzeit ebenfalls vorverlegt. Zwischenzeitlich neu geplante Prompts gewinnen (`_scheduledPrompts.ContainsKey`-Prüfung). Ohne Scope-Factory (Unit-Tests) entfällt die Prüfung.
 - **Pausen-Ende:** Rein zeitbasiert — `PausedUntilUtc <= UtcNow` macht alle Guards wirkungslos; der Zeitstempel verbleibt inert in der Datenbank. Es gibt keinen automatischen Restart.
 - **Gegenläufige Wirkung auf die SCM-Ausführungsbegrenzung:** Dieselbe Pausenprüfung wirkt freigebend in `ScmEventExecutionLimitService.GetOccupancyAsync` — eine pausierte Aufgabe zählt weder in den globalen noch in den Plugin-Zähler, obwohl ihr Prozess weiterläuft; `ICliExecutionLimitSource`/`GetRunningWorkItemIds` bleiben davon bewusst unberührt (geteilter „laufender Prozess"-Vertrag für `CliProcessManager.ReconcileTickAsync`, `IsRunning`, Statusanzeige und Auto-Shutdown). Da `SetPauseAsync` die Startprüfung anfordert, füllt ein wartendes SCM-Ereignis den Platz ohne Poll-Durchlauf nach (Details: [GitHub-Ereignisüberwachung — Technischer Ablauf](../plugins/github-ereignisse/ablauf-technisch.md)).
 
@@ -530,7 +530,7 @@ Beteiligte Komponenten:
 Ablauf:
 1. Beim Starten, automatischen Neustarten oder Pluginwechsel wird das tatsächlich verwendete KI-Plugin aufgelöst
 2. `ActiveCliName` wird auf den Pluginnamen gesetzt; wenn kein Name auflösbar ist, dient der Prefix als Fallback
-3. Bei Stop, Fehler oder Prozessende setzt das ViewModel `AktiverCliName = null`
+3. Bei Stop, Fehler oder Prozessende setzt das ViewModel `ActiveCliName = null`
 4. Die Fußzeile zeigt dadurch nur während einer aktiven CLI-Ausführung einen CLI-Namen und behält keine veralteten Werte
 
 ### 6. Prozess beendet sich
@@ -557,7 +557,7 @@ Beteiligte Komponenten:
 - `AiExecutionStatusData` — trägt `LiveRunStatus` als zusätzliches Feld
 
 Ablauf:
-1. `GetLiveRunStatus(workItemId)` liefert `null`, wenn `IsRunning(workItemId)` nicht zutrifft (kein gehandelter, nicht beendeter Prozess); `WaitingForInput`, wenn die Session `CliRuntimeStatus.WaitingForInput` meldet; sonst `Running` — auch bei laufendem Handle ohne Session oder `RuntimeStatus.Inaktiv` (ein nachweislich laufender Prozess ohne Wartet-Meldung gilt fachlich als „Läuft").
+1. `GetLiveRunStatus(workItemId)` liefert `null`, wenn `IsRunning(workItemId)` nicht zutrifft (kein gehandelter, nicht beendeter Prozess); `WaitingForInput`, wenn die Session `CliRuntimeStatus.WaitingForInput` meldet; sonst `Running` — auch bei laufendem Handle ohne Session oder `CliRuntimeStatus.Inactive` (ein nachweislich laufender Prozess ohne Wartet-Meldung gilt fachlich als „Läuft").
 2. `MapActiveWorkItemPanelItem` schreibt den Wert bei jeder Aktualisierung der `ActiveWorkItemsList` in `ActiveWorkItemPanelItem.LiveRunStatus`.
 3. `Classify` wertet `AiExecutionStatusData` in der Reihenfolge `Paused` → `PromptQueued` → **Live-Zweig** → `ExecutionStatus != Active` → `IsActive(Heartbeat)` → `Status == Waiting` → `Ready` aus. Im Live-Zweig gilt: `LiveRunStatus == WaitingForInput` → `Waiting`, sonst gesetzt → `Running`.
 4. Der Zweig wirkt ausschließlich aufwärts: Er kann nie auf `Ready` zurückfallen, und bei `LiveRunStatus == null` entscheiden unverändert die persistierten Laufdaten (Heartbeat-Regel bleibt einzige Lebendigkeits-Prüfung für persistierte Läufe). `Paused` und `PromptQueued` behalten Vorrang (bestehende Überlagerungssemantik).
@@ -582,7 +582,7 @@ Ablauf:
 1. `AiExecutionService.IsRunning(workItemId)` `false` → Rückkehr ohne Aktion (beendete oder verwaiste Zustände werden nie wieder aktiv geschrieben).
 2. Unter `_lifecycleLock`: Bei `_disposed` Rückkehr; sonst `StartHeartbeatCore(workItemId)` nur, wenn für die Aufgabe noch kein Timer in `_heartbeatTimers` läuft (setzt den Takt nicht zurück).
 3. `SubscribeRuntimeStatus(workItemId)` — idempotent und unter `_lifecycleLock` atomar: Ist für die Aufgabe bereits dieselbe Session registriert, erfolgt keine erneute Registrierung; eine abweichende Alt-Registrierung wird zuvor bereinigt.
-4. `ExecuteWithWorkItemServiceAsync(workItemId, "Sicherstellen der Laufdaten", s => s.EnsureActiveRunAsync(workItemId, runStatusProvider, runningGuard))` — `runStatusProvider` liefert `GetTerminalSession(workItemId)?.RuntimeStatus.ToWorkItemRunStatus()`, `runningGuard` liefert `IsRunning(workItemId)`; beide werden erst innerhalb der `RunGates`-Sperre ausgewertet.
+4. `ExecuteWithWorkItemServiceAsync(workItemId, "Sicherstellen der Laufdaten", s => s.EnsureActiveRunAsync(workItemId, runStatusProvider, runningGuard))` — `runStatusProvider` liefert `GetTerminalSession(workItemId)?.CliRuntimeStatusExtensions.ToWorkItemRunStatus()`, `runningGuard` liefert `IsRunning(workItemId)`; beide werden erst innerhalb der `RunGates`-Sperre ausgewertet.
 5. Nach erfolgreicher Persistenz feuert `NotifyRunDataChanged` den Kachel-Refresh an.
 
 #### `WorkItemService.EnsureActiveRunAsync` (idempotente Persistenz)
@@ -600,7 +600,7 @@ Ablauf (innerhalb der `RunGates`-Sperre, siehe unten):
 
 #### Prozessweite Serialisierung der Laufdaten (`WorkItemService.RunGates`)
 
-Alle Laufdaten-Mutationen einer Aufgabe laufen unter der statischen `ConcurrentDictionary<Guid, SemaphoreSlim> RunGates`: `StartenAsync`, `CompleteAsync`, `ResetStartAsync` (die die Laufdaten zurücksetzen) sowie `SetActiveRunAsync`, `EndActiveRunAsync` und `EnsureActiveRunAsync`. `WorkItemService`-Instanzen sind scoped — die Schreibpfade konvergieren aber aus mehreren Quellen (Selbstheilung, Prozess-Exit, ViewModel) in unterschiedlichen DbContexts auf derselben Datenbankzeile; ohne gemeinsame Sperre könnte ein Sicherstellen-Save nach einem Beenden-Save landen und einen Phantom-Lauf wiederbeleben. Einträge werden bewusst nie entfernt (das Entfernen während wartender Aufrufer wäre selbst eine Race-Bedingung; der Speicherbedarf bleibt durch die Anzahl der Aufgaben begrenzt). `SetActiveRunAsync` trägt ebenfalls einen optionalen `runningGuard`-Parameter mit identischer In-Sperre-Semantik.
+Alle Laufdaten-Mutationen einer Aufgabe laufen unter der statischen `ConcurrentDictionary<Guid, SemaphoreSlim> RunGates`: `StartAsync`, `CompleteAsync`, `ResetStartAsync` (die die Laufdaten zurücksetzen) sowie `SetActiveRunAsync`, `EndActiveRunAsync` und `EnsureActiveRunAsync`. `WorkItemService`-Instanzen sind scoped — die Schreibpfade konvergieren aber aus mehreren Quellen (Selbstheilung, Prozess-Exit, ViewModel) in unterschiedlichen DbContexts auf derselben Datenbankzeile; ohne gemeinsame Sperre könnte ein Sicherstellen-Save nach einem Beenden-Save landen und einen Phantom-Lauf wiederbeleben. Einträge werden bewusst nie entfernt (das Entfernen während wartender Aufrufer wäre selbst eine Race-Bedingung; der Speicherbedarf bleibt durch die Anzahl der Aufgaben begrenzt). `SetActiveRunAsync` trägt ebenfalls einen optionalen `runningGuard`-Parameter mit identischer In-Sperre-Semantik.
 
 #### Periodischer Abgleich (letztes Sicherheitsnetz)
 
@@ -623,7 +623,7 @@ Alle Laufdaten-Mutationen einer Aufgabe laufen unter der statischen `ConcurrentD
 
 ### 7. Aufgabe abschließen (`CompleteAsync`)
 
-- `DevelopmentProcessService.CompleteAsync` — einziger produktiver Einstieg des Geschäftsvorgangs; fährt unter der `ScmTaskCoordinator`-Aufgabensperre die vollständige Sequenz: `AiExecutionService.StopCliAsync` → `PromptTimeDispatchService.CancelScheduledPromptAsync` → Offene-To-do-Prüfung → Klonverzeichnis löschen → Status auf `Completed` setzen → Statusübergang protokollieren. Alle Aufrufer (UI über `CompleteWorkItemCommand`, `ScmTaskCompletionMonitoringService`) nutzen denselben Pass.
+- `DevelopmentProcessService.CompleteAsync` — einziger produktiver Einstieg des Geschäftsvorgangs; fährt unter der `ScmTaskCoordinator`-Aufgabensperre die vollständige Sequenz: `AiExecutionService.StopCliAsync` → `PromptScheduleDispatchService.CancelScheduledPromptAsync` → Offene-To-do-Prüfung → Klonverzeichnis löschen → Status auf `Completed` setzen → Statusübergang protokollieren. Alle Aufrufer (UI über `CompleteWorkItemCommand`, `ScmTaskCompletionMonitoringService`) nutzen denselben Pass.
 
 ### 7.1. Issue anlegen und der Aufgabe zuordnen
 
@@ -657,7 +657,7 @@ Providerumfang:
 ### 7.1a. GitHub-Code-Scanning-Alert in Aufgabe konvertieren
 
 Beteiligte Komponenten:
-- `ProjectDetailViewModel.LadenOffeneAnforderungenAsync` — lädt Issues und Alerts für die Projektdetailansicht.
+- `ProjectDetailViewModel.LoadOpenRequirementAsync` — lädt Issues und Alerts für die Projektdetailansicht.
 - `IScmAlertProvider.GetAlertsAsync` — optionale Alert-Quelle des SCM-Plugins.
 - `GitHubPlugin.GetAlertsAsync` — liest GitHub-Code-Scanning-Alerts paginiert über die HTTP-REST-API (`GET /repos/{id}/code-scanning/alerts`).
 - `ProjectDetailViewModel.CreateWorkItemFromRequirementCommand` — unterscheidet `ScmRequirementKind.Issue` und `ScmRequirementKind.Alert`.
@@ -733,27 +733,27 @@ Ausgelöst durch den „Löschen"-Button im Ribbon.
 
 Beteiligte Komponenten:
 - `TaskDetailViewModel.DeleteCommand` — Prüft `DeleteCan` (Status ∉ {Completed, Archived} && !IsCliRunning)
-- `IDialogService.BestaetigenDialog` — Zeigt Bestätigungsdialog
+- `IDialogService.ConfirmDialog` — Zeigt Bestätigungsdialog
 - `WorkItemService.DeleteAsync` — Löscht die Aufgabe aus der Datenbank
 - `RefreshWorkItemListCallback` — Optional: aktualisiert übergeordnete Listenansicht
-- `ZurueckAction` — Navigationscallback zur Rückkehr zur Projektdetailansicht
+- `BackAction` — Navigationscallback zur Rückkehr zur Projektdetailansicht
 
 Ablauf:
 1. Anwender klickt „Löschen" im Ribbon
 2. `DeleteCommand.Execute()` wird aufgerufen
-3. `IDialogService.BestaetigenDialog("WorkItem '{Title}' wirklich löschen?...")` wird angezeigt
+3. `IDialogService.ConfirmDialog("WorkItem '{Title}' wirklich löschen?...")` wird angezeigt
 4. Anwender wählt „Löschen" oder „Abbrechen"
 5. Bei „Löschen": `WorkItemService.DeleteAsync()` wird aufgerufen
-6. Bei Erfolg: Callback aufgerufen, `ZurueckAction` navigiert zur Projektansicht
+6. Bei Erfolg: Callback aufgerufen, `BackAction` navigiert zur Projektansicht
 7. Bei Fehler (z.B. Status=Completed): `ErrorMessage` zeigt Exception-Message
 
 ## Diagramm
 
 ```mermaid
 flowchart TD
-    START[Projektdetailansicht\nAufgabenliste sichtbar] --> DBLCLICK{Doppelklick\nauf WorkItem?}
-    DBLCLICK -- Ja --> OEFFNE[OeffneAufgabe aufgerufen\nTaskDetailViewModel erstellt]
-    OEFFNE --> NAVIGATE1[ProjectListViewModel.ZeigeTaskDetailView\nDetailViewModel = TaskDetailVM]
+    START[Projektdetailansicht\nWorkItemsList sichtbar] --> DBLCLICK{Doppelklick\nauf WorkItem?}
+    DBLCLICK -- Ja --> OEFFNE[OpenWorkItem aufgerufen\nTaskDetailViewModel erstellt]
+    OEFFNE --> NAVIGATE1[ProjectListViewModel.ShowTaskDetailView\nDetailViewModel = TaskDetailVM]
     NAVIGATE1 --> SHOW_TASK[TaskDetailView wird angezeigt\nProjectDetailView ausgeblendet]
     
     SHOW_TASK --> LOAD[Aufgabe wird geladen\nAufgabeId triggert LoadAsync]
@@ -762,16 +762,16 @@ flowchart TD
     STATUS_CHECK -- New --> INFO_NEU[Info-Ansicht anzeigen\nTitel und Anforderung editierbar]
     INFO_NEU --> C[Titel und Anforderung eingeben]
     C --> D{Speichern klicken}
-    D -- Gespeichert --> E[Status bleibt New\nAufgabenliste aktualisiert]
+    D -- Gespeichert --> E[Status bleibt New\nWorkItemsList aktualisiert]
     E --> F{Zurück klicken?}
-    F -- Ja --> NAVIGATE_BACK[KehreZuProjectZurueck\nDetailViewModel = ProjectDetailVM]
+    F -- Ja --> NAVIGATE_BACK[NavigateBackToProject\nDetailViewModel = ProjectDetailVM]
     NAVIGATE_BACK --> SHOW_PROJECT[ProjectDetailView wird angezeigt\nTaskDetailView ausgeblendet]
     F -- Nein --> F
     
     STATUS_CHECK -- Started/Waiting --> CLI_VIEW[CLI-Ansicht anzeigen\nTerminalfenster eingebettet]
     CLI_VIEW --> STARTEN{CLI starten klicken?}
     STARTEN -- Ja --> START_CLI[KiPlugin.StartCliAsync\nProcess.Start]
-    START_CLI --> RUNNING[CLI-Prozess läuft\nAktiverCliName gesetzt]
+    START_CLI --> RUNNING[CLI-Prozess läuft\nActiveCliName gesetzt]
     RUNNING --> VIEW_SELECT{Ansicht wählen?}
     VIEW_SELECT -- Info --> INFO[Info-Ansicht anzeigen\nAufgabeneigenschaften + Protokoll]
     VIEW_SELECT -- CLI --> CLI_VIEW2[CLI-Ansicht anzeigen]
@@ -809,7 +809,7 @@ Beteiligte Komponenten:
 - `DashboardViewModel.ActiveWorkItemsList` — ObservableCollection für Dashboard
 
 Ablauf in `WorkItemService.GetActiveWorkItemsAsync()`:
-1. Filtert Aufgaben mit `Status == WorkItemStatus.Started || Status == WorkItemStatus.Wartend`
+1. Filtert Aufgaben mit `Status == WorkItemStatus.Started || Status == WorkItemStatus.Waiting`
 2. Sortiert absteigend nach `LastCliStartUtc ?? CreatedAt` (neueste zuerst), Tie-Breaker `Title`, dann `Id`
 3. Begrenzt auf maximal 20 Ergebnisse
 4. Verwendet `AsNoTracking()` für Performance
@@ -833,11 +833,11 @@ Ablauf:
 2. Service wird aufgerufen, aktive Aufgaben werden abgerufen und gemappt
 3. `ActiveWorkItemsList.ReplaceAll(items)` füllt die Collection
 4. Das `ActiveTasksListControl` erzeugt beim Setzen seiner `ItemsSource` eine instanz-eigene `ListCollectionView` über der Collection (bewusst kein `CollectionViewSource.GetDefaultView` — die ItemsSource wird mit dem Dashboard geteilt; eine gemeinsame Default-View würde die Gruppierung einer Ansicht in die andere leaken) und weist sie dem internen `ItemsControl` zu
-5. `WorkItemListLayout.Konfiguriere(view, ListMode)` setzt die zum Modus gehörigen Sort- und Gruppierungsdeskriptoren (siehe „Anzeigemodus und Gruppierung")
-6. Für jedes `ActiveWorkItemPanelItem` wird `WorkItemsTileTemplate` angewendet — ein vollflächiger `Button` (`AutomationProperties.Name="AufgabeNavigieren:{Title}"`, `Cursor="Hand"`, `Command={Binding NavigateCommand}` mit `CommandParameter={Binding Id}`) mit eigenem `ControlTemplate` (bisheriger `Border` inkl. `IsActive`/`IsPaused`-Triggern, Hover-/Pressed-Feedback). Das `WorkItemsTileContentTemplate` rendert drei Zeilen:
+5. `WorkItemListLayout.Configure(view, ListMode)` setzt die zum Modus gehörigen Sort- und Gruppierungsdeskriptoren (siehe „Anzeigemodus und Gruppierung")
+6. Für jedes `ActiveWorkItemPanelItem` wird `WorkItemsTileTemplate` angewendet — ein vollflächiger `Button` (`AutomationProperties.Name="WorkItemNavigate:{Title}"`, `Cursor="Hand"`, `Command={Binding NavigateCommand}` mit `CommandParameter={Binding Id}`) mit eigenem `ControlTemplate` (bisheriger `Border` inkl. `IsActive`/`IsPaused`-Triggern, Hover-/Pressed-Feedback). Das `WorkItemsTileContentTemplate` rendert drei Zeilen:
    - `TextBlock` zeigt `Title` (mit Ellipsis bei Überlauf)
    - `TextBlock` zeigt `RepositoryName` (Repository-Name, Fallback Projektname)
-   - horizontale Symbolzeile: SCM-Glyph (`ScmPluginSymbol`, Tooltip/`HelpText` „SCM: {ScmPluginName}", `AutomationId="AktiveAufgabeScmPlugin_{Title}"`, ausgeblendet wenn leer), KI-Glyph (`AiPluginSymbol`, Tooltip „KI: {KiPluginName}", `AutomationId="AktiveAufgabeKiPlugin_{Title}"`), Status-Glyph via `AiExecutionStatusSymbolConverter` (`AutomationProperties.Name="WorkItemStatus:{Title}"`, Volltext via `AiExecutionStatusConverter` in Tooltip/`HelpText`, `StatusTransitionAnimation.Status` am Symbol-Converter) und der `OffeneTodos:{Title}`-Button (`Command` + `Click`-Handler mit `e.Handled = true`, damit der Klick nicht die Kachel-Navigation auslöst)
+   - horizontale Symbolzeile: SCM-Glyph (`ScmPluginSymbol`, Tooltip/`HelpText` „SCM: {ScmPluginName}", `AutomationId="ActiveWorkItemScmPlugin_{Title}"`, ausgeblendet wenn leer), KI-Glyph (`AiPluginSymbol`, Tooltip „KI: {KiPluginName}", `AutomationId="ActiveWorkItemAiPlugin_{Title}"`), Status-Glyph via `AiExecutionStatusSymbolConverter` (`AutomationProperties.Name="WorkItemStatus:{Title}"`, Volltext via `AiExecutionStatusConverter` in Tooltip/`HelpText`, `StatusTransitionAnimation.Status` am Symbol-Converter) und der `OffeneTodos:{Title}`-Button (`Command` + `Click`-Handler mit `e.Handled = true`, damit der Klick nicht die Kachel-Navigation auslöst)
 7. Sichtbarkeit gesteuert durch `IsDashboardVisible`:
    - Wenn `CurrentView is DashboardViewModel`: `Visibility=Collapsed`
    - Sonst: `Visibility=Visible`
@@ -848,36 +848,36 @@ Beteiligte Komponenten:
 - `WorkItemListMode` — Enum `Datum` (flach), `Repository`, `Ki` (`src/Softwareschmiede.App/ViewModels/`)
 - `ActiveTasksListControl.ListMode` — Dependency Property, an `WorkItemListMode` des jeweiligen ViewModels gebunden
 - `WorkItemListLayout` — statische Hilfsklasse, liefert die Deskriptoren je Modus
-- `MainWindow.xaml` / `DashboardView.xaml` — je drei `RadioButton`s (`AufgabenModus:{m}` bzw. `DashboardAufgabenModus:{m}`), `IsChecked` via `EnumToBoolConverter` mit `ConverterParameter` an `WorkItemListMode` gebunden
-- `ItemsControl.GroupStyle` — `HeaderTemplate` mit Gruppenname; `AutomationProperties.Name="AufgabenGruppe:{Name}"` am `GroupItem`
+- `MainWindow.xaml` / `DashboardView.xaml` — je drei `RadioButton`s (`WorkItemsMode:{m}` bzw. `DashboardWorkItemsMode:{m}`), `IsChecked` via `EnumToBoolConverter` mit `ConverterParameter` an `WorkItemListMode` gebunden
+- `ItemsControl.GroupStyle` — `HeaderTemplate` mit Gruppenname; `AutomationProperties.Name="WorkItemsGroup:{Name}"` am `GroupItem`
 
 Ablauf bei Moduswechsel:
 1. `RadioButton`-Auswahl setzt `WorkItemListMode` im ViewModel (Zwei-Wege über `EnumToBoolConverter.ConvertBack`)
-2. Die gebundene Dependency Property `ListMode` ändert sich; `OnListModeChanged` ruft `WorkItemListLayout.Konfiguriere(view, modus)` auf
+2. Die gebundene Dependency Property `ListMode` ändert sich; `OnListModeChanged` ruft `WorkItemListLayout.Configure(view, modus)` auf
 3. `Konfiguriere` löscht `GroupDescriptions`/`SortDescriptions` der View und setzt je Modus:
    - `Datum`: keine Gruppierung, Sort `[SortierZeitpunkt desc, Title asc, Id asc]`
-   - `Repository`: `PropertyGroupDescription(RepositoryGruppenName)` + Sort `[RepositoryGruppeIstFallback asc, RepositoryGruppenName asc, SortierZeitpunkt desc, Title asc, Id asc]`
-   - `Ki`: `PropertyGroupDescription(KiGruppenName)` + Sort `[KiGruppeIstFallback asc, KiGruppenName asc, SortierZeitpunkt desc, Title asc, Id asc]`
+   - `Repository`: `PropertyGroupDescription(RepositoryGruppenName)` + Sort `[RepositoryGroupIsFallback asc, RepositoryGruppenName asc, SortierZeitpunkt desc, Title asc, Id asc]`
+   - `Ki`: `PropertyGroupDescription(KiGruppenName)` + Sort `[AiGroupIsFallback asc, KiGruppenName asc, SortierZeitpunkt desc, Title asc, Id asc]`
 4. Durch die Item-Sortierung erscheinen die Gruppen alphabetisch mit der Fallback-Gruppe (`WorkItemListLayout.WithoutRepository` / `NotExecuted`) am Ende; gruppenintern gilt die Sortierung nach letzter Ausführung — identisch zur Datenquelle
 5. Die Gruppenheader werden über das `HeaderTemplate` gerendert (`CollectionViewGroup.Name`)
 
-Die Modus-Buttons in der Seitenleiste werden an `IsNavigationExpanded` gebunden — in der eingeklappten 48-px-Leiste sind sie verborgen. Da die Template-Anker (`AufgabenGruppe:*`, `AufgabeNavigieren:*` u. a.) in beiden Ansichten existieren, sobald das Dashboard sichtbar ist, tragen die Controls die ansichtsspezifischen `AutomationId`s `ActiveWorkItemsListMenu` bzw. `ActiveWorkItemsListDashboard` als E2E-Scoping-Wurzeln; die Modus-Buttons heißen `AufgabenModus:*` (Seitenleiste) vs. `DashboardAufgabenModus:*` (Dashboard).
+Die Modus-Buttons in der Seitenleiste werden an `IsNavigationExpanded` gebunden — in der eingeklappten 48-px-Leiste sind sie verborgen. Da die Template-Anker (`WorkItemsGroup:*`, `WorkItemNavigate:*` u. a.) in beiden Ansichten existieren, sobald das Dashboard sichtbar ist, tragen die Controls die ansichtsspezifischen `AutomationId`s `ActiveWorkItemsListMenu` bzw. `ActiveWorkItemsListDashboard` als E2E-Scoping-Wurzeln; die Modus-Buttons heißen `WorkItemsMode:*` (Seitenleiste) vs. `DashboardWorkItemsMode:*` (Dashboard).
 
 ### Persistenz des Anzeigemodus
 
 Beteiligte Komponenten:
 - `WorkItemListModeService` — Singleton (`src/Softwareschmiede.App/Services/`), liest/schreibt den Modus je Ansicht über `AppSettingService` in eigenen DI-Scopes (`IServiceScopeFactory`, Muster `DarkModeService` — verhindert `DbContext`-Konflikte mit dem 5-s-Refresh)
-- `WorkItemListModeBindung` — kapselt den gemeinsamen Zustand beider ViewModels: hält den Wert, persistiert Anwender-Änderungen per `SafeFireAndForget`, stellt den gespeicherten Modus ohne Write-Back wieder her; Race-Guard `_changed` (vor und nach dem `await` geprüft) verhindert, dass ein verspäteter Ladevorgang eine Benutzerumschaltung überschreibt
+- `WorkItemListModeBinding` — kapselt den gemeinsamen Zustand beider ViewModels: hält den Wert, persistiert Anwender-Änderungen per `SafeFireAndForget`, stellt den gespeicherten Modus ohne Write-Back wieder her; Race-Guard `_changed` (vor und nach dem `await` geprüft) verhindert, dass ein verspäteter Ladevorgang eine Benutzerumschaltung überschreibt
 - `AppSettingService.ActiveWorkItemsListModeKey` (`"aktiveaufgaben.listenmodus"`) / `ActiveWorkItemsListModeDashboardKey` (`"aktiveaufgaben.listenmodus.dashboard"`) — je Ansicht ein eigener Schlüssel
-- `MainWindowViewModel` / `DashboardViewModel` — eigene `WorkItemListMode`-Property, die an `WorkItemListModeBindung.Wert` delegiert
+- `MainWindowViewModel` / `DashboardViewModel` — eigene `WorkItemListMode`-Property, die an `WorkItemListModeBinding.Value` delegiert
 
 Ablauf beim Speichern:
-1. Setter von `WorkItemListMode` → `WorkItemListModeBindung.Wert` setzt `_changed`, löst `ValueChanged` aus (`OnPropertyChanged`) und ruft `SaveMenuModeAsync` bzw. `SaveDashboardModeAsync` fire-and-forget auf
+1. Setter von `WorkItemListMode` → `WorkItemListModeBinding.Value` setzt `_changed`, löst `ValueChanged` aus (`OnPropertyChanged`) und ruft `SaveMenuModeAsync` bzw. `SaveDashboardModeAsync` fire-and-forget auf
 2. Der Service schreibt den Enum-Namen (`modus.ToString()`, z. B. `"Repository"`) per `AppSettingService.SetSettingAsync` unter dem Ansichts-Schlüssel
 
 Ablauf beim Wiederherstellen:
 1. `MainWindowViewModel`-Konstruktor stößt `LoadSavedWorkItemsListModeAsync()` per `SafeFireAndForget` an; beim `DashboardViewModel` geschieht dies aus `Initialize`
-2. `WorkItemListModeBindung.LoadSavedValueAsync` liest den Wert über `LoadMenuModeAsync`/`LoadDashboardModeAsync`; `Enum.TryParse` (Groß-/Kleinschreibung tolerant) + `Enum.IsDefined` — fehlender oder ungültiger Wert fällt auf `Datum` zurück
+2. `WorkItemListModeBinding.LoadSavedValueAsync` liest den Wert über `LoadMenuModeAsync`/`LoadDashboardModeAsync`; `Enum.TryParse` (Groß-/Kleinschreibung tolerant) + `Enum.IsDefined` — fehlender oder ungültiger Wert fällt auf `Datum` zurück
 3. Der geladene Wert wird über den optionalen Dispatcher (UI-Thread) auf das Backing-Feld gesetzt und `ValueChanged` ausgelöst — ohne zurückzuschreiben; bei gruppiertem Start zeigt die Liste sofort Gruppenheader
 
 ### Plugin-Symbol-Auflösung und Mapping
@@ -895,8 +895,8 @@ Ablauf in `ResolvePlugin`:
 
 Ablauf in `MapActiveWorkItemPanelItem` — zusätzlich zu den bisherigen Feldern:
 - `RepositoryName` = `GitRepository?.RepositoryName`, Fallback `Project?.Name` bei Aufgaben ohne Repository-Verknüpfung
-- `RepositoryGruppenName` = Repository-Name bzw. `WorkItemListLayout.WithoutRepository` (`RepositoryGruppeIstFallback = true`)
-- `KiGruppenName` = aufgelöster `PluginName`, sonst roher Prefix (eigene Gruppe), sonst `NotExecuted` (`KiGruppeIstFallback = true`, nur bei leerem Prefix)
+- `RepositoryGruppenName` = Repository-Name bzw. `WorkItemListLayout.WithoutRepository` (`RepositoryGroupIsFallback = true`)
+- `KiGruppenName` = aufgelöster `PluginName`, sonst roher Prefix (eigene Gruppe), sonst `NotExecuted` (`AiGroupIsFallback = true`, nur bei leerem Prefix)
 - `SortierZeitpunkt` = `LastCliStartUtc ?? CreatedAt`
 
 Trigger zur Aktualisierung:
@@ -941,14 +941,14 @@ Ausgelöst durch `WorkItemRunDataChangedNotifier.RunDataChanged`, nachdem `CliPr
 Beteiligte Komponenten:
 - `CliProcessManager` — persistiert Start, Ende und Laufstatuswechsel einer CLI-Ausführung
 - `WorkItemRunDataChangedNotifier` — UI-neutraler Singleton-Notifier für geänderte Laufdaten
-- `MainWindowViewModel` — Event-Handler `OnRunDataChanged`, Dispatcher-Marshalling und Refresh der aktiven Aufgabenliste
+- `MainWindowViewModel` — Event-Handler `OnRunDataChanged`, Dispatcher-Marshalling und Refresh der aktiven WorkItemsList
 - `WorkItemService.GetActiveWorkItemsAsync()` — liest die persistierten Laufdaten für die sichtbaren Kacheln neu
 
 Ablauf:
 1. `CliProcessManager` speichert Laufdaten über `SetActiveRunAsync`, `EnsureActiveRunAsync` oder `EndActiveRunAsync` (im Wiederverwendungspfad der Detailansicht ruft zusätzlich `TaskDetailViewModel.StartCliAndUpdateStateAsync` `EnsureActiveRunAsync` auf).
 2. Erst nach erfolgreicher Persistenz ruft `CliProcessManager` (bzw. das `TaskDetailViewModel` im eigenen Sicherstellungspfad) `NotifyRunDataChanged(workItemId)` auf.
 3. `MainWindowViewModel.OnRunDataChanged(workItemId)` marshallt über `_dispatcherInvoke` auf den UI-Thread.
-4. `RefreshActiveWorkItemsInBackground()` lädt die aktive Aufgabenliste neu und verwendet weiter den bestehenden `_refreshGate` gegen überlappende Refreshes.
+4. `RefreshActiveWorkItemsInBackground()` lädt die aktive WorkItemsList neu und verwendet weiter den bestehenden `_refreshGate` gegen überlappende Refreshes.
 5. Die Kachel erhält neue `ActiveRunId`-, `LastHeartbeatUtc`- und `RunStatus`-Werte; der Converter zeigt dadurch zeitnah `Running`, `Waiting` oder `Ready`.
 
 ### Periodische Statusaktualisierung (Timer-Fallback, alle 5 Sekunden)
@@ -962,7 +962,7 @@ Beteiligte Komponenten:
 
 Ablauf:
 1. Timer löst zyklisch `Tick` auf dem UI-Thread aus (alle 5 Sekunden)
-2. `MainWindowViewModel.OnAktualisierungsTimerTick(object? sender, EventArgs e)` wird aufgerufen
+2. `MainWindowViewModel.OnUpdateTimerTick(object? sender, EventArgs e)` wird aufgerufen
 3. `RefreshActiveWorkItemsInBackground()` wird per `SafeFireAndForget` aufgerufen
 4. Weitere Schritte wie oben (ab Schritt 7 im Event-Pfad)
 
@@ -993,7 +993,7 @@ Ablauf:
    - `e.NewValue`: Neuer Status-Glyph (z. B. `"▶"`)
 6. Callback prüft: Ist `d` ein `FrameworkElement` und ist `DataContext` eine `WorkItem` oder ein `ActiveWorkItemPanelItem`? Sonst abbrechen. (Die Erweiterung auf `ActiveWorkItemPanelItem` war nötig, weil der `DataContext` im Kachel-Template nie eine `WorkItem` ist — ohne sie feuerte die Animation dort faktisch nie.)
 7. Callback registriert eine Unloaded-Bereinigung (nur beim ersten Mal), um die Erkennung aus dem Speicher zu entfernen, wenn das Element entladen wird
-8. Callback fragt `StatusChangeDetection.HatSichGeaendert(id, neuerStatus)` ab (`id` = `WorkItem.Id` bzw. `ActiveWorkItemPanelItem.Id`):
+8. Callback fragt `StatusChangeDetection.HasChanged(id, newStatus)` ab (`id` = `WorkItem.Id` bzw. `ActiveWorkItemPanelItem.Id`):
    - **Erste Beobachtung** (Status noch nicht für diese `Id` gemerkt): `false` → keine Animation
    - **Gleicher Status wie zuletzt** (Routine-Refresh alle 5 s ohne echten Wechsel): `false` → keine Animation
    - **Neuer Status** (echter Wechsel, z. B. von `"✓"` zu `"▶"`): `true` → Animation wird ausgelöst
@@ -1013,11 +1013,11 @@ Ablauf:
 ### Dashboard-Rendering (DashboardView.xaml)
 
 Ablauf:
-1. `DashboardViewModel.LoadAsync()` wird ausgelöst (z.B. via `LadenCommand`)
+1. `DashboardViewModel.LoadAsync()` wird ausgelöst (z.B. via `LoadCommand`)
 2. Bestehende Logik für Projekte, Recovery, Statistik-Zähler bleibt unverändert
 3. Neue Zeile: `WorkItemService.GetActiveWorkItemsAsync()` wird aufgerufen
 4. `ActiveWorkItemsList.ReplaceAll(items)` füllt die Collection
-5. Dashboard bindet auf `ActiveWorkItemsList` mit demselben `ActiveTasksListControl` wie die Seitenleiste — mit eigener instanz-eigener `ListCollectionView`, eigener `ListMode`-Bindung (`DashboardViewModel.WorkItemListMode`) und den ansichtsspezifischen Modus-Buttons `DashboardAufgabenModus:*`
+5. Dashboard bindet auf `ActiveWorkItemsList` mit demselben `ActiveTasksListControl` wie die Seitenleiste — mit eigener instanz-eigener `ListCollectionView`, eigener `ListMode`-Bindung (`DashboardViewModel.WorkItemListMode`) und den ansichtsspezifischen Modus-Buttons `DashboardWorkItemsMode:*`
 6. Gleiche Kachel-Templates (`WorkItemsTileTemplate`/`WorkItemsTileContentTemplate`) wie in der Seitenleiste
 7. Abschnitt ist immer sichtbar wenn auf Dashboard
 
@@ -1045,7 +1045,7 @@ Konvertierungs-Logik in `Convert()` (Volltext):
 6. Wenn `ActiveRunId != null` UND `LastHeartbeatUtc != null` UND `(Jetzt - LastHeartbeatUtc) < 5 Minuten`:
    - Bei `RunStatus == WorkItemRunStatus.WaitingForInput`: Output `"⏸ Wartet"`
    - Sonst: Output `"▶ Läuft"`
-7. Wenn `Status == WorkItemStatus.Wartend`:
+7. Wenn `Status == WorkItemStatus.Waiting`:
    - Output: `"⏸ Wartet"`
 8. Sonst (Default):
    - Output: `"✓ Bereit"`
@@ -1061,15 +1061,15 @@ Ausgelöst durch Klick auf die Aufgabenkachel (die gesamte Kachel ist ein `Butto
 
 Beteiligte Komponenten:
 - `WorkItemsTileTemplate` in `ActiveTasksListControl.xaml` — vollflächiger `Button` mit `Command="{Binding NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"` und `CommandParameter="{Binding Id}"`; der To-do-Button innerhalb der Kachel bleibt eigenständig klickbar (sein Click-Handling leitet den Klick nicht an den äußeren Button weiter; `OpenTodosButtonClick` setzt zusätzlich `e.Handled = true`)
-- `NavigateZuAufgabeCommand` des jeweiligen ViewModels — `RelayCommand<Guid>` (`MainWindowViewModel` bzw. `DashboardViewModel`)
-- `MainWindowViewModel.NavigateZuAufgabe(Guid workItemId)` — Erstellt `TaskDetailViewModel`
+- `NavigateToWorkItemCommand` des jeweiligen ViewModels — `RelayCommand<Guid>` (`MainWindowViewModel` bzw. `DashboardViewModel`)
+- `MainWindowViewModel.NavigateToWorkItem(Guid workItemId)` — Erstellt `TaskDetailViewModel`
 
 Ablauf:
 1. Benutzer klickt auf die Aufgabenkachel
-2. `NavigateZuAufgabeCommand.Execute(workItemId)` wird aufgerufen
-3. `NavigateZuAufgabe(workItemId)` wird ausgeführt:
+2. `NavigateToWorkItemCommand.Execute(workItemId)` wird aufgerufen
+3. `NavigateToWorkItem(workItemId)` wird ausgeführt:
    - Neue `TaskDetailViewModel`-Instanz wird aus DI-Container erstellt: `_serviceProvider.GetRequiredService<TaskDetailViewModel>()`
-   - `TaskDetailViewModel.ZurueckAction = NavigateToDashboard` wird gesetzt
+   - `TaskDetailViewModel.BackAction = NavigateToDashboard` wird gesetzt
    - `TaskDetailViewModel.DetailTitleChangeAction` wird gesetzt und aktualisiert den Fenstertitel nur, solange diese Detailansicht noch aktiv ist
    - `MainWindowViewModel.Title` wird zunächst auf `Softwareschmiede – WorkItem` gesetzt
    - `MainWindowViewModel.CurrentView = viewModel` wird gesetzt → navigiert zu `TaskDetailView`
@@ -1102,15 +1102,15 @@ Ausgelöst durch Eingabe von Text in das Eingabefeld und Klick auf „Hinzufüge
 
 Beteiligte Komponenten:
 - `TodoListView.xaml` — TextBox und Button „Hinzufügen"
-- `TaskDetailViewModel.TodoHinzufuegenCommand` — Command zum Erstellen
+- `TaskDetailViewModel.AddTodoCommand` — Command zum Erstellen
 - `TodoService.CreateTodoAsync` — Speichert neues To-Do in der Datenbank
 
 Ablauf:
 1. Benutzer gibt Text in TextBox ein
 2. Benutzer klickt Button „Hinzufügen" oder drückt Enter
-3. `TodoHinzufuegenCommand.Execute()` wird aufgerufen
+3. `AddTodoCommand.Execute()` wird aufgerufen
 4. Validierung: Text darf nicht leer sein; sonst Abbruch mit `ErrorMessage`
-5. `TodoService.CreateTodoAsync(workItemId, beschreibung, ct)` wird aufgerufen
+5. `TodoService.CreateTodoAsync(workItemId, description, ct)` wird aufgerufen
 6. Neue `Todo`-Entität wird erstellt mit `Id`, `WorkItemId`, `Description`, `CreatedAt`
 7. `Todo` wird in `DbContext.Todos` hinzugefügt und in die Datenbank gespeichert
 8. Zurückgegebene `Todo` wird in ein neues `TodoViewModel` konvertiert
@@ -1192,17 +1192,17 @@ Ablauf:
 | Situation | Verhalten |
 |-----------|-----------|
 | Speichern mit leerem Titel | „Speichern"-Button ist disabled; kein Service-Aufruf |
-| Speichern während CLI läuft | „Speichern"-Button ist disabled (`KannSpeichern` prüft `!IsCliRunning`) |
+| Speichern während CLI läuft | „Speichern"-Button ist disabled (`SaveCan` prüft `!IsCliRunning`) |
 | Löschen im Status Beendet/Archiviert | „Löschen"-Button ist disabled (`DeleteCan` prüft Status) |
 | Löschen während CLI läuft | „Löschen"-Button ist disabled (`DeleteCan` prüft `!IsCliRunning`) |
 | Dialog-Bestätigung abgebrochen | Aufgabe bleibt unverändert; Dialog wird geschlossen |
 | Delete-Service wirft Exception | `ErrorMessage` zeigt Exception-Message; Aufgabe bleibt erhalten |
 | CLI-Prozess startet nicht | Exception in `StartCliAsync`; `ErrorMessage` in ViewModel gesetzt |
 | `SetParent` schlägt fehl | CLI-Fenster bleibt eigenständig; kein Absturz der Anwendung |
-| Prozess beendet sich unerwartet | `Process.Exited`-Event; `IsCliRunning = false`; Heartbeat bleibt als letzter Wert |
+| Prozess beendet sich unexpected | `Process.Exited`-Event; `IsCliRunning = false`; Heartbeat bleibt als letzter Wert |
 | Heartbeat > 5 Min, kein Prozess | Recovery-Kandidat; Banner auf Dashboard |
 | Start/CLI-Neustart/Recovery bei aktiver Pause | `InvalidOperationException` („Die Aufgabe ist bis … pausiert." / „Wiederherstellung nicht möglich, die Aufgabe ist bis … pausiert."); Recovery-Ablehnung wird mit `TaskRecoveryRejected ReasonCode=Paused` geloggt; in der UI sind die betreffenden Buttons deaktiviert |
-| Pause-Dialog mit Zeitpunkt in Vergangenheit oder ungültiger Eingabe | `KannBestaetigen == false`, `ValidationError`-Text im Dialog; zusätzlich wirft `WorkItemService.SetPauseAsync` `InvalidOperationException` als Service-Layer-Absicherung |
+| Pause-Dialog mit Zeitpunkt in Vergangenheit oder ungültiger Eingabe | `CanConfirm == false`, `ValidationError`-Text im Dialog; zusätzlich wirft `WorkItemService.SetPauseAsync` `InvalidOperationException` als Service-Layer-Absicherung |
 | `SetPauseAsync` auf Status `Completed`/`Archived` | `InvalidOperationException`; der Ribbon-Button ist in diesen Fällen ausgeblendet (`CanPause`) |
 | Rate-Limit-Marker ohne gültigen Zeitstempel oder ohne `AiPluginPrefix` | Nur `RateLimit`-Protokolleintrag; kein persistiertes Plugin-Limit, keine Pause |
 | Session-Limit-Zeitpunkt liegt in der Vergangenheit | Wert wird als `AppSetting` persistiert, löst aber keine Pause aus |
@@ -1219,7 +1219,7 @@ Ablauf:
 | Überlappende Event- und Timer-Aktualisierungen | `SemaphoreSlim(1,1)` in `RefreshActiveWorkItemsAsync()` mit `WaitAsync(0)` (non-blocking) überspringt neue Anfragen während eine Aktualisierung läuft — keine DbContext-Konflikte, aber auch keine "schwebenden" Anfragen-Queue |
 | DispatcherTimer läuft weiter, obwohl Fenster geschlossen | `MainWindowViewModel.Dispose()` wird in `MainWindow.OnClosed` aufgerufen; Timer wird gestoppt und Event-Handler abgemeldet — wichtig für App-Lifecycle |
 | Statuserkennung speichert Einträge ohne Limit | Pro aktiver Aufgabe wird ein Eintrag in `StatusChangeDetection._lastStatus` erstellt; maximal ~20 gleichzeitig aktive Aufgaben; Speicher-Overhead ist vernachlässigbar; Einträge werden nicht bereinigt, aber Speicher wird bei App-Shutdown freigegeben |
-| Fehlender/ungültiger gespeicherter Aufgabenlisten-Modus | `WorkItemListModeService` fällt auf `Datum` zurück (`Enum.TryParse` + `Enum.IsDefined`) — kein Fehler, kein Crash |
+| Fehlender/ungültiger gespeicherter WorkItemsListn-Modus | `WorkItemListModeService` fällt auf `Datum` zurück (`Enum.TryParse` + `Enum.IsDefined`) — kein Fehler, kein Crash |
 | Persistenz-Fehler beim Modus-Wechsel | `SafeFireAndForget` loggt den Fehler; der Live-Modus bleibt wirksam — die Umschaltung selbst ist nicht vom Schreibzugriff abhängig |
-| Wiederherstellungs-Ladevorgang vs. Benutzerumschaltung | Race-Guard `_changed` in `WorkItemListModeBindung` (vor und nach dem `await` geprüft) verwirft den geladenen Wert, wenn der Anwender inzwischen selbst umgeschaltet hat |
+| Wiederherstellungs-Ladevorgang vs. Benutzerumschaltung | Race-Guard `_changed` in `WorkItemListModeBinding` (vor und nach dem `await` geprüft) verwirft den geladenen Wert, wenn der Anwender inzwischen selbst umgeschaltet hat |
 | Modus-Laden/-Speichern parallel zum 5-s-Aufgaben-Refresh | `WorkItemListModeService` arbeitet in eigenem DI-Scope pro Operation — kein gemeinsamer `DbContext`, keine EF-Core-Nebenläufigkeitsfehler |

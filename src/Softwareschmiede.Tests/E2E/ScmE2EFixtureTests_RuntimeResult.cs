@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace Softwareschmiede.Tests.E2E;
 
-/// <summary>Runtime fixture results are only consumed after their writer releases the file.</summary>
+/// <summary>Laufzeit-Fixture-Ergebnisse werden erst konsumiert, nachdem ihr Writer die Datei freigegeben hat.</summary>
 public sealed class ScmE2EFixtureTests_RuntimeResult
 {
     /// <summary>Ein sichtbares, aber exklusiv gesperrtes Ergebnis wird wiederholt, bevor die vollständige Lauf-ID zurückgegeben wird.</summary>

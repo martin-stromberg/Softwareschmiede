@@ -121,7 +121,7 @@ public sealed class CodexPluginTests
         psi.Arguments.Should().Be("--some-flag");
     }
 
-    /// <summary>StartCliAsync does not set an auth environment variable by default.</summary>
+    /// <summary>StartCliAsync setzt standardmäßig keine Auth-Umgebungsvariable.</summary>
     [Fact]
     public async Task StartCliAsync_ShouldNotSetAuthEnvironmentVariable()
     {

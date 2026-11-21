@@ -25,7 +25,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
     /// <summary>Creates an isolated effective CLI workspace.</summary>
     public ScmEventCliExchangeAccessTests() => Directory.CreateDirectory(_root);
 
-    /// <summary>A read-only simulator remains identifiable and ready while its independent channel contract denies dispatch.</summary>
+    /// <summary>Ein Read-only-Simulator bleibt erkennbar und bereit, während sein unabhängiger Kanalvertrag die Zustellung verweigert.</summary>
     [Fact]
     public async Task ReadOnlySimulator_ReportsChannelDenialWithoutLosingPromptRecognition()
     {
@@ -108,7 +108,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         mock.Verify(session => session.WritePromptAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    /// <summary>A banner without a parseable version token reports honestly instead of guessing.</summary>
+    /// <summary>Ein Banner ohne parsebares Versionstoken meldet ehrlich nicht ermittelt statt zu raten.</summary>
     [Fact]
     public async Task UnparseableVersion_ReportsVersionNotDetermined()
     {
@@ -326,7 +326,7 @@ public sealed partial class ScmEventCliExchangeAccessTests : IDisposable
         return session;
     }
 
-    /// <summary>Removes only the isolated fixture workspace; laufende Kindprozesse werden
+    /// <summary>Entfernt nur den isolierten Fixture-Workspace; laufende Kindprozesse werden
     /// zuerst beendet und Restfehler nur diagnostisch gemeldet statt den Assert zu ueberdecken.</summary>
     public void Dispose() => TempDirectoryCleanup.DeleteBestEffort(_root, _restrictedChildren);
 }

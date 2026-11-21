@@ -74,7 +74,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         // Act
         await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
 
-        // Assert: ZurueckAction wird nach Erstellung aufgerufen
+        // Assert: BackAction wird nach Erstellung aufgerufen
         backInvoked.Should().BeTrue();
         // Projekt ist in der DB vorhanden
         var projects = await _projectService.GetAllAsync(TestContext.Current.CancellationToken);
@@ -103,7 +103,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         updates.Description.Should().Be("Neue Beschreibung");
     }
 
-    /// <summary>ProjektLoeschenAsync ruft DeleteAsync und ZurueckAction auf.</summary>
+    /// <summary>ProjektDeleteAsync ruft DeleteAsync und BackAction auf.</summary>
     [Fact]
     public async Task DeleteProjectAsync_Success_CallsDeleteAsyncAndBackActionOn()
     {
@@ -124,7 +124,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         deleted.Should().BeNull();
     }
 
-    /// <summary>ProjektLoeschenAsync ruft weder DeleteAsync noch ZurueckAction auf, wenn Benutzer abbricht.</summary>
+    /// <summary>ProjektDeleteAsync ruft weder DeleteAsync noch BackAction auf, wenn Benutzer abbricht.</summary>
     [Fact]
     public async Task DeleteProjectAsync_Aborted_CallsDeleteAsyncNotOn()
     {
@@ -193,7 +193,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         var project = await _projectService.CreateAsync("FireAndForget-Projekt", null, TestContext.Current.CancellationToken);
         var sut = CreateSut();
 
-        // Act: ProjektId-Setter löst SafeFireAndForget(LadenAsync) aus, ohne explizites Awaiten von LadenCommand
+        // Act: ProjektId-Setter löst SafeFireAndForget(LadenAsync) aus, ohne explizites Awaiten von LoadCommand
         sut.ProjectId = project.Id;
 
         // Assert
@@ -323,7 +323,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         sut.OpenRepositoryCommand.CanExecute(null).Should().BeTrue();
     }
 
-    /// <summary>AufgabeOeffnenCommand ruft NavigateToTaskViewCallback auf, wenn eine Aufgabe ausgewählt wird.</summary>
+    /// <summary>OpenWorkItemCommand ruft NavigateToTaskViewCallback auf, wenn eine Aufgabe ausgewählt wird.</summary>
     [Fact]
     public async Task OpenWorkItem_CallsNavigateToTaskViewCallback_WhenWorkItemSelected()
     {
@@ -347,7 +347,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         navigatesViewModel.Should().NotBeNull();
     }
 
-    /// <summary>Beim Öffnen einer Aufgabe werden ZurueckAction und RefreshWorkItemListCallback auf dem neuen TaskDetailViewModel gesetzt.</summary>
+    /// <summary>Beim Öffnen einer Aufgabe werden BackAction und RefreshWorkItemListCallback auf dem neuen TaskDetailViewModel gesetzt.</summary>
     [Fact]
     public async Task NavigateToTaskViewCallback_SetsBackActionAndCallbackOnTaskVM()
     {
@@ -373,7 +373,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         navigatesViewModel.RefreshWorkItemListCallback.Should().NotBeNull();
     }
 
-    /// <summary>AufgabeErstellenCommand erstellt eine Aufgabe mit Status Neu und navigiert zur TaskDetailView.</summary>
+    /// <summary>CreateWorkItemCommand erstellt eine Aufgabe mit Status Neu und navigiert zur TaskDetailView.</summary>
     [Fact]
     public async Task CreateWorkItem_CreatesTaskWithStatusNewAndNavigates()
     {
@@ -398,7 +398,7 @@ public sealed class ProjectDetailViewModelTests : IDisposable
         workItems.Should().ContainSingle(a => a.Status == WorkItemStatus.New);
     }
 
-    /// <summary>AufgabeErstellenCommand uebernimmt das im Projekt ausgewaehlte Repository.</summary>
+    /// <summary>CreateWorkItemCommand uebernimmt das im Projekt ausgewaehlte Repository.</summary>
     [Fact]
     public async Task CreateWorkItem_AssignsSelectedRepositoryToNewTask()
     {

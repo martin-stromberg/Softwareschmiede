@@ -21,7 +21,7 @@ Jede Ansicht der Anwendung (Dashboard, Projektliste, Projektdetail, Aufgabendeta
 
 Definiert die einheitliche API für alle Views:
 
-- **`IsVisible`** (Property): Prüft, ob diese Ansicht gerade aktiv/fokussiert ist. Die Prüfung sucht nach charakteristischen UI-Elementen der Ansicht (z. B. für `ProjectDetailView`: das "ProjektName"-Feld und der "AufgabeNeu"-Button).
+- **`IsVisible`** (Property): Prüft, ob diese Ansicht gerade aktiv/fokussiert ist. Die Prüfung sucht nach charakteristischen UI-Elementen der Ansicht (z. B. für `ProjectDetailView`: das "ProjectName"-Feld und der "AufgabeNeu"-Button).
 
 - **`ForceShow()`** (Methode): Navigiert zu dieser Ansicht. Ist die Ansicht bereits sichtbar, ist es ein No-Op (nur Synchronisation). Nicht sichtbare Ansichten werden durch UI-Klicks oder Menü-Navigation aktiviert.
 
@@ -43,7 +43,7 @@ Beispiele:
 - `MenuView`: Zugriff auf Navigationsmenü, Methoden `NavigateToDashboard()`, `NavigateToProjects()`, `NavigateToSettings()`
 - `DashboardView`: Erkannt über Navigationsbuttons, No-Op-`ForceShow()`
 - `ProjectListView`: Erkannt über "Neu"-Button und Projekt-Elemente
-- `ProjectDetailView`: Erkannt über "ProjektName"-Feld und "AufgabeNeu"-Button, Hilfsmethode `CreateTask()`
+- `ProjectDetailView`: Erkannt über "ProjectName"-Feld und "AufgabeNeu"-Button, Hilfsmethode `CreateTask()`
 - `TaskDetailView`: Erkannt über "EditTitel"-Feld und "Speichern"-Button, Hilfsmethode `GetTaskTitle()`, `SetTaskTitle()`
 - `SettingsView`: Erkannt über Einstellungs-Tabs
 - Dialoge (`RepositoryAssignDialogView`, `PluginSelectionDialogView`, etc.): Erkannt über Dialog-spezifische Elemente, haben eigene Fenster-Handles
@@ -119,7 +119,7 @@ Wenn `CurrentView()` keine Ansicht erkennt oder wenn `WaitForElement()` während
 
 - `InvalidOperationException` mit detaillierter Nachricht, die auflistet:
   - Welche Ansichten gesucht wurden
-  - Welche Marker erwartet wurden
+  - Welche Marker expected wurden
   - Welche UI-Elemente tatsächlich sichtbar sind
   - Falls Fehlerbanner: dessen Inhalt
 

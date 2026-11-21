@@ -9,7 +9,7 @@ namespace Softwareschmiede.IntegrationTests.Services;
 /// <summary>End-to-End-Dispatch eines SCM-Ereignisses an eine Devin-gebundene Aufgabe über den bewährten Kanal.</summary>
 public sealed class ScmEventDispatchTests_Devin
 {
-    /// <summary>Readiness, channel proof and prompt delivery reach Zugestellt for a Devin task.</summary>
+    /// <summary>Bereitschaft, Kanalnachweis und Prompt-Zustellung erreichen für eine Devin-Aufgabe den Status Zugestellt.</summary>
     [Fact]
     public async Task DevinTask_WithGrantingStartContract_DeliversEvent()
     {

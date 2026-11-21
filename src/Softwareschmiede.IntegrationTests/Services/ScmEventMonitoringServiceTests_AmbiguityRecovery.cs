@@ -10,10 +10,10 @@ using Softwareschmiede.TestSupport;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
-/// <summary>Persistent recovery of unchanged comments after ambiguous aliases are corrected.</summary>
+/// <summary>Dauerhafte Wiederherstellung unveränderter Kommentare, nachdem mehrdeutige Aliase korrigiert wurden.</summary>
 public sealed class ScmEventMonitoringServiceTests_AmbiguityRecovery
 {
-    /// <summary>Ambiguity survives empty polls and a full service restart without losing the original comment.</summary>
+    /// <summary>Mehrdeutigkeit übersteht leere Polls und einen kompletten Dienst-Neustart, ohne den ursprünglichen Kommentar zu verlieren.</summary>
     [Fact]
     public async Task Monitor_AliasRemovedAfterRestartAndPollWindow_AcceptsUnchangedCommentExactlyOnce()
     {

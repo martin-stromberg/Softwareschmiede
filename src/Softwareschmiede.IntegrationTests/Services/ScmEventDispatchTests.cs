@@ -101,7 +101,7 @@ public sealed class ScmEventDispatchTests
             checkpoint => Assert.Equal("Mehrdeutige Zuordnung zu Aufgaben", checkpoint.Diagnostic));
     }
 
-    /// <summary>Older waiting tasks do not starve event 101 for a different start-ready task.</summary>
+    /// <summary>Ältere wartende Aufgaben lassen Ereignis 101 für eine andere startbereite Aufgabe nicht verhungern.</summary>
     [Fact]
     public async Task Monitor_ProcessesPastOneHundredWaitingEvents()
     {
@@ -147,7 +147,7 @@ public sealed class ScmEventDispatchTests
         Assert.Single(fixture.Prompts);
     }
 
-    /// <summary>The second start waits before clone preparation and reuses the first run and its files.</summary>
+    /// <summary>Der zweite Start wartet vor der Klon-Vorbereitung und verwendet den ersten Lauf samt Dateien wieder.</summary>
     [Fact]
     public async Task ConcurrentDispatchAndManualStart_PreserveWorkspaceAndStartOneProcess()
     {

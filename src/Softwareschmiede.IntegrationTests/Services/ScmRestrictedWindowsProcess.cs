@@ -9,7 +9,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
-/// <summary>Starts only a genuinely write-restricted same-user test process; never falls back to normal execution.</summary>
+/// <summary>Startet nur einen echt schreib-eingeschränkten Testprozess desselben Benutzers; fällt niemals auf normale Ausführung zurück.</summary>
 [SupportedOSPlatform("windows")]
 internal static class ScmRestrictedWindowsProcess
 {
@@ -24,8 +24,8 @@ internal static class ScmRestrictedWindowsProcess
             throw new Win32Exception(Marshal.GetLastWin32Error());
         using (original)
         {
-            // Logon/Everyone are required by Windows process initialization, but neither is
-            // granted access to the private workspace/channel or the neighbouring app-data.
+            // Logon/Everyone werden von der Windows-Prozessinitialisierung benötigt, erhalten aber
+            // beide keinen Zugriff auf den privaten Workspace/Kanal oder die benachbarten App-Daten.
             var sids = new[] { new SecurityIdentifier(capabilitySid), GetLogonSid(original), new SecurityIdentifier(WellKnownSidType.WorldSid, null) };
             var buffers = new List<IntPtr>();
             try

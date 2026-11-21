@@ -30,7 +30,7 @@ Die Konfiguration wird in der Datenbank gespeichert und ist persistent — auch 
 
 ### Automatische Ausführung beim Aufgabenstart
 
-Wenn Sie eine Aufgabe für das Repository starten (über `DevelopmentProcessService.ProzessStartenAsync()`), läuft der folgende Ablauf ab:
+Wenn Sie eine Aufgabe für das Repository starten (über `DevelopmentProcessService.StartProcessAsync()`), läuft der folgende Ablauf ab:
 
 1. **Repository wird geklont** an den lokalen Pfad
 2. **Feature-Branch wird erstellt** (vom konfigurierten Basis-Branch, oder vom Standard-Branch, wenn nicht konfiguriert)
@@ -38,7 +38,7 @@ Wenn Sie eine Aufgabe für das Repository starten (über `DevelopmentProcessServ
    - Konfiguration wird auf Aktiv-Status geprüft
    - Skriptpfad wird aufgelöst (relativ zum Repository-Root)
    - Pfad wird validiert (muss innerhalb des Repository-Roots liegen — kein Directory-Escape)
-   - Skript wird per PowerShell ausgeführt mit Parametern: `-NoProfile`, `-NonInteractive`, `-ExecutionPolicy Bypass`, `-File <skriptpfad>`
+   - Skript wird per PowerShell ausgeführt mit Parametern: `-NoProfile`, `-NonInteractive`, `-ExecutionPolicy Bypass`, `-File <scriptPath>`
    - **Fehlerbehandlung:** Fehler werden als Warnung geloggt; die Aufgabe läuft normal weiter (nicht blockiert)
 4. **Startskript wird ausgeführt** (falls konfiguriert; nach Initialisierungsskript)
 5. **KI-Agent-Ausführung startet** normal

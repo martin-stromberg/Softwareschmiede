@@ -90,7 +90,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         pluginManagerMock.Setup(p => p.GetDefaultSourceCodeManagementPlugin()).Returns(_gitPluginForResolutionMock.Object);
         // Standard-IDE-Plugins (Visual Studio, Visual Studio Code) mit nicht-verfügbarem VS Code als
         // Default; CreateSut() konfiguriert diese bei Bedarf pro Test mit spezifischem
-        // IProzessStarter/IVisualStudioCodeLocator um, damit OeffneIdeCommand-Tests Prozessstarts
+        // IProcessStarter/IVisualStudioCodeLocator um, damit OeffneIdeCommand-Tests Prozessstarts
         // verifizieren können.
         var defaultVisualStudioPlugin = new VisualStudioIdePlugin(new Mock<IProcessStarter>().Object);
         var defaultVisualStudioCodePlugin = new VisualStudioCodeIdePlugin(
@@ -168,7 +168,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workingDirectoryOpenService = TaskDetailViewModelTestFactory.CreateWorkingDirectoryOpenService(processStarterMock);
 
         // Die von OeffneIdeCommand über _pluginSelectionService aufgelösten IDE-Plugins (Visual Studio,
-        // Visual Studio Code) müssen denselben IProzessStarter/IVisualStudioCodeLocator verwenden wie die
+        // Visual Studio Code) müssen denselben IProcessStarter/IVisualStudioCodeLocator verwenden wie die
         // hier verifizierten Prozessstarts, damit die Prozessstart-Verifikationen in Tests greifen.
         var effectiveProcessStarterMock = processStarterMock ?? new Mock<IProcessStarter>();
         var effectiveVisualStudioCodeLocator = visualStudioCodeLocator ?? new TestVisualStudioCodeLocator(VisualStudioCodeAvailability.NotAvailable);
@@ -208,7 +208,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             {
                 // Aktiven Ausführungsstatus direkt auf der Entity setzen (das frühere
                 // AufgabeService.AusfuehrungAktivSetzenAsync wurde entfernt): simuliert den Zustand
-                // einer gestarteten Aufgabe ohne zugehörige Laufdaten (AktiveRunId bleibt null).
+                // einer gestarteten Aufgabe ohne zugehörige Laufdaten (ActiveRunId bleibt null).
                 workItem.ExecutionStatus = WorkItemExecutionStatus.Active;
                 await _db.SaveChangesAsync();
             }
@@ -249,7 +249,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         var workItem = await CreateWorkItem(WorkItemStatus.New);
         var sut = CreateSut();
 
-        // Act: AufgabeId-Setter löst SafeFireAndForget(LadenAsync) aus, ohne explizites Awaiten von LadenCommand
+        // Act: AufgabeId-Setter löst SafeFireAndForget(LadenAsync) aus, ohne explizites Awaiten von LoadCommand
         sut.WorkItemId = workItem.Id;
 
         // Assert
@@ -262,7 +262,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
     // --- Protokoll asynchrones Nachladen (Issue 193) ---
 
-    /// <summary>LadeProtokolleAsync lädt die Protokolleinträge der Aufgabe und befüllt die Protokolleintraege-Collection.</summary>
+    /// <summary>LoadLogAsync lädt die Protokolleinträge der Aufgabe und befüllt die Protokolleintraege-Collection.</summary>
     [Fact]
     public async Task LoadLogAsync_ShouldLoadProtocols_WhenSuccessful()
     {
@@ -279,7 +279,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.LogEntries.Should().ContainSingle(p => p.Content == "Testinhalt");
     }
 
-    /// <summary>LadeProtokolleAsync fängt Fehler des ProtokollService nicht selbst ab, sondern lässt sie propagieren, damit SafeFireAndForget (wie bei allen anderen Fire-and-Forget-Aufrufen dieser Klasse) sie protokolliert.</summary>
+    /// <summary>LoadLogAsync fängt Fehler des LogService nicht selbst ab, sondern lässt sie propagieren, damit SafeFireAndForget (wie bei allen anderen Fire-and-Forget-Aufrufen dieser Klasse) sie protokolliert.</summary>
     [Fact]
     public async Task LoadLogAsync_ShouldPropagateException_WhenLogServiceFails()
     {
@@ -297,7 +297,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await act.Should().ThrowAsync<ObjectDisposedException>("LadeProtokolleAsync darf Fehler nicht mehr selbst abfangen, sondern muss sie propagieren, damit SafeFireAndForget sie protokollieren kann");
     }
 
-    /// <summary>LadeProtokolleAsync fängt eine OperationCanceledException nicht selbst ab, sondern lässt sie propagieren, damit SafeFireAndForget den Abbruch behandelt.</summary>
+    /// <summary>LoadLogAsync fängt eine OperationCanceledException nicht selbst ab, sondern lässt sie propagieren, damit SafeFireAndForget den Abbruch behandelt.</summary>
     [Fact]
     public async Task LoadLogAsync_ShouldPropagateCancellation_WhenCancellationTokenCancelled()
     {
@@ -437,7 +437,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         }
     }
 
-    /// <summary>ShowFileExplorerPanel ist nur true, wenn LokalerKlonPfad gesetzt ist und das Verzeichnis existiert.</summary>
+    /// <summary>ShowFileExplorerPanel ist nur true, wenn LocalClonePath gesetzt ist und das Verzeichnis existiert.</summary>
     [Fact]
     public async Task ShowFileExplorerPanel_OnlyAtExistingClonePath()
     {
@@ -483,9 +483,9 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.ShowFileExplorerPanel.Should().BeTrue();
     }
 
-    // --- KannSpeichern ---
+    // --- SaveCan ---
 
-    /// <summary>KannSpeichern ist true wenn Status=Neu, Titel gesetzt, kein CLI läuft.</summary>
+    /// <summary>SaveCan ist true wenn Status=Neu, Titel gesetzt, kein CLI läuft.</summary>
     [Fact]
     public async Task SaveCan_IsTrue_WhenStatusNewAndTitleSet()
     {
@@ -499,7 +499,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.SaveCan.Should().BeTrue();
     }
 
-    /// <summary>KannSpeichern ist false wenn Titel leer ist.</summary>
+    /// <summary>SaveCan ist false wenn Titel leer ist.</summary>
     [Fact]
     public async Task SaveCan_IsFalse_WhenTitleEmpty()
     {
@@ -513,7 +513,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.SaveCan.Should().BeFalse();
     }
 
-    /// <summary>KannSpeichern ist false wenn Status=Beendet.</summary>
+    /// <summary>SaveCan ist false wenn Status=Beendet.</summary>
     [Fact]
     public async Task SaveCan_IsFalse_WhenStatusCompleted()
     {
@@ -525,7 +525,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.SaveCan.Should().BeFalse();
     }
 
-    /// <summary>KannSpeichern ist true wenn Status=Gestartet und Titel gesetzt.</summary>
+    /// <summary>SaveCan ist true wenn Status=Gestartet und Titel gesetzt.</summary>
     [Fact]
     public async Task SaveCan_IsTrue_WhenStatusStarted()
     {
@@ -651,7 +651,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.ErrorMessage.Should().BeNull();
     }
 
-    /// <summary>SpeichernCommand hat CanExecute false wenn KannSpeichern false ist.</summary>
+    /// <summary>SpeichernCommand hat CanExecute false wenn SaveCan false ist.</summary>
     [Fact]
     public async Task SaveCommand_CanExecuteFalse_WhenTitleEmpty()
     {
@@ -675,13 +675,13 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.WorkItemId = Guid.NewGuid(); // nicht in DB
 
         // EditTitle muss gesetzt sein damit CanExecute true ist; aber Aufgabe ist null
-        // → SpeichernCommand ist nicht ausführbar (KannSpeichern = false, weil Aufgabe null)
+        // → SpeichernCommand ist nicht ausführbar (SaveCan = false, weil Aufgabe null)
         sut.SaveCommand.CanExecute(null).Should().BeFalse();
     }
 
-    // --- LoeschenCommand ---
+    // --- DeleteCommand ---
 
-    /// <summary>LoeschenCommand zeigt Dialog und löscht bei Bestätigung.</summary>
+    /// <summary>DeleteCommand zeigt Dialog und löscht bei Bestätigung.</summary>
     [Fact]
     public async Task DeleteCommand_DeletesWorkItem_WhenUserConfirms()
     {
@@ -700,7 +700,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         deleted.Should().BeNull();
     }
 
-    /// <summary>LoeschenCommand navigiert nicht zurück wenn Benutzer abbricht.</summary>
+    /// <summary>DeleteCommand navigiert nicht zurück wenn Benutzer abbricht.</summary>
     [Fact]
     public async Task DeleteCommand_NavigatesNotBack_WhenUserCancels()
     {
@@ -719,7 +719,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         stillExisting.Should().NotBeNull();
     }
 
-    /// <summary>LoeschenCommand ruft BestaetigenDialog auf.</summary>
+    /// <summary>DeleteCommand ruft ConfirmDialog auf.</summary>
     [Fact]
     public async Task DeleteCommand_CallsConfirmDialogOn()
     {
@@ -735,7 +735,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         _dialogServiceMock.Verify(d => d.ConfirmDialog(It.IsAny<string>(), It.IsAny<string>()), Times.Once);
     }
 
-    /// <summary>LoeschenCommand setzt ErrorMessage wenn Service-Fehler auftritt.</summary>
+    /// <summary>DeleteCommand setzt ErrorMessage wenn Service-Fehler auftritt.</summary>
     [Fact]
     public async Task DeleteCommand_SetErrorMessage_WhenDeleteFails()
     {
@@ -752,7 +752,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.ErrorMessage.Should().NotBeNullOrEmpty();
     }
 
-    /// <summary>LoeschenCommand hat CanExecute true wenn Status=Beendet (beendete Aufgaben können gelöscht werden).</summary>
+    /// <summary>DeleteCommand hat CanExecute true wenn Status=Beendet (beendete Aufgaben können gelöscht werden).</summary>
     [Fact]
     public async Task DeleteCommand_CanExecuteTrue_WhenStatusCompleted()
     {
@@ -764,7 +764,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
 
-    /// <summary>LoeschenCommand ruft RefreshWorkItemListCallback auf nach erfolgreichem Löschen.</summary>
+    /// <summary>DeleteCommand ruft RefreshWorkItemListCallback auf nach erfolgreichem Löschen.</summary>
     [Fact]
     public async Task DeleteCommand_CallsCallbackOn_DeleteAfterSuccessful()
     {
@@ -902,7 +902,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.EditRequirementDescription.Should().Be("Anforderung XYZ");
     }
 
-    /// <summary>EditTitle ist bindbar und triggert KannSpeichern-Neuberechnung.</summary>
+    /// <summary>EditTitle ist bindbar und triggert SaveCan-Neuberechnung.</summary>
     [Fact]
     public async Task EditTitle_ChangesCanSave_AtChange()
     {
@@ -918,7 +918,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.SaveCan.Should().BeTrue();
     }
 
-    /// <summary>ZurueckCommand ruft ZurueckAction auf.</summary>
+    /// <summary>BackCommand ruft BackAction auf.</summary>
     [Fact]
     public void BackCommand_CallsBackActionOn()
     {
@@ -950,7 +950,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.ErrorMessage.Should().NotBeNullOrEmpty();
     }
 
-    /// <summary>SpeichernAsync ruft ZurueckAction nicht auf, wenn das Speichern fehlschlägt.</summary>
+    /// <summary>SpeichernAsync ruft BackAction nicht auf, wenn das Speichern fehlschlägt.</summary>
     [Fact]
     public async Task SaveAsync_DoesNotNavigateBack_WhenSaveFails()
     {
@@ -997,7 +997,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.StartCommand.CanExecute(null).Should().BeFalse();
     }
 
-    /// <summary>StartenAsync zeigt den Plugin-Dialog, falls die Aufgabe kein Plugin hat.</summary>
+    /// <summary>StartAsync zeigt den Plugin-Dialog, falls die Aufgabe kein Plugin hat.</summary>
     [Fact]
     public async Task StartTestAsync_ShowsDialogIfNoPluginSelected()
     {
@@ -1016,7 +1016,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    /// <summary>StartenAsync speichert den Projekt-Default, falls die Checkbox aktiviert wurde.</summary>
+    /// <summary>StartAsync speichert den Projekt-Default, falls die Checkbox aktiviert wurde.</summary>
     [Fact]
     public async Task StartTestAsync_SavesProjectDefaultIfCheckboxActivated()
     {
@@ -1036,7 +1036,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         saved.Should().Be("Softwareschmiede.TestKi");
     }
 
-    /// <summary>StartenAsync speichert keinen Projekt-Default, falls die Checkbox deaktiviert ist.</summary>
+    /// <summary>StartAsync speichert keinen Projekt-Default, falls die Checkbox deaktiviert ist.</summary>
     [Fact]
     public async Task StartTestAsync_DoesNotSaveProjectDefaultIfCheckboxDeactivated()
     {
@@ -1056,7 +1056,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         saved.Should().BeNull();
     }
 
-    /// <summary>StartenAsync ruft den kombinierten Prozess auf und die CLI läuft danach.</summary>
+    /// <summary>StartAsync ruft den kombinierten Prozess auf und die CLI läuft danach.</summary>
     [Fact]
     public async Task StartTestAsync_InvokesCombinedProcess_StartsCliUponSuccess()
     {
@@ -1078,7 +1078,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         updates!.Status.Should().Be(WorkItemStatus.Started);
     }
 
-    /// <summary>StartenAsync zeigt während eines laufenden Repository-Klons den Vorbereitungsstatus.</summary>
+    /// <summary>StartAsync zeigt während eines laufenden Repository-Klons den Vorbereitungsstatus.</summary>
     [Fact]
     public async Task StartAsync_ShouldShowRepositoryPreparationStatus_WhileCloneIsRunning()
     {
@@ -1107,7 +1107,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         await startTask;
     }
 
-    /// <summary>StartenAsync lässt den Vorbereitungsstatus nach einem Clone-Fehler nicht stehen.</summary>
+    /// <summary>StartAsync lässt den Vorbereitungsstatus nach einem Clone-Fehler nicht stehen.</summary>
     [Fact]
     public async Task StartAsync_ShouldClearRepositoryPreparationStatus_WhenCloneFails()
     {
@@ -1202,7 +1202,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
     /// <summary>
     /// Divergenzpfad F2 (Issue 342): StartCliAndUpdateStateAsync persistiert bei laufendem Prozess
-    /// die vollständigen Laufdaten (AktiveRunId, Heartbeat, LaufStatus, AusfuehrungsStatus) —
+    /// die vollständigen Laufdaten (ActiveRunId, Heartbeat, LaufStatus, AusfuehrungsStatus) —
     /// auch wenn CliNeustartenAsync in den Wiederverwendungs-Early-Return ohne Gestartet-Ereignis
     /// lief, statt nur AusfuehrungsStatus=Aktiv zu schreiben.
     /// </summary>
@@ -1234,7 +1234,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     }
 
     /// <summary>
-    /// StartenAsync muss TerminalSessionGestartet feuern, damit TaskDetailView
+    /// StartAsync muss TerminalSessionStarted feuern, damit TaskDetailView
     /// das TerminalControl mit der Session verbinden kann.
     /// </summary>
     [Fact]
@@ -1262,7 +1262,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
     /// <summary>
     /// GetTerminalSession gibt nach explizitem Start die laufende Session zurück.
     /// Das erlaubt <see cref="Softwareschmiede.App.Views.TaskDetailView"/> im Loaded-Handler die Session
-    /// auch dann zu holen, wenn TerminalSessionGestartet schon gefeuert hat.
+    /// auch dann zu holen, wenn TerminalSessionStarted schon gefeuert hat.
     /// </summary>
     [Fact]
     public async Task GetTerminalSession_ReturnsSession_AfterExplicitStart()
@@ -1280,7 +1280,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         await ((AsyncRelayCommand)sut.StartCommand).ExecuteAsync();
 
-        // Simuliert: Loaded feuert NACH LadenAsync/TerminalSessionGestartet.
+        // Simuliert: Loaded feuert NACH LadenAsync/TerminalSessionStarted.
         // Der View ruft GetTerminalSession() im Loaded-Handler auf und setzt TerminalConsole.Session direkt.
         var session = sut.GetTerminalSession();
 
@@ -1474,7 +1474,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.SwitchPluginCommand.CanExecute(null).Should().BeFalse();
     }
 
-    /// <summary>PluginWechselAsync stoppt die alte CLI, zeigt den Dialog und startet die neue CLI.</summary>
+    /// <summary>SwitchPluginAsync stoppt die alte CLI, zeigt den Dialog und startet die neue CLI.</summary>
     [Fact]
     public async Task SwitchTestPluginAsync_StopsCliAndStartsNew()
     {
@@ -1496,7 +1496,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
             It.IsAny<IEnumerable<string>>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
-    /// <summary>PluginWechselAsync zeigt einen Fehler, falls StopCliAsync fehlschlägt, und bricht den Wechsel ab.</summary>
+    /// <summary>SwitchPluginAsync zeigt einen Fehler, falls StopCliAsync fehlschlägt, und bricht den Wechsel ab.</summary>
     [Fact]
     public async Task SwitchTestPluginAsync_StopCliFailure_ShowsError()
     {
@@ -2433,7 +2433,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
         sut.OpenWorkingDirectoryCommand.CanExecute(null).Should().BeTrue("das Arbeitsverzeichnis existiert jetzt");
     }
 
-    /// <summary>Ausführung von OeffneArbeitsverzeichnisCommand delegiert an ArbeitsverzeichnisOeffnenService mit dem LokalerKlonPfad der Aufgabe.</summary>
+    /// <summary>Ausführung von OeffneArbeitsverzeichnisCommand delegiert an ArbeitsverzeichnisOeffnenService mit dem LocalClonePath der Aufgabe.</summary>
     [Fact]
     public async Task OpenWorkingDirectoryCommand_CallsServiceWithLocalClonePath()
     {

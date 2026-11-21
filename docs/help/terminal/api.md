@@ -125,7 +125,7 @@ Schreibt bereits kodierte Eingabebytes serialisiert in den Input-Stream der Sitz
 
 #### `WritePromptAsync(string prompt, CancellationToken ct)`
 
-Schreibt einen Prompt als Texteingabe inkl. abschließendem Submit (`\r`) in den Input-Stream, flusht und meldet die Eingabe über `MarkInputActivity`. Zeilenumbrüche werden einheitlich als `\r` übertragen (entspricht der Tastaturkodierung von Enter). Wird u. a. von `PromptTimeDispatchService` verwendet.
+Schreibt einen Prompt als Texteingabe inkl. abschließendem Submit (`\r`) in den Input-Stream, flusht und meldet die Eingabe über `MarkInputActivity`. Zeilenumbrüche werden einheitlich als `\r` übertragen (entspricht der Tastaturkodierung von Enter). Wird u. a. von `PromptScheduleDispatchService` verwendet.
 
 **Parameter:**
 - `prompt`: Der zu sendende Prompt-Text
@@ -301,7 +301,7 @@ var bytes = KeyToVt100Encoder.EncodeText("Hello");
 
 #### `EncodeClipboardText(string? text)`
 
-Kodiert Zwischenablage-Text für die CLI-Eingabe: Zeilenumbrüche werden einheitlich normalisiert, das Ergebnis wird als UTF-8 kodiert.
+Kodiert Zwischenablage-Text für die CLI-Eingabe: Zeilenumbrüche werden einheitlich normalisiert, das Result wird als UTF-8 kodiert.
 
 **Parameter:**
 - `text`: Der zu kodierende Zwischenablage-Text (oder `null`)
@@ -319,7 +319,7 @@ Kodiert Zwischenablage-Text für die CLI-Eingabe: Zeilenumbrüche werden einheit
 ```csharp
 var textWithUnixNewlines = "line1\nline2\nline3";
 var bytes = KeyToVt100Encoder.EncodeClipboardText(textWithUnixNewlines);
-// Ergebnis: UTF-8-Bytes von "line1\rline2\rline3"
+// Result: UTF-8-Bytes von "line1\rline2\rline3"
 await session.InputStream.WriteAsync(bytes);
 ```
 
@@ -346,9 +346,9 @@ Startet einen KI-CLI-Prozess als interaktive Terminal-Session — über die Pseu
 
 **Interner Ablauf:** Die Spec wird über `aiPlugin.GetTerminalStartSpecAsync` geholt und zusammen mit `aiPlugin.CheckHealthAsync` (als `healthCheck`-Delegate) an `ITerminalSessionFactory.StartAsync` gereicht. `TerminalSessionService` löst die Executable auf (`TerminalExecutableResolver`), führt den Preflight aus (`TerminalSessionDiagnostics`), wählt das Backend und startet den Prozess direkt über den jeweiligen `IPseudoConsoleProcessLauncher` — ohne `cmd.exe`-Zwischenschale. `session.Exited`/`session.Failed` sind auf `HandleSessionEndedAsync`/`HandleSessionFailedAsync` verdrahtet.
 
-**Output-Protokollierung:** Für jeden Session-Start erzeugt der Service einen `CliOutputLogWriter`, reicht ihn als `ITerminalOutputSink` an die Factory/den Launcher weiter und hält ihn im `CliProcessHandle.OutputSink`. Der Writer speichert Ausgabezeilen über `LogService.AddCliOutputAsync` als `LogEntryType.CliOutput`. Fehler- und Fallback-Fälle schreiben zusätzlich eine `[Terminal-Diagnose]`-Markerzeile mit den Preflight-Ergebnissen in dasselbe Protokoll.
+**Output-Protokollierung:** Für jeden Session-Start erzeugt der Service einen `CliOutputLogWriter`, reicht ihn als `ITerminalOutputSink` an die Factory/den Launcher weiter und hält ihn im `CliProcessHandle.OutputSink`. Der Writer speichert Ausgabezeilen über `LogService.AddCliOutputAsync` als `LogEntryType.CliOutput`. Fehler- und Fallback-Fälle schreiben zusätzlich eine `[Terminal-Diagnose]`-Markerzeile mit den Preflight-Resultsen in dasselbe Protokoll.
 
-**Rohbyte-Mitschnitt:** Ist `TerminalSessionOptions.AufzeichnungByteBudget > 0` (Default 8 MB), erzeugt der Service zusätzlich einen `CliOutputRecorder` und übergibt beide Senken als `CompositeTerminalOutputSink`; der Recorder wird in `_recording` registriert (Registry auf die letzten `MaxAufzeichnungenAnzahl = 8` Aufgaben begrenzt — siehe `GetCliAufzeichnung`). Bei `AufzeichnungByteBudget <= 0` bleibt es beim Protokoll-Writer allein.
+**Rohbyte-Mitschnitt:** Ist `TerminalSessionOptions.RecordingByteBudget > 0` (Default 8 MB), erzeugt der Service zusätzlich einen `CliOutputRecorder` und übergibt beide Senken als `CompositeTerminalOutputSink`; der Recorder wird in `_recording` registriert (Registry auf die letzten `MaxRecordingCount = 8` Aufgaben begrenzt — siehe `GetCliRecording`). Bei `RecordingByteBudget <= 0` bleibt es beim Protokoll-Writer allein.
 
 **Exceptions:**
 - `ArgumentException`: `TerminalSessionStartSpec.FileName` leer
@@ -356,7 +356,7 @@ Startet einen KI-CLI-Prozess als interaktive Terminal-Session — über die Pseu
 
 **Beispiel:**
 ```csharp
-var handle = await _kiService.StartTerminalSessionAsync(
+var handle = await _aiService.StartTerminalSessionAsync(
     taskId, 
     codexPlugin, 
     "C:\\repos\\my-project",
@@ -376,21 +376,21 @@ Gibt die aktive `ITerminalSession` für eine Aufgabe zurück, falls eine läuft.
 
 **Beispiel:**
 ```csharp
-var session = _kiService.GetTerminalSession(taskId);
+var session = _aiService.GetTerminalSession(taskId);
 if (session != null)
 {
     session.Resize(100, 25);
 }
 ```
 
-#### `GetCliAufzeichnung(Guid workItemId)`
+#### `GetCliRecording(Guid workItemId)`
 
-Gibt den Rohbyte-Mitschnitt der letzten Terminal-Session einer Aufgabe zurück — auch nach dem Session-Ende abrufbar, da der Recorder-Eintrag das `CliProcessHandle` überlebt. Die Registry ist auf die letzten `MaxAufzeichnungenAnzahl = 8` Aufgaben begrenzt (ältere Mitschnitte werden verworfen; ein Neustart derselben Aufgabe zählt als jüngster Eintrag).
+Gibt den Rohbyte-Mitschnitt der letzten Terminal-Session einer Aufgabe zurück — auch nach dem Session-Ende abrufbar, da der Recorder-Eintrag das `CliProcessHandle` überlebt. Die Registry ist auf die letzten `MaxRecordingCount = 8` Aufgaben begrenzt (ältere Mitschnitte werden verworfen; ein Neustart derselben Aufgabe zählt als jüngster Eintrag).
 
 **Parameter:**
 - `workItemId`: Aufgaben-ID
 
-**Rückgabe:** `CliOutputAufzeichnung?` — Snapshot mit Header-Metadaten und den aufgezeichneten Chunks; `null`, wenn keine Aufzeichnung existiert (kein Session-Start oder Mitschnitt via `AufzeichnungByteBudget <= 0` deaktiviert)
+**Rückgabe:** `CliOutputRecording?` — Snapshot mit Header-Metadaten und den aufgezeichneten Chunks; `null`, wenn keine Aufzeichnung existiert (kein Session-Start oder Mitschnitt via `RecordingByteBudget <= 0` deaktiviert)
 
 #### `StopAsync(Guid workItemId)`
 
@@ -411,7 +411,7 @@ Live-Substatus der Aufgabe für Statusprojektionen (Implementierung von `IRunnin
 **Parameter:**
 - `workItemId`: Aufgaben-ID
 
-**Rückgabe:** `WorkItemRunStatus?` — `null`, wenn kein gehandelter Prozess läuft (`IsRunning` `false`); `WaitingForInput`, wenn die Session `CliRuntimeStatus.WaitingForInput` meldet; sonst `Running` (Fallback bei laufendem Handle ohne Session oder `RuntimeStatus.Inaktiv` — ein nachweislich laufender Prozess gilt fachlich als „Läuft"). Datenquelle des Live-Zweigs der Kachel-Klassifikation (siehe [Aufgaben — Technischer Ablauf](../aufgaben/ablauf-technisch.md)).
+**Rückgabe:** `WorkItemRunStatus?` — `null`, wenn kein gehandelter Prozess läuft (`IsRunning` `false`); `WaitingForInput`, wenn die Session `CliRuntimeStatus.WaitingForInput` meldet; sonst `Running` (Fallback bei laufendem Handle ohne Session oder `CliRuntimeStatus.Inactive` — ein nachweislich laufender Prozess gilt fachlich als „Läuft"). Datenquelle des Live-Zweigs der Kachel-Klassifikation (siehe [Aufgaben — Technischer Ablauf](../aufgaben/ablauf-technisch.md)).
 
 #### `GetRunningWorkItemIds()`
 
@@ -498,7 +498,7 @@ Wird von `TerminalSessionService.WriteDiagnosis` aufgerufen, wenn die übergeben
 || `OnDiagnoseChunk` | Ruft `OnDiagnoseChunk` nur der inneren Senken auf, die `ITerminalDiagnoseSink` implementieren |
 || `Complete`/`CompleteAsync` | Schließt alle inneren Senken der Reihe nach ab |
 
-Wird in `AiExecutionService.StartTerminalSessionAsync` eingesetzt, um `CliOutputLogWriter` + `CliOutputRecorder` parallel zu betreiben (bei `AufzeichnungByteBudget <= 0` entfällt sie — der Protokoll-Writer wird direkt übergeben).
+Wird in `AiExecutionService.StartTerminalSessionAsync` eingesetzt, um `CliOutputLogWriter` + `CliOutputRecorder` parallel zu betreiben (bei `RecordingByteBudget <= 0` entfällt sie — der Protokoll-Writer wird direkt übergeben).
 
 ## CliOutputProtokollWriter
 
@@ -740,7 +740,7 @@ Laufzeitparameter der Terminal-Integration; gebunden aus der `appsettings.json`-
 | `ReplayBufferByteBudget` | `int` | `524288` (512 KiB) | Byte-Budget des `TerminalReplayBuffer` pro Session |
 | `DefaultCols` | `int` | `220` | Initiale Spaltenanzahl (ConPTY-Erstellung, Preflight-Check) |
 | `DefaultRows` | `int` | `50` | Initiale Zeilenanzahl |
-| `AufzeichnungByteBudget` | `int` | `8388608` (8 MB) | Byte-Budget des `CliOutputRecorder`-Mitschnitts pro Session; `<= 0` deaktiviert die Aufzeichnung (kein Recorder, keine Composite-Senke) |
+| `RecordingByteBudget` | `int` | `8388608` (8 MB) | Byte-Budget des `CliOutputRecorder`-Mitschnitts pro Session; `<= 0` deaktiviert die Aufzeichnung (kein Recorder, keine Composite-Senke) |
 
 ## Enums
 
@@ -791,9 +791,9 @@ Backend-Empfehlung aus dem Preflight: `Pty`, `Pipe`, `Fehler`.
 | `TerminalControl.FontSize` | 13.0 | Schriftgröße (Punkt) für Rendering |
 | `TerminalSessionOptions.ReplayBufferByteBudget` | 524288 (512 KiB) | Byte-Budget des Replay-Puffers pro Session (`appsettings.json`-Sektion `Terminal`) |
 | `TerminalSessionOptions.DefaultCols`/`DefaultRows` | 220 / 50 | Initiale Terminalgröße beim Session-Start |
-| `TerminalSessionOptions.AufzeichnungByteBudget` | 8388608 (8 MB) | Byte-Budget der Rohbyte-Aufzeichnung pro Session; `<= 0` deaktiviert den Mitschnitt |
+| `TerminalSessionOptions.RecordingByteBudget` | 8388608 (8 MB) | Byte-Budget der Rohbyte-Aufzeichnung pro Session; `<= 0` deaktiviert den Mitschnitt |
 | `AiExecutionService.MaxRecordingCount` | 8 | Maximale Anzahl vorgehaltener CLI-Aufzeichnungen (ältere werden verworfen) |
-| `TerminalSessionService.ForcePtyUnavailableKey` | `"Terminal.ForcePtyUnavailable"` | `AppSettingen`-Schlüssel (Debug-/Test-Hook): `"true"` erzwingt `PtyAvailable=false` im Preflight |
+| `TerminalSessionService.ForcePtyUnavailableKey` | `"Terminal.ForcePtyUnavailable"` | `AppEinstellungen`-Schlüssel (Debug-/Test-Hook): `"true"` erzwingt `PtyAvailable=false` im Preflight |
 | `TerminalSessionService.TestDatabasePathVariable` | `"SOFTWARESCHMIEDE_TEST_DB_PATH"` | Umgebungsvariable, die den E2E-Testmodus kennzeichnet (erzwingt Pipe-Backend) |
 | `AiExecutionService.ConPtyOutputDrainTimeout` | 2 Sekunden | Wartezeit auf `DrainOutputAsync` der Session im Cleanup |
 | `AiExecutionService.CliOutputWriterDrainTimeout` | 2 Sekunden | Wartezeit auf `OutputSink.CompleteAsync` im Cleanup |
@@ -808,10 +808,10 @@ Backend-Empfehlung aus dem Preflight: `Pty`, `Pipe`, `Fehler`.
 || Member | Verhalten |
 ||--------|-----------|
 || `OnOutputChunk` | Kopiert die Bytes unverändert und speichert sie als `CliOutputChunkRecord` mit Offset `timeProvider.GetUtcNow() - StartUtc`; leere Chunks werden übersprungen. Bei `buffered + bytes.Length > byteBudget` stoppt die Aufnahme dauerhaft und `IsComplete` wird `false` — das intakte Präfix bleibt erhalten (kein Verwerfen ältester Chunks) |
-|| `Complete`/`CompleteAsync` | Setzt `EndeUtc` idempotent (erstes `Complete` gewinnt); `CompleteAsync` ist synchron abgeschlossen |
+|| `Complete`/`CompleteAsync` | Setzt `EndUtc` idempotent (erstes `Complete` gewinnt); `CompleteAsync` ist synchron abgeschlossen |
 || `GetRecording()` | Liefert einen `CliOutputRecording`-Snapshot der bis dahin aufgezeichneten Chunks — auch nach dem Session-Ende abrufbar |
 
-## CliOutputAufzeichnung / CliOutputChunkRecord
+## CliOutputRecording / CliOutputChunkRecord
 
 Datenmodell der Rohbyte-Aufzeichnung (`Softwareschmiede.Infrastructure.Terminal`).
 
@@ -826,7 +826,7 @@ Datenmodell der Rohbyte-Aufzeichnung (`Softwareschmiede.Infrastructure.Terminal`
 || `StartUtc` | `DateTimeOffset` | Absoluter Aufzeichnungsbeginn (UTC); Anker der relativen Chunk-Offsets |
 || `Cols` / `Rows` | `int` | Initiale Terminal-Geometrie der aufgezeichneten Session |
 || `IsComplete` | `bool` | `false`, wenn das Byte-Budget überschritten wurde (nur das Präfix ist enthalten) |
-|| `EndeUtc` | `DateTimeOffset?` | Aufzeichnungsende; `null` solange die Aufzeichnung läuft |
+|| `EndUtc` | `DateTimeOffset?` | Aufzeichnungsende; `null` solange die Aufzeichnung läuft |
 || `Chunks` | `IReadOnlyList<CliOutputChunkRecord>` | Chunks in Eingangsreihenfolge |
 
 ## CliReplayAufzeichnungStore — `.clireplay`-Dateiformat
@@ -838,19 +838,19 @@ Serialisiert/Deserialisiert `CliOutputRecording` im `.clireplay`-Binärformat. I
 || Bereich | Inhalt |
 ||---------|--------|
 || Magic | 8 Bytes `SWCLRPLY` (ASCII) |
-|| Header | `Int32 Version` (= 1), `Guid WorkItemId` (16 Bytes), `Int64 StartUtcTicks`, `Int64 EndeUtcTicks` (`0` = nicht gesetzt), `Int32 Cols`, `Int32 Rows`, `Boolean IstVollstaendig`, `Int32 PluginNameLength` + UTF-8-Bytes |
+|| Header | `Int32 Version` (= 1), `Guid WorkItemId` (16 Bytes), `Int64 StartUtc`, `Int64 EndUtcTicks` (`0` = nicht gesetzt), `Int32 Cols`, `Int32 Rows`, `Boolean IsComplete`, `Int32 PluginNameLength` + UTF-8-Bytes |
 || Records | Wiederholt bis EOF: `Int64 OffsetTicks`, `Int32 Length`, `Length` Bytes Rohdaten |
 
 ### Methoden
 
-- `SaveAsync(Stream, CliOutputAufzeichnung, ct)` / `SaveAsync(string pfad, CliOutputAufzeichnung, ct)` — serialisiert gepuffert und schreibt async (UI-Thread bleibt frei)
+- `SaveAsync(Stream, CliOutputRecording, ct)` / `SaveAsync(string pfad, CliOutputRecording, ct)` — serialisiert gepuffert und schreibt async (UI-Thread bleibt frei)
 - `LadeAsync(Stream, ct)` / `LadeAsync(string pfad, ct)` → `CliOutputRecording` — liest async in einen gepufferten Stream und validiert: Magic, `Version == 1`, `Cols`/`Rows > 0` (sonst wirft die Buffer-Anlage beim Replay), `PluginName`-Länge und Record-Längen gegen die Restlänge — Verletzungen → `InvalidDataException`
 
 ## TerminalReplaySession
 
 Zweite `ITerminalSession`-Implementierung (`Softwareschmiede.Infrastructure.Terminal`): spielt eine `CliOutputRecording` zeitgesteuert durch denselben Renderpfad wie `PseudoConsoleSession` ab (`AnsiSequenceParser` → `TerminalBuffer` → `BufferChanged`). Zusätzlich zur Schnittstelle steuert sie die Wiedergabe — zeitgesteuert (`StartReplay`/`Pausieren`/`Fortsetzen`/`TimeLapseThreshold`) und als Einzelschritte (`StepForward`/`StepBack`).
 
-**Konstruktor:** `TerminalReplaySession(CliOutputAufzeichnung aufzeichnung, TimeProvider timeProvider, ILogger<TerminalReplaySession>? logger = null)` — legt `Buffer` mit `Math.Max(1, Cols)`/`Rows` aus dem Aufzeichnungs-Header an.
+**Konstruktor:** `TerminalReplaySession(CliOutputRecording recording, TimeProvider timeProvider, ILogger<TerminalReplaySession>? logger = null)` — legt `Buffer` mit `Math.Max(1, Cols)`/`Rows` aus dem Aufzeichnungs-Header an.
 
 ### Zusätzliche Abspiel-Member
 
@@ -890,9 +890,9 @@ Zweite `ITerminalSession`-Implementierung (`Softwareschmiede.Infrastructure.Term
 
 Export-Service für den `.clireplay`-Mitschnitt (`Softwareschmiede.App.Services`; in der DI als Singleton registriert). Wird von `TaskDetailViewModel.ExportCliReplayAsync` verwendet.
 
-### `ExportCliReplayAsync(Guid workItemId, string zielPfad, CancellationToken ct)` → `Task`
+### `ExportCliReplayAsync(Guid workItemId, string targetPath, CancellationToken ct)` → `Task`
 
-Holt die Aufzeichnung über `AiExecutionService.GetCliAufzeichnung(workItemId)` und schreibt sie über `CliReplayRecordingStore.SaveAsync`.
+Holt die Aufzeichnung über `AiExecutionService.GetCliRecording(workItemId)` und schreibt sie über `CliReplayRecordingStore.SaveAsync`.
 
 **Exceptions:**
 - `ArgumentException`: `targetPath` leer
@@ -924,14 +924,14 @@ ViewModel und Fenster des Konsolentestfensters (`Softwareschmiede.App.ViewModels
 || `StartReplayCommand` | Startet die Wiedergabe ab der aktuellen Position; bei beendetem Durchlauf (`_replayExited`) wird eine frische `TerminalReplaySession` erzeugt (Rebind über `Session` → `RebuildBufferFromReplay`) — nach einem `StepBack` vom Ende wird stattdessen dieselbe Session re-armiert und läuft an der Position weiter |
 || `RestartPlaybackCommand` | Bricht eine laufende/pausierte Wiedergabe ab und spielt sofort wieder ab Position 0 (frische Session); zusätzlich im reinen Schrittmodus aktiv (`CurrentChunkIndex > 0` ohne laufende Wiedergabe) als direkter Rückweg zum Anfang |
 || `PauseReplayCommand` | Toggle `Pausieren`/`Fortsetzen` |
-|| `StepBeforeCommand` / `StepBackCommand` | Einzelschritt vorwärts/rückwärts über `TerminalReplaySession.StepForward`/`StepBack`; CanExecute: Session geladen, nicht unpausiert laufende Wiedergabe (`!IstWiedergabeAktiv \|\| IstPausiert`) und Positionsgrenze (`CurrentChunkIndex < QuellEintraege.Count` bzw. `> 0`). Die Handler ziehen den Wiedergabe-Zustandsteil der Sperre intern nach (RelayCommand wertet CanExecute bei `Execute` nicht aus) und setzen eigene `StatusText`-Meldungen; `StepBack` löscht `_replayExited` |
+|| `StepBeforeCommand` / `StepBackCommand` | Einzelschritt vorwärts/rückwärts über `TerminalReplaySession.StepForward`/`StepBack`; CanExecute: Session geladen, nicht unpausiert laufende Wiedergabe (`!IstWiedergabeAktiv \|\| IsPaused`) und Positionsgrenze (`CurrentChunkIndex < QuellEintraege.Count` bzw. `> 0`). Die Handler ziehen den Wiedergabe-Zustandsteil der Sperre intern nach (RelayCommand wertet CanExecute bei `Execute` nicht aus) und setzen eigene `StatusText`-Meldungen; `StepBack` löscht `_replayExited` |
 || `CloseCommand` | `CloseRequested`-Event → Fenster schließt |
 || `Session` | `ITerminalSession?` — Bindung ans `TerminalControl` (`AutomationName="ReplayTerminal"`) |
 || `SourceEntries` / `CurrentSourceEntry` | `ObservableCollection<CliChunkDisplayEntry>` (`Index` 1-basiert — die „#"-Spalte zählt wie der PositionsText die angewendeten Chunks, `Offset`, `Length`, `Quelltext`) für die `ListView` `SourceChunkList`; der aktuelle Eintrag folgt `CurrentChunkIndex` über `BufferChanged` (`null` an Position 0) und wird per `ScrollIntoView` sichtbar gehalten |
 || `TimelapseThresholdText` | Sekunden als Dezimalzahl ≥ 0 (`0` = maximale Geschwindigkeit); validiert — ungültige Eingabe → `ErrorMessage`, letzte gültige Schwelle bleibt aktiv |
 || `StatusText` / `PositionsText` | Statuszeile („Wiedergabe läuft.", „Pausiert.", „Wiedergabe beendet.", „Einzelschritt — Chunk n/y angewendet.", „Schritt zurück — Chunk n/y zurückgenommen.") und Position („Chunk x/y") |
 || `GeometryText` | Anzeigetext der aufgezeichneten Terminal-Geometrie („Aufzeichnung: {Cols}×{Rows}") — wird beim Laden gesetzt und beim Entsorgen der Session geleert |
-|| `IncompleteNotice` | Hinweistext bei `IstVollstaendig = false` der geladenen Aufzeichnung |
+|| `IncompleteNotice` | Hinweistext bei `IsComplete = false` der geladenen Aufzeichnung |
 || `ErrorMessage` | Fehlertext des Dialogs |
 
 **Hilfsklassen der Quell-Ansicht:** `CliChunkSourceTextFormatter.Format(ReadOnlySpan<byte>)` (statisch, `Softwareschmiede.App.Services`) dekodiert UTF-8 und macht Steuerzeichen sichtbar (`ESC` → `␛`, `CR` → `\r`, `LF` → `\n`, `TAB` → `\t`, übrige Steuerbytes/DEL → `\xNN`); `CliChunkDisplayEntry` (`Softwareschmiede.App.ViewModels`) ist das Zeilenmodell.

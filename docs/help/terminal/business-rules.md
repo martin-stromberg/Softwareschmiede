@@ -7,12 +7,12 @@
 **Beschreibung:** Die CLI-Aufzeichnung läuft automatisch bei jedem Terminal-Session-Start mit — ein späteres opt-in wäre für die Diagnose von Rendering-Fehlern zu spät, weil der Fehler dann bereits aufgetreten ist, bevor die Aufzeichnung begonnen hätte.
 
 **Bedingungen:**
-- `TerminalSessionOptions.AufzeichnungByteBudget > 0` (Default 8 MB) → Mitschnitt aktiv.
-- `AufzeichnungByteBudget <= 0` → bewusster Opt-out: es wird weder ein `CliOutputRecorder` noch eine `CompositeTerminalOutputSink` erzeugt; der `CliOutputLogWriter` wird direkt als `outputSink` übergeben.
+- `TerminalSessionOptions.RecordingByteBudget > 0` (Default 8 MB) → Mitschnitt aktiv.
+- `RecordingByteBudget <= 0` → bewusster Opt-out: es wird weder ein `CliOutputRecorder` noch eine `CompositeTerminalOutputSink` erzeugt; der `CliOutputLogWriter` wird direkt als `outputSink` übergeben.
 
 **Verhalten:**
 - Mitschnitt läuft ab Session-Erzeugung mit (die Composite-Senke existiert vor dem ersten Chunk) → keine Race-Bedingung für frühe Chunks, die eine nachträgliche `OutputChunk`-Event-Registrierung hätte.
-- Der Mitschnitt bleibt auch nach dem Session-Ende abrufbar (`AiExecutionService.GetCliAufzeichnung`).
+- Der Mitschnitt bleibt auch nach dem Session-Ende abrufbar (`AiExecutionService.GetCliRecording`).
 - Ein Neustart derselben Aufgabe ersetzt den bisherigen Mitschnitt.
 
 **Umsetzung:** `AiExecutionService.StartTerminalSessionAsync` (Recorder-Erzeugung + Composite), `CliOutputRecorder`, `CompositeTerminalOutputSink`.
@@ -25,7 +25,7 @@
 - `bufferedBytes + chunk.Length > byteBudget` beim `OnOutputChunk`-Aufruf.
 
 **Verhalten:**
-- Erste Überschreitung: `IstVollstaendig = false`, Log-Information, Chunk wird nicht mehr gespeichert.
+- Erste Überschreitung: `IsComplete = false`, Log-Information, Chunk wird nicht mehr gespeichert.
 - Alle folgenden Chunks werden verworfen; der Session-Betrieb (Protokoll, Rendering) läuft unverändert weiter.
 - Ein Replay braucht den Session-Anfang für den Parser-Zustand — ein verworfener Anfang würde den Neuaufbau korrumpieren. Ein abgeschnittenes Ende ist für die Diagnose brauchbarer als ein fehlender Anfang.
 
@@ -33,15 +33,15 @@
 
 ## Retention: nur die letzten 8 Aufzeichnungen
 
-**Beschreibung:** Die Aufzeichnungs-Registry im `AiExecutionService` ist auf die zuletzt gestarteten Aufgaben begrenzt, damit der Speicherverbrauch nicht unbegrenzt mit der Zahl der Sessions wächst (ein Eintrag kann bis zu `AufzeichnungByteBudget` Bytes halten).
+**Beschreibung:** Die Aufzeichnungs-Registry im `AiExecutionService` ist auf die zuletzt gestarteten Aufgaben begrenzt, damit der Speicherverbrauch nicht unbegrenzt mit der Zahl der Sessions wächst (ein Eintrag kann bis zu `RecordingByteBudget` Bytes halten).
 
 **Bedingungen:**
-- `AiExecutionService.MaxAufzeichnungenAnzahl = 8`.
+- `AiExecutionService.MaxRecordingCount = 8`.
 
 **Verhalten:**
 - Beim 9. Eintrag wird der älteste Mitschnitt verworfen (LRU über die Registrierungsreihenfolge).
 - Ein Neustart derselben Aufgabe zählt als jüngster Eintrag — der alte Mitschnitt der Aufgabe wird ersetzt.
-- `GetCliAufzeichnung` für eine verdrängte Aufgabe liefert `null` → der Export meldet „keine Aufzeichnung vorhanden".
+- `GetCliRecording` für eine verdrängte Aufgabe liefert `null` → der Export meldet „keine Aufzeichnung vorhanden".
 
 **Umsetzung:** `AiExecutionService.RegisterRecording` (`ConcurrentDictionary` + `LinkedList` unter `_recordingsLock`).
 

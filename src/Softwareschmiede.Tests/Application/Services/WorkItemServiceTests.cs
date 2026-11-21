@@ -332,7 +332,7 @@ public sealed class WorkItemServiceTests : IDisposable
         result.Should().HaveCount(2);
     }
 
-    /// <summary>StartenAsync setzt Status auf Gestartet und setzt Branch und KlonPfad.</summary>
+    /// <summary>StartAsync setzt Status auf Started und setzt Branch und LocalClonePath.</summary>
     [Fact]
     public async Task StartAsync_ShouldSetStatusStartedAndBranchName_WhenWorkItemExists()
     {
@@ -350,7 +350,7 @@ public sealed class WorkItemServiceTests : IDisposable
         result.LocalClonePath.Should().Be("/tmp/klon");
     }
 
-    /// <summary>StartenAsync sperrt terminale Gesamtstatus unabhängig vom Ausführungsstatus.</summary>
+    /// <summary>StartAsync sperrt terminale Gesamtstatus unabhängig vom Ausführungsstatus.</summary>
     [Fact]
     public async Task StartAsync_ShouldThrow_WhenWorkItemCompletedIs()
     {
@@ -399,7 +399,7 @@ public sealed class WorkItemServiceTests : IDisposable
         result.Should().BeNull();
     }
 
-    /// <summary>StatusSetzenAsync setzt Status auf Gestartet via generische Methode.</summary>
+    /// <summary>StatusSetzenAsync setzt Status auf Started via generische Methode.</summary>
     [Fact]
     public async Task SetStatusAsync_ShouldSetStatusStarted_WhenWorkItemExists()
     {
@@ -560,7 +560,7 @@ public sealed class WorkItemServiceTests : IDisposable
             .WithMessage("Nur neue Aufgaben können verworfen werden.");
     }
 
-    /// <summary>StartenAsync wirft InvalidOperationException wenn Aufgabe nicht gefunden.</summary>
+    /// <summary>StartAsync wirft InvalidOperationException wenn Aufgabe nicht gefunden.</summary>
     [Fact]
     public async Task StartAsync_ShouldThrowInvalidOperationException_WhenWorkItemDoesNotExist()
     {
@@ -685,7 +685,7 @@ public sealed class WorkItemServiceTests : IDisposable
         result.Should().OnlyContain(a => a.Status == WorkItemStatus.Started || a.Status == WorkItemStatus.Waiting);
     }
 
-    /// <summary>GetAktiveAufgabenAsync sortiert nach LetzterCliStartUtc absteigend, mit Fallback auf ErstellungsDatum.</summary>
+    /// <summary>GetAktiveAufgabenAsync sortiert nach LastCliStartUtc absteigend, mit Fallback auf ErstellungsDatum.</summary>
     [Fact]
     public async Task GetActiveWorkItemsAsync_ShouldSortByLastCliStartDescThenByCreationDate_WhenCalled()
     {

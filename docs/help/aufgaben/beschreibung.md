@@ -264,7 +264,7 @@ Die Aufgabendetailansicht bietet eine dedizierte **Todos-Ansicht** mit einer To-
   - **Löschen-Button:** Entfernt das To-Do aus der Liste und der Datenbank.
 - **Validierung beim Aufgabenabschluss:** Die Aufgabe kann **nicht** beendet werden (Status: `Completed`), solange noch offene To-Dos vorhanden sind. Ein Versuch, die Aufgabe zu beenden, zeigt eine Fehlermeldung wie „Diese Aufgabe kann nicht beendet werden, solange noch X offene To-Do(s) vorhanden sind."
 - **Ribbon-Badge:** Im Ribbon-Menü wird in der Aufgaben-Gruppe eine Markierung angezeigt, falls offene To-Dos vorhanden sind (z. B. „⚠ 3 offen"). Das Badge wird verborgen wenn alle To-Dos erledigt sind.
-- **Aktive-Aufgaben-Label:** In der aktiven Aufgabenliste der Seitenleiste und im Dashboard wird die Anzahl offener Todos pro Aufgabe direkt an der Kachel angezeigt. Das Label bleibt auch bei `0 Todos` sichtbar und öffnet einen read-only Dialog mit den offenen Todos oder dem Leerzustand.
+- **Aktive-Aufgaben-Label:** In der aktiven WorkItemsList der Seitenleiste und im Dashboard wird die Anzahl offener Todos pro Aufgabe direkt an der Kachel angezeigt. Das Label bleibt auch bei `0 Todos` sichtbar und öffnet einen read-only Dialog mit den offenen Todos oder dem Leerzustand.
 
 ## Einschränkungen
 

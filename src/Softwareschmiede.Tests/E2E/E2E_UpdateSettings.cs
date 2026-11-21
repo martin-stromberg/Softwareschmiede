@@ -27,7 +27,7 @@ public partial class End2EndTest
     private const string UpdateModeOnlyCheckLabel = UpdateModeText.CheckOnly;
     private const string UpdateModeStartLabel = UpdateModeText.CheckAndRunAtStartup;
     private const string UpdatePathProductionLabel = UpdatePathText.StableVersions;
-    private const string UpdatePathUpfrontLabel = UpdatePathText.Vorabversionen;
+    private const string UpdatePathUpfrontLabel = UpdatePathText.PrereleaseVersions;
     private const string UpdateNoticeChannelConflictPart = "passt nicht";
     private const string UpdateDownloadGate = "download-block";
     private const string UpdateReleaseGate = "release-block";

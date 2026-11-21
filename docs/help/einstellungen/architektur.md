@@ -54,7 +54,7 @@ SettingsViewModel
 ```
 SettingsView geöffnet
     ↓
-SettingsViewModel.LadenCommand triggert LoadAsync()
+SettingsViewModel.LoadCommand triggert LoadAsync()
     ↓
 Plugins laden: IPluginManager.GetSourceCodeManagementPlugins()
                 IPluginManager.GetDevelopmentAutomationPlugins()
@@ -92,11 +92,11 @@ Wenn Validierung erfolgreich:
     ├─ WorkingDirectorySettingsService.SaveWorkingDirectory()
     └─ DarkModeService.SetMode() (Theme anwenden)
     ↓
-ErfolgsMeldung anzeigen
+SuccessMessage anzeigen
 
 Wenn Validierung fehlgeschlagen:
     ↓
-FehlerMeldung anzeigen
+ErrorMessage anzeigen
     ↓
 Speichern abgebrochen, keine Daten persistiert
 ```

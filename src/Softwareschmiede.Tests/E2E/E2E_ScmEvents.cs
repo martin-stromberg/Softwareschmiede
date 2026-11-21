@@ -32,7 +32,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.AddText(1, 101, original);
         var first = await fixture.WaitEventAsync(1, "Wartend");
         SelectEvent(window, 1);
-        // Windows UI Automation terminates a text value at NUL; storage and request assertions below retain it.
+        // Windows UI Automation schneidet einen Textwert am NUL-Zeichen ab; die Speicher- und Request-Asserts darunter behalten ihn bei.
         Assert.Equal(original.TrimEnd('\0'), Element(window, "ScmEventBody").AsTextBox().Text);
         Assert.Equal(original, ScmEventStore.Observation(first).Body);
         Assert.Equal("https://github.com/scm-owner/scm-e2e/issues/1#issuecomment-101", Element(window, "ScmEventOrigin").AsTextBox().Text);
@@ -283,7 +283,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         var current = await fixture.WaitEventAsync(1, "ZustellungUngewiss", 105);
         await WaitPromptCountAsync(fixture, promptCount + 2, current.DeliveryAttemptId);
         // Beweist die explizite Status-Aktion, solange der aktuelle Versuch noch unsicher ist.
-        // Once completion is released, background reconciliation may finish it and hide the action.
+        // Sobald die Fertigstellung freigegeben ist, kann die Hintergrund-Abstimmung sie abschließen und die Aktion verbergen.
         SelectEvent(window, 1);
         Click(window, "ScmEventCheckStatus");
         Assert.Equal(current.DeliveryAttemptId, (await fixture.WaitEventAsync(1, "ZustellungUngewiss", 105)).DeliveryAttemptId);
@@ -609,8 +609,8 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.DoesNotContain(fixture.Prompts(), p => p.GetProperty("request").GetProperty("cliRunId").GetString() == readOnly.CliRunId);
         output.WriteLine("E6-Read-only: regular task stop/restart replaces denied run; only new supported run receives one event.");
 
-        // A simulator started without its protocol banner stays honestly unrecognized: the wait
-        // reason names the missing banner instead of unknown readiness, no confirm button is
+        // Ein Simulator, der ohne sein Protokoll-Banner gestartet wurde, bleibt ehrlich unerkannt: der
+        // Wartegrund benennt das fehlende Banner statt einer unbekannten Bereitschaft, kein Bestätigen-Button wird
         // angeboten, und ein regulärer Neustart mit Banner liefert dasselbe Ereignis.
         fixture.Control("unknown-banner", true);
         SelectEvent(window, 2);

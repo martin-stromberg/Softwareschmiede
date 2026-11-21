@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace Softwareschmiede.App.Services.Testing;
 
-// Deliberately internal: a file fixture, not an application control API.
+// Bewusst internal: ein Datei-Fixture, keine Anwendungs-Steuerungs-API.
 internal sealed class ScmE2ETestConfiguration
 {
     public const string EnvironmentVariable = "SOFTWARESCHMIEDE_SCM_TEST_CONFIG";

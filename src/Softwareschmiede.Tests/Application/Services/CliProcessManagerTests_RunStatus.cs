@@ -153,17 +153,17 @@ public sealed class CliProcessManagerTests_RunStatus : IDisposable
     }
 
     /// <summary>
-    /// Voller Zyklus über die tatsächliche Produktionsverdrahtung: Gestartet setzt AktiveRunId + LaufStatus
+    /// Voller Zyklus über die tatsächliche Produktionsverdrahtung: Gestartet setzt ActiveRunId + LaufStatus
     /// Laeuft sofort; ein anschließender RuntimeStatusChanged-Wechsel der Sitzung auf WartetAufEingabe muss
-    /// bei weiterhin laufendem Prozess (AktiveRunId bleibt gesetzt) als LaufStatus persistiert werden;
-    /// Stopped entfernt danach sowohl AktiveRunId als auch LaufStatus wieder vollständig.
+    /// bei weiterhin laufendem Prozess (ActiveRunId bleibt gesetzt) als LaufStatus persistiert werden;
+    /// Stopped entfernt danach sowohl ActiveRunId als auch LaufStatus wieder vollständig.
     /// </summary>
     [Fact]
     public async Task FullCycle_StartedWaitsStopped_PersistedRunStatusOverTheSession()
     {
         var session = RegisterFakeSessionForWorkItem(_workItemId);
 
-        // Läuft: CliProcessManager setzt AktiveRunId + LaufStatus=Laeuft sofort beim Start und abonniert
+        // Läuft: CliProcessManager setzt ActiveRunId + LaufStatus=Laeuft sofort beim Start und abonniert
         // die Sitzung.
         await RaiseStatusChangedAsync(CliProcessStatus.Started, a => a.ActiveRunId != null);
         var afterStart = LoadWorkItem();
@@ -179,7 +179,7 @@ public sealed class CliProcessManagerTests_RunStatus : IDisposable
         whileWait.ActiveRunId.Should().NotBeNull("der Prozess lebt während des Wartens auf Eingabe weiterhin");
         whileWait.RunStatus.Should().Be(WorkItemRunStatus.WaitingForInput);
 
-        // Bereit: Prozess wird beendet — AktiveRunId und LaufStatus müssen beide entfernt werden.
+        // Bereit: Prozess wird beendet — ActiveRunId und LaufStatus müssen beide entfernt werden.
         await RaiseStatusChangedAsync(CliProcessStatus.Stopped, a => a.ActiveRunId == null);
         var afterStop = LoadWorkItem();
         afterStop.ActiveRunId.Should().BeNull();

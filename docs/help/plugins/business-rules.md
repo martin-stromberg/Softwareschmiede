@@ -50,7 +50,7 @@
 - Checkbox bleibt aktiviert
 
 **Fehlerfall:**
-- Fehlermeldung: `ValidatePluginActivation()` → `FehlerMeldung = "Mindestens ein Quellcodeverwaltungs-Plugin muss aktiv bleiben."` oder `"Mindestens ein KI-Plugin muss aktiv bleiben."`
+- Fehlermeldung: `ValidatePluginActivation()` → `ErrorMessage = "Mindestens ein Quellcodeverwaltungs-Plugin muss aktiv bleiben."` oder `"Mindestens ein KI-Plugin muss aktiv bleiben."`
 - `SaveAsync()` bricht ab, keine Änderungen werden persistiert
 
 **Umsetzung:** `SettingsViewModel.ValidatePluginActivation()` prüft vor Speichern, ob noch mindestens ein Plugin aktiv ist

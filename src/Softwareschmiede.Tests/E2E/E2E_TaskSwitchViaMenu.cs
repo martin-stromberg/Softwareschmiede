@@ -109,7 +109,7 @@ public partial class End2EndTest
 
         // taskAfterSwitchToA wurde zuletzt über das Menü (Menu.NavigateToTask) erreicht, nicht über die
         // Projektdetailansicht. MainWindowViewModel.NavigateZuAufgabe setzt für diesen Navigationsweg
-        // ZurueckAction bewusst auf NavigateToDashboard (siehe dortiger Kommentar) - "Zurück" führt daher
+        // BackAction bewusst auf NavigateToDashboard (siehe dortiger Kommentar) - "Zurück" führt daher
         // unabhängig vom vorherigen Navigationsverlauf zum Dashboard, nicht zur Projektdetailansicht.
         taskAfterSwitchToA.ForceClose(recurseToDashboard: false);
         var dashboardFinal = Assert.IsType<DashboardView>(mainWindow.CurrentView());

@@ -186,7 +186,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         item.LiveRunStatus.Should().Be(WorkItemRunStatus.WaitingForInput);
     }
 
-    /// <summary>RefreshActiveWorkItemsAsync mappt PausiertBisUtc und das abgeleitete IsPaused auf das Panel-Item (Issue 151).</summary>
+    /// <summary>RefreshActiveWorkItemsAsync mappt PausedUntilUtc und das abgeleitete IsPaused auf das Panel-Item (Issue 151).</summary>
     [Fact]
     public async Task RefreshActiveWorkItemsAsync_ShouldMapPausedUntilUtc_WhenTaskIsPaused()
     {
@@ -947,14 +947,14 @@ public sealed class MainWindowViewModelTests : IDisposable
         fallback.RepositoryGroupIsFallback.Should().BeTrue();
     }
 
-    /// <summary>RefreshActiveWorkItemsAsync mappt SortierZeitpunkt auf LetzterCliStartUtc ?? ErstellungsDatum.</summary>
+    /// <summary>RefreshActiveWorkItemsAsync mappt SortierZeitpunkt auf LastCliStartUtc ?? ErstellungsDatum.</summary>
     [Fact]
     public async Task RefreshActiveWorkItemsAsync_ShouldMapSortTimestamp()
     {
         // Arrange
         var workItem = await _workItemService.CreateAsync(_projectId, "Sortier-Aufgabe", null, ct: TestContext.Current.CancellationToken);
         await _workItemService.StartAsync(workItem.Id, "feature/sort", "/tmp/sort", ct: TestContext.Current.CancellationToken);
-        // StartenAsync setzt LetzterCliStartUtc bewusst auf null — der Zeitstempel entsteht erst
+        // StartAsync setzt LastCliStartUtc bewusst auf null — der Zeitstempel entsteht erst
         // beim echten CLI-Prozessstart (CliProcessManager → AktivenLaufSetzenAsync).
         await _workItemService.SetActiveRunAsync(workItem.Id, Guid.NewGuid().ToString(), TestContext.Current.CancellationToken);
         var sut = CreateSut();

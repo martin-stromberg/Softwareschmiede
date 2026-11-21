@@ -12,7 +12,7 @@ public sealed class AiExecutionStatusSymbolConverterTests
 {
     private readonly AiExecutionStatusSymbolConverter _sut = new();
 
-    /// <summary>Convert gibt "▶" zurück, wenn AktiveRunId gesetzt und der Heartbeat aktuell ist.</summary>
+    /// <summary>Convert gibt "▶" zurück, wenn ActiveRunId gesetzt und der Heartbeat aktuell ist.</summary>
     [Fact]
     public void Convert_ShouldReturnSymbolOnly_WhenRuns()
     {

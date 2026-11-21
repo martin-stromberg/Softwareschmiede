@@ -259,7 +259,7 @@ public sealed class DevelopmentProcessService
             throw new InvalidOperationException("Beendete oder archivierte Aufgaben können nicht gestartet werden.");
         }
 
-        // Deckt auch den Plugin-Wechsel-Pfad (PluginWechselAsync → CliNeustartenAsync) ab.
+        // Deckt auch den Plugin-Wechsel-Pfad (SwitchPluginAsync → CliNeustartenAsync) ab.
         ThrowIfPaused(workItem);
 
         var current = _options.AiExecutionService.GetTerminalSession(workItemId);

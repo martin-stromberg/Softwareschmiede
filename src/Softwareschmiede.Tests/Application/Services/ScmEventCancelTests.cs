@@ -52,7 +52,7 @@ public sealed class ScmEventCancelTests
         Assert.Equal(status, (await fixture.EventAsync(eventId)).Status);
     }
 
-    /// <summary>A cancelled earlier event no longer blocks the queue order of its task.</summary>
+    /// <summary>Ein abgebrochenes früheres Ereignis blockiert die Warteschlangenreihenfolge seiner Aufgabe nicht mehr.</summary>
     [Fact]
     public async Task Cancel_PredecessorEvent_LetsSuccessorDispatchContinue()
     {

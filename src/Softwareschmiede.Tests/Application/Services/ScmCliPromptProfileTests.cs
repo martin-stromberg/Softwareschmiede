@@ -2,7 +2,7 @@ using Softwareschmiede.Application.Services;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Range boundaries, token strictness and catalog honesty of the prompt-format profiles.</summary>
+/// <summary>Bereichsgrenzen, Token-Strenge und Katalog-Ehrlichkeit der Promptformat-Profile.</summary>
 public sealed class ScmCliPromptProfileTests
 {
     /// <summary>Codex und Claude unterstützen dasselbe Major.Minor mit beliebigem Patch; Devin toleriert beliebiges Minor und Patch innerhalb von Major 3000. Andere Major-Releases werden nicht unterstützt.</summary>
@@ -42,7 +42,7 @@ public sealed class ScmCliPromptProfileTests
         Assert.True(match.IsSupported);
     }
 
-    /// <summary>Missing banner anchors and prefixes without a profile never produce a match.</summary>
+    /// <summary>Fehlende Banner-Anker und Präfixe ohne Profil erzeugen nie einen Treffer.</summary>
     [Theory]
     [InlineData("Softwareschmiede.GitHubCopilot", "GitHub Copilot CLI v1.0.0")]
     [InlineData("Softwareschmiede.Codex", "irrelevant startup output")]
@@ -75,7 +75,7 @@ public sealed class ScmCliPromptProfileTests
         Assert.Equal("KI-Simulator", match.Profile.DisplayName);
     }
 
-    /// <summary>Only reasons carrying the shared confirmation suffix offer the confirm action.</summary>
+    /// <summary>Nur Gründe mit dem gemeinsamen Bestätigungs-Suffix bieten die Bestätigungsaktion an.</summary>
     [Theory]
     [InlineData("Eingabebereitschaft unbekannt. Für die angezeigte CLI-Sitzung bestätigen.", true)]
     [InlineData("Devin CLI v3001.0.0 wird nicht unterstützt; unterstützt ist v3000.x. Für die angezeigte CLI-Sitzung bestätigen.", true)]
@@ -85,7 +85,7 @@ public sealed class ScmCliPromptProfileTests
     public void IsConfirmable_MatchesOnlyTheMarkerSuffix(string? reason, bool expected)
         => Assert.Equal(expected, ScmCliWaitReason.IsConfirmable(reason));
 
-    /// <summary>An out-of-range version names CLI, detected version and supported range, and stays confirmable.</summary>
+    /// <summary>Eine Version außerhalb des Bereichs nennt CLI, erkannte Version und unterstützten Bereich und bleibt bestätigbar.</summary>
     [Fact]
     public void Describe_UnsupportedVersion_NameCliVersionAndRange()
     {

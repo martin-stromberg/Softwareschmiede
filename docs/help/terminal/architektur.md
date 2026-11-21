@@ -18,11 +18,11 @@
 | `Win32PseudoConsoleProcessLauncher` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | ConPTY-Backend: startet die normalisierte Spec direkt via `CreateProcess` + `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE` — ohne `cmd.exe`-Hülle |
 | `SimulatedPseudoConsoleProcessLauncher` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Pipe-Backend: startet die Spec über umgeleitete Stdin/Stdout/Stderr; `CrSubmittingInputStream` übersetzt nacktes `\r` nach `\r\n` für Pipe-basierte Shells |
 | `TerminalReplayBuffer` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Begrenzter Byte-Ringpuffer mit den rohen Ausgabe-Chunks — Basis für `RebuildBufferFromReplay` beim UI-Reattach |
-| `TerminalSessionOptions` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | `Terminal`-Konfiguration: `ReplayBufferByteBudget` (Default 512 KiB), `DefaultCols`/`DefaultRows` (220/50), `AufzeichnungByteBudget` (Default 8 MB) |
+| `TerminalSessionOptions` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | `Terminal`-Konfiguration: `ReplayBufferByteBudget` (Default 512 KiB), `DefaultCols`/`DefaultRows` (220/50), `RecordingByteBudget` (Default 8 MB) |
 | `ITerminalOutputSink` | Interface | `Softwareschmiede.Infrastructure.Terminal` | Optionale Senke für rohe Terminal-Output-Bytes; erlaubt UI-unabhängige Weiterverarbeitung der gelesenen Chunks |
 | `ITerminalDiagnoseSink` | Interface | `Softwareschmiede.Infrastructure.Terminal` | Zusätzlicher Routing-Kanal einer Output-Senke für `[Terminal-Diagnose]`-Markerzeilen — hält Artefakt-Zeilen aus byte-exakten Mitschnitten heraus |
 | `CompositeTerminalOutputSink` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Fächert `OnOutputChunk` auf mehrere innere Senken auf (Protokoll-Writer + Recorder); `OnDiagnoseChunk` nur an innere `ITerminalDiagnoseSink`-Implementierungen |
-| `CliOutputRecorder` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | `ITerminalOutputSink`: zeichnet Rohbytes mit `TimeProvider`-Offset im Speicher auf; budgetbegrenzt (`AufzeichnungByteBudget`), bei Überschreitung `IstVollstaendig=false` und intaktes Präfix |
+| `CliOutputRecorder` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | `ITerminalOutputSink`: zeichnet Rohbytes mit `TimeProvider`-Offset im Speicher auf; budgetbegrenzt (`RecordingByteBudget`), bei Überschreitung `IsComplete=false` und intaktes Präfix |
 | `CliOutputRecording` / `CliOutputChunkRecord` | Datenmodell | `Softwareschmiede.Infrastructure.Terminal` | Mitschnitt-Modell: Header (Aufgabe, Plugin, Start/Ende, Geometrie, Vollständigkeit) + Chunks `(Offset, Data)` |
 | `CliReplayRecordingStore` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Serialisiert/Deserialisiert `CliOutputRecording` im `.clireplay`-Binärformat (Magic `SWCLRPLY`, Version 1, Header + Offset/Length-Records); Magic-/Versions-/Header-Validierung → `InvalidDataException` |
 | `ICliReplayExportService` / `CliReplayExportService` | Interface / Klasse | `Softwareschmiede.App.Services` | Exportiert den Mitschnitt einer Aufgabe als `.clireplay`-Datei (`HasRecording`-Vorab-Prüfung) |
@@ -170,7 +170,7 @@ ist (Issue-86). Jeder gelesene Chunk:
 PseudoConsoleSession.OutputStream (ConPTY-Pipe bzw. Prozess-Stdout)
   ↓ async bytes gelesen in ReadLoopAsync (läuft ab Session-Konstruktion)
 ITerminalOutputSink.OnOutputChunk(bytes)
-  ├─ CompositeTerminalOutputSink (bei AufzeichnungByteBudget > 0)
+  ├─ CompositeTerminalOutputSink (bei RecordingByteBudget > 0)
   │    ├─ CliOutputLogWriter → LogService.AddCliOutputAsync(workItemId, line)
   │    └─ CliOutputRecorder → CliOutputChunkRecord(Offset, Bytes) im Speicher
   │         (ITerminalDiagnoseSink-Kanal: [Terminal-Diagnose]-Marker nur an den Writer)
@@ -289,7 +289,7 @@ Sektion `Terminal` in `appsettings.json` (gebunden an `TerminalSessionOptions`):
 | `Terminal:ReplayBufferByteBudget` | 524288 (512 KiB) | Byte-Budget des Replay-Puffers pro Session — begrenzt, wie viel Rohoutput für den Reattach-Neuaufbau vorgehalten wird |
 | `Terminal:DefaultCols` | 220 | Anfangsspalten der Session (ConPTY-Erstellung, Preflight-Check) |
 | `Terminal:DefaultRows` | 50 | Anfangszeilen der Session |
-| `Terminal:AufzeichnungByteBudget` | 8388608 (8 MB) | Byte-Budget des `CliOutputRecorder`-Mitschnitts pro Session; `<= 0` deaktiviert die Aufzeichnung |
+| `Terminal:RecordingByteBudget` | 8388608 (8 MB) | Byte-Budget des `CliOutputRecorder`-Mitschnitts pro Session; `<= 0` deaktiviert die Aufzeichnung |
 | `Terminal.ForcePtyUnavailable` (App-Einstellung, nicht JSON) | — | Test-/Debug-Hook: erzwingt `PtyAvailable=false` im Preflight → Pipe-Fallback mit Diagnose-Marker; `RequiresPty`-Plugins schlagen fehl |
 
 ## Executable-Auflösung
@@ -322,7 +322,7 @@ Zentrale Lifecycle-Klasse:
 
 Holt die laufende Session vom Service (nach dem Start über `CliProcessStatusChanged` bzw. beim Laden via `GetTerminalSession`) und propagiert sie über das eigene `TerminalSessionStarted`-Event an die View:
 ```csharp
-var session = _kiService.GetTerminalSession(_workItemId);
+var session = _aiService.GetTerminalSession(_workItemId);
 if (session is not null)
     TerminalSessionStarted?.Invoke(session); // Action<ITerminalSession>
 ```
@@ -337,7 +337,7 @@ ViewModel.TerminalSessionStarted += session =>
 };
 ```
 
-## Fehlertoleranzen
+## FehlertoleranceMinutesen
 
 | Fehlerszenario | Behandlung |
 |---|---|
@@ -350,7 +350,7 @@ ViewModel.TerminalSessionStarted += session =>
 | Resize-API schlägt fehl | Rückgabewert ignoriert; Konsole läuft mit alter Größe weiter |
 | `InputStream.WriteAsync` schlägt fehl (`OnPreviewKeyDown`/`OnTextInput`) | Fehler wird per `LogWarning` protokolliert statt verschluckt; Tastatureingabe geht verloren, Steuerung bleibt bedienbar |
 | ANSI-Parser-Fehler | Fehlerhafte Sequenzen werden ignoriert; Zustand bleibt konsistent; `Failed`-Event signalisiert Lesefehler |
-| Unerwartete Exception in `ReadLoopAsync` | `catch (Exception)` protokolliert (`LogError`) und feuert `Failed`; Leseschleife endet geordnet |
+| Unexpectede Exception in `ReadLoopAsync` | `catch (Exception)` protokolliert (`LogError`) und feuert `Failed`; Leseschleife endet geordnet |
 | `TerminalControl` nicht (mehr) gebunden, während Prozess Ausgabe produziert | Die Leseschleife der Session läuft unabhängig weiter und puffert Ausgabe in `Buffer` + `TerminalReplayBuffer` — kein Datenverlust (Issue-86); Reattach baut den Buffer aus dem Replay neu auf |
 | `CliOutputLogWriter` kann eine Zeile nicht persistieren | Fehler wird geloggt; die Terminal-Session, der Parser und das Rendering laufen weiter |
 | Output-Persistenz fällt hinter schnelle CLI-Ausgabe zurück | Bounded Queue erzeugt Backpressure und protokolliert Warnungen ab definierten Schwellen; der Terminal-Output-Reader wartet, bis wieder Queue-Kapazität verfügbar ist |

@@ -63,7 +63,7 @@ public sealed class ScmCliWorkspaceTrustTests : IDisposable
         File.ReadAllText(config).Should().Be("{ not json");
     }
 
-    /// <summary>The Codex projects entry is appended once and existing files gain it without duplication.</summary>
+    /// <summary>Der Codex-Projekte-Eintrag wird einmal angehängt, und bestehende Dateien erhalten ihn ohne Duplikat.</summary>
     [Fact]
     public void EnsureCodexTrusted_AppendsScopedEntry_Idempotently()
     {

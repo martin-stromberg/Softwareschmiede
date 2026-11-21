@@ -40,13 +40,13 @@ Die Sektion `Terminal` in `src/Softwareschmiede/appsettings.json` steuert die La
 | `Terminal:ReplayBufferByteBudget` | `int` (Bytes) | `524288` (512 KiB) | Größe des Replay-Puffers pro Session — begrenzt, wie viel Rohoutput für den Neuaufbau der Anzeige beim erneuten Öffnen einer Aufgabenseite vorgehalten wird |
 | `Terminal:DefaultCols` | `int` | `220` | Initiale Spaltenanzahl beim Session-Start (muss zwischen 1 und 32767 liegen) |
 | `Terminal:DefaultRows` | `int` | `50` | Initiale Zeilenanzahl beim Session-Start (muss zwischen 1 und 32767 liegen) |
-| `Terminal:AufzeichnungByteBudget` | `int` (Bytes) | `8388608` (8 MB) | Byte-Budget der Rohbyte-Aufzeichnung (`CliOutputRecorder`) pro Session für den `.clireplay`-Export; `<= 0` deaktiviert den Mitschnitt vollständig |
+| `Terminal:RecordingByteBudget` | `int` (Bytes) | `8388608` (8 MB) | Byte-Budget der Rohbyte-Aufzeichnung (`CliOutputRecorder`) pro Session für den `.clireplay`-Export; `<= 0` deaktiviert den Mitschnitt vollständig |
 
 ### Test-/Debug-Hook (nicht für den Produktivbetrieb)
 
 | Schlüssel | Ort | Beschreibung |
 |-----------|-----|--------------|
-| `Terminal.ForcePtyUnavailable` | `AppSettingen`-Tabelle (Wert `"true"`) | Erzwingt den Fehlschlag des PTY-Verfügbarkeits-Checks im Preflight — treibt den Pipe-Fallback inkl. `[Terminal-Diagnose]`-Marker bzw. den `RequiresPty`-Fehler. Wird pro Session-Start gelesen; dient ausschließlich Tests/Diagnose und wird nie implizit gesetzt. |
+| `Terminal.ForcePtyUnavailable` | `AppEinstellungen`-Tabelle (Wert `"true"`) | Erzwingt den Fehlschlag des PTY-Verfügbarkeits-Checks im Preflight — treibt den Pipe-Fallback inkl. `[Terminal-Diagnose]`-Marker bzw. den `RequiresPty`-Fehler. Wird pro Session-Start gelesen; dient ausschließlich Tests/Diagnose und wird nie implizit gesetzt. |
 
 ## Plugin-Voraussetzungen
 
@@ -87,12 +87,12 @@ public override TerminalProviderCapabilities TerminalCapabilities =>
 |---------|---------|--------|
 | Terminal bleibt leer | Prozess hat Fehler beim Start | Logs im `logs/`-Verzeichnis prüfen; `CodexPlugin.CheckHealthAsync` aufrufen |
 | Start schlägt mit „CLI-Executable '…' kann nicht gestartet werden" fehl | `TerminalExecutableResolver` meldet `NotFound` (Executable nicht im Arbeitsverzeichnis/`PATH`) oder `NotExecutable` (z. B. `.ps1`-Skript) | CLI installieren bzw. `PATH` prüfen oder den `ExecutablePath` des Plugins in den Einstellungen auf einen absoluten `.exe`-Pfad setzen; Details liefert die `[Terminal-Diagnose]`-Zeile im Aufgabenprotokoll |
-| Start schlägt mit „… erfordert ein Pseudo-Terminal (PTY)" fehl | Plugin deklariert `RequiresPty`, aber ConPTY ist nicht verfügbar (OS-Build < 17763 oder `Terminal.ForcePtyUnavailable`-Test-Hook aktiv) | Windows ≥ 10 Build 17763 verwenden; prüfen, ob der Test-Override `Terminal.ForcePtyUnavailable` in den `AppSettingen` gesetzt ist |
-| Statuszeile zeigt „ (eingeschränkter Modus – kein Pseudo-Terminal)" | Session läuft auf dem Pipe-Fallback (PTY nicht verfügbar oder Plugin ohne `SupportsPty`) | Gewollter Fallback — die `[Terminal-Diagnose]`-Zeile im Aufgabenprotokoll nennt Grund und Einzelcheck-Ergebnisse; für PTY-Betrieb Windows-Build und Plugin-Capabilities prüfen |
+| Start schlägt mit „… erfordert ein Pseudo-Terminal (PTY)" fehl | Plugin deklariert `RequiresPty`, aber ConPTY ist nicht verfügbar (OS-Build < 17763 oder `Terminal.ForcePtyUnavailable`-Test-Hook aktiv) | Windows ≥ 10 Build 17763 verwenden; prüfen, ob der Test-Override `Terminal.ForcePtyUnavailable` in den `AppEinstellungen` gesetzt ist |
+| Statuszeile zeigt „ (eingeschränkter Modus – kein Pseudo-Terminal)" | Session läuft auf dem Pipe-Fallback (PTY nicht verfügbar oder Plugin ohne `SupportsPty`) | Gewollter Fallback — die `[Terminal-Diagnose]`-Zeile im Aufgabenprotokoll nennt Grund und Einzelcheck-Resultse; für PTY-Betrieb Windows-Build und Plugin-Capabilities prüfen |
 | Nur ASCII-Text, keine Farben | ANSI-Sequenzen nicht erkannt | Plugin-Output prüfen (z.B. `codex --version`); TERM-Umgebungsvariable auf `xterm-256color` setzen |
 | `Ctrl+C` löst „Batchdatei abbrechen (J/N)?" aus | CLI wurde über einen `.cmd`/`.bat`-Shim gestartet (z. B. npm-Installation) | Bekanntes Verhalten von Batch-Shims — die Rückfrage mit `J` bestätigen oder die CLI normal beenden |
 | Größenänderung verursacht Fehler | `ResizePseudoConsole` schlägt fehl | Seltener Windows-Fehler; Prozess beenden und neu starten |
 | Tastatureingaben funktionieren nicht | Focus nicht im Terminal | Terminal-Bereich klicken um Focus zu setzen |
-| „Aufzeichnung exportieren" meldet „Für diese Aufgabe liegt noch keine Aufzeichnung vor" | Für die Aufgabe wurde noch keine Terminal-Session gestartet, die Aufzeichnung wurde über `Terminal:AufzeichnungByteBudget <= 0` deaktiviert oder der Mitschnitt gehört zu einer älteren als den letzten 8 Aufgaben (verworfen) | CLI der Aufgabe starten; Budget-Konfiguration prüfen |
+| „Aufzeichnung exportieren" meldet „Für diese Aufgabe liegt noch keine Aufzeichnung vor" | Für die Aufgabe wurde noch keine Terminal-Session gestartet, die Aufzeichnung wurde über `Terminal:RecordingByteBudget <= 0` deaktiviert oder der Mitschnitt gehört zu einer älteren als den letzten 8 Aufgaben (verworfen) | CLI der Aufgabe starten; Budget-Konfiguration prüfen |
 | Konsolentestfenster meldet „Die Aufzeichnung konnte nicht geladen werden" | Die Datei ist keine gültige `.clireplay`-Datei (falsches Format, beschädigt, abgeschnitten) | Datei erneut aus der Aufgabendetailansicht exportieren; Fremdformate werden nicht unterstützt |
-| Konsolentestfenster zeigt „Aufzeichnung unvollständig" | Das Aufzeichnungs-Budget wurde während der Session erreicht — nur der Anfang der Ausgabe ist enthalten | `Terminal:AufzeichnungByteBudget` erhöhen und die Session erneut aufzeichnen |
+| Konsolentestfenster zeigt „Aufzeichnung unvollständig" | Das Aufzeichnungs-Budget wurde während der Session erreicht — nur der Anfang der Ausgabe ist enthalten | `Terminal:RecordingByteBudget` erhöhen und die Session erneut aufzeichnen |

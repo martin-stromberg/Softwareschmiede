@@ -58,7 +58,7 @@ Projektdetail-Ansicht mit Aufgabenliste und Eigenschaften.
 
 | Eigenschaft / Methode | Typ | Beschreibung |
 |----------------------|-----|-------------|
-| `IsVisible` | bool | True: "ProjektName"-Feld und "AufgabeNeu"-Button sichtbar |
+| `IsVisible` | bool | True: "ProjectName"-Feld und "AufgabeNeu"-Button sichtbar |
 | `ForceShow()` | BaseWindowView | Öffnet Projekt aus Projektliste |
 | `CreateTask()` | void | Klick auf "AufgabeNeu"-Button |
 | `DeleteProject()` | void | Projekt-Löschung mit Bestätigung |
@@ -110,7 +110,7 @@ Fehlerbanner-View (zeigt Fehler der Anwendung).
 
 | Eigenschaft / Methode | Typ | Beschreibung |
 |----------------------|-----|-------------|
-| `IsVisible` | bool | True: "FehlerMeldung"-TextBlock sichtbar |
+| `IsVisible` | bool | True: "ErrorMessage"-TextBlock sichtbar |
 | `GetErrorMessage()` | string | Fehlertext lesen |
 
 ### DialogView : BaseWindowView

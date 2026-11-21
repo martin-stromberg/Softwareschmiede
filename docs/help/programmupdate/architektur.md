@@ -57,8 +57,8 @@ flowchart LR
 | Komponente | Rolle |
 |------------|-------|
 | `MainWindow` | Registriert den einmaligen `ContentRendered`-Handler und stößt `InitializeUpdatesAfterWindowReadyAsync` an. |
-| `MainWindowViewModel` | Delegiert den Update-Bereich an `MainWindowUpdateFlow`: Commands `UpdatePruefenCommand`/`StartUpdateCommand`, Zustands-Properties (`UpdateAvailable`, `AvailableUpdate`, `UpdateCheckRunning`, `UpdateBeingPrepared`, `UpdateNotice`, `UpdateCheckTooltip`) und den Start-Einstieg. |
-| `MainWindowUpdateFlow` | Orchestriert alle Update-Versuche: `_updateGate` (nicht wartend), `_updateSettingsGeneration` (Aktualität), `_updateFlowCts` (Abbruch), `CheckAsync`/`StartenAsync`/`RunUpdateAttemptAsync`/`InstallUpdateAsync`, Startautomatik und Settings-Anwendung. |
+| `MainWindowViewModel` | Delegiert den Update-Bereich an `MainWindowUpdateFlow`: Commands `CheckUpdateCommand`/`StartUpdateCommand`, Zustands-Properties (`UpdateAvailable`, `AvailableUpdate`, `UpdateCheckRunning`, `UpdateBeingPrepared`, `UpdateNotice`, `UpdateCheckTooltip`) und den Start-Einstieg. |
+| `MainWindowUpdateFlow` | Orchestriert alle Update-Versuche: `_updateGate` (nicht wartend), `_updateSettingsGeneration` (Aktualität), `_updateFlowCts` (Abbruch), `CheckAsync`/`StartAsync`/`RunUpdateAttemptAsync`/`InstallUpdateAsync`, Startautomatik und Settings-Anwendung. |
 | `MainWindowUpdateServices` | Record-Bündel der Update-Kollaborateure (`IUpdateService`, `ICliUpdateSafetyService`, `IUpdateProgressDialogService`, `IUpdateAttemptLog`). |
 | `MainWindowOptionalServices` | Record-Bündel der optionalen `MainWindowViewModel`-Abhängigkeiten (DispatcherInvoke, `IDialogService`, `IApplicationVersionProvider`, `WorkItemRunDataChangedNotifier`, `MainWindowUpdateServices`). |
 | `UpdateModeText` / `UpdateModeOption` | Zentrale Anzeige-Labels (`Aus`/`Nur prüfen`/`Bei Programmstart prüfen und ausführen`) und typisierte Auswahloptionen (`All`, `ForMode`). |
@@ -75,7 +75,7 @@ flowchart LR
 |------------|-------|
 | `UpdateService` (`IUpdateService`) | Orchestriert `CheckForUpdateAsync(UpdateCheckOptions)`, `PrepareUpdateAsync` (Delegat an `IUpdatePackageService`) und `StartPreparedUpdateAsync` (Skriptstart → Shutdown). Serialisiert Prüfungen über `_checkGate`. |
 | `ApplicationVersionProvider` (`IApplicationVersionProvider`) | Liest und normalisiert die installierte Version aus `version.json`; `null` = nicht prüfbar. |
-| `CliUpdateSafetyService` (`ICliUpdateSafetyService`) | Bewertet aktive Aufgaben via `WorkItemRunActivity.IstAktiv`; liefert `CliUpdateSafetyResult`. |
+| `CliUpdateSafetyService` (`ICliUpdateSafetyService`) | Bewertet aktive Aufgaben via `WorkItemRunActivity.IsActive`; liefert `CliUpdateSafetyResult`. |
 | `UpdateVersionComparer` | Statische Fassade: `TryParse`, `Normalize`, `IsNewer` auf Basis von `SemanticUpdateVersion`. |
 | `SemanticUpdateVersion` | SemVer-2.0-Value-Object: `Major`/`Minor`/`Patch`, `PrereleaseIdentifiers`, `BuildMetadata`, `IsPrerelease`, `IComparable`/`IEquatable`. |
 | `UpdateModels.cs` | `UpdateMode`, `UpdateChannel`, `UpdateSettings`, `UpdateCheckOptions`, `UpdateDownloadRoute` (primäre Download-URL + optionaler API-Fallback, je Route), `UpdateInfo`, `UpdateReleaseLookupResult`, `UpdateCheckResult`/`UpdateCheckStatus`, `UpdatePreparationProgress`/`Phase` (inkl. `Verifizieren`), `UpdatePreparationResult`, `CliUpdateSafetyResult`, `InstalledVersionInfo`. |
@@ -87,7 +87,7 @@ flowchart LR
 
 | Komponente | Rolle |
 |------------|-------|
-| `GitHubReleaseClient` (`IUpdateReleaseClient`) | Paginierte Release-Suche über die GitHub-REST-API, exklusiver Kandidatenfilter je `UpdateCheckOptions.Kanal` (Draft/Tag/Asset/Kanalzugehörigkeit), SemVer-Maximum, `UpdateReleaseLookupResult`. Befüllt pro Kandidat `UpdateInfo.PackageDownload` und — bei vorhandenem `update.json`-Asset — `UpdateInfo.ManifestDownload` als `UpdateDownloadRoute`; die optionalen `Fallback`-URLs leitet `CreateFallbackDownloadUrl` aus den Asset-Feldern `url`/`id` ab (Host auf `api.github.com` gepinnt via `IsAllowedAssetApiUrl`). Ein fehlendes Manifest-Asset disqualifiziert den Kandidaten nicht. |
+| `GitHubReleaseClient` (`IUpdateReleaseClient`) | Paginierte Release-Suche über die GitHub-REST-API, exklusiver Kandidatenfilter je `UpdateCheckOptions.UpdatePath` (Draft/Tag/Asset/Kanalzugehörigkeit), SemVer-Maximum, `UpdateReleaseLookupResult`. Befüllt pro Kandidat `UpdateInfo.PackageDownload` und — bei vorhandenem `update.json`-Asset — `UpdateInfo.ManifestDownload` als `UpdateDownloadRoute`; die optionalen `Fallback`-URLs leitet `CreateFallbackDownloadUrl` aus den Asset-Feldern `url`/`id` ab (Host auf `api.github.com` gepinnt via `IsAllowedAssetApiUrl`). Ein fehlendes Manifest-Asset disqualifiziert den Kandidaten nicht. |
 | `UpdatePackageService` (`IUpdatePackageService`) | Download (`*.download` → `release.zip`), SHA-256-Verifikation des Pakets gegen `update.json` (Phase `Verifizieren`: `DownloadManifestAsync` + `GetExpectedSha256` + `VerifyPackageHashAsync` — harter Abbruch bei fehlendem/ungültigem Manifest oder Hash-Mismatch), Entpacken nach `updates/extracted/{Version}`, Paketvalidierung (Executable + `version.json`), Schreibrechte-Probe (`RequiresElevation`), Pfadsicherung gegen Verzeichnisaustritt (`EnsureInsideBase`). Paket- und Manifest-Abruf teilen `SendWithFallbackAsync` (einmaliger Fallback auf `route.Fallback` bei HTTP-Status ≥ 500, via `SendDownloadRequestAsync` mit API-Headern). |
 | `UpdateScriptService` (`IUpdateScriptService`) | Schreibt `updates/update.ps1` (wartet auf App-Exit, kopiert Dateien, startet App neu, Logdatei) und startet es via `IUpdateProcessLauncher`. |
 | `UpdateProcessLauncher` (`IUpdateProcessLauncher`) | `ProcessStartInfo`-Kapselung; `Verb = "runas"` bei `RequiresElevation`. |
@@ -104,11 +104,11 @@ Die Optionsverträge `UpdateSettings` und `UpdateCheckOptions` sind unveränderl
 
 ## Persistenz
 
-Beide Einstellungen liegen in der bestehenden Key-Value-Tabelle `AppSettingen` — keine Schemaänderung:
+Beide Einstellungen liegen in der bestehenden Key-Value-Tabelle `AppEinstellungen` — keine Schemaänderung:
 
 | Schlüssel | Inhalt | Default |
 |-----------|--------|---------|
-| `updates.mode` | `UpdateMode`-Wert als Zahl (0/1/2) | `NurPruefen` |
+| `updates.mode` | `UpdateMode`-Wert als Zahl (0/1/2) | `CheckOnly` |
 | `updates.pfad` | Update-Pfad als Kanalselektor (`Produktivversionen`/`Vorabversionen`) | `Produktivversionen` (bei fehlendem/leerem/unbekanntem Wert) |
 
 Der Altbestand `updates.includePrereleases` verfällt still — er wird nicht mehr gelesen oder geschrieben; eine Migration ist nicht nötig.

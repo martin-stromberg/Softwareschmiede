@@ -24,7 +24,7 @@
   - ProjectListViewModel wird benachrichtigt
   - Aufgaben-Kachel ist sichtbar
 
-**Umsetzung:** `ProjectDetailViewModel.ProjektSaveAsync()` prüft `_projectId == Guid.Empty` und ruft entsprechend `CreateAsync` oder `UpdateAsync` auf
+**Umsetzung:** `ProjectDetailViewModel.SaveProjectAsync()` prüft `_projectId == Guid.Empty` und ruft entsprechend `CreateAsync` oder `UpdateAsync` auf
 
 ## Projekt-Löschung mit Bestätigung
 
@@ -54,7 +54,7 @@
 
 **Verhalten:**
 - Der Dialog zeigt alle verfügbaren Repositories mit Name und URL
-- Der Benutzer muss ein Repository auswählen (BestaetigenCommand ist sonst deaktiviert)
+- Der Benutzer muss ein Repository auswählen (ConfirmCommand ist sonst deaktiviert)
 - Nach "Zuweisen": `ProjectService.AddRepositoryAsync()` wird mit den Daten des ausgewählten Repository aufgerufen
 - Das Repository wird dem Projekt zugeordnet
 - Das Projekt wird neu geladen, um die neuen Repositories anzuzeigen

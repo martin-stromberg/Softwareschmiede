@@ -74,7 +74,7 @@ PropertyChanged löst LoadAsync aus
     ↓
 ProjectService.GetDetailAsync() + WorkItemService.GetByProjektAsync()
     ↓
-Projekt, Aufgaben, ProjektName, ProjektBeschreibung, SelectedRepository werden gesetzt
+Projekt, Aufgaben, ProjectName, ProjectDescription, SelectedRepository werden gesetzt
     ↓
 UI aktualisiert via Data Binding
 ```
@@ -83,17 +83,17 @@ UI aktualisiert via Data Binding
 ```
 Benutzer bearbeitet Name/Beschreibung in TextBoxen
     ↓
-ProjektName/ProjektBeschreibung Properties ändern sich (UpdateSourceTrigger=PropertyChanged)
+ProjectName/ProjectDescription Properties ändern sich (UpdateSourceTrigger=PropertyChanged)
     ↓
 Benutzer klickt "Speichern"-Button
     ↓
-SaveCommand ruft ProjektSaveAsync auf
+SaveCommand ruft SaveProjectAsync auf
     ↓
 Prüfung: IsNeuanlage (leere ID)?
-    ├─ Ja: ProjectService.CreateAsync() → neue ID → ZurueckAction
+    ├─ Ja: ProjectService.CreateAsync() → neue ID → BackAction
     └─ Nein: ProjectService.UpdateAsync() → LoadAsync() → UI aktualisiert
     ↓
-ProjektListeAktualisierenCallback wird aufgerufen
+RefreshProjectListCallback wird aufgerufen
 ```
 
 **Repository zuweisen:**

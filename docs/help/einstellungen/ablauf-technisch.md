@@ -13,7 +13,7 @@ Die Einstellungsansicht (`SettingsView`) lädt beim Öffnen alle verfügbaren SC
 Auslöser: Anwender öffnet die Einstellungsansicht.
 
 1. `SettingsView.xaml.cs` wird initialisiert; sein `DataContext` wird auf `SettingsViewModel` gesetzt
-2. Das `Loaded`-Event triggert `SettingsViewModel.LadenCommand`
+2. Das `Loaded`-Event triggert `SettingsViewModel.LoadCommand`
 3. `SettingsViewModel.LoadAsync(CancellationToken)` wird aufgerufen:
    - `AppSettingService.GetSettingAsync(AppSettingService.DefaultKiPluginKey)` → lädt String-Name des Standard-KI-Plugins
    - `AppSettingService.GetSettingAsync(AppSettingService.DefaultScmPluginKey)` → lädt String-Name des Standard-SCM-Plugins
@@ -123,7 +123,7 @@ Auslöser: Anwender klickt den Button **Speichern**.
    - `WorkingDirectorySettingsService.SaveWorkingDirectoryAsync()`
    - `DarkModeService.SetModeAsync()` (wendet Design sofort an)
 7. Erfolgsmeldung anzeigen:
-   - `ErfolgsMeldung = "Einstellungen gespeichert."`
+   - `SuccessMessage = "Einstellungen gespeichert."`
 
 Beteiligte Komponenten:
 - `SettingsViewModel.SaveAsync()` — Orchestrierung
@@ -152,12 +152,12 @@ flowchart TD
     J -->|Nein| K[Benutzer ändert Werte<br/>Echtzeit-Binding]
     K --> J
     J -->|Ja| L[ValidierePflichtfelder]
-    L -->|Fehler| M[FehlerMeldung anzeigen]
+    L -->|Fehler| M[ErrorMessage anzeigen]
     M --> N[Abbruch]
     L -->|OK| O[Standard-Plugins speichern<br/>AppEinstellungService.SetSetting]
     O --> P[Plugin-Einstellungen speichern<br/>PluginSettingsService.SetValue]
     P --> Q[Weitere Einstellungen speichern<br/>Arbeitsverzeichnis, Design]
-    Q --> R[ErfolgsMeldung anzeigen]
+    Q --> R[SuccessMessage anzeigen]
 ```
 
 ## Fehlerbehandlung
@@ -191,14 +191,14 @@ Falls `SetValue()` wirft eine Exception:
 
 ### Übersicht
 
-Der `AutoShutdownOrchestrator` (Application-Layer, Singleton) überwacht die Anzahl fachlich laufender Automatisierungen und armiert bei aktiviertem Schalter einen Countdown über die konfigurierte Wartezeit. Läuft der Countdown ab, wird der OS-Shutdown über `ISystemShutdownService` angefordert. Die UI-Seite liegt in `MainWindowAutoShutdownFlow` (Seitenleisten-Fußzeile des `MainWindow`); Persistenz läuft über `AutoShutdownSettingsService` → `AppSettingService` (Key-Value-Tabelle `AppSettingen`, keine Migration).
+Der `AutoShutdownOrchestrator` (Application-Layer, Singleton) überwacht die Anzahl fachlich laufender Automatisierungen und armiert bei aktiviertem Schalter einen Countdown über die konfigurierte Wartezeit. Läuft der Countdown ab, wird der OS-Shutdown über `ISystemShutdownService` angefordert. Die UI-Seite liegt in `MainWindowAutoShutdownFlow` (Seitenleisten-Fußzeile des `MainWindow`); Persistenz läuft über `AutoShutdownSettingsService` → `AppSettingService` (Key-Value-Tabelle `AppEinstellungen`, keine Migration).
 
 ### Ablauf
 
 #### 1. Fachliche Lauf-Zählung
 
 1. `RunningAutomationsCount.CountAsync` öffnet einen DI-Scope (`IServiceScopeFactory`) und lädt Kandidaten über `IActiveWorkItemsService.GetActiveWorkItemsAsync`.
-2. Pro Aufgabe wird ein `AiExecutionStatusData` aus `WorkItem.Status`, `ExecutionStatus`, `ActiveRunId`, `LastHeartbeatUtc`, `RunStatus`, `PausedUntilUtc`, `IRunningAutomationStatusSource.GetLiveRunStatus(id)` und `PromptTimeDispatchService.GetScheduledPromptStatus(id)` befüllt.
+2. Pro Aufgabe wird ein `AiExecutionStatusData` aus `WorkItem.Status`, `ExecutionStatus`, `ActiveRunId`, `LastHeartbeatUtc`, `RunStatus`, `PausedUntilUtc`, `IRunningAutomationStatusSource.GetLiveRunStatus(id)` und `PromptScheduleDispatchService.GetScheduledPromptStatus(id)` befüllt.
 3. `AiExecutionStatusClassification.Classify` (aus der App in den Application-Layer verschoben, `public`) liefert den `AiExecutionState`; gezählt wird ausschließlich `Running`.
 4. Zusätzlich zählt der Dienst `ScmIncomingEvents` mit Status `Verzögert` (per Verzögerungs-Keyword zurückgestellte SCM-Ereignisse) als ausstehende Automatisierungen — ein laufender Delay-Timer blockiert den Shutdown-Countdown unabhängig von der Aufgabenkandidatenmenge.
 5. `MainWindowViewModel` wendet dieselbe Klassifikation (über den `internal` Adapter in `AppConverters.cs`) auf die gemappte `ActiveWorkItemsList` an und setzt `RunningAutomationsCount` — identisches Ergebnis ohne zweite DB-Abfrage.
@@ -206,21 +206,21 @@ Der `AutoShutdownOrchestrator` (Application-Layer, Singleton) überwacht die Anz
 Beteiligte Komponenten:
 - `RunningAutomationsCount` / `IRunningAutomationsCount` — Zählservice
 - `AiExecutionStatusClassification`, `AiExecutionStatusData`, `AiExecutionState` — geteilte Klassifikation
-- `IActiveWorkItemsService`, `IRunningAutomationStatusSource`, `PromptTimeDispatchService` — Datenquellen
+- `IActiveWorkItemsService`, `IRunningAutomationStatusSource`, `PromptScheduleDispatchService` — Datenquellen
 
 #### 2. Aktivierung und Optionen (UI → Orchestrator)
 
 1. Checkbox „Nach Leerlauf PC herunterfahren" → `MainWindowAutoShutdownFlow.AutoShutdownEnabled` → `IAutoShutdownOrchestrator.SetEnabled(bool)`; bei `true` wird sofort eine Auswertung angestoßen und der 5-s-Sicherheitstick armiert, bei `false` wird ein laufender Countdown disarmiert.
 2. Textbox „Wartezeit (Minuten):" → `AutoShutdownToleranceMinutes`-Setter validiert (`int.TryParse`, 0–`AppSettingService.AutoShutdownMaxToleranceMinutes` = 1440); gültig → `AutoShutdownSettingsService.SaveToleranceMinutesAsync` + `SetOptions(toleranceMinutes, force)`, ungültig → `AutoShutdownToleranceError` sichtbar, nichts wird angewendet.
 3. Checkbox „Herunterfahren erzwingen" → `SaveForceAsync` + `SetOptions`.
-4. `SetOptions` speichert beide Werte im Orchestrator; bei laufendem Countdown und geänderter Toleranz wird `CountdownEndeUtc = now + neueToleranz` neu armiert. `Erzwingen` wird erst beim Auslösen ausgewertet.
+4. `SetOptions` speichert beide Werte im Orchestrator; bei laufendem Countdown und geänderter Toleranz wird `CountdownEndUtc = now + newTolerance` neu armiert. `Erzwingen` wird erst beim Auslösen ausgewertet.
 
 #### 3. Countdown-Lebenszyklus (Orchestrator)
 
 1. Trigger-Quellen: `IRunningAutomationStatusSource.RunningCountChanged`, `WorkItemRunDataChangedNotifier.RunDataChanged`, periodischer 5-s-Sicherheitstick (`TimeProvider`-Timer, nur solange aktiviert) sowie `SetEnabled`/`SetOptions`. Alle Trigger laufen in die koaleszierte `EvaluateAsync` (`SemaphoreSlim` + Erneut-Flag — parallele Trigger während einer laufenden Auswertung erzeugen höchstens einen Nachlauf).
 2. `EvaluateOnceAsync`: `count = await _zaehlung.CountAsync()`; unter `_syncLock`:
    - `count > 0` → `_shutdownTriggered = false`, laufender Countdown wird disarmiert, `StateChanged` gefeuert.
-   - `enabled && count == 0 && !_shutdownTriggered && CountdownEndeUtc == null` → `CountdownEndeUtc = TimeProvider.GetUtcNow() + toleranz`, Countdown-`ITimer` auf die Restlaufzeit armiert.
+   - `enabled && count == 0 && !_shutdownTriggered && CountdownEndUtc == null` → `CountdownEndUtc = TimeProvider.GetUtcNow() + toleranz`, Countdown-`ITimer` auf die Restlaufzeit armiert.
    - sonst → keine Änderung; ein armiertes Countdown läuft bei unveränderter Anzahl mit dem bestehenden Endzeitpunkt weiter (verhindert Verhungern durch periodische Heartbeat-`RunDataChanged`-Ereignisse).
 3. Countdown-Timer-Callback → `OnCountdownElapsedAsync`: Final-Recheck (`enabled` und `CountAsync() == 0`) → `_shutdownTriggered = true`, `StateChanged`, Warn-Log, `ISystemShutdownService.RequestShutdownAsync(force)`. Negativer Recheck → erneute `EvaluateAsync`. Der Shutdown wird pro Null-Phase höchstens einmal ausgelöst.
 4. `Dispose`: Abmeldung beider Events, Entsorgung beider `ITimer`.
@@ -232,7 +232,7 @@ Beteiligte Komponenten:
 
 #### 4. Countdown-Anzeige (UI)
 
-1. `AutoShutdownUiSichtbar` (`MainWindowViewModel`) = `LaufendeAutomatisierungenAnzahl > 0 || AutoShutdownAktiviert || AutoShutdownCountdownAktiv` — der Block bleibt im Countdown sichtbar, damit deaktiviert werden kann; der gesamte Block ist zusätzlich an `IsNavigationExpanded` gebunden (eingeklappte Navigation blendet ihn aus).
+1. `AutoShutdownUiVisible` (`MainWindowViewModel`) = `RunningAutomationsCount > 0 || AutoShutdownEnabled || AutoShutdownCountdownActive` — der Block bleibt im Countdown sichtbar, damit deaktiviert werden kann; der gesamte Block ist zusätzlich an `IsNavigationExpanded` gebunden (eingeklappte Navigation blendet ihn aus).
 2. Orchestrator-Event `StateChanged` → `MainWindowAutoShutdownFlow.RefreshCountdownDisplay` liest `CountdownEndUtc` per Dispatcher: gesetzt → `AutoShutdownCountdownText` („Herunterfahren in X Min. Y Sek." / „X Std. Y Min." / „Y Sek.") und 1-s-`DispatcherTimer` für die Restzeit-Ticks; `null` → Timer gestoppt, Text geleert.
 3. Beim Start lädt `LoadSettingsAsync` einmalig die persistierten Nebenwerte (kein Write-Back, kein Enabled) und reicht sie per `SetOptions` an den Orchestrator; ein zwischenzeitlich vom Anwender geänderter Wert wird nicht überschrieben.
 
@@ -244,7 +244,7 @@ Beteiligte Komponenten:
 
 #### 6. Testmodus-Aufzeichnung
 
-1. `App.xaml.cs` `ConfigureServices`: Ist `SOFTWARESCHMIEDE_TEST_DB_PATH` gesetzt (wie beim `IProzessStarter`-Testmodus), wird `ISystemShutdownService` → `RecordingSystemShutdownService` registriert, sonst `SystemShutdownService`.
+1. `App.xaml.cs` `ConfigureServices`: Ist `SOFTWARESCHMIEDE_TEST_DB_PATH` gesetzt (wie beim `IProcessStarter`-Testmodus), wird `ISystemShutdownService` → `RecordingSystemShutdownService` registriert, sonst `SystemShutdownService`.
 2. `RecordingSystemShutdownService.RequestShutdownAsync` hängt eine Zeile (`erzwingen|utc|pid`) an `system-shutdowns.log` im Verzeichnis der Testdatenbank an — kein Prozessstart, kein OS-Kontakt. Damit kann kein E2E-/Unit-Test ein echtes Herunterfahren auslösen.
 
 ### Fehlerbehandlung

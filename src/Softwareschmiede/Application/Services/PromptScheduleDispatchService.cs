@@ -29,13 +29,13 @@ public sealed class PromptScheduleDispatchService : IDisposable
     private readonly object _lock = new();
 
     /// <inheritdoc cref="PromptScheduleDispatchService"/>
-    /// <param name="kiService">Der KI-Ausführungsservice, über den der Prompt an die laufende CLI-Session gesendet wird.</param>
+    /// <param name="aiService">Der KI-Ausführungsservice, über den der Prompt an die laufende CLI-Session gesendet wird.</param>
     /// <param name="timeProvider">Zeitquelle für Timer und Zeitpunktvergleiche.</param>
     /// <param name="logger">Logger.</param>
-    /// <param name="scopeFactory">Optionale Scope-Factory zum Laden des aktuellen <c>PausiertBisUtc</c>-Werts der Aufgabe vor dem Versand sowie für die Persistenz der geplanten Prompts. Ohne Registrierung (z. B. Unit-Tests) entfallen Pausenprüfung und Persistenz.</param>
-    public PromptScheduleDispatchService(AiExecutionService kiService, TimeProvider timeProvider, ILogger<PromptScheduleDispatchService> logger, IServiceScopeFactory? scopeFactory = null)
+    /// <param name="scopeFactory">Optionale Scope-Factory zum Laden des aktuellen <c>PausedUntilUtc</c>-Werts der Aufgabe vor dem Versand sowie für die Persistenz der geplanten Prompts. Ohne Registrierung (z. B. Unit-Tests) entfallen Pausenprüfung und Persistenz.</param>
+    public PromptScheduleDispatchService(AiExecutionService aiService, TimeProvider timeProvider, ILogger<PromptScheduleDispatchService> logger, IServiceScopeFactory? scopeFactory = null)
     {
-        _aiService = kiService;
+        _aiService = aiService;
         _timeProvider = timeProvider;
         _logger = logger;
         _scopeFactory = scopeFactory;
@@ -87,9 +87,9 @@ public sealed class PromptScheduleDispatchService : IDisposable
         // Aktive Pause: Der Versand wird auf das Pausenende verschoben statt sofort/zur Zielzeit
         // zu senden — der Prompt geht nicht verloren.
         var pausedUntil = await GetPausedUntilUtcAsync(workItemId);
-        if (pausedUntil is { } bis && bis > now && bis > targetTime)
+        if (pausedUntil is { } until && until > now && until > targetTime)
         {
-            targetTime = bis;
+            targetTime = until;
         }
 
         if (targetTime <= now)
@@ -101,7 +101,7 @@ public sealed class PromptScheduleDispatchService : IDisposable
             // keine Wartestellung, die einen App-Neustart überleben müsste. Schlägt der Versand
             // fehl, wird der neue Plan persistiert, damit nach einem Neustart nicht der ersetzte
             // (ältere) Datensatz wiederhergestellt wird. Der Schreibzugriff ist doppelt konditional:
-            // Erst legt MarkiereWartetAufSession den Eintrag unter _lock nur zurück, wenn kein
+            // Erst legt MarkWaitingForSession den Eintrag unter _lock nur zurück, wenn kein
             // neuerer Plan eingetragen wurde; danach schreibt der Upsert nur, wenn der Datensatz
             // noch dem Vorgängerstand entspricht — sonst würde der Alt-Versand einen während des
             // in-flight-Versands persistierten neueren Plan überschreiben (dessen Datensatz die
@@ -183,8 +183,8 @@ public sealed class PromptScheduleDispatchService : IDisposable
             if (store is null || workItemService is null)
                 return;
 
-            var plaene = await store.GetAllAsync();
-            foreach (var plan in plaene)
+            var plans = await store.GetAllAsync();
+            foreach (var plan in plans)
             {
                 // Fehler pro Datensatz isolieren: Ein einzelner defekter Plan darf die
                 // Wiederherstellung der übrigen Pläne nicht blockieren.
@@ -200,10 +200,10 @@ public sealed class PromptScheduleDispatchService : IDisposable
 
                     var now = _timeProvider.GetUtcNow();
                     var target = plan.TargetTimeUtc;
-                    if (workItem.PausedUntilUtc is { } bis && bis > now && bis > target)
+                    if (workItem.PausedUntilUtc is { } until && until > now && until > target)
                     {
-                        target = bis;
-                        await store.UpdateTargetTimeAsync(plan.WorkItemId, bis);
+                        target = until;
+                        await store.UpdateTargetTimeAsync(plan.WorkItemId, until);
                     }
 
                     var info = new ScheduledPromptInfo(plan.WorkItemId, plan.PromptText, target);
@@ -339,11 +339,11 @@ public sealed class PromptScheduleDispatchService : IDisposable
             entry = removed;
         }
 
-        // Pause kann NACH dem Planen gesetzt worden sein: aktuellen PausiertBisUtc-Wert laden und
+        // Pause kann NACH dem Planen gesetzt worden sein: aktuellen PausedUntilUtc-Wert laden und
         // bei aktiver Pause den Timer auf das Pausenende neu scharf machen statt zu senden.
         var pausedUntil = await GetPausedUntilUtcAsync(workItemId);
         var now = _timeProvider.GetUtcNow();
-        if (pausedUntil is { } bis && bis > now)
+        if (pausedUntil is { } until && until > now)
         {
             var rescheduled = false;
             lock (_lock)
@@ -355,10 +355,10 @@ public sealed class PromptScheduleDispatchService : IDisposable
                     // die tatsächliche neue Zielzeit meldet statt des verstrichenen Zeitpunkts.
                     _scheduledPrompts[workItemId] = new ScheduledPromptEntry
                     {
-                        Info = new ScheduledPromptInfo(workItemId, entry.Info.PromptText, bis),
+                        Info = new ScheduledPromptInfo(workItemId, entry.Info.PromptText, until),
                         Timer = entry.Timer
                     };
-                    entry.Timer?.Change(bis - now, Timeout.InfiniteTimeSpan);
+                    entry.Timer?.Change(until - now, Timeout.InfiniteTimeSpan);
                     rescheduled = true;
                 }
             }
@@ -368,8 +368,8 @@ public sealed class PromptScheduleDispatchService : IDisposable
                 _logger.LogInformation(
                     "Zeitgesteuerter Prompt für Aufgabe {AufgabeId} auf das Pausenende {PausiertBisUtc} verschoben.",
                     workItemId,
-                    bis);
-                await UpdateTargetTimeRecordAsync(workItemId, bis);
+                    until);
+                await UpdateTargetTimeRecordAsync(workItemId, until);
                 ScheduledPromptChanged?.Invoke(workItemId);
             }
             else

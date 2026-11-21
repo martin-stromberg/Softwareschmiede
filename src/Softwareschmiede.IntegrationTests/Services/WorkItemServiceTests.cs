@@ -47,7 +47,7 @@ public sealed class WorkItemServiceTests
     }
 
     /// <summary>
-    /// Testet, dass StartenAsync den Status auf InBearbeitung setzt und Branch/Pfad persistiert.
+    /// Testet, dass StartAsync den Status auf Started setzt und Branch/Pfad persistiert.
     /// </summary>
     [Fact]
     public async Task StartAsync_ShouldSetStatusInEditingAndPersistBranchInfo_WhenWorkItemExists()
@@ -104,7 +104,7 @@ public sealed class WorkItemServiceTests
 
     /// <summary>
     /// Testet, dass GetDetailAsync Protokolleinträge NICHT mehr per Include lädt (Issue 193: Protokoll wird
-    /// separat über ProtokollService.GetByAufgabeAsync geladen, um die Detailansicht schnell anzuzeigen).
+    /// separat über LogService.GetByWorkItemAsync geladen, um die Detailansicht schnell anzuzeigen).
     /// </summary>
     [Fact]
     public async Task GetDetailAsync_ShouldNotIncludeLogentries_WhenDataExists()
@@ -356,7 +356,7 @@ public sealed class WorkItemServiceTests
 
     /// <summary>
     /// Testet, dass GetAktiveAufgabenAsync gegen eine echte SQLite-Datenbank absteigend nach
-    /// LetzterCliStartUtc (Fallback ErstellungsDatum) sortiert. Regressionstest für die
+    /// LastCliStartUtc (Fallback ErstellungsDatum) sortiert. Regressionstest für die
     /// COALESCE-basierte Sortierung, die bei der reinen InMemory-Provider-Testabdeckung
     /// nicht gegen die tatsächliche SQL-Übersetzung geprüft wird.
     /// </summary>

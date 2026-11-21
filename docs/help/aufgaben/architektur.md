@@ -11,7 +11,7 @@
 | `IDialogService` / `WpfDialogService` | UI-Abstraktion | Öffnet den nativen Speichern-Dialog für den Zielpfad. |
 | `ICliRawExportService` / `CliRawExportService` | Application Service | Liest die gespeicherten CLI-Protokolle und schreibt die `.raw`-Datei. |
 | `ICliReplayExportService` / `CliReplayExportService` | Application Service | Schreibt den Rohbyte-Mitschnitt der letzten Terminal-Session als `.clireplay`-Datei (`HasRecording`-Vorab-Prüfung). |
-| `AiExecutionService` / `CliOutputRecorder` | Application Service / Output-Senke | Hält die Rohbyte-Aufzeichnung der letzten 8 Aufgaben im Speicher (`GetCliAufzeichnung`); der Mitschnitt entsteht beim Session-Start über die `CompositeTerminalOutputSink`. |
+| `AiExecutionService` / `CliOutputRecorder` | Application Service / Output-Senke | Hält die Rohbyte-Aufzeichnung der letzten 8 Aufgaben im Speicher (`GetCliRecording`); der Mitschnitt entsteht beim Session-Start über die `CompositeTerminalOutputSink`. |
 | `CliReplayRecordingStore` | Infrastruktur | Serialisiert die `CliOutputRecording` im `.clireplay`-Binärformat. |
 | `LogService` | Persistenzservice | Liefert den kompletten Protokoll-Snapshot einer Aufgabe. |
 | `LogEntry` | Domain-Entity | Quelle der exportierten `CliOutput`-Zeilen. |
@@ -29,12 +29,12 @@
 1. Der Benutzer löst den Export in der `TaskDetailView` aus.
 2. `TaskDetailViewModel` öffnet über `IDialogService` den Speichern-Dialog.
 3. Nach der Pfadwahl ruft das ViewModel `ICliRawExportService.ExportCliRawAsync(...)` auf.
-4. Der Service lädt die Protokolle der Aufgabe über `LogService.GetByAufgabeAsync(...)`.
+4. Der Service lädt die Protokolle der Aufgabe über `LogService.GetByWorkItemAsync(...)`.
 5. Aus den geladenen Einträgen werden nur `LogEntryType.CliOutput`-Zeilen übernommen.
 6. Die Zeilen werden in ihrer gespeicherten Reihenfolge zusammengeführt und als UTF-8-Datei ohne BOM geschrieben.
 7. Fehler beim Schreiben werden im ViewModel sichtbar gemacht; der restliche UI-Zustand bleibt unverändert.
 
-Der `.clireplay`-Export folgt demselben Dialogmuster, greift aber nicht auf persistierte Protokolle zu: `ExportCliReplayAsync` prüft vorab `CliReplayExportService.HasRecording(workItemId)`, ruft nach der Pfadwahl `ExportCliReplayAsync` auf, das den flüchtigen Mitschnitt über `AiExecutionService.GetCliAufzeichnung` holt und via `CliReplayRecordingStore` als Binärdatei schreibt. Die Aufzeichnung selbst entsteht bereits beim Session-Start (`CliOutputRecorder` als zweite Senke der `CompositeTerminalOutputSink`) — Details siehe [Terminal-Architektur](../terminal/architektur.md).
+Der `.clireplay`-Export folgt demselben Dialogmuster, greift aber nicht auf persistierte Protokolle zu: `ExportCliReplayAsync` prüft vorab `CliReplayExportService.HasRecording(workItemId)`, ruft nach der Pfadwahl `ExportCliReplayAsync` auf, das den flüchtigen Mitschnitt über `AiExecutionService.GetCliRecording` holt und via `CliReplayRecordingStore` als Binärdatei schreibt. Die Aufzeichnung selbst entsteht bereits beim Session-Start (`CliOutputRecorder` als zweite Senke der `CompositeTerminalOutputSink`) — Details siehe [Terminal-Architektur](../terminal/architektur.md).
 
 ## Diagramm
 
@@ -45,7 +45,7 @@ graph TD
     C --> D{Zielpfad gewählt?}
     D -- Nein --> E[Abbruch ohne Export]
     D -- Ja --> F[CliRawExportService]
-    F --> G[ProtokollService]
+    F --> G[LogService]
     G --> H[(Datenbank)]
     F --> I[(Dateisystem)]
 ```
@@ -66,11 +66,11 @@ Die Pause einer regulären Aufgabe ist als zeitbasiertes Overlay (`WorkItem.Paus
 |------------|-----|-------|
 | `WorkItem.PausedUntilUtc` | Domain-Entity-Property | Persistenter Pausen-Endzeitpunkt (UTC, nullable Unix-Millis in der Datenbank) |
 | `WorkItemService.SetPauseAsync` | Application Service (scoped) | Setzt/leert die Pause mit Validierung und `SystemMessage`-Protokolleintrag |
-| `TaskDetailViewModel` / `WorkItemPauseDialogViewModel` | ViewModel | Ribbon-Aktion **Pause einstellen**, Dialog-Vorbelegung und -Validierung |
+| `TaskDetailViewModel` / `PauseWorkItemDialogViewModel` | ViewModel | Ribbon-Aktion **Pause einstellen**, Dialog-Vorbelegung und -Validierung |
 | `WorkItemPauseDialog` / `IDialogService` | WPF-View / UI-Abstraktion | Modaler Dialog zur Datum-/Uhrzeitwahl |
 | `DevelopmentProcessService.ThrowIfPaused` | Application Service | Guard für Prozessstart, CLI-Neustart und Plugin-Wechsel |
 | `WorkItemRecoveryService` | Application Service | Filtert pausierte Aufgaben aus den Recovery-Kandidaten, lehnt manuelle Recovery ab |
-| `PromptTimeDispatchService` | Application Service (Singleton) | Verwaltet geplante zeitgesteuerte Prompts (persistiert via `ScheduledPromptStore`, Wiederherstellung beim App-Start, Nachzustellung bei CLI-Start); verschiebt sie bei Pause auf das Pausenende statt sie zu verwerfen |
+| `PromptScheduleDispatchService` | Application Service (Singleton) | Verwaltet geplante zeitgesteuerte Prompts (persistiert via `ScheduledPromptStore`, Wiederherstellung beim App-Start, Nachzustellung bei CLI-Start); verschiebt sie bei Pause auf das Pausenende statt sie zu verwerfen |
 | `AiPluginLimitService` | Application Service (scoped) | Persistiert Session-Limits als `AppSetting` (`plugins.sessionlimit.<Prefix>`) und wendet die Pause prefix-weit an |
 | `CliOutputLogWriter` / `LogService` | Infrastruktur / Application Service | Erkennen den Marker `[[SOFTWARESCHMIEDE_RATE_LIMIT:<ISO8601>]]` im CLI-Output-Stream |
 | `CliUpdateSafetyService` | Application Service | Behandelt Aufgaben mit zukünftigem Session-Limit als nicht riskant |
@@ -80,7 +80,7 @@ Die Pause einer regulären Aufgabe ist als zeitbasiertes Overlay (`WorkItem.Paus
 ### Datenfluss (automatische Pause bei Session-Limit)
 
 1. `CliOutputLogWriter` persistiert eine CLI-Zeile über `LogService.AddCliOutputAsync` — dabei entsteht bei Marker-Fund der `RateLimit`-Protokolleintrag.
-2. Bei gültigem Zeitstempel ruft der Writer `AiPluginLimitService.VerarbeiteRateLimitAsync` (neuer DI-Scope pro Zeile).
+2. Bei gültigem Zeitstempel ruft der Writer `AiPluginLimitService.ProcessRateLimitAsync` (neuer DI-Scope pro Zeile).
 3. Der Service persistiert den Reset-Zeitpunkt als `AppSetting` und lädt die aktiven regulären Aufgaben mit demselben `AiPluginPrefix`.
 4. Pro Aufgabe wird `PausedUntilUtc` mit Max-Semantik gesetzt, ein `SystemMessage`-Eintrag geschrieben und `NotifyRunDataChanged` ausgelöst.
 5. Die Seitenleiste aktualisiert die Kachel sofort; der Countdown tickt anschließend über den bestehenden 5-Sekunden-Refresh.

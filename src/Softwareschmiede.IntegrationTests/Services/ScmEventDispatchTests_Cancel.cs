@@ -10,7 +10,7 @@ namespace Softwareschmiede.IntegrationTests.Services;
 /// <summary>Abgebrochene Ereignisse sind für den Poll endgültig: kein Dispatch und kein Remote-Outbox-Flush.</summary>
 public sealed class ScmEventDispatchTests_Cancel
 {
-    /// <summary>A cancelled event is never delivered and never answers remotely.</summary>
+    /// <summary>Ein abgebrochenes Ereignis wird niemals zugestellt und löst keine Remote-Antwort aus.</summary>
     [Fact]
     public async Task Monitor_SkipsCancelledEventEntirely()
     {

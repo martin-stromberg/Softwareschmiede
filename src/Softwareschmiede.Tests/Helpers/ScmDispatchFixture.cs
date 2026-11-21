@@ -33,7 +33,7 @@ internal sealed record ScmAiProfile(string Prefix, string Arguments, string Bann
         banner, "❭", new Dictionary<string, string?>(), onWritePrompt);
 }
 
-/// <summary>Real SQLite and services with isolated SCM transport and deterministic terminal boundary.</summary>
+/// <summary>Echtes SQLite und echte Services mit isoliertem SCM-Transport und deterministischer Terminal-Grenze.</summary>
 internal sealed class ScmDispatchFixture : IAsyncDisposable
 {
     internal const string AiPrefix = "Softwareschmiede.KiSimulator";

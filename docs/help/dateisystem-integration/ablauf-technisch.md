@@ -4,7 +4,7 @@
 
 ## Übersicht
 
-Das Feature implementiert zwei plattformabhängige Dateiexplorer-Funktionen über eine abstrakte `IProzessStarter`-Schnittstelle. Prozessstart-Anfragen werden gekapselt, geloggt und entweder direkt ausgeführt (Production) oder aufgezeichnet (Test). „IDE öffnen" ist als Split-Button umgesetzt (Haupt- und Dropdown-Teil), die seit der Multi-Plugin-Aggregation **unterschiedliche** Plugin-Auflösungen verwenden: Der Haupt-Button löst bei jedem Klick über `PluginSelectionService.ResolveIdePluginAsync()` genau **ein** priorisiertes IDE-Plugin auf (`TaskDetailViewModel.ResolveIdeEntryPointsAsync()`, unverändert gegenüber dem ursprünglichen Single-Plugin-Verhalten; kein Vorab-Caching mehr beim Laden der Aufgabe) und fragt es generisch über `IIdePlugin.FindEntryPointsAsync()` nach seinen verfügbaren Einstiegspunkten (bei `VisualStudioIdePlugin`: je gefundener `.sln`/`.slnx`-Datei ein Einstiegspunkt; bei `VisualStudioCodeIdePlugin`: immer genau einer, das Repository-Root); bei mehreren Einstiegspunkten wird immer direkt der erste geöffnet (kein Dialog). Der Dropdown-Button löst stattdessen über `PluginSelectionService.ResolveAllCompatibleIdePluginsAsync()` **alle** aktivierten, `Explicit`- oder `Fallback`-kompatiblen IDE-Plugins auf (`TaskDetailViewModel.ResolveAggregatedIdeEntryPointsAsync()`), fragt **jedes** davon nach seinen Einstiegspunkten und aggregiert die Ergebnisse zu `(Plugin, EntryPoint)`-Tupeln; nur wenn diese aggregierte Gesamtliste mehr als einen Eintrag enthält (der Dropdown-Teil ist dann sichtbar), zeigt er ein modales Dialogfenster mit plugin-qualifizierten Anzeigewerten (Format „{PluginName}: {Bezeichnung}") zur Auswahl an — der gewählte Eintrag wird über das zu ihm gehörende Plugin geöffnet, nicht zwingend über das für den Haupt-Button priorisierte. Ist kein Plugin explizit kompatibel, greift automatisch das erste aktive Fallback-Plugin (standardmäßig Visual Studio Code).
+Das Feature implementiert zwei plattformabhängige Dateiexplorer-Funktionen über eine abstrakte `IProcessStarter`-Schnittstelle. Prozessstart-Anfragen werden gekapselt, geloggt und entweder direkt ausgeführt (Production) oder aufgezeichnet (Test). „IDE öffnen" ist als Split-Button umgesetzt (Haupt- und Dropdown-Teil), die seit der Multi-Plugin-Aggregation **unterschiedliche** Plugin-Auflösungen verwenden: Der Haupt-Button löst bei jedem Klick über `PluginSelectionService.ResolveIdePluginAsync()` genau **ein** priorisiertes IDE-Plugin auf (`TaskDetailViewModel.ResolveIdeEntryPointsAsync()`, unverändert gegenüber dem ursprünglichen Single-Plugin-Verhalten; kein Vorab-Caching mehr beim Laden der Aufgabe) und fragt es generisch über `IIdePlugin.FindEntryPointsAsync()` nach seinen verfügbaren Einstiegspunkten (bei `VisualStudioIdePlugin`: je gefundener `.sln`/`.slnx`-Datei ein Einstiegspunkt; bei `VisualStudioCodeIdePlugin`: immer genau einer, das Repository-Root); bei mehreren Einstiegspunkten wird immer direkt der erste geöffnet (kein Dialog). Der Dropdown-Button löst stattdessen über `PluginSelectionService.ResolveAllCompatibleIdePluginsAsync()` **alle** aktivierten, `Explicit`- oder `Fallback`-kompatiblen IDE-Plugins auf (`TaskDetailViewModel.ResolveAggregatedIdeEntryPointsAsync()`), fragt **jedes** davon nach seinen Einstiegspunkten und aggregiert die Ergebnisse zu `(Plugin, EntryPoint)`-Tupeln; nur wenn diese aggregierte Gesamtliste mehr als einen Eintrag enthält (der Dropdown-Teil ist dann sichtbar), zeigt er ein modales Dialogfenster mit plugin-qualifizierten Anzeigewerten (Format „{PluginName}: {Bezeichnung}") zur Auswahl an — der gewählte Eintrag wird über das zu ihm gehörende Plugin geöffnet, nicht zwingend über das für den Haupt-Button priorisierte. Ist kein Plugin explizit kompatibel, greift automatisch das erste aktive Fallback-Plugin (standardmäßig Visual Studio Code).
 
 ## Ablauf
 
@@ -17,12 +17,12 @@ Das Feature implementiert zwei plattformabhängige Dateiexplorer-Funktionen übe
    - Ruft `WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync(LocalClonePath, startConfig, gitPlugin: null, CancellationToken)` auf.
    - `WorkingDirectoryResolver` kombiniert den Repository-Root mit dem optionalen `WorkingDirectoryRelativePath` und validiert das Ergebnis.
    - Rückgabe: effektives Arbeitsverzeichnis (z. B. `C:\repos\project\src\backend` falls `WorkingDirectoryRelativePath="src/backend"`).
-4. ViewModel ruft `WorkingDirectoryOpenService.Oeffne(effectiveWorkdir)` mit dem aufgelösten Pfad auf.
+4. ViewModel ruft `WorkingDirectoryOpenService.Open(effectiveWorkdir)` mit dem aufgelösten Pfad auf.
 5. `WorkingDirectoryOpenService` ermittelt den plattformabhängigen Befehl:
    - Windows: `explorer.exe` + aufgelöster Verzeichnispfad (als Argument mit Anführungszeichen)
    - Linux: `xdg-open` + aufgelöster Verzeichnispfad
    - macOS: `open` + aufgelöster Verzeichnispfad
-6. Service erstellt `ProcessStartRequest(DateiName="explorer.exe", Argumente="\"C:\\...\\backend\"", ShellAusfuehren=false)`.
+6. Service erstellt `ProcessStartRequest(FileName="explorer.exe", Arguments="\"C:\\...\\backend\"", UseShellExecute=false)`.
 7. Service ruft `IProcessStarter.Start(request)` auf.
 8. `SystemProcessStarter` mappt die Anfrage auf `ProcessStartInfo` und ruft `Process.Start()` auf.
 9. Der Prozess wird gestartet; Fehler werden geloggt und in `ErrorMessage` angezeigt (z. B. bei nicht-existentem oder nicht-erreichbarem Verzeichnis).
@@ -32,7 +32,7 @@ Beteiligte Komponenten:
 - `TaskDetailViewModel` — Command-Handler, Auflösung des Arbeitsverzeichnisses
 - `WorkingDirectoryResolver` — Auflösung des effektiven Arbeitsverzeichnisses mit Validierung
 - `WorkingDirectoryOpenService` — Plattformauflösung und Service-Logik
-- `IProzessStarter` (Gateway) — Abstraktionsschicht
+- `IProcessStarter` (Gateway) — Abstraktionsschicht
 - `SystemProcessStarter` — Reale Implementierung
 - `ProcessStartRequest` — Value Object für Prozessstart-Parameter
 
@@ -57,11 +57,11 @@ Beteiligte Komponenten:
 Der Split-Button „IDE öffnen" besteht aus einem Haupt- und einem Dropdown-Teil (Dropdown nur sichtbar, wenn `SelectCanIde` `true` ist, d. h. mindestens zwei aggregierte Einstiegspunkte ermittelt wurden). Haupt- und Dropdown-Button verwenden ab hier **unterschiedliche** Plugin-Auflösungspfade:
 
 1. Benutzer klickt Haupt- oder Dropdown-Button:
-   - **Haupt-Button:** `TaskDetailViewModel.OpenIdeCommand.Execute()` → `OeffneIdeAsync(ct)` → ruft `OeffneIdeInternAsync(waehleEntryPointAsync: null, ct)` auf.
-   - **Dropdown-Button:** `TaskDetailViewModel.OpenIdeSelectionCommand.Execute()` → `OeffneIdeAuswahlAsync(ct)` → ruft `OeffneIdeInternAsync(waehleEntryPointAsync: WaehleEntryPointAsync, ct)` auf.
-2. `OeffneIdeInternAsync()` ermittelt zunächst `effectiveWorkdir` über `ResolveEffectiveWorkingDirectoryAsync()`, dann verzweigt sie nach dem Button:
+   - **Haupt-Button:** `TaskDetailViewModel.OpenIdeCommand.Execute()` → `OpenIdeAsync(ct)` → ruft `OpenIdeInternalAsync(SelectEntryPointAsync: null, ct)` auf.
+   - **Dropdown-Button:** `TaskDetailViewModel.OpenIdeSelectionCommand.Execute()` → `OpenIdeSelectionAsync(ct)` → ruft `OpenIdeInternalAsync(SelectEntryPointAsync: WaehleEntryPointAsync, ct)` auf.
+2. `OpenIdeInternalAsync()` ermittelt zunächst `effectiveWorkdir` über `ResolveEffectiveWorkingDirectoryAsync()`, dann verzweigt sie nach dem Button:
 
-**2a. Haupt-Button (`waehleEntryPointAsync is null`) — Single-Plugin-Pfad, unverändert:**
+**2a. Haupt-Button (`SelectEntryPointAsync is null`) — Single-Plugin-Pfad, unverändert:**
    - Ruft `ErmittleIdeEntryPointsAsync(effectiveWorkdir, ct)` auf:
      - Ruft `_pluginSelectionService.ResolveIdePluginAsync(effectiveWorkdir, ct)` auf:
        - Ermittelt die aktivierten IDE-Plugins (`PluginActivationService.GetEnabledIdePluginsAsync()`) in der konfigurierten Reihenfolge (`plugins.ide.order`).
@@ -76,7 +76,7 @@ Der Split-Button „IDE öffnen" besteht aus einem Haupt- und einem Dropdown-Tei
 
 **2b. Dropdown-Button — Multi-Plugin-Aggregationspfad (neu):**
    - Ruft ausschließlich `ResolveAggregatedIdeEntryPointsAsync(effectiveWorkdir, ct)` auf:
-     - Ruft `_pluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync(effectiveWorkdir, ct)` auf:
+     - Ruft `_pluginSelectionService.ResolveAllCompatibleIdePluginsAsync(effectiveWorkdir, ct)` auf:
        - Ermittelt die aktivierten IDE-Plugins in konfigurierter Reihenfolge (identische Hilfsmethode `GetOrderedEnabledIdePluginsAsync()` wie bei `ResolveIdePluginAsync()`).
        - Prüft jedes Plugin über `CheckCompatibilityAsync(effectiveWorkdir, ct)` — **ohne** bei einem `Explicit`-Treffer abzubrechen.
        - Sammelt alle `Explicit`-kompatiblen Plugins in einer Liste, alle `Fallback`-kompatiblen in einer zweiten.
@@ -89,9 +89,9 @@ Der Split-Button „IDE öffnen" besteht aus einem Haupt- und einem Dropdown-Tei
    - **Mehr als 1 aggregierter Einstiegspunkt:** Weiterfahrt mit Schritt 4a (Dialog).
 
 4a. **Dialog anzeigen (nur beim Dropdown-Button, bei mehr als einem aggregierten Einstiegspunkt):**
-   - `OeffneIdeInternAsync()` ruft den `SelectEntryPointAsync`-Callback mit allen aggregierten `(Plugin, EntryPoint)`-Tupeln auf.
-   - Der Callback bildet jedes Tupel über `FormatiereAnzeigeWert(plugin, entryPoint)` auf einen plugin-qualifizierten Anzeigewert ab: `"{PluginName}: {Bezeichnung}"`, wobei `Bezeichnung` = `entryPoint.DisplayName ?? Path.GetFileName(entryPoint.Path)` — ist `Bezeichnung` bereits identisch mit `PluginName` (z. B. bei `VisualStudioCodeIdePlugin`), wird nur `PluginName` angezeigt (kein Doppel-Label).
-   - Ruft `_dialogService.ShowSolutionSelectionDialogAsync(anzeigeWerte, ct)` auf.
+   - `OpenIdeInternalAsync()` ruft den `SelectEntryPointAsync`-Callback mit allen aggregierten `(Plugin, EntryPoint)`-Tupeln auf.
+   - Der Callback bildet jedes Tupel über `FormatDisplayValue(plugin, entryPoint)` auf einen plugin-qualifizierten Anzeigewert ab: `"{PluginName}: {Bezeichnung}"`, wobei `Bezeichnung` = `entryPoint.DisplayName ?? Path.GetFileName(entryPoint.Path)` — ist `Bezeichnung` bereits identisch mit `PluginName` (z. B. bei `VisualStudioCodeIdePlugin`), wird nur `PluginName` angezeigt (kein Doppel-Label).
+   - Ruft `_dialogService.ShowSolutionSelectionDialogAsync(displayValues, ct)` auf.
    - `WpfDialogService.ShowSolutionSelectionDialogAsync()`:
      - Erstellt `SolutionSelectionDialogViewModel` mit der Liste der Anzeigewerte.
      - Erstellt Modal-Dialog `SolutionSelectionDialog` mit `Owner = MainWindow`.
@@ -99,12 +99,12 @@ Der Split-Button „IDE öffnen" besteht aus einem Haupt- und einem Dropdown-Tei
      - Wartet auf Benutzeraktion:
        - **OK:** Gibt den gewählten Anzeigewert zurück.
        - **Abbrechen:** Gibt `null` zurück.
-   - **Wenn `null` (Abbruch):** `SelectEntryPointAsync()` liefert `null`; `OeffneIdeInternAsync()` beendet den Ablauf, kein Prozessstart.
-   - **Wenn Anzeigewert:** `SelectEntryPointAsync()` sucht den Listenindex des gewählten Anzeigewerts (nicht Stringgleichheit, da theoretisch mehrere Einträge denselben Anzeigewert liefern könnten) und gibt das zugehörige `(Plugin, EntryPoint)`-Tupel zurück; `OeffneIdeInternAsync()` ruft damit `selected.Value.Plugin.OpenEntryPointAsync()` auf (siehe Schritt 6) — also das zum gewählten Eintrag gehörende Plugin, nicht zwingend das für den Haupt-Button priorisierte. Ablauf endet danach.
+   - **Wenn `null` (Abbruch):** `SelectEntryPointAsync()` liefert `null`; `OpenIdeInternalAsync()` beendet den Ablauf, kein Prozessstart.
+   - **Wenn Anzeigewert:** `SelectEntryPointAsync()` sucht den Listenindex des gewählten Anzeigewerts (nicht Stringgleichheit, da theoretisch mehrere Einträge denselben Anzeigewert liefern könnten) und gibt das zugehörige `(Plugin, EntryPoint)`-Tupel zurück; `OpenIdeInternalAsync()` ruft damit `selected.Value.Plugin.OpenEntryPointAsync()` auf (siehe Schritt 6) — also das zum gewählten Eintrag gehörende Plugin, nicht zwingend das für den Haupt-Button priorisierte. Ablauf endet danach.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.OeffneIdeAsync()` / `OeffneIdeAuswahlAsync()` — Einstiegspunkte für Haupt- und Dropdown-Button, delegieren beide an `OeffneIdeInternAsync()`
-- `TaskDetailViewModel.OeffneIdeInternAsync()` — gemeinsame Implementierung: verzweigt intern nach Button zwischen Single-Plugin- und Multi-Plugin-Pfad, öffnet und aktualisiert `SelectCanIde`
+- `TaskDetailViewModel.OpenIdeAsync()` / `OpenIdeSelectionAsync()` — Einstiegspunkte für Haupt- und Dropdown-Button, delegieren beide an `OpenIdeInternalAsync()`
+- `TaskDetailViewModel.OpenIdeInternalAsync()` — gemeinsame Implementierung: verzweigt intern nach Button zwischen Single-Plugin- und Multi-Plugin-Pfad, öffnet und aktualisiert `SelectCanIde`
 - `TaskDetailViewModel.ResolveIdeEntryPointsAsync()` — Single-Plugin-Ermittlungslogik (Plugin + Einstiegspunkte), genutzt vom Haupt-Button
 - `TaskDetailViewModel.ResolveAggregatedIdeEntryPointsAsync()` — Multi-Plugin-Ermittlungslogik ((Plugin, EntryPoint)-Tupel über alle kompatiblen Plugins), genutzt vom Dropdown-Button und von `UpdateCanSelectIdeAsync()`
 - `TaskDetailViewModel.FormatDisplayValue()` — plugin-qualifizierte Anzeige-Formatierung für den Dialog
@@ -120,28 +120,28 @@ Beteiligte Komponenten:
 
 ### 5. IDE öffnen (direktes Öffnen über den ermittelten Einstiegspunkt)
 
-Bei genau einem gefundenen bzw. aggregierten Einstiegspunkt, beim Fallback-Verhalten des Haupt-Buttons (mehrere Einstiegspunkte des einen aufgelösten Plugins, kein Dialog) sowie nach einer Dialog-Auswahl im Dropdown-Button (das zum gewählten `(Plugin, EntryPoint)`-Tupel gehörende Plugin, das nicht zwingend dasselbe sein muss wie das für den Haupt-Button aufgelöste) ruft `TaskDetailViewModel.OeffneIdeInternAsync()` `plugin.OpenEntryPointAsync(entryPoint, ct)` auf:
+Bei genau einem gefundenen bzw. aggregierten Einstiegspunkt, beim Fallback-Verhalten des Haupt-Buttons (mehrere Einstiegspunkte des einen aufgelösten Plugins, kein Dialog) sowie nach einer Dialog-Auswahl im Dropdown-Button (das zum gewählten `(Plugin, EntryPoint)`-Tupel gehörende Plugin, das nicht zwingend dasselbe sein muss wie das für den Haupt-Button aufgelöste) ruft `TaskDetailViewModel.OpenIdeInternalAsync()` `plugin.OpenEntryPointAsync(entryPoint, ct)` auf:
 
 - **`VisualStudioIdePlugin.OpenEntryPointAsync()`:** Öffnet die Solution-Datei des übergebenen `IdeEntryPoint` per Shell-Execute (siehe Schritt 6).
 - **`VisualStudioCodeIdePlugin.OpenEntryPointAsync()`:**
   1. Fragt `IVisualStudioCodeLocator.Locate()` ab.
   2. `VisualStudioCodeLocator` sucht zuerst `code.cmd` und `code` in `PATH`, danach typische Windows-Pfade unter `%LOCALAPPDATA%`, `%ProgramFiles%` und `%ProgramFiles(x86)%`.
-  3. Bei Treffer erstellt es `ProcessStartRequest(DateiName=<code-Pfad>, Argumente="\"<Pfad des Einstiegspunkts>\"", ShellAusfuehren=false)` — **mit dem aufgelösten Arbeitsverzeichnis-Pfad**, nicht zwingend dem Repository-Root.
-  4. Ohne Treffer wirft es `InvalidOperationException("Visual Studio Code wurde nicht gefunden.")`; `OeffneIdeInternAsync()` fängt das ab und setzt `FehlerMeldung = "IDE konnte nicht geöffnet werden: Visual Studio Code wurde nicht gefunden."`.
+  3. Bei Treffer erstellt es `ProcessStartRequest(FileName=<code-Pfad>, Arguments="\"<Pfad des Einstiegspunkts>\"", UseShellExecute=false)` — **mit dem aufgelösten Arbeitsverzeichnis-Pfad**, nicht zwingend dem Repository-Root.
+  4. Ohne Treffer wirft es `InvalidOperationException("Visual Studio Code wurde nicht gefunden.")`; `OpenIdeInternalAsync()` fängt das ab und setzt `ErrorMessage = "IDE konnte nicht geöffnet werden: Visual Studio Code wurde nicht gefunden."`.
 
 ### 6. IDE öffnen (Prozessstart eines Einstiegspunkts)
 
 1. Innerhalb von `VisualStudioIdePlugin.OpenEntryPointAsync()` (Schritt 5) wird letztlich die interne `VisualStudioIdePlugin.OpenSolutionFile()`-Hilfsmethode aufgerufen.
-2. Diese erstellt `ProcessStartRequest(DateiName=solutionPfad, Argumente=null, ShellAusfuehren=true)`.
+2. Diese erstellt `ProcessStartRequest(FileName=solutionPath, Argumente=null, UseShellExecute=true)`.
 3. `IProcessStarter.Start(request)` wird aufgerufen.
 4. `SystemProcessStarter` mappt auf `ProcessStartInfo` mit `UseShellExecute=true` (Shell-Execute).
 5. `Process.Start()` startet den Prozess; das Betriebssystem ruft den registrierten Handler für `.sln` auf (üblicherweise Visual Studio).
-6. Fehler werden in `OeffneIdeInternAsync()` geloggt und in `ErrorMessage` angezeigt.
+6. Fehler werden in `OpenIdeInternalAsync()` geloggt und in `ErrorMessage` angezeigt.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.OeffneIdeInternAsync()` — Koordination (gemeinsam für Haupt- und Dropdown-Button)
+- `TaskDetailViewModel.OpenIdeInternalAsync()` — Koordination (gemeinsam für Haupt- und Dropdown-Button)
 - `VisualStudioIdePlugin.OpenEntryPointAsync()` / `OpenSolutionFile()` — Solution-Start
-- `IProzessStarter` (Gateway)
+- `IProcessStarter` (Gateway)
 - `SystemProcessStarter` — Reale Implementierung
 
 ## Diagramm
@@ -150,8 +150,8 @@ Beteiligte Komponenten:
 flowchart TD
     A["Benutzer klickt Button"] --> B{"Welcher Button?"}
     B -->|Arbeitsverzeichnis| C["OeffneArbeitsverzeichnisAsync"]
-    B -->|"IDE öffnen (Haupt)"| D["OeffneIdeAsync<br/>→ OeffneIdeInternAsync(null)"]
-    B -->|"IDE öffnen (Dropdown)"| D2["OeffneIdeAuswahlAsync<br/>→ OeffneIdeInternAsync(WaehleEntryPointAsync)"]
+    B -->|"IDE öffnen (Haupt)"| D["OpenIdeAsync<br/>→ OpenIdeInternalAsync(null)"]
+    B -->|"IDE öffnen (Dropdown)"| D2["OpenIdeSelectionAsync<br/>→ OpenIdeInternalAsync(WaehleEntryPointAsync)"]
 
     C --> E["ArbeitsverzeichnisOeffnenService.Oeffne"]
     E --> F["Plattformbefehl auflösen<br/>Windows: explorer.exe<br/>Linux: xdg-open<br/>macOS: open"]
@@ -159,7 +159,7 @@ flowchart TD
     G --> H["IProcessStarter.Start"]
     H --> I["SystemProzessStarter"]
     I --> J["Process.Start"]
-    J --> K["Fehler? → FehlerMeldung"]
+    J --> K["Fehler? → ErrorMessage"]
 
     D --> L["ErmittleIdeEntryPointsAsync:<br/>PluginSelectionService.ResolveIdePluginAsync<br/>— EIN priorisiertes Plugin"]
     L --> L2["plugin.FindEntryPointsAsync<br/>(dieses einen Plugins)"]
@@ -167,12 +167,12 @@ flowchart TD
     M -->|0| M0["FileNotFoundException"]
     M -->|"≥1"| Z["plugin.OpenEntryPointAsync<br/>ersten Einstiegspunkt, kein Dialog"]
 
-    D2 --> L3["ResolveAggregatedIdeEntryPointsAsync:<br/>PluginSelectionService.ResolveAlleKompatiblenIdePluginsAsync<br/>— ALLE kompatiblen Plugins"]
+    D2 --> L3["ResolveAggregatedIdeEntryPointsAsync:<br/>PluginSelectionService.ResolveAllCompatibleIdePluginsAsync<br/>— ALLE kompatiblen Plugins"]
     L3 --> L4["je Plugin: FindEntryPointsAsync<br/>zu (Plugin, EntryPoint)-Tupeln aggregieren"]
     L4 --> M2{"Anzahl<br/>aggregierter<br/>Einstiegspunkte?"}
     M2 -->|0| M0
     M2 -->|1| Z2["gewaehlt.Plugin.OpenEntryPointAsync<br/>direkt, kein Dialog"]
-    M2 -->|">1"| P["FormatiereAnzeigeWert je Tupel<br/>Dialog anzeigen"]
+    M2 -->|">1"| P["FormatDisplayValue je Tupel<br/>Dialog anzeigen"]
     P --> Q{"Benutzer bestätigt?"}
     Q -->|Nein| R["Abbruch, kein Prozessstart"]
     Q -->|Ja| Z2
@@ -182,10 +182,10 @@ flowchart TD
     R2 -->|VisualStudioIdePlugin| S["OpenSolutionFile"]
     R2 -->|VisualStudioCodeIdePlugin| V["VisualStudioCodeLocator.Locate"]
     V --> W{"VS Code gefunden?"}
-    W -->|Nein| X["FehlerMeldung"]
-    W -->|Ja| Y["ProcessStartRequest<br/>ShellAusfuehren=false"]
+    W -->|Nein| X["ErrorMessage"]
+    W -->|Ja| Y["ProcessStartRequest<br/>UseShellExecute=false"]
     Y --> H
-    S --> T["ProcessStartRequest<br/>ShellAusfuehren=true"]
+    S --> T["ProcessStartRequest<br/>UseShellExecute=true"]
     T --> H
 ```
 
@@ -196,7 +196,7 @@ flowchart TD
 Wenn `WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync()` eine Ausnahme wirft (z. B. das konfigurierte Unterverzeichnis existiert nicht oder ist nicht erreichbar):
 
 1. Ausnahme wird geloggt mit Details (konfig. Pfad, Grund: `DirectoryNotFoundException`, `UnauthorizedAccessException`, etc.).
-2. `TaskDetailViewModel` fängt die Ausnahme ab (in `OpenWorkingDirectoryAsync()` bzw. `OeffneIdeInternAsync()`, gemeinsam für Haupt- und Dropdown-Button).
+2. `TaskDetailViewModel` fängt die Ausnahme ab (in `OpenWorkingDirectoryAsync()` bzw. `OpenIdeInternalAsync()`, gemeinsam für Haupt- und Dropdown-Button).
 3. Fehlermeldung wird in Property `ErrorMessage` gespeichert (z. B. „Arbeitsverzeichnis konnte nicht geöffnet werden: Verzeichnis nicht gefunden").
 4. UI zeigt Fehler-Banner an.
 5. Buttons bleiben inaktiv, solange das konfigurierte Arbeitsverzeichnis nicht erreichbar ist.
@@ -205,8 +205,8 @@ Wenn `WorkingDirectoryResolver.DetermineEffectiveWorkingDirectoryAsync()` eine A
 
 Wenn `SystemProcessStarter.Start()` eine Ausnahme wirft (z. B. Befehl nicht gefunden, keine Berechtigung):
 
-1. Ausnahme wird geloggt mit vollständigen Details (`DateiName`, `Argumente`, `ShellAusfuehren`, aufgelöster Pfad).
-2. `TaskDetailViewModel` fängt die Ausnahme (in `OpenWorkingDirectoryAsync()` oder `OeffneIdeInternAsync()`) ab.
+1. Ausnahme wird geloggt mit vollständigen Details (`FileName`, `Argumente`, `UseShellExecute`, aufgelöster Pfad).
+2. `TaskDetailViewModel` fängt die Ausnahme (in `OpenWorkingDirectoryAsync()` oder `OpenIdeInternalAsync()`) ab.
 3. Fehlermeldung wird in Property `ErrorMessage` gespeichert.
 4. UI zeigt Fehler-Banner an.
 5. Benutzer kann den Fehler einblenden (durch Fehlerbanner-Klick oder Bestätigung).
@@ -225,7 +225,7 @@ Wenn Benutzer im `SolutionSelectionDialog` (nur über den Dropdown-Button erreic
 
 1. `ShowSolutionSelectionDialogAsync()` gibt `null` zurück.
 2. `SelectEntryPointAsync()` in `TaskDetailViewModel` gibt daraufhin ebenfalls `null` zurück.
-3. `OeffneIdeInternAsync()` bricht ab, ruft nicht `plugin.OpenEntryPointAsync()` auf.
+3. `OpenIdeInternalAsync()` bricht ab, ruft nicht `plugin.OpenEntryPointAsync()` auf.
 4. Keine Fehlermeldung; kein Prozess wird gestartet.
 
 ## Test-Implementierung

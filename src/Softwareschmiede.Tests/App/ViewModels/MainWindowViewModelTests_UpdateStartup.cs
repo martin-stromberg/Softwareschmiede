@@ -45,7 +45,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
 
     /// <summary>
     /// Nach Fensterbereitschaft läuft der Startfluss exakt einmal; Aus führt keine Prüfung aus,
-    /// NurPruefen meldet nur, der Startmodus installiert das gefundene Update sofort.
+    /// CheckOnly meldet nur, der Startmodus installiert das gefundene Update sofort.
     /// </summary>
     [Theory]
     [InlineData(UpdateMode.Off)]

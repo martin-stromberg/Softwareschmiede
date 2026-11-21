@@ -33,7 +33,7 @@
 | `ScmAbschlussReferenz` | `string?` | Anzeigetext der für den Abschluss beobachteten SCM-Referenz (z. B. „Pull Request #7" oder „Issue #3") — Diagnose-/Protokollwert zu `ScmAbschlussErkanntUtc` |
 | `PullRequests` | `ICollection<PullRequestReference>` | Persistierte Pull Requests, die aus der Aufgabe heraus erstellt wurden |
 
-`PausedUntilUtc` modelliert die Pause als zeitbasiertes Overlay — es gibt **kein** eigenes `WorkItemStatus.Pausiert`. Eine Aufgabe gilt genau dann als pausiert, wenn `PausedUntilUtc > UtcNow` gilt (Referenzdefinition: Extension `AiExecutionStatusClassification.IsCurrentlyPaused`, striktes Größer-als); abgelaufene Werte verbleiben wirkungslos in der Datenbank. Die Spalte wird als nullable Unix-Millisekunden-Wert (`long?`) über `NullableUnixMillisConverter` persistiert (Migration `20260916094502_AddAufgabePausedUntilUtc`).
+`PausedUntilUtc` modelliert die Pause als zeitbasiertes Overlay — es gibt **kein** eigenes `WorkItemStatus.Paused`. Eine Aufgabe gilt genau dann als pausiert, wenn `PausedUntilUtc > UtcNow` gilt (Referenzdefinition: Extension `AiExecutionStatusClassification.IsCurrentlyPaused`, striktes Größer-als); abgelaufene Werte verbleiben wirkungslos in der Datenbank. Die Spalte wird als nullable Unix-Millisekunden-Wert (`long?`) über `NullableUnixMillisConverter` persistiert (Migration `20260916094502_AddAufgabePausiertBisUtc`).
 
 ### `LogEntry`
 
@@ -42,7 +42,7 @@
 | `Id` | `Guid` | Primärschlüssel |
 | `WorkItemId` | `Guid` | FK → Aufgabe |
 | `Zeitstempel` | `DateTimeOffset` | Zeitpunkt des Eintrags |
-| `Typ` | `LogEntryType` | `Prompt`, `KiAntwort`, `GitAktion`, `StatusUebergang`, `TestErgebnis`, `CliOutput`, `RateLimit`, `SystemMessage` |
+| `Typ` | `LogEntryType` | `Prompt`, `KiAntwort`, `GitAktion`, `StatusUebergang`, `TestResult`, `CliOutput`, `RateLimit`, `SystemMessage` |
 | `Inhalt` | `string` | Inhalt (Markdown) |
 | `AgentName` | `string?` | Name des Agenten |
 
@@ -139,7 +139,7 @@
 | `CreatedAtUtc` | `DateTimeOffset` | Erstellungszeitpunkt des Datensatzes |
 | `AktualisiertAmUtc` | `DateTimeOffset` | Letzter Aktualisierungszeitpunkt (Ersetzen, Pausenverschiebung) |
 
-Persistierter Datensatz eines geplanten zeitgesteuerten Prompts (Tabelle `ZeitgesteuertePrompts`, Migration `20261107211018_AddScheduledPrompt`). Die drei `DateTimeOffset`-Spalten werden als Unix-Millisekunden (`long`) über `UnixMillisConverter` gespeichert. Der Unique-Index `IX_ZeitgesteuertePrompts_AufgabeId` setzt die Ersetzungsregel „max. ein Plan pro Aufgabe" datenbankseitig durch. Der Datensatz wird beim erfolgreichen Versand, beim Storno („Wartestellung aufheben", Aufgabenabschluss) und per Cascade beim Löschen der Aufgabe entfernt; der EF-Zugriff läuft über den scoped Service `ScheduledPromptStore`.
+Persistierter Datensatz eines geplanten zeitgesteuerten Prompts (Tabelle `ZeitgesteuertePrompts`, Migration `20261107211018_AddZeitgesteuerterPrompt`). Die drei `DateTimeOffset`-Spalten werden als Unix-Millisekunden (`long`) über `UnixMillisConverter` gespeichert. Der Unique-Index `IX_ZeitgesteuertePrompts_AufgabeId` setzt die Ersetzungsregel „max. ein Plan pro Aufgabe" datenbankseitig durch. Der Datensatz wird beim erfolgreichen Versand, beim Storno („Wartestellung aufheben", Aufgabenabschluss) und per Cascade beim Löschen der Aufgabe entfernt; der EF-Zugriff läuft über den scoped Service `ScheduledPromptStore`.
 
 ## Statusübergänge
 
@@ -255,15 +255,15 @@ Enthält der Rate-Limit-Marker einen gültigen Reset-Zeitpunkt, speichert `AiPlu
 |-----------|------|-------|
 | `plugins.sessionlimit.<AiPluginPrefix>` | ISO-8601-Roundtrip-Zeitstempel (UTC) | Letztes bekanntes Session-Limit des KI-Plugins; Grundlage für die automatische Pause aktiver Aufgaben mit demselben Prefix und für die Update-Sicherheitsprüfung |
 
-Dieser Eintrag ist **Laufzeitstatus**, keine Anwender-Konfiguration — er wird ausschließlich vom System geschrieben. Abgelaufene oder ungültige Werte werden beim Lesen (`GetAktiveSessionLimitsAsync`) ignoriert und beim nächsten Marker-Ereignis überschrieben. Details zum `AppSetting`-Modell: [Einstellungen — Datenmodell](../einstellungen/datenmodell.md).
+Dieser Eintrag ist **Laufzeitstatus**, keine Anwender-Konfiguration — er wird ausschließlich vom System geschrieben. Abgelaufene oder ungültige Werte werden beim Lesen (`GetActiveSessionLimitsAsync`) ignoriert und beim nächsten Marker-Ereignis überschrieben. Details zum `AppSetting`-Modell: [Einstellungen — Datenmodell](../einstellungen/datenmodell.md).
 
-## Persistierter Anzeigemodus der Aufgabenliste
+## Persistierter Anzeigemodus der WorkItemsList
 
-Der Anzeigemodus der aktiven Aufgabenliste wird je Ansicht als eigener Key-Value-Eintrag in der `AppSetting`-Tabelle gespeichert (kein eigenes Schema, keine Migration):
+Der Anzeigemodus der aktiven WorkItemsList wird je Ansicht als eigener Key-Value-Eintrag in der `AppSetting`-Tabelle gespeichert (kein eigenes Schema, keine Migration):
 
 | Schlüssel | Wert | Zweck |
 |-----------|------|-------|
-| `aktiveaufgaben.listenmodus` (`AppSettingService.ActiveWorkItemsListModeKey`) | Enum-Name des `WorkItemListMode` (`Datum`, `Repository`, `Ki`) | Anzeigemodus der Seitenleisten-Aufgabenliste; beim App-Start wiederhergestellt |
-| `aktiveaufgaben.listenmodus.dashboard` (`AppSettingService.ActiveWorkItemsListModeDashboardKey`) | Enum-Name des `WorkItemListMode` | Anzeigemodus der Dashboard-Aufgabenliste — unabhängig vom Menü-Modus |
+| `aktiveaufgaben.listenmodus` (`AppSettingService.ActiveWorkItemsListModeKey`) | Enum-Name des `WorkItemListMode` (`Date`, `Repository`, `Ai`) | Anzeigemodus der Seitenleisten-WorkItemsList; beim App-Start wiederhergestellt |
+| `aktiveaufgaben.listenmodus.dashboard` (`AppSettingService.ActiveWorkItemsListModeDashboardKey`) | Enum-Name des `WorkItemListMode` | Anzeigemodus der Dashboard-WorkItemsList — unabhängig vom Menü-Modus |
 
 Lesen und Schreiben laufen über den `WorkItemListModeService` (Singleton) mit eigenem DI-Scope pro Operation — kein gemeinsamer `DbContext` mit dem 5-Sekunden-Aufgaben-Refresh. Fehlende oder ungültige Werte fallen beim Lesen auf `Datum` zurück (`Enum.TryParse` + `Enum.IsDefined`). Die Einträge entstehen als Datenzeilen zur Laufzeit über `AppSettingService.SetSettingAsync` beim ersten expliziten Moduswechsel — die Wiederherstellung schreibt nicht zurück.

@@ -54,7 +54,7 @@ public sealed class RateLimitDetectionServiceIntegrationTests : IDisposable
         resetUtc.Value.Day.Should().Be(15);
     }
 
-    /// <summary>VorschlagPrompt_WirdGespeichert_UndStatusWirdWartend.</summary>
+    /// <summary>SuggestedPrompt_WirdGespeichert_UndStatusWirdWartend.</summary>
     [Fact]
     public async Task SuggestionPrompt_WillSaved_AndStatusWillWaiting()
     {

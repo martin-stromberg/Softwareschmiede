@@ -40,7 +40,7 @@ public sealed class RecordingProcessStarterTests : IDisposable
         content.Should().Contain(@"C:\Temp\Arbeitsverzeichnis");
     }
 
-    /// <summary>Prüft, dass Starten die Zeile exakt im Format "DateiName|Argumente|ShellAusfuehren" gefolgt von einem Zeilenumbruch schreibt.</summary>
+    /// <summary>Prüft, dass Starten die Zeile exakt im Format "DateiName|Argumente|UseShellExecute" gefolgt von einem Zeilenumbruch schreibt.</summary>
     [Fact]
     public void Start_WritesLineInExactPipeSeparateFormat()
     {

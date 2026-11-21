@@ -61,7 +61,7 @@ public sealed class IssueSelectionDialogViewModelTests
         sut.AvailableIssues.Should().BeEmpty();
     }
 
-    /// <summary>Wenn ein Issue selektiert wird, wird KannBestaetigen true.</summary>
+    /// <summary>Wenn ein Issue selektiert wird, wird CanConfirm true.</summary>
     [Fact]
     public void SelectedIssue_UpdatesCanConfirm()
     {

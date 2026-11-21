@@ -39,7 +39,7 @@ public sealed class WorkItemRecoveryService
         var now = DateTimeOffset.UtcNow;
         var cutoff = now.AddMinutes(-HeartbeatTimeoutMinutes);
 
-        // Pausierte Aufgaben (PausiertBisUtc in der Zukunft) sind keine „festhängenden" Kandidaten:
+        // Pausierte Aufgaben (PausedUntilUtc in der Zukunft) sind keine „festhängenden" Kandidaten:
         // sie wurden bewusst bis zu einem bekannten Zeitpunkt angehalten (z. B. Session-Limit des
         // KI-Plugins) und tauchen nach Pausenende bei weiterhin abgelaufenem Heartbeat wieder auf.
         var candidates = await _db.WorkItems

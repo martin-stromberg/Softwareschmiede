@@ -9,7 +9,7 @@ using Softwareschmiede.TestSupport;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
-/// <summary>Host response retries must not reopen a separately blocked event dispatch.</summary>
+/// <summary>Wiederholungen der Host-Antwort dürfen einen separat blockierten Ereignisversand nicht wieder öffnen.</summary>
 public sealed class ScmEventDispatchTests_HostRetry
 {
     /// <summary>Nur eine explizite Wiederholung oder die Ereignis-Frist darf die Dispatch-Verzögerung aufheben.</summary>

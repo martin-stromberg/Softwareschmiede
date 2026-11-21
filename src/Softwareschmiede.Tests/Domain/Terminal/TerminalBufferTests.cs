@@ -103,7 +103,7 @@ public sealed class TerminalBufferTests
 
         // Cursor is now on last row — apply another newline via CursorMovedRelative
         sut.Apply(new CursorMovedEvent(1, 0, true));
-        // Writing on the last row and advancing should scroll
+        // Schreiben in der letzten Zeile und Weiterschalten soll scrollen
         sut.Apply(new TextWrittenEvent("C\n"));
 
         // Nach dem Scroll hat der Puffer weiterhin 2 Zeilen, Inhalt verschoben

@@ -816,12 +816,12 @@ public sealed class SettingsView : BaseWindowView
     }
 
     /// <summary>Liest das aktuell ausgewählte Label der "Update-Pfad"-ComboBox im "Allgemein"-Tab.</summary>
-    /// <returns>Das Anzeige-Label des gewählten Update-Pfads (siehe <c>UpdatePfadTexte</c>).</returns>
+    /// <returns>Das Anzeige-Label des gewählten Update-Pfads (siehe <c>UpdatePathText</c>).</returns>
     public string GetUpdatePath()
         => WaitForElement(Window, cf => cf.ByName("Update-Path").And(cf.ByControlType(ControlType.ComboBox)), Short).AsComboBox().SelectedItem?.Name ?? string.Empty;
 
     /// <summary>Wählt einen Eintrag der "Update-Pfad"-ComboBox und wartet, bis er übernommen wurde.</summary>
-    /// <param name="label">Das Anzeige-Label (aus <c>UpdatePfadTexte</c>: "Produktivversionen" oder "Vorabversionen").</param>
+    /// <param name="label">Das Anzeige-Label (aus <c>UpdatePathText</c>: "Produktivversionen" oder "Vorabversionen").</param>
     /// <returns>Diese Instanz.</returns>
     public SettingsView SetUpdatePath(string label)
     {
@@ -844,7 +844,7 @@ public sealed class SettingsView : BaseWindowView
     }
 
     /// <summary>Liest den schreibgeschützten Anzeigetext des abgeleiteten UpdateChannels im "Allgemein"-Tab.</summary>
-    /// <returns>Der Kanal-Anzeigetext (siehe <c>UpdatePfadTexte</c>).</returns>
+    /// <returns>Der Kanal-Anzeigetext (siehe <c>UpdatePathText</c>).</returns>
     /// <remarks>
     /// Das Element trägt kein <c>AutomationProperties.Name</c> — der gebundene Kanaltext ist
     /// daher als UIA-Name des TextBlocks lesbar (Muster wie <c>UpdateNotice</c>).

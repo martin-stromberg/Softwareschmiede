@@ -18,7 +18,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>User-visible loading failures, source recovery and truthful queue commands.</summary>
 public sealed class ScmEventQueueViewModelTests
 {
-    /// <summary>Initial and filter-change failures never masquerade as a successful empty/new-filter result.</summary>
+    /// <summary>Fehler beim initialen Laden und beim Filterwechsel werden nie als erfolgreiches Leer-/Neu-Filter-Ergebnis ausgegeben.</summary>
     [Fact]
     public async Task LoadingFailure_ExplainsInitialFailureAndClearsOldFilterRows_ThenRecovers()
     {

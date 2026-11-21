@@ -12,7 +12,7 @@ public sealed class AiExecutionStatusConverterTests
 {
     private readonly AiExecutionStatusConverter _sut = new();
 
-    /// <summary>Convert gibt "▶ Läuft" zurück, wenn AktiveRunId gesetzt und der Heartbeat aktuell ist.</summary>
+    /// <summary>Convert gibt "▶ Läuft" zurück, wenn ActiveRunId gesetzt und der Heartbeat aktuell ist.</summary>
     [Fact]
     public void Convert_ShouldReturnRunsString_WhenActiveRunIdPresentAndHeartbeatRecent()
     {
@@ -169,7 +169,7 @@ public sealed class AiExecutionStatusConverterTests
 
     /// <summary>
     /// Live-Zweig (Issue 342): Zeigt <see cref="ActiveWorkItemPanelItem.LiveRunStatus"/> einen laufenden
-    /// Prozess an, zeigt die Kachel "▶ Läuft" — selbst ohne persistierte Laufdaten (AktiveRunId null)
+    /// Prozess an, zeigt die Kachel "▶ Läuft" — selbst ohne persistierte Laufdaten (ActiveRunId null)
     /// und selbst wenn der persistierte Ausführungsstatus noch Beendet lautet.
     /// </summary>
     [Fact]
@@ -296,7 +296,7 @@ public sealed class AiExecutionStatusConverterTests
         result.Should().Be("✓ Bereit");
     }
 
-    /// <summary>Convert zeigt bei zukünftigem PausiertBisUtc den Pausiert-Countdown — vor allen übrigen Statusanzeigen (Issue 151).</summary>
+    /// <summary>Convert zeigt bei zukünftigem PausedUntilUtc den Pausiert-Countdown — vor allen übrigen Statusanzeigen (Issue 151).</summary>
     [Fact]
     public void Convert_ShouldReturnPausedCountdown_WhenPausedUntilUtcInFuture()
     {
@@ -357,7 +357,7 @@ public sealed class AiExecutionStatusConverterTests
         result.Should().BeOfType<string>().Which.Should().MatchRegex(@"^⏸ Pausiert \(noch \d+\.\d{2}:\d{2}:\d{2}\)$");
     }
 
-    /// <summary>Convert ignoriert einen abgelaufenen PausiertBisUtc-Wert und zeigt den normalen Status (Issue 151).</summary>
+    /// <summary>Convert ignoriert einen abgelaufenen PausedUntilUtc-Wert und zeigt den normalen Status (Issue 151).</summary>
     [Fact]
     public void Convert_ShouldReturnNormalStatus_WhenPausedUntilUtcExpired()
     {

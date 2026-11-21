@@ -124,7 +124,7 @@ public sealed class AppSettingServiceTests_UpdateSettings : IDisposable
         }
     }
 
-    /// <summary>Fehlende oder ungültige gespeicherte Werte liefern die Defaults NurPruefen/Produktivversionen; ein Altbestand unter updates.includePrereleases wird ignoriert.</summary>
+    /// <summary>Fehlende oder ungültige gespeicherte Werte liefern die Defaults CheckOnly/Produktivversionen; ein Altbestand unter updates.includePrereleases wird ignoriert.</summary>
     [Fact]
     public async Task GetUpdateSettingsAsync_ReturnsDefaults_WhenStoredValuesAreMissingOrInvalid()
     {

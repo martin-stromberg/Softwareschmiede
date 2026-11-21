@@ -24,7 +24,7 @@ public sealed class AiExecutionServiceCliRecordingTests
         return pluginMock;
     }
 
-    /// <summary>Nach dem Session-Start liefert <c>GetCliAufzeichnung</c> die aufgezeichneten Roh-Chunks —
+    /// <summary>Nach dem Session-Start liefert <c>GetCliRecording</c> die aufgezeichneten Roh-Chunks —
     /// inklusive derer, die bereits beim Start an die Senke gingen (kein Race-Fenster).</summary>
     [Fact]
     public async Task GetCliRecording_AfterSessionStart_ContainsRawChunks()
@@ -54,7 +54,7 @@ public sealed class AiExecutionServiceCliRecordingTests
         recording.Chunks[1].Data.Should().Equal(chunks[1]);
     }
 
-    /// <summary>Ohne Session-Start liefert <c>GetCliAufzeichnung</c> null.</summary>
+    /// <summary>Ohne Session-Start liefert <c>GetCliRecording</c> null.</summary>
     [Fact]
     public void GetCliRecording_WithoutSession_ReturnsNull()
     {
@@ -63,8 +63,8 @@ public sealed class AiExecutionServiceCliRecordingTests
         sut.GetCliRecording(Guid.NewGuid()).Should().BeNull();
     }
 
-    /// <summary>Mit <c>AufzeichnungByteBudget &lt;= 0</c> wird kein Recorder erstellt — die Senke des
-    /// Handles ist dann direkt der Protokoll-Writer (keine einelementige Composite).</summary>
+    /// <summary>Mit <c>RecordingByteBudget &lt;= 0</c> wird kein Recorder erstellt — die Senke des
+    /// Handles ist dann direkt der Protokoll-Writer (kein einelementiges Composite).</summary>
     [Fact]
     public async Task StartTerminalSessionAsync_DisabledBudget_NoRecorderAndNoComposite()
     {

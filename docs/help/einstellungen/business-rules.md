@@ -213,7 +213,7 @@
 **Beschreibung:** Wartezeit und Erzwingen sind dauerhafte Anwendereinstellungen; die Aktivierung ist bewusst ein Sitzungsschalter.
 
 **Bedingungen:**
-- Schlüssel `autoshutdown.toleranz.minuten` (int, Standard `5`, Clamp 0–1440) und `autoshutdown.force` (bool, Standard `false`)
+- Schlüssel `autoshutdown.toleranceMinutes.minuten` (int, Standard `5`, Clamp 0–1440) und `autoshutdown.force` (bool, Standard `false`)
 - Die Aktivierungs-Checkbox wird nicht persistiert — Sicherheitsaspekt: kein „vergessenes" Arming nach Neustart
 
 **Verhalten:**

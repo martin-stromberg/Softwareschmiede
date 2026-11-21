@@ -51,7 +51,7 @@ public partial class End2EndTest
         ConfirmLocalDirectoryGitInitInSourceDirectory();
         var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
 
-        // Nach erfolgreichem Start ist das Repository geklont (LokalerKlonPfad gesetzt) und
+        // Nach erfolgreichem Start ist das Repository geklont (LocalClonePath gesetzt) und
         // das CLI-Panel sichtbar - das bestätigt, dass der kombinierte Klon-/Start-Ablauf durchlief.
         // Ab hier bleiben ShowCliPanel (Status=Gestartet) und ShowFileExplorerPanel (Klonpfad
         // existiert) für den Rest des Tests durchgehend true.

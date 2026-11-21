@@ -9,14 +9,14 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 - `WorkItemService` — Persistente Datenbankoperationen für Aufgaben, einschließlich `SetPauseAsync` und der Laufdaten-Operationen
 - `AiExecutionService` / `IRunningAutomationStatusSource` — Live-Laufquelle und `CliRunActive`-Signal für die Status-Synchronisation
 - `AiPluginLimitService` — Persistenz und Anwendung von KI-Plugin-Session-Limits
-- `PromptTimeDispatchService` — Laufzeit-Verwaltung zeitgesteuerter Prompts (inkl. Persistenz, Pausen-Verschiebung und Nachzustellung)
+- `PromptScheduleDispatchService` — Laufzeit-Verwaltung zeitgesteuerter Prompts (inkl. Persistenz, Pausen-Verschiebung und Nachzustellung)
 - `ScheduledPromptStore` — Scoped Service für den EF-Zugriff auf persistierte geplante Prompts
 - `LogService` — Persistente Protokolleinträge, einschließlich automatischer CLI-Ausgaben und Rate-Limit-Marker
 - `ICliRawExportService` — Exportiert die gespeicherte CLI-Rohausgabe einer Aufgabe als `.raw`
 - `IDialogService` — UI-Abstraktion für Dialoge (Speichern-Dialog, Pause-Dialog)
-- `WorkItemListModeService` / `WorkItemListModeBindung` — Persistenz und Zustand des Anzeigemodus der aktiven Aufgabenliste je Ansicht
+- `WorkItemListModeService` / `WorkItemListModeBinding` — Persistenz und Zustand des Anzeigemodus der aktiven Aufgabenliste je Ansicht
 
-## ProtokollService — CLI-Ausgabeprotokoll
+## LogService — CLI-Ausgabeprotokoll
 
 ### `AddCliOutputAsync(Guid workItemId, string outputLine, CancellationToken ct = default) : Task`
 
@@ -36,7 +36,7 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 - Wird im interaktiven Terminal-Pfad (ConPTY oder Pipe-Fallback) automatisch durch `CliOutputLogWriter` aufgerufen.
 - Erkennt Rate-Limit-Marker in der Ausgabezeile und speichert dann zusätzlich einen `LogEntryType.RateLimit`-Eintrag (`"Rate-Limit erkannt. Weiter ab: …"` bzw. `"(kein Zeitstempel)"`).
 - Speichert pro Aufruf eine Zeile.
-- Der Aufrufer `CliOutputLogWriter` reicht Marker mit gültigem Zeitstempel anschließend an `AiPluginLimitService.VerarbeiteRateLimitAsync` weiter.
+- Der Aufrufer `CliOutputLogWriter` reicht Marker mit gültigem Zeitstempel anschließend an `AiPluginLimitService.ProcessRateLimitAsync` weiter.
 
 ### `TryParseRateLimitMarker(string outputLine, out DateTimeOffset? resetUtc) : bool` (statisch)
 
@@ -54,7 +54,7 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 
 ## AufgabeService — Pause
 
-### `SetPauseAsync(Guid workItemId, DateTimeOffset? pausiertBisUtc, CancellationToken ct = default) : Task`
+### `SetPauseAsync(Guid workItemId, DateTimeOffset? pausedUntilUtc, CancellationToken ct = default) : Task`
 
 **Beschreibung:** Setzt oder leert den Pausen-Endzeitpunkt (`WorkItem.PausedUntilUtc`) einer regulären Aufgabe.
 
@@ -63,20 +63,20 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 | Name | Typ | Beschreibung |
 |------|-----|--------------|
 | `workItemId` | `Guid` | ID der Aufgabe. |
-| `pausiertBisUtc` | `DateTimeOffset?` | UTC-Zeitpunkt, bis zu dem pausiert wird; `null` hebt eine bestehende Pause auf. |
+| `pausedUntilUtc` | `DateTimeOffset?` | UTC-Zeitpunkt, bis zu dem pausiert wird; `null` hebt eine bestehende Pause auf. |
 | `ct` | `CancellationToken` | Optionales Abbruch-Token. |
 
 **Verhalten:**
 
 - Erlaubte Stati: `New`, `Started`, `Waiting` — andere Stati werden mit `InvalidOperationException` abgelehnt.
-- Beim Setzen muss `pausiertBisUtc` in der Zukunft liegen; andernfalls `InvalidOperationException`.
+- Beim Setzen muss `pausedUntilUtc` in der Zukunft liegen; andernfalls `InvalidOperationException`.
 - Schreibt pro Aufruf einen `LogEntryType.SystemMessage`-Eintrag („Aufgabe pausiert bis …" / „Pause aufgehoben").
 - Fordert nach dem Speichern die ereignisgesteuerte SCM-Startprüfung an (`ScmStartCheckTrigger.RequestStartCheck`), sofern der optionale Auslöser injiziert ist — ein durch die Pause frei werdender Ausführungsplatz wird ohne Poll-Durchlauf nachgefüllt.
 - Wirft `InvalidOperationException`, wenn die Aufgabe nicht gefunden wird.
 
 ## KiAusfuehrungsStatusKlassifikation — Pausenkriterium
 
-### `IsCurrentlyPaused(this DateTimeOffset? pausiertBisUtc, DateTimeOffset jetzt) : bool` (Extension, statisch)
+### `IsCurrentlyPaused(this DateTimeOffset? pausedUntilUtc, DateTimeOffset now) : bool` (Extension, statisch)
 
 **Beschreibung:** Referenzdefinition des Pausenkriteriums für alle Pausen-Auswertungen der Anwendung.
 
@@ -84,19 +84,19 @@ Die Task-Detail-Ansicht exponiert öffentliche Service-Schnittstellen für die V
 
 | Name | Typ | Beschreibung |
 |------|-----|--------------|
-| `pausiertBisUtc` | `DateTimeOffset?` | UTC-Pausenende der Aufgabe (`WorkItem.PausedUntilUtc`). |
-| `jetzt` | `DateTimeOffset` | Der als „jetzt" zu verwendende UTC-Zeitpunkt. |
+| `pausedUntilUtc` | `DateTimeOffset?` | UTC-Pausenende der Aufgabe (`WorkItem.PausedUntilUtc`). |
+| `now` | `DateTimeOffset` | Der als „jetzt" zu verwendende UTC-Zeitpunkt. |
 
-**Rückgabe:** `true`, wenn `pausiertBisUtc` gesetzt ist und strikt in der Zukunft liegt (`pausiertBisUtc > jetzt`); `null` oder ein abgelaufener bzw. exakt aktueller Zeitpunkt gelten als nicht pausiert.
+**Rückgabe:** `true`, wenn `pausedUntilUtc` gesetzt ist und strikt in der Zukunft liegt (`pausedUntilUtc > now`); `null` oder ein abgelaufener bzw. exakt aktueller Zeitpunkt gelten als nicht pausiert.
 
 **Verhalten:**
 
 - Kapselt den früher an mehreren Stellen duplizierten Direktvergleich, damit das Pausenkriterium nicht divergiert.
-- Verwendet u. a. von `Classify` (Kachel-Zustand `AiExecutionState.Pausiert`), `ScmEventExecutionLimitService.GetOccupancyAsync` (Limit-Belegung), `ScmEventOrchestrator.BlockReason` (Start-Sperrgrund), `WorkItemRecoveryService` und `DevelopmentProcessService.ThrowIfPaused`.
+- Verwendet u. a. von `Classify` (Kachel-Zustand `AiExecutionState.Paused`), `ScmEventExecutionLimitService.GetOccupancyAsync` (Limit-Belegung), `ScmEventOrchestrator.BlockReason` (Start-Sperrgrund), `WorkItemRecoveryService` und `DevelopmentProcessService.ThrowIfPaused`.
 
 ## AufgabeService — KI-Laufdaten
 
-Alle Laufdaten-Mutationen laufen unter der statischen Sperrung `WorkItemService.RunGates` (`ConcurrentDictionary<Guid, SemaphoreSlim>`): Sie serialisiert prozessweit alle Schreibzugriffe auf `ActiveRunId`/`LastHeartbeatUtc`/`LastCliStartUtc`/`RunStatus`/`ExecutionStatus` einer Aufgabe — einschließlich der laufdatenrücksetzenden Lebenszyklus-Pfade `StartenAsync`, `CompleteAsync` und `ResetStartAsync`. Die optionalen Callbacks `runningGuard` und `runStatusProvider` werden grundsätzlich erst innerhalb der gehaltenen Sperre ausgewertet (TOCTOU-/Stale-Write-Schutz).
+Alle Laufdaten-Mutationen laufen unter der statischen Sperrung `WorkItemService.RunGates` (`ConcurrentDictionary<Guid, SemaphoreSlim>`): Sie serialisiert prozessweit alle Schreibzugriffe auf `ActiveRunId`/`LastHeartbeatUtc`/`LastCliStartUtc`/`RunStatus`/`ExecutionStatus` einer Aufgabe — einschließlich der laufdatenrücksetzenden Lebenszyklus-Pfade `StartAsync`, `CompleteAsync` und `ResetStartAsync`. Die optionalen Callbacks `runningGuard` und `runStatusProvider` werden grundsätzlich erst innerhalb der gehaltenen Sperre ausgewertet (TOCTOU-/Stale-Write-Schutz).
 
 ### `SetActiveRunAsync(Guid id, string laufId, CancellationToken ct = default, Func<bool>? runningGuard = null) : Task`
 
@@ -125,7 +125,7 @@ Alle Laufdaten-Mutationen laufen unter der statischen Sperrung `WorkItemService.
 
 ### `WorkItemRunStatus? GetLiveRunStatus(Guid workItemId)` (Interface-Methode)
 
-**Beschreibung:** Live-Substatus aus der Laufzeitquelle: `null`, wenn kein gehandelter Prozess läuft (`IsRunning` `false`); `WaitingForInput`, wenn die Session `CliRuntimeStatus.WaitingForInput` meldet; sonst `Running` — auch bei laufendem Handle ohne Session oder `RuntimeStatus.Inaktiv`. Datenquelle für `ActiveWorkItemPanelItem.LiveRunStatus`; der Live-Zweig der Kachel-Klassifikation darf bei laufendem Prozess damit nie auf `Ready` zurückfallen.
+**Beschreibung:** Live-Substatus aus der Laufzeitquelle: `null`, wenn kein gehandelter Prozess läuft (`IsRunning` `false`); `WaitingForInput`, wenn die Session `CliRuntimeStatus.WaitingForInput` meldet; sonst `Running` — auch bei laufendem Handle ohne Session oder `CliRuntimeStatus.Inactive`. Datenquelle für `ActiveWorkItemPanelItem.LiveRunStatus`; der Live-Zweig der Kachel-Klassifikation darf bei laufendem Prozess damit nie auf `Ready` zurückfallen.
 
 ### `IReadOnlyCollection<Guid> GetRunningWorkItemIds()`
 
@@ -139,13 +139,13 @@ Alle Laufdaten-Mutationen laufen unter der statischen Sperrung `WorkItemService.
 
 **Beschreibung:** Signal, dass eine Startanforderung einen bereits laufenden Prozess zurückgibt (Early-Return „zweiter Start abgewiesen" in `StartCliCoreAsync`/`StartTerminalSessionCoreAsync` — dort feuert kein `CliProcessStatus.Started`) bzw. ein laufender Prozess über `NotifyRunActive` bestätigt wurde. Einziger produktiver Abonnent: `CliProcessManager.OnCliRunActive` → `EnsureRunDataAsync`. Vertrag wie `CliProcessStatusChanged`: Der Invoke läuft unter der klassenweiten Start-Sperre (`_startLock`) — Abonnenten müssen non-blocking sein und dürfen nicht reentrant `StartCliAsync`/`StartTerminalSessionAsync` aufrufen.
 
-## KiPluginLimitService — Plugin-Session-Limits
+## AiPluginLimitService — Plugin-Session-Limits
 
 **Registrierung:** Scoped in DI; Abhängigkeiten: `SoftwareschmiedeDbContext`, `AppSettingService`, `WorkItemRunDataChangedNotifier`.
 
-**Konstante:** `KiPluginLimitService.SessionLimitKeyPrefix = "plugins.sessionlimit."` — Schlüsselpräfix für persistierte Reset-Zeitpunkte in `AppSetting`.
+**Konstante:** `AiPluginLimitService.SessionLimitKeyPrefix = "plugins.sessionlimit."` — Schlüsselpräfix für persistierte Reset-Zeitpunkte in `AppSetting`.
 
-### `VerarbeiteRateLimitAsync(Guid workItemId, DateTimeOffset resetUtc, CancellationToken ct = default) : Task`
+### `ProcessRateLimitAsync(Guid workItemId, DateTimeOffset resetUtc, CancellationToken ct = default) : Task`
 
 **Beschreibung:** Verarbeitet einen erkannten Session-Limit-Marker: persistiert den Reset-Zeitpunkt unter `plugins.sessionlimit.<AiPluginPrefix>` der auslösenden Aufgabe und pausiert bei zukünftigem Zeitpunkt alle aktiv laufenden regulären Aufgaben mit demselben Prefix.
 
@@ -162,12 +162,12 @@ Alle Laufdaten-Mutationen laufen unter der statischen Sperrung `WorkItemService.
 - Aufgabe nicht gefunden oder `AiPluginPrefix` leer: `LogWarning`, keine Persistenz, keine Pause.
 - Persistiert `resetUtc` (normalisiert auf UTC) als ISO-8601-Roundtrip-String (`"O"`) in `AppSetting`.
 - Liegt `resetUtc` in der Vergangenheit: Persistenz erfolgt, aber es wird keine Pause gesetzt.
-- Kandidaten: Aufgaben mit `Status.IsActiveOrWaiting()`, `ExecutionStatus == Aktiv`, Prefix-Vergleich `OrdinalIgnoreCase`.
+- Kandidaten: Aufgaben mit `Status.IsActiveOrWaiting()`, `ExecutionStatus == Active`, Prefix-Vergleich `OrdinalIgnoreCase`.
 - Max-Semantik: `PausedUntilUtc` wird auf `max(bisheriger Wert, resetUtc)` gesetzt — längere manuelle Pausen werden nicht verkürzt.
 - Pro pausierter Aufgabe wird ein `LogEntryType.SystemMessage`-Eintrag geschrieben; nach dem Speichern wird `WorkItemRunDataChangedNotifier.NotifyRunDataChanged` je Aufgabe ausgelöst.
 - Laufende CLI-Prozesse werden nicht angefasst.
 
-### `GetAktiveSessionLimitsAsync(IReadOnlyCollection<string> prefixes, CancellationToken ct = default) : Task<IReadOnlyDictionary<string, DateTimeOffset>>`
+### `GetActiveSessionLimitsAsync(IReadOnlyCollection<string> prefixes, CancellationToken ct = default) : Task<IReadOnlyDictionary<string, DateTimeOffset>>`
 
 **Beschreibung:** Liest die persistierten Session-Limits mehrerer Plugin-Prefixe in einer Abfrage (Batch-Lookup, z. B. für `CliUpdateSafetyService`).
 
@@ -178,11 +178,11 @@ Alle Laufdaten-Mutationen laufen unter der statischen Sperrung `WorkItemService.
 - Das zurückgegebene Dictionary verwendet `OrdinalIgnoreCase`-Schlüsselvergleich.
 - Leere Prefix-Liste oder ausschließlich leere Prefixe: leeres Dictionary.
 
-## PromptZeitVersandService — Zeitgesteuerte Prompt-Versendung
+## PromptScheduleDispatchService — Zeitgesteuerte Prompt-Versendung
 
 ### Übersicht
 
-`PromptTimeDispatchService` ist ein Singleton-Service, der zeitgesteuerte Prompts pro Aufgabe in einer Laufzeit-Warteschlange verwaltet. Geplante Prompts werden zusätzlich über den scoped `ScheduledPromptStore` in der Tabelle `ZeitgesteuertePrompts` persistiert, beim App-Start via `RestoreScheduledPromptsAsync` wiederhergestellt und — wenn zum Fälligkeitszeitpunkt keine Session zustellfähig ist — beim nächsten CLI-Start der Aufgabe nachgestellt (`CliProcessStatusChanged` → `Started`). Der Service ist registriert in der Dependency Injection und wird vom `TaskDetailViewModel` genutzt.
+`PromptScheduleDispatchService` ist ein Singleton-Service, der zeitgesteuerte Prompts pro Aufgabe in einer Laufzeit-Warteschlange verwaltet. Geplante Prompts werden zusätzlich über den scoped `ScheduledPromptStore` in der Tabelle `ZeitgesteuertePrompts` persistiert, beim App-Start via `RestoreScheduledPromptsAsync` wiederhergestellt und — wenn zum Fälligkeitszeitpunkt keine Session zustellfähig ist — beim nächsten CLI-Start der Aufgabe nachgestellt (`CliProcessStatusChanged` → `Started`). Der Service ist registriert in der Dependency Injection und wird vom `TaskDetailViewModel` genutzt.
 
 ### Öffentliche Methoden
 
@@ -216,7 +216,7 @@ Alle Laufdaten-Mutationen laufen unter der statischen Sperrung `WorkItemService.
 
 ```csharp
 var targetTime = DateTimeOffset.Now.AddHours(2); // in 2 Stunden
-await _promptZeitVersandService.SchedulePromptAsync(
+await _promptScheduleDispatchService.SchedulePromptAsync(
     workItemId: workItemId,
     promptText: "Analysiere den Bug in LoginService",
     targetTime: targetTime);
@@ -246,7 +246,7 @@ await _promptZeitVersandService.SchedulePromptAsync(
 **Beispiel:**
 
 ```csharp
-await _promptZeitVersandService.CancelScheduledPromptAsync(workItemId);
+await _promptScheduleDispatchService.CancelScheduledPromptAsync(workItemId);
 ```
 
 ---
@@ -280,12 +280,12 @@ await _promptZeitVersandService.CancelScheduledPromptAsync(workItemId);
 
 | Typ | Beschreibung |
 |-----|--------------|
-| `ScheduledPromptInfo?` | Objekt mit `WorkItemId`, `PromptText`, `TargetTime` und `WartetAufSession`, oder `null` wenn kein Prompt geplant ist. |
+| `ScheduledPromptInfo?` | Objekt mit `WorkItemId`, `PromptText`, `TargetTime` und `WaitingForSession`, oder `null` wenn kein Prompt geplant ist. |
 
 **Beispiel:**
 
 ```csharp
-var scheduled = _promptZeitVersandService.GetScheduledPromptStatus(workItemId);
+var scheduled = _promptScheduleDispatchService.GetScheduledPromptStatus(workItemId);
 if (scheduled is not null)
 {
     Console.WriteLine($"Prompt geplant für {scheduled.TargetTime:HH:mm}");
@@ -312,7 +312,7 @@ if (scheduled is not null)
 **Beispiel:**
 
 ```csharp
-_promptZeitVersandService.PromptSent += (workItemId) =>
+_promptScheduleDispatchService.PromptSent += (workItemId) =>
 {
     Console.WriteLine($"Prompt für Aufgabe {workItemId} versendet");
 };
@@ -346,44 +346,44 @@ _promptZeitVersandService.PromptSent += (workItemId) =>
 | `WorkItemId` | `Guid` | ID der Aufgabe, deren Session den Prompt erhalten wird. |
 | `PromptText` | `string` | Der bereits aufgelöste Prompttext. |
 | `TargetTime` | `DateTimeOffset` | Der Zeitpunkt, zu dem der Prompt versendet werden soll. |
-| `WartetAufSession` | `bool` | `true`, wenn die Zielzeit bereits verstrichen ist, der Versand aber mangels zustellfähiger CLI-Session aussteht — der Plan bleibt gültig und wird beim nächsten CLI-Start zugestellt. |
+| `WaitingForSession` | `bool` | `true`, wenn die Zielzeit bereits verstrichen ist, der Versand aber mangels zustellfähiger CLI-Session aussteht — der Plan bleibt gültig und wird beim nächsten CLI-Start zugestellt. |
 
 **Beispiel:**
 
 ```csharp
 var info = new ScheduledPromptInfo(
     workItemId: workItemId,
-    promptText: "Analyt den Bug",
+    promptText: "Analysiere den Bug",
     targetTime: DateTimeOffset.Now.AddHours(1));
 ```
 
 ---
 
-## ZeitgesteuerterPromptStore — Persistenz geplanter Prompts
+## ScheduledPromptStore — Persistenz geplanter Prompts
 
-**Registrierung:** Scoped in DI; Abhängigkeiten: `SoftwareschmiedeDbContext`. Wird vom Singleton `PromptTimeDispatchService` ausschließlich über einen eigenen Scope (`IServiceScopeFactory` → `WithStoreAsync`) aufgelöst — Fehler beim Store-Zugriff werden geloggt und brechen den Versandpfad nicht.
+**Registrierung:** Scoped in DI; Abhängigkeiten: `SoftwareschmiedeDbContext`. Wird vom Singleton `PromptScheduleDispatchService` ausschließlich über einen eigenen Scope (`IServiceScopeFactory` → `WithStoreAsync`) aufgelöst — Fehler beim Store-Zugriff werden geloggt und brechen den Versandpfad nicht.
 
-### `GetAlleAsync(CancellationToken ct = default) : Task<IReadOnlyList<ScheduledPrompt>>`
+### `GetAllAsync(CancellationToken ct = default) : Task<IReadOnlyList<ScheduledPrompt>>`
 
 **Beschreibung:** Liefert alle persistierten geplanten Prompts (`AsNoTracking`); Grundlage für `RestoreScheduledPromptsAsync`.
 
-### `UpsertAsync(Guid workItemId, string promptText, DateTimeOffset zielZeitpunktUtc, CancellationToken ct = default) : Task`
+### `UpsertAsync(Guid workItemId, string promptText, DateTimeOffset targetTimeUtc, CancellationToken ct = default) : Task`
 
 **Beschreibung:** Schreibt den geplanten Prompt der Aufgabe oder ersetzt einen vorhandenen Datensatz (Ersetzungsregel — pro Aufgabe maximal ein Plan, datenbankseitig über Unique-Index auf `WorkItemId` abgesichert). Aktualisiert bei Ersetzung `PromptText`, `ZielZeitpunktUtc` und `AktualisiertAmUtc`.
 
-### `UpsertWennUebereinstimmendAsync(Guid workItemId, string promptText, DateTimeOffset zielZeitpunktUtc, ScheduledPromptInfo? erwartet, CancellationToken ct = default) : Task<bool>`
+### `UpsertIfMatchingAsync(Guid workItemId, string promptText, DateTimeOffset targetTimeUtc, ScheduledPromptInfo? erwartet, CancellationToken ct = default) : Task<bool>`
 
-**Beschreibung:** Schreibt den Plan nur, wenn der vorhandene Datensatz noch dem erwarteten Vorgängerstand entspricht (`PromptText` + `ZielZeitpunktUtc` auf Unix-Millisekunden normiert) bzw. kein Datensatz existiert und keiner erwartet wird — Lost-Update-Schutz für den Sofortversand-Fehlerpfad. Gibt `false` zurück, wenn ein abweichender (neuerer) Datensatz den Schreibzugriff verweigert.
+**Beschreibung:** Schreibt den Plan nur, wenn der vorhandene Datensatz noch dem expecteden Vorgängerstand entspricht (`PromptText` + `ZielZeitpunktUtc` auf Unix-Millisekunden normiert) bzw. kein Datensatz existiert und keiner expected wird — Lost-Update-Schutz für den Sofortversand-Fehlerpfad. Gibt `false` zurück, wenn ein abweichender (neuerer) Datensatz den Schreibzugriff verweigert.
 
-### `LoeschenAsync(Guid workItemId, CancellationToken ct = default) : Task`
+### `DeleteAsync(Guid workItemId, CancellationToken ct = default) : Task`
 
 **Beschreibung:** Entfernt den persistierten Plan der Aufgabe, falls vorhanden (Storno).
 
-### `LoeschenNachVersandAsync(Guid workItemId, string promptText, DateTimeOffset zielZeitpunktUtc, bool neuererPlanAktiv, CancellationToken ct = default) : Task`
+### `DeleteAfterDispatchAsync(Guid workItemId, string promptText, DateTimeOffset targetTimeUtc, bool newerScheduleActive, CancellationToken ct = default) : Task`
 
-**Beschreibung:** Entfernt den Datensatz nach erfolgreichem Versand. Entspricht der Datensatz dem versendeten Plan, wird er immer gelöscht; weicht er ab, bleibt er nur bei `neuererPlanAktiv == true` erhalten (Lost-Update-Schutz), sonst wird er als Leiche des versendeten Plans mitgelöscht.
+**Beschreibung:** Entfernt den Datensatz nach erfolgreichem Versand. Entspricht der Datensatz dem versendeten Plan, wird er immer gelöscht; weicht er ab, bleibt er nur bei `newerScheduleActive == true` erhalten (Lost-Update-Schutz), sonst wird er als Leiche des versendeten Plans mitgelöscht.
 
-### `UpdateTargetTimeAsync(Guid workItemId, DateTimeOffset zielZeitpunktUtc, CancellationToken ct = default) : Task`
+### `UpdateTargetTimeAsync(Guid workItemId, DateTimeOffset targetTimeUtc, CancellationToken ct = default) : Task`
 
 **Beschreibung:** Aktualisiert `ZielZeitpunktUtc` (und `AktualisiertAmUtc`) des persistierten Plans, z. B. bei Pausenverschiebung; No-Op, wenn kein Datensatz existiert.
 
@@ -454,7 +454,7 @@ var info = new ScheduledPromptInfo(
 **Ausgeführte Aktion:** `SchedulePromptAsync()` (private Methode)
 - Validiert Zeitfelder
 - Berechnet `targetTime`
-- Ruft `PromptTimeDispatchService.SchedulePromptAsync()` auf
+- Ruft `PromptScheduleDispatchService.SchedulePromptAsync()` auf
 - Aktualisiert `ScheduledPromptStatus` und `ScheduledPromptTimeDisplay` via `UpdateQueueDisplay()`
 - Leert Zeitfelder und Vorlage-Auswahl
 
@@ -464,13 +464,13 @@ var info = new ScheduledPromptInfo(
 
 **Typ:** `AsyncRelayCommand`
 
-**Bindung:** Button „Wartestellung aufheben" (`AutomationProperties.Name="WartestellungAufheben"`) im Status-`StackPanel`; sichtbar nur solange `ScheduledPromptStatus` gesetzt ist.
+**Bindung:** Button „Wartestellung aufheben" (`AutomationProperties.Name="ReleaseWaiting"`) im Status-`StackPanel`; sichtbar nur solange `ScheduledPromptStatus` gesetzt ist.
 
-**Ausgeführte Aktion:** `PromptTimeDispatchService.CancelScheduledPromptAsync(_workItemId)` — entfernt Plan und Datensatz; die Statusanzeige wird anschließend über `ScheduledPromptChanged` → `UpdateQueueDisplay` geleert.
+**Ausgeführte Aktion:** `PromptScheduleDispatchService.CancelScheduledPromptAsync(_workItemId)` — entfernt Plan und Datensatz; die Statusanzeige wird anschließend über `ScheduledPromptChanged` → `UpdateQueueDisplay` geleert.
 
 ---
 
-## Fehlerbehandlung (PromptZeitVersandService)
+## Fehlerbehandlung (PromptScheduleDispatchService)
 
 | Fehler | Verhalten |
 |--------|-----------|
@@ -486,7 +486,7 @@ var info = new ScheduledPromptInfo(
 
 ## CliRawExportService — CLI-Rohausgabe
 
-### `ExportCliRawAsync(Guid workItemId, string zielPfad, CancellationToken ct = default) : Task`
+### `ExportCliRawAsync(Guid workItemId, string targetPath, CancellationToken ct = default) : Task`
 
 **Beschreibung:** Schreibt die protokollierte CLI-Rohausgabe einer Aufgabe in eine `.raw`-Datei.
 
@@ -500,7 +500,7 @@ var info = new ScheduledPromptInfo(
 
 **Verhalten:**
 
-- Lädt die gespeicherten Protokolle über `LogService.GetByAufgabeAsync(...)`.
+- Lädt die gespeicherten Protokolle über `LogService.GetByWorkItemAsync(...)`.
 - Filtert ausschließlich `LogEntryType.CliOutput` und übernimmt nur deren `Inhalt`.
 - Verbindet die Zeilen in vorhandener Reihenfolge mit `Environment.NewLine`.
 - Schreibt die Datei mit UTF-8 ohne BOM.
@@ -510,7 +510,7 @@ var info = new ScheduledPromptInfo(
 
 Exportiert den im `AiExecutionService` gehaltenen Rohbyte-Mitschnitt einer Aufgabe als `.clireplay`-Binärdatei (Interface `ICliReplayExportService`).
 
-### `ExportCliReplayAsync(Guid workItemId, string zielPfad, CancellationToken ct = default) : Task`
+### `ExportCliReplayAsync(Guid workItemId, string targetPath, CancellationToken ct = default) : Task`
 
 **Beschreibung:** Schreibt die aufgezeichnete CLI-Ausgabe einer Aufgabe (Header + zeitgestempelte Chunk-Records) über `CliReplayRecordingStore` in die angegebene `.clireplay`-Datei.
 
@@ -527,7 +527,7 @@ Exportiert den im `AiExecutionService` gehaltenen Rohbyte-Mitschnitt einer Aufga
 | Exception | Ursache |
 |-----------|---------|
 | `ArgumentException` | `targetPath` leer. |
-| `InvalidOperationException` | „Für diese Aufgabe liegt keine Aufzeichnung vor." — `AiExecutionService.GetCliAufzeichnung` liefert `null`. |
+| `InvalidOperationException` | „Für diese Aufgabe liegt keine Aufzeichnung vor." — `AiExecutionService.GetCliRecording` liefert `null`. |
 
 ### `HasRecording(Guid workItemId) : bool`
 
@@ -535,23 +535,23 @@ Exportiert den im `AiExecutionService` gehaltenen Rohbyte-Mitschnitt einer Aufga
 
 ## AufgabenListModeService — Anzeigemodus-Persistenz
 
-Singleton-Service (`src/Softwareschmiede.App/Services/`), der den Anzeigemodus der aktiven Aufgabenliste je Ansicht (Seitenleiste, Dashboard) über `AppSettingService` in eigenen DI-Scopes (`IServiceScopeFactory`) liest und schreibt — Muster `DarkModeService`.
+Singleton-Service (`src/Softwareschmiede.App/Services/`), der den Anzeigemodus der aktiven WorkItemsList je Ansicht (Seitenleiste, Dashboard) über `AppSettingService` in eigenen DI-Scopes (`IServiceScopeFactory`) liest und schreibt — Muster `DarkModeService`.
 
-### `LadeMenueModusAsync(CancellationToken ct = default) : Task<WorkItemListMode>`
+### `LoadMenuModeAsync(CancellationToken ct = default) : Task<WorkItemListMode>`
 
-**Beschreibung:** Lädt den gespeicherten Anzeigemodus der Seitenleisten-Aufgabenliste (`AppSettingService.ActiveWorkItemsListModeKey`).
+**Beschreibung:** Lädt den gespeicherten Anzeigemodus der Seitenleisten-WorkItemsList (`AppSettingService.ActiveWorkItemsListModeKey`).
 
 **Rückgabe:** Der gespeicherte `WorkItemListMode` oder `Datum`, wenn kein gültiger Wert gespeichert ist (`Enum.TryParse`, Groß-/Kleinschreibung tolerant, plus `Enum.IsDefined`).
 
-### `LadeDashboardModusAsync(CancellationToken ct = default) : Task<WorkItemListMode>`
+### `LoadDashboardModeAsync(CancellationToken ct = default) : Task<WorkItemListMode>`
 
 **Beschreibung:** Wie `LoadMenuModeAsync`, aber für den Dashboard-Schlüssel (`ActiveWorkItemsListModeDashboardKey`).
 
-### `SpeichereMenueModusAsync(WorkItemListMode modus, CancellationToken ct = default) : Task`
+### `SaveMenuModeAsync(WorkItemListMode modus, CancellationToken ct = default) : Task`
 
-**Beschreibung:** Speichert den Anzeigemodus der Seitenleisten-Aufgabenliste als Enum-Namen (`modus.ToString()`) per `SetSettingAsync`.
+**Beschreibung:** Speichert den Anzeigemodus der Seitenleisten-WorkItemsList als Enum-Namen (`modus.ToString()`) per `SetSettingAsync`.
 
-### `SpeichereDashboardModusAsync(WorkItemListMode modus, CancellationToken ct = default) : Task`
+### `SaveDashboardModeAsync(WorkItemListMode modus, CancellationToken ct = default) : Task`
 
 **Beschreibung:** Wie `SaveMenuModeAsync`, aber für den Dashboard-Schlüssel.
 
@@ -561,8 +561,8 @@ Kapselt die gemeinsame Bindungslogik von `MainWindowViewModel` und `DashboardVie
 
 | Member | Typ | Beschreibung |
 |--------|-----|--------------|
-| `FuerMenue(modusService, logger, dispatch)` | statische Factory | Bindung für die Seitenleiste (Menü-Schlüssel); `dispatch` = UI-Thread-Marshalling der Wiederherstellung |
-| `FuerDashboard(modusService, logger)` | statische Factory | Bindung für das Dashboard (Dashboard-Schlüssel) |
+| `ForMenu(modeService, logger, dispatch)` | statische Factory | Bindung für die Seitenleiste (Menü-Schlüssel); `dispatch` = UI-Thread-Marshalling der Wiederherstellung |
+| `FuerDashboard(modeService, logger)` | statische Factory | Bindung für das Dashboard (Dashboard-Schlüssel) |
 | `Wert` | `WorkItemListMode` | Aktueller Modus; Setzen löst `ValueChanged` aus, setzt den Race-Guard und persistiert fire-and-forget |
 | `ValueChanged` | `event Action` | Benachrichtigung nach Wertänderung und Wiederherstellung (für `OnPropertyChanged` im ViewModel) |
 | `LoadSavedValueAsync(ct)` | `Task` | Lädt den persistierten Modus und wendet ihn ohne Write-Back an; ein zwischenzeitlich gesetzter Wert (Race-Guard, geprüft vor und nach dem `await`) wird nicht überschrieben |
@@ -571,12 +571,12 @@ Kapselt die gemeinsame Bindungslogik von `MainWindowViewModel` und `DashboardVie
 
 - `WorkItemListMode` (Enum): `Datum` (flache Liste nach letzter Ausführung), `Repository` (gruppiert nach Repository-Name), `Ki` (gruppiert nach KI).
 - `WorkItemListLayout` (statisch): `Konfiguriere(ListCollectionView, WorkItemListMode)` setzt die zum Modus gehörigen `SortDescriptions` und optional eine `PropertyGroupDescription`; `CreateSortDescriptors`/`CreateGroupDescriptor` liefern dieselben Deskriptoren als Daten (unit-testbar). Konstanten `NotExecuted` (`"Nicht ausgeführt"`) und `WithoutRepository` (`"Ohne Repository"`) als Fallback-Gruppennamen.
-- `ActiveTasksListControl.ListMode` (Dependency Property): gebunden an `WorkItemListMode` des jeweiligen ViewModels; Änderungen werden über `OnListModeChanged` → `WorkItemListLayout.Konfiguriere` auf die instanz-eigene `ListCollectionView` angewendet.
+- `ActiveTasksListControl.ListMode` (Dependency Property): gebunden an `WorkItemListMode` des jeweiligen ViewModels; Änderungen werden über `OnListModeChanged` → `WorkItemListLayout.Configure` auf die instanz-eigene `ListCollectionView` angewendet.
 - `IPlugin.PluginSymbol` (`string`, Default-Interface-Member → `IPlugin.FallbackSymbol = "◻"`): Unicode-Glyph des Plugins für die Symbolzeile der Aufgabenkachel; `virtual` an `GitPluginBase<TPlugin>`/`CliAiPluginBase`, von allen Repo-Plugins überschrieben. Binärkompatibel — ältere Plugin-DLLs erhalten den Fallback-Glyph. Details: [Plugin-System — API](../plugins/api.md).
 
 ## IDialogService — Dialoge
 
-### `ShowWorkItemPauseDialogAsync(WorkItemPauseDialogViewModel viewModel, CancellationToken ct = default) : Task<PauseWorkItemResult?>`
+### `ShowWorkItemPauseDialogAsync(PauseWorkItemDialogViewModel viewModel, CancellationToken ct = default) : Task<PauseWorkItemResult?>`
 
 **Beschreibung:** Zeigt den modalen Dialog **Pause einstellen** zum Setzen oder Aufheben einer Aufgaben-Pause.
 
@@ -584,10 +584,10 @@ Kapselt die gemeinsame Bindungslogik von `MainWindowViewModel` und `DashboardVie
 
 | Name | Typ | Beschreibung |
 |------|-----|--------------|
-| `viewModel` | `WorkItemPauseDialogViewModel` | Vorbefülltes Dialog-ViewModel (Vorbelegung: nächste volle Minute; bei bestehender Pause deren Endzeitpunkt). |
+| `viewModel` | `PauseWorkItemDialogViewModel` | Vorbefülltes Dialog-ViewModel (Vorbelegung: nächste volle Minute; bei bestehender Pause deren Endzeitpunkt). |
 | `ct` | `CancellationToken` | Optionales Abbruch-Token. |
 
-**Rückgabe:** `PauseWorkItemResult?` — `null` bei Abbruch; `Aufheben = true` zum Aufheben; andernfalls `PausedUntilUtc` mit dem gewählten UTC-Zeitpunkt.
+**Rückgabe:** `PauseWorkItemResult?` — `null` bei Abbruch; `Lift = true` zum Aufheben; andernfalls `PausedUntilUtc` mit dem gewählten UTC-Zeitpunkt.
 
 **`PauseWorkItemResult` (Record):**
 
@@ -599,7 +599,7 @@ Kapselt die gemeinsame Bindungslogik von `MainWindowViewModel` und `DashboardVie
 **Verhalten:**
 
 - `WpfDialogService` zeigt `WorkItemPauseDialog` modal über `ShowDialogAsync`.
-- Die Validierung läuft im ViewModel (`KannBestaetigen`, `ValidationError`): Datum gesetzt, Stunde 0–23, Minute 0–59, Zeitpunkt in der Zukunft.
+- Die Validierung läuft im ViewModel (`CanConfirm`, `ValidationError`): Datum gesetzt, Stunde 0–23, Minute 0–59, Zeitpunkt in der Zukunft.
 - `TaskDetailViewModel.SetPauseAsync` ruft anschließend `WorkItemService.SetPauseAsync` auf (`null` bei `Aufheben`).
 
 ### `ShowSaveFileDialogAsync(string title, string filter, string defaultFileName, string? initialDirectory = null, CancellationToken ct = default) : Task<string?>`
@@ -651,6 +651,6 @@ Kapselt die gemeinsame Bindungslogik von `MainWindowViewModel` und `DashboardVie
 
 ## Thread-Sicherheit
 
-- `PromptTimeDispatchService` ist Thread-safe: Der interne Dictionary wird durch `lock` geschützt.
+- `PromptScheduleDispatchService` ist Thread-safe: Der interne Dictionary wird durch `lock` geschützt.
 - Timer-Callbacks laufen auf Thread-Pool-Threads; `PromptSent`-Event wird ebenfalls auf Thread-Pool-Thread ausgelöst.
 - UI-Updates im ViewModel (über `PromptSent`) müssen via `Dispatcher.Invoke` gemarshallt werden; das `TaskDetailViewModel` macht dies automatisch.

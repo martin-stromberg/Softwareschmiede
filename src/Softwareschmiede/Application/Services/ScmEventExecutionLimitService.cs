@@ -4,7 +4,7 @@ using Softwareschmiede.Infrastructure.Data;
 namespace Softwareschmiede.Application.Services;
 
 /// <summary>Belegung laufender CLI-Ausführungen für die Ausführungsbegrenzung.
-/// Pausierte Aufgaben (<c>Aufgabe.PausiertBisUtc</c> in der Zukunft) belegen trotz
+/// Pausierte Aufgaben (<c>Aufgabe.PausedUntilUtc</c> in der Zukunft) belegen trotz
 /// weiterlaufendem Prozess keinen Platz und fehlen in beiden Zählern.</summary>
 /// <param name="Global">Anzahl aller Aufgaben mit laufender, nicht pausierter CLI-Ausführung
 /// (inklusive laufender Handles ohne auflösbare Aufgabenzeile).</param>
@@ -183,7 +183,7 @@ public sealed class ScmEventExecutionLimitService(
         => int.TryParse(value, out var limit) && limit >= 1 ? limit : null;
 
     /// <summary>Zählt die laufenden CLI-Handles global und je Plugin. Pausierte Aufgaben
-    /// (<c>PausiertBisUtc</c> in der Zukunft — ihr Prozess läuft bewusst weiter) belegen keinen
+    /// (<c>PausedUntilUtc</c> in der Zukunft — ihr Prozess läuft bewusst weiter) belegen keinen
     /// Platz und werden vor der globalen Zählung und der Plugin-Attribution herausgefiltert;
     /// abgelaufene oder fehlende Pausenzeiten sowie Handles ohne Aufgabenzeile zählen voll.</summary>
     private async Task<CliExecutionOccupancy> GetOccupancyAsync(CancellationToken ct)
@@ -209,7 +209,7 @@ public sealed class ScmEventExecutionLimitService(
             proPlugin[prefix] = count + 1;
         }
         // Global = active Aufgaben plus laufende Handles ohne auflösbare Aufgabenzeile
-        // (letztere haben kein PausiertBisUtc und zählen bewusst weiterhin voll).
+        // (letztere haben kein PausedUntilUtc und zählen bewusst weiterhin voll).
         return new(active.Count + (runningIds.Count - workItems.Count), proPlugin);
     }
 }

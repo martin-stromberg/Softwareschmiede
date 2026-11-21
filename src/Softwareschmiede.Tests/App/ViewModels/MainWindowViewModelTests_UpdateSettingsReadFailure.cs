@@ -29,7 +29,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
     {
         /// <summary>Einmalige Startautomatik nach Fensterbereitschaft.</summary>
         Startautomatik,
-        /// <summary>Manuelle Prüfung über UpdatePruefenCommand.</summary>
+        /// <summary>Manuelle Prüfung über CheckUpdateCommand.</summary>
         CheckManual,
         /// <summary>Manueller Installationsstart über UpdateStartenCommand.</summary>
         InstallManual

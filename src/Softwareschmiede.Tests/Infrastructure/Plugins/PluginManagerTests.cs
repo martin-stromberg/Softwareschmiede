@@ -189,7 +189,7 @@ public sealed class PluginManagerTests : IDisposable
     [Fact]
     public void GetDefaultIdePlugin_ShouldThrowInvalidOperationException_WhenNoPluginsRegistered()
     {
-        // Ohne registrierten IProzessStarter/IVisualStudioCodeLocator kann ActivatorUtilities die
+        // Ohne registrierten IProcessStarter/IVisualStudioCodeLocator kann ActivatorUtilities die
         // eingebauten IDE-Plugins nicht instanziieren; TryCreateAndRegister fängt die Exception ab
         // und überspringt die Registrierung, sodass _idePlugins leer bleibt.
         var services = new ServiceCollection()

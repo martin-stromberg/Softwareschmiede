@@ -9,7 +9,7 @@ Der gespeicherte Update-Modus (`UpdateMode`, persistiert als Zahl unter dem Schl
 | Modus | Wert | Startautomatik | Manuelle Prüfung („⟳ Prüfen") | Installation |
 |-------|------|----------------|-------------------------------|--------------|
 | `Aus` | 0 | Kein Releaseabruf | Gesperrt (`CheckCan` = false); der Methodenrumpf bricht ebenfalls vor der Prüfung ab | Nicht möglich; `⇧ Update` ausgeblendet |
-| `NurPruefen` | 1 (Default) | Einmal prüfen, Fund anbieten | Prüfen + Angebot | Nur per Klick auf „⇧ Update", mit erneuter Prüfung |
+| `CheckOnly` | 1 (Default) | Einmal prüfen, Fund anbieten | Prüfen + Angebot | Nur per Klick auf „⇧ Update", mit erneuter Prüfung |
 | `CheckAndRunAtStartup` | 2 | Einmal prüfen **und** bei Fund automatisch installieren | Prüfen + nur Angebot (keine Automatik) | Automatisch beim Start bzw. per Klick mit erneuter Prüfung |
 
 Regeln:
@@ -17,17 +17,17 @@ Regeln:
 - `Aus` sperrt die Startprüfung, den manuellen Prüfbefehl und den manuellen Installationsstart — ohne Ausnahmen.
 - Die automatische Installation ist auf den einmaligen Programmstart begrenzt (`_startInitializationCompleted`). Spätere manuelle Prüfungen installieren nie automatisch, auch nicht im Startmodus.
 - Die CLI-Sicherheitsprüfung samt Bestätigungsdialog gilt in allen Modi, in denen eine Installation ansteht — auch bei der Startautomatik.
-- Fehlende oder ungültige gespeicherte Werte fallen auf `NurPruefen` bzw. den Update-Pfad `Produktivversionen` zurück.
+- Fehlende oder ungültige gespeicherte Werte fallen auf `CheckOnly` bzw. den Update-Pfad `Produktivversionen` zurück.
 - Ein Datenbank-**Lesefehler** ist kein erfolgreich gelesener fehlender Schlüssel: Er erzeugt den sichtbaren Nicht-prüfbar-Zustand und verhindert jeden Updater-Start. Es gibt keine Ersatzfreigabe durch Defaults, Snapshots oder Caches.
 
 ## Update-Pfad und exklusiver Update-Kanal
 
-- Der gespeicherte Update-Pfad (`updates.pfad`, `AppSettingService.UpdatePathKey`) kennt genau zwei gültige Werte (`UpdatePathChannelResolver.StableVersionsPath`/`PrereleaseVersionsPath`), die auf den exklusiven `UpdateChannel` abgebildet werden: `Produktivversionen` → `UpdateChannel.Produktiv`, `Vorabversionen` → `UpdateChannel.ReleaseCandidate` (`UpdatePathChannelResolver.ResolveChannel`, OrdinalIgnoreCase + Trim).
+- Der gespeicherte Update-Pfad (`updates.pfad`, `AppSettingService.UpdatePathKey`) kennt genau zwei gültige Werte (`UpdatePathChannelResolver.StableVersionsPath`/`PrereleaseVersionsPath`), die auf den exklusiven `UpdateChannel` abgebildet werden: `Produktivversionen` → `UpdateChannel.Stable`, `Vorabversionen` → `UpdateChannel.ReleaseCandidate` (`UpdatePathChannelResolver.ResolveChannel`, OrdinalIgnoreCase + Trim).
 - Fehlende, leere oder unbekannte gespeicherte Werte werden beim Lesen über `UpdatePathChannelResolver.NormalizePath` auf `Produktivversionen` zurückgeführt; `SetUpdateSettingsAsync` lehnt Werte außerhalb der zwei bekannten Pfade per `IsValidPath` mit `ArgumentOutOfRangeException` ab — es wird dann nichts geschrieben.
 - Der Kanal filtert die Kandidatenmenge **strikt exklusiv**: Im Produktiv-Kanal überspringt `GitHubReleaseClient.TryCreateCandidate` alle als Prerelease klassifizierten Einträge, im RC-Kanal alle nicht-prerelease Einträge. Stabile und Vorabversionen konkurrieren niemals gemeinsam im SemVer-Vergleich.
 - Hintergrund der Trennung: RC-Installationen nutzen einen eigenen Datenbank-Speicherort (`DatabasePathResolver`: `version.json`-`tagName` mit „-rc"-Infix → `{Programmverzeichnis}\softwareschmiede.db`, produktive Tags → `%LocalAppData%\Softwareschmiede\softwareschmiede.db`). Ein kanalübergreifendes Update würde die Installation auf den fremden Datenbestand umschalten.
 - Ein Release gilt als Prerelease, wenn das GitHub-Flag `prerelease` gesetzt **oder** das Tag ein SemVer-Prerelease-Suffix trägt (`SemanticUpdateVersion.IsPrerelease`). `UpdateInfo.IsPrerelease` führt diese Klassifikation verbindlich weiter — auch bei GitHub-markierten Tags ohne Suffix.
-- **Defensivprüfung:** Ein Ergebnis, das nicht zum gewählten Kanal passt (`UpdateInfo.IsPrerelease` widerspricht `UpdateCheckOptions.Kanal` in beide Richtungen), ist eine interne Vertragsverletzung und wird nicht angeboten (`NotCheckable`).
+- **Defensivprüfung:** Ein Ergebnis, das nicht zum gewählten Kanal passt (`UpdateInfo.IsPrerelease` widerspricht `UpdateCheckOptions.UpdatePath` in beide Richtungen), ist eine interne Vertragsverletzung und wird nicht angeboten (`NotCheckable`).
 - **Konsistenzwarnung Installation ↔ Kanal:** `UpdatePathChannelResolver.ResolveChannelForTagName` ordnet den `tagName` der installierten `version.json` dem Kanalmodell zu („-rc"-Infix → `ReleaseCandidate`; fehlender/leerer Tag konservativ → `ReleaseCandidate`, gleiche Regel wie `DatabasePathResolver`). Weicht der Installationskanal vom gewählten Kanal ab, bleibt das Ergebnis `UpdateAvailable`, trägt aber eine Warn-`Message` („Der gewählte Update-Pfad passt nicht zur installierten Version. Das Update wird trotzdem angeboten."), die über `UpdateNotice` in der Seitenleiste erscheint; zusätzlich wird ein `LogWarning` geschrieben. Die Warnung greift nur im Angebotsfall — `KeinUpdate` und `NotCheckable` bleiben warnfrei.
 - Der Altbestand `updates.includePrereleases` wird nicht mehr gelesen oder geschrieben (stiller Verfall, keine Migration).
 
@@ -93,6 +93,6 @@ Regeln:
 
 ## Sicherheitsprüfung vor der Installation
 
-- `CliUpdateSafetyService.CheckAsync` lädt aktive Aufgaben und zählt als riskant, was `WorkItemRunActivity.IstAktiv(ActiveRunId, LastHeartbeatUtc, now)` als aktiv laufenden CLI-Prozess klassifiziert.
+- `CliUpdateSafetyService.CheckAsync` lädt aktive Aufgaben und zählt als riskant, was `WorkItemRunActivity.IsActive(ActiveRunId, LastHeartbeatUtc, now)` als aktiv laufenden CLI-Prozess klassifiziert.
 - `CliUpdateSafetyResult.RequiresConfirmation` (RiskyTaskCount > 0) führt zum Bestätigungsdialog „Update starten?" mit bis zu fünf gelisteten Aufgaben (Rest als „weitere n Aufgabe(n)").
 - Ablehnung verhindert Fortschrittsdialog, Download und Start — auch für die Startautomatik.
