@@ -7,11 +7,11 @@
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
 | `Id` | `Guid` | Primärschlüssel |
-| `AufgabeId` | `Guid?` | FK → Aufgabe (optional) |
+| `WorkItemId` | `Guid?` | FK → Aufgabe (optional) |
 | `GitRepositoryId` | `Guid?` | FK → GitRepository (optional) |
-| `Status` | `DiffResultStatus` | `Erfolgreich`, `Fehlgeschlagen`, `NochNichtBerechnet` |
+| `Status` | `DiffResultStatus` | `Generated`, `Error`, `Pending` |
 | `Typ` | `DiffType` | Art des Diffs (z.B. `Branch`, `Commit`, `Datei`) |
-| `ErstellungsDatum` | `DateTimeOffset` | Berechnungszeitpunkt |
+| `CreatedAt` | `DateTimeOffset` | Berechnungszeitpunkt |
 | `Blocks` | `List<DiffBlock>` | Änderungsblöcke |
 
 ### `DiffBlock`
@@ -20,9 +20,9 @@
 |-------------|-----|--------------|
 | `Id` | `Guid` | Primärschlüssel |
 | `DiffResultId` | `Guid` | FK → DiffResult |
-| `Typ` | `DiffBlockType` | `Hinzugefuegt`, `Entfernt`, `Kontext` |
-| `OldStart` | `int` | Erste Zeile im Original |
-| `NewStart` | `int` | Erste Zeile in der neuen Version |
+| `Typ` | `DiffBlockType` | `Added`, `Removed`, `Context` |
+| `SourceStartLine` | `int` | Erste Zeile im Original |
+| `TargetStartLine` | `int` | Erste Zeile in der neuen Version |
 | `Lines` | `List<DiffLine>` | Enthaltene Zeilen |
 
 ### `DiffLine`
@@ -31,7 +31,7 @@
 |-------------|-----|--------------|
 | `Id` | `Guid` | Primärschlüssel |
 | `DiffBlockId` | `Guid` | FK → DiffBlock |
-| `Status` | `DiffLineStatus` | `Hinzugefuegt`, `Entfernt`, `Unveraendert` |
+| `Status` | `DiffLineStatus` | `Added`, `Removed`, `Context` |
 | `OldLineNumber` | `int?` | Zeilennummer im Original |
 | `NewLineNumber` | `int?` | Zeilennummer in der neuen Version |
 | `Inhalt` | `string` | Zeileninhalt |
@@ -43,7 +43,7 @@
 | `Id` | `Guid` | Primärschlüssel |
 | `CacheKey` | `string` | Hash/Schlüssel für Cache-Lookup |
 | `DiffResultId` | `Guid` | FK → DiffResult |
-| `ErstellungsDatum` | `DateTimeOffset` | Cache-Zeitpunkt |
+| `CreatedAt` | `DateTimeOffset` | Cache-Zeitpunkt |
 
 ## Beziehungen
 

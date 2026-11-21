@@ -15,8 +15,8 @@
 | `RibbonGroup` | Custom Control | Visuelle Gruppe von Ribbon-Buttons |
 | `RibbonLargeButton` | Custom Control | Großer Ribbon-Button mit Icon und Text |
 | `RibbonSmallButton` | Custom Control | Kleiner Ribbon-Button mit Icon und Text |
-| `ProjektService` | Service (C#) | Geschäftslogik für Projekt-CRUD und Repository-Management |
-| `AufgabeService` | Service (C#) | Geschäftslogik für Aufgaben-Verwaltung |
+| `ProjectService` | Service (C#) | Geschäftslogik für Projekt-CRUD und Repository-Management |
+| `WorkItemService` | Service (C#) | Geschäftslogik für Aufgaben-Verwaltung |
 | `TaskDetailViewModel` | ViewModel (C#) | Verwaltung der Aufgabendetail-Ansicht (inline eingebunden) |
 
 ## Abhängigkeiten
@@ -24,10 +24,10 @@
 ```
 ProjectDetailView (XAML)
 ├── ProjectDetailViewModel (Binding)
-│   ├── ProjektService (Dependency Injection)
-│   │   └── SoftwareschmiededDbContext
-│   ├── AufgabeService (Dependency Injection)
-│   │   └── SoftwareschmiededDbContext
+│   ├── ProjectService (Dependency Injection)
+│   │   └── SoftwareschmiedeDbContext
+│   ├── WorkItemService (Dependency Injection)
+│   │   └── SoftwareschmiedeDbContext
 │   ├── IServiceProvider (DI-Container)
 │   │   └── TaskDetailViewModel (On-demand instantiation)
 │   │   └── RepositoryAssignViewModel (On-demand instantiation)
@@ -35,7 +35,7 @@ ProjectDetailView (XAML)
 │
 ├── RepositoryAssignDialog (via RepositoryDialogOeffnenFunc)
 │   └── RepositoryAssignViewModel
-│       ├── ProjektService
+│       ├── ProjectService
 │       └── ILogger<RepositoryAssignViewModel>
 │
 ├── TaskDetailView (via SelectedTaskViewModel binding)
@@ -68,11 +68,11 @@ Die Projektdetailansicht ist in drei visuelle Bereiche unterteilt:
 ```
 BenutzernavigationZuProjekt
     ↓
-ProjectListViewModel setzt ProjectDetailViewModel.ProjektId
+ProjectListViewModel setzt ProjectDetailViewModel.ProjectId
     ↓
-PropertyChanged löst LadenAsync aus
+PropertyChanged löst LoadAsync aus
     ↓
-ProjektService.GetDetailAsync() + AufgabeService.GetByProjektAsync()
+ProjectService.GetDetailAsync() + WorkItemService.GetByProjektAsync()
     ↓
 Projekt, Aufgaben, ProjektName, ProjektBeschreibung, SelectedRepository werden gesetzt
     ↓
@@ -87,11 +87,11 @@ ProjektName/ProjektBeschreibung Properties ändern sich (UpdateSourceTrigger=Pro
     ↓
 Benutzer klickt "Speichern"-Button
     ↓
-SpeichernCommand ruft ProjektSpeichernAsync auf
+SaveCommand ruft ProjektSaveAsync auf
     ↓
 Prüfung: IsNeuanlage (leere ID)?
-    ├─ Ja: ProjektService.CreateAsync() → neue ID → ZurueckAction
-    └─ Nein: ProjektService.UpdateAsync() → LadenAsync() → UI aktualisiert
+    ├─ Ja: ProjectService.CreateAsync() → neue ID → ZurueckAction
+    └─ Nein: ProjectService.UpdateAsync() → LoadAsync() → UI aktualisiert
     ↓
 ProjektListeAktualisierenCallback wird aufgerufen
 ```
@@ -102,16 +102,16 @@ Benutzer klickt "Zuweisen"-Button
     ↓
 RepositoryZuweisenCommand ruft RepositoryZuweisenAsync auf
     ↓
-RepositoryAssignViewModel wird instantiiert und LadenAsync() aufgerufen
+RepositoryAssignViewModel wird instantiiert und LoadAsync() aufgerufen
     ↓
-ProjektService.GetAllRepositoriesAsync() lädt Repositories in VerfuegbareRepositories
+ProjectService.GetAllRepositoriesAsync() lädt Repositories in VerfuegbareRepositories
     ↓
 RepositoryDialogOeffnenFunc öffnet RepositoryAssignDialog modal
     ↓
 Benutzer wählt Repository aus (SelectedRepository wird gesetzt)
     ↓
 Benutzer klickt "Zuweisen" oder "Abbrechen"
-    ├─ Zuweisen: Dialog gibt true zurück → ProjektService.AddRepositoryAsync() → LadenAsync()
+    ├─ Zuweisen: Dialog gibt true zurück → ProjectService.AddRepositoryAsync() → LoadAsync()
     └─ Abbrechen: Dialog gibt false zurück → keine Änderung
     ↓
 UI aktualisiert mit neuen Repositories
@@ -124,13 +124,13 @@ Folgende WPF-Value-Converter werden in der Ansicht verwendet:
 - **`BoolToVisibilityConverter`** — Zeigt Loading-Symbol und Filter-Overlay wenn entsprechende Properties true sind
 - **`InverseBoolToVisibilityConverter`** — Versteckt Aufgaben-Kachel im Anlage-Modus (IsNeuanlage ist true)
 - **`NullOrEmptyToVisibilityConverter`** — Zeigt TaskDetailView nur wenn SelectedTaskViewModel nicht null ist
-- **`EnumToBoolConverter`** — Bindet AufgabenFilterTyp Enum-Werte an RadioButton-Selection
+- **`EnumToBoolConverter`** — Bindet WorkItemFilterType Enum-Werte an RadioButton-Selection
 
 ## Disposa​l und Cleanup
 
 - `ProjectDetailViewModel` implementiert `IDisposable`
-- `_ladenCts` (CancellationTokenSource) wird bei jedem neuen Laden abgebrochen und disposed
+- `_loadCts` (CancellationTokenSource) wird bei jedem neuen Laden abgebrochen und disposed
 - Wenn `SelectedTaskViewModel` eine neue Instanz wird, wird die alte disposed (falls `IDisposable`)
-- Bei Disposal des ViewModels: `_ladenCts` wird disposed und `_selectedTaskViewModel` wird disposed
+- Bei Disposal des ViewModels: `_loadCts` wird disposed und `_selectedTaskViewModel` wird disposed
 
 Dies verhindert Memory Leaks und stellt sicher, dass Background-Tasks nicht auf disposed ViewModels zugreifen.

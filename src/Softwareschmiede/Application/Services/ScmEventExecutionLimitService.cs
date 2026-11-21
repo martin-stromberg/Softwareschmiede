@@ -90,9 +90,9 @@ public sealed class ScmEventExecutionLimitService(
             // gelesen, damit die Momentaufnahme nicht zwischen Prüfung und Platzbelegung
             // veralten kann. Starts, die die Zulassungskontrolle gar nicht passieren (z. B.
             // manuelle CLI-Starts im Aufgabenfenster), unterliegen dem Limit bewusst nicht.
-            var wartegrund = GetStartBlockReason(pluginPrefix, globalLimit, pluginLimit, await EffectiveOccupancyAsync(ct));
-            if (wartegrund is not null)
-                return new CliStartSlotAdmission(wartegrund, null);
+            var waitReason = GetStartBlockReason(pluginPrefix, globalLimit, pluginLimit, await EffectiveOccupancyAsync(ct));
+            if (waitReason is not null)
+                return new CliStartSlotAdmission(waitReason, null);
             var reservation = reservationPool.Reserve(pluginPrefix,
                 time.GetUtcNow().ToUnixTimeMilliseconds() + (long)ReservationLifetime.TotalMilliseconds);
             return new CliStartSlotAdmission(null, reservation);

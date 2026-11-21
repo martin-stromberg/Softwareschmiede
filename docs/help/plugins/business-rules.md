@@ -6,11 +6,11 @@
 
 ### Regel: Fehlende Einträge gelten als aktiviert
 
-**Beschreibung:** Wenn für ein Plugin kein Aktivierungseintrag in der `AppEinstellung`-Tabelle existiert, wird das Plugin als aktiviert behandelt. Dies ermöglicht Rückwärtskompatibilität und macht neue Plugins automatisch verfügbar.
+**Beschreibung:** Wenn für ein Plugin kein Aktivierungseintrag in der `AppSetting`-Tabelle existiert, wird das Plugin als aktiviert behandelt. Dies ermöglicht Rückwärtskompatibilität und macht neue Plugins automatisch verfügbar.
 
 **Bedingungen:**
 - Plugin existiert im System
-- Kein Eintrag mit Schlüssel `plugins.enabled.<PluginPrefix>` in `AppEinstellung`
+- Kein Eintrag mit Schlüssel `plugins.enabled.<PluginPrefix>` in `AppSetting`
 
 **Verhalten:**
 - `PluginActivationService.IsPluginEnabledAsync(pluginPrefix)` gibt `true` zurück
@@ -32,7 +32,7 @@
 - Plugin wird nicht als Default vorgeschlagen
 - Plugin wird von Filter-Methoden ausgeschlossen
 
-**Umsetzung:** `PluginSelectionService.GetAvailableKiPluginPrefixesAsync()` — ruft `PluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync()` auf, die deaktivierte Plugins filtert
+**Umsetzung:** `PluginSelectionService.GetAvailableAiPluginPrefixesAsync()` — ruft `PluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync()` auf, die deaktivierte Plugins filtert
 
 ## Mindestanforderung für funktionsfähige Kategorien
 
@@ -50,10 +50,10 @@
 - Checkbox bleibt aktiviert
 
 **Fehlerfall:**
-- Fehlermeldung: `ValidierePluginAktivierung()` → `FehlerMeldung = "Mindestens ein Quellcodeverwaltungs-Plugin muss aktiv bleiben."` oder `"Mindestens ein KI-Plugin muss aktiv bleiben."`
-- `SpeichernAsync()` bricht ab, keine Änderungen werden persistiert
+- Fehlermeldung: `ValidatePluginActivation()` → `FehlerMeldung = "Mindestens ein Quellcodeverwaltungs-Plugin muss aktiv bleiben."` oder `"Mindestens ein KI-Plugin muss aktiv bleiben."`
+- `SaveAsync()` bricht ab, keine Änderungen werden persistiert
 
-**Umsetzung:** `SettingsViewModel.ValidierePluginAktivierung()` prüft vor Speichern, ob noch mindestens ein Plugin aktiv ist
+**Umsetzung:** `SettingsViewModel.ValidatePluginActivation()` prüft vor Speichern, ob noch mindestens ein Plugin aktiv ist
 
 ## UI-Verhalten bei Auswahl
 
@@ -74,9 +74,9 @@
 | Projektbearbeitung SCM-Selector | `HasMultipleScmPlugins = false`; Plugin wird automatisch selektiert |
 
 **Umsetzung:**
-- `TaskDetailViewModel.LadeVerfuegbarePluginsAsync()` — setzt `ZeigeKiPluginAuswahl` basierend auf Anzahl aktiver Plugins
+- `TaskDetailViewModel.LoadAvailablePluginsAsync()` — setzt `ZeigeKiPluginAuswahl` basierend auf Anzahl aktiver Plugins
 - `PluginSelectionDialogService.ShowPluginSelectionDialogAsync()` — wird übergangen, wenn nur ein Plugin aktiv
-- `RepositoryAssignViewModel.LadenAsync()` — setzt `HasMultipleScmPlugins` basierend auf Anzahl aktiver Plugins
+- `RepositoryAssignViewModel.LoadAsync()` — setzt `HasMultipleScmPlugins` basierend auf Anzahl aktiver Plugins
 
 ### Regel: Deaktivierte Plugins verschwinden aus allen Auswahllisten
 
@@ -91,13 +91,13 @@
 - Plugin kann nicht als Default gesetzt werden
 - Plugin wird von Issue-Text-Generatoren ausgeschlossen
 
-**Umsetzung:** `PluginSelectionService.GetAvailableKiPluginPrefixesAsync()` — filtert via `PluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync()`
+**Umsetzung:** `PluginSelectionService.GetAvailableAiPluginPrefixesAsync()` — filtert via `PluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync()`
 
 ## Persistierung und Konsistenz
 
 ### Regel: Aktivierungsstatus wird sofort persistiert
 
-**Beschreibung:** Wenn der Benutzer in den Einstellungen den Status über die CheckBox „Plugin aktiviert" im rechten Bereich wechselt und speichert, wird dieser Status sofort in die `AppEinstellung`-Tabelle geschrieben und bleibt nach Neustart erhalten.
+**Beschreibung:** Wenn der Benutzer in den Einstellungen den Status über die CheckBox „Plugin aktiviert" im rechten Bereich wechselt und speichert, wird dieser Status sofort in die `AppSetting`-Tabelle geschrieben und bleibt nach Neustart erhalten.
 
 **Bedingungen:**
 - Benutzer wählt ein Plugin in der Liste aus
@@ -107,11 +107,11 @@
 
 **Verhalten:**
 - `PluginActivationService.SetPluginEnabledAsync(pluginPrefix, enabled)` wird aufgerufen
-- Eintrag wird in `AppEinstellung` gespeichert mit Schlüssel `plugins.enabled.<PluginPrefix>` und Wert `"true"` oder `"false"`
+- Eintrag wird in `AppSetting` gespeichert mit Schlüssel `plugins.enabled.<PluginPrefix>` und Wert `"true"` oder `"false"`
 - Beim nächsten Öffnen der Einstellungen ist der Status noch aktiv
 - Nach Neustart der Anwendung ist der Status nach Reload noch aktiv
 
-**Umsetzung:** `SettingsViewModel.SpeichernAsync()` — iteriert über alle Einträge in `SourceCodeManagementPlugins` und `DevelopmentAutomationPlugins`, deren `IsEnabled`-Status sich geändert hat, und ruft `SetPluginEnabledAsync()` auf
+**Umsetzung:** `SettingsViewModel.SaveAsync()` — iteriert über alle Einträge in `SourceCodeManagementPlugins` und `DevelopmentAutomationPlugins`, deren `IsEnabled`-Status sich geändert hat, und ruft `SetPluginEnabledAsync()` auf
 
 ## Kompatibilität und Migration
 
@@ -120,7 +120,7 @@
 **Beschreibung:** Ältere Konfigurationen, die vor Einführung des Aktivierungs-Features erstellt wurden, haben keine `plugins.enabled.*`-Einträge. Diese Plugins werden automatisch als aktiviert behandelt und funktionieren wie gehabt.
 
 **Bedingungen:**
-- `AppEinstellung` hat keinen Eintrag für `plugins.enabled.<PluginPrefix>`
+- `AppSetting` hat keinen Eintrag für `plugins.enabled.<PluginPrefix>`
 - Plugin existiert im System
 
 **Verhalten:**
@@ -136,7 +136,7 @@
 
 **Bedingungen:**
 - Plugin existiert in der aktuellen Version
-- Kein entsprechender `plugins.enabled.<PluginPrefix>`-Eintrag in `AppEinstellung`
+- Kein entsprechender `plugins.enabled.<PluginPrefix>`-Eintrag in `AppSetting`
 
 **Verhalten:**
 - Plugin wird sofort in Auswahllisten angezeigt
@@ -233,7 +233,7 @@
 - Beliebige plugin-geführte git-Operation des `GitHubPlugin` bzw. die Prozessumgebung einer Agenten-Terminal-Session (`IScmAgentAccess.GetAgentEnvironmentAsync`) mit vorhandenem Token
 
 **Verhalten:**
-- Der Zielhost wird je Operation aus der kontaktierten URL bestimmt: `clone`/`ls-remote`/Credential-Konfiguration aus der (per `ToHttpsRepositoryUrl` normalisierten) übergebenen Repository-URL; `push`/`pull` und der Same-Repository-Fall des PR-Checkouts aus der `remote.origin.url`-Rückgabe von `NormalizeRemoteUrlAsync`; der Fork-Fall des PR-Checkouts aus der normalisierten `SourceRepositoryUrl`; Agenten-Sessions aus `repository.RepositoryUrl`, die über `EntwicklungsprozessService` → `KiAusfuehrungsService` → `IScmAgentAccess.GetAgentEnvironmentAsync(konto, repositoryUrl, ct)` durchgereicht wird.
+- Der Zielhost wird je Operation aus der kontaktierten URL bestimmt: `clone`/`ls-remote`/Credential-Konfiguration aus der (per `ToHttpsRepositoryUrl` normalisierten) übergebenen Repository-URL; `push`/`pull` und der Same-Repository-Fall des PR-Checkouts aus der `remote.origin.url`-Rückgabe von `NormalizeRemoteUrlAsync`; der Fork-Fall des PR-Checkouts aus der normalisierten `SourceRepositoryUrl`; Agenten-Sessions aus `repository.RepositoryUrl`, die über `DevelopmentProcessService` → `AiExecutionService` → `IScmAgentAccess.GetAgentEnvironmentAsync(konto, repositoryUrl, ct)` durchgereicht wird.
 - SSH-/SCP-Formen der Ziel-URL werden vor der Key-Bildung über `ToHttpsRepositoryUrl` normalisiert; Userinfo/Credentials gelangen nie in den Key. Der Host steht als `IdnHost` (IDN → Punycode) im Key, IPv6-Literale behalten ihre Klammern, ein Nicht-Default-Port wird angehängt.
 - Lässt sich kein Zielhost bestimmen (URL fehlt, ist unparsebar oder nicht-HTTPS, `remote.origin.url` nicht lesbar), entsteht kein `GIT_CONFIG_*`-Block — die Operation läuft fail-closed mit `GIT_TERMINAL_PROMPT=0` weiter; es gibt keinen Fallback auf `github.com` oder einen hostlosen Key.
 - Bekannte Einschränkung: `GH_TOKEN`/`gh`-CLI adressiert ohne gesetztes `GH_HOST` weiterhin `github.com` — `gh`-Aufrufe gegen GitHub-Enterprise-Hosts sind nicht Teil dieser Anbindung.

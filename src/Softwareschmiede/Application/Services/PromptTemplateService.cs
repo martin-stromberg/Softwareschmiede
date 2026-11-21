@@ -29,9 +29,9 @@ public sealed class PromptTemplateService
     }
 
     /// <summary>Legt eine neue Promptvorlage an.</summary>
-    public async Task<PromptTemplate> CreateAsync(string name, string prompttext, CancellationToken ct = default)
+    public async Task<PromptTemplate> CreateAsync(string name, string promptText, CancellationToken ct = default)
     {
-        Validate(name, prompttext);
+        Validate(name, promptText);
 
         var sortOrder = await _db.PromptTemplates.AnyAsync(ct)
             ? await _db.PromptTemplates.MaxAsync(v => v.SortOrder, ct) + 1
@@ -41,7 +41,7 @@ public sealed class PromptTemplateService
         {
             Id = Guid.NewGuid(),
             Name = name.Trim(),
-            PromptText = prompttext,
+            PromptText = promptText,
             SortOrder = sortOrder,
             CreatedAt = now,
             UpdatedAt = now
@@ -53,15 +53,15 @@ public sealed class PromptTemplateService
     }
 
     /// <summary>Aktualisiert eine bestehende Promptvorlage.</summary>
-    public async Task UpdateAsync(Guid id, string name, string prompttext, CancellationToken ct = default)
+    public async Task UpdateAsync(Guid id, string name, string promptText, CancellationToken ct = default)
     {
-        Validate(name, prompttext);
+        Validate(name, promptText);
 
         var template = await _db.PromptTemplates.FirstOrDefaultAsync(v => v.Id == id, ct)
             ?? throw new InvalidOperationException($"Promptvorlage '{id}' wurde nicht gefunden.");
 
         template.Name = name.Trim();
-        template.PromptText = prompttext;
+        template.PromptText = promptText;
         template.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
     }
@@ -114,11 +114,11 @@ public sealed class PromptTemplateService
         _logger.LogInformation("Initiale Promptvorlagen wurden angelegt.");
     }
 
-    private static void Validate(string name, string prompttext)
+    private static void Validate(string name, string promptText)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Der Name der Promptvorlage darf nicht leer sein.", nameof(name));
-        if (string.IsNullOrWhiteSpace(prompttext))
-            throw new ArgumentException("Der Prompttext darf nicht leer sein.", nameof(prompttext));
+        if (string.IsNullOrWhiteSpace(promptText))
+            throw new ArgumentException("Der Prompttext darf nicht leer sein.", nameof(promptText));
     }
 }

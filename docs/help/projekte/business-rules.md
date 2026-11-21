@@ -7,24 +7,24 @@
 **Beschreibung:** Unterschiedliches Verhalten je nachdem, ob ein Projekt neu angelegt oder bereits vorhanden ist.
 
 **Bedingungen:**
-- Wenn `ProjektId == Guid.Empty`: Neuanlage-Modus
-- Wenn `ProjektId != Guid.Empty`: Bearbeitungsmodus
+- Wenn `ProjectId == Guid.Empty`: Neuanlage-Modus
+- Wenn `ProjectId != Guid.Empty`: Bearbeitungsmodus
 
 **Verhalten:**
 - **Neuanlage-Modus (leere ID):**
-  - Der "Speichern"-Button ruft `ProjektService.CreateAsync()` auf
+  - Der "Speichern"-Button ruft `ProjectService.CreateAsync()` auf
   - Ein neues Projekt wird mit dem angegebenen Namen und der optionalen Beschreibung angelegt
   - Projektname ist Pflichtfeld (Button deaktiviert wenn leer)
-  - Nach erfolgreichem Speichern: ProjectListViewModel wird benachrichtigt (`ProjektListeAktualisierenCallback`), Navigation zurück zur Projektübersicht
+  - Nach erfolgreichem Speichern: ProjectListViewModel wird benachrichtigt (`RefreshProjectListCallback`), Navigation zurück zur Projektübersicht
   - Aufgaben-Kachel ist im Anlage-Modus nicht sichtbar (nur Projekt-Kachel sichtbar)
 
 - **Bearbeitungsmodus (ID vorhanden):**
-  - Der "Speichern"-Button ruft `ProjektService.UpdateAsync()` auf
-  - Nach erfolgreichem Speichern: Projekt wird neu geladen mit `LadenAsync()`, um sicherzustellen, dass die UI mit DB-Daten synchron ist
+  - Der "Speichern"-Button ruft `ProjectService.UpdateAsync()` auf
+  - Nach erfolgreichem Speichern: Projekt wird neu geladen mit `LoadAsync()`, um sicherzustellen, dass die UI mit DB-Daten synchron ist
   - ProjectListViewModel wird benachrichtigt
   - Aufgaben-Kachel ist sichtbar
 
-**Umsetzung:** `ProjectDetailViewModel.ProjektSpeichernAsync()` prüft `_projektId == Guid.Empty` und ruft entsprechend `CreateAsync` oder `UpdateAsync` auf
+**Umsetzung:** `ProjectDetailViewModel.ProjektSaveAsync()` prüft `_projectId == Guid.Empty` und ruft entsprechend `CreateAsync` oder `UpdateAsync` auf
 
 ## Projekt-Löschung mit Bestätigung
 
@@ -32,16 +32,16 @@
 
 **Bedingungen:**
 - Benutzer klickt "Löschen"-Button
-- `LoeschenBestaetigenFunc` wird aufgerufen (überschreibbar in Tests)
+- `ConfirmDialog` wird aufgerufen (überschreibbar in Tests)
 
 **Verhalten:**
 - Eine `MessageBox` mit Text "Soll das Projekt wirklich gelöscht werden?" wird angezeigt
 - Buttons: "Ja" und "Nein"
-- Bei "Ja": `ProjektService.DeleteAsync()` wird aufgerufen, Projekt wird gelöscht (inklusive aller zugeordneten Aufgaben durch Cascade-Delete)
+- Bei "Ja": `ProjectService.DeleteAsync()` wird aufgerufen, Projekt wird gelöscht (inklusive aller zugeordneten Aufgaben durch Cascade-Delete)
 - Bei "Nein": Löschung wird abgebrochen, Projekt bleibt erhalten
 - Nach erfolgreicher Löschung: ProjectListViewModel wird benachrichtigt, Navigation zurück zur Projektübersicht
 
-**Umsetzung:** `ProjectDetailViewModel.LoeschenBestaetigenFunc` ist ein `Func<bool>`, das bei Tests durch Mock ersetzt werden kann. Standard: `MessageBox.Show()`
+**Umsetzung:** `ProjectDetailViewModel.ConfirmDialog` ist ein `Func<bool>`, das bei Tests durch Mock ersetzt werden kann. Standard: `MessageBox.Show()`
 
 ## Repository-Zuweisung aus Vorrat
 
@@ -49,13 +49,13 @@
 
 **Bedingungen:**
 - Der Repository-Zuweisung-Dialog wird geöffnet
-- `ProjektService.GetAllRepositoriesAsync()` lädt alle vorhandenen Repositories
+- `ProjectService.GetAllRepositoriesAsync()` lädt alle vorhandenen Repositories
 - Benutzer wählt eines aus und klickt "Zuweisen"
 
 **Verhalten:**
 - Der Dialog zeigt alle verfügbaren Repositories mit Name und URL
 - Der Benutzer muss ein Repository auswählen (BestaetigenCommand ist sonst deaktiviert)
-- Nach "Zuweisen": `ProjektService.AddRepositoryAsync()` wird mit den Daten des ausgewählten Repository aufgerufen
+- Nach "Zuweisen": `ProjectService.AddRepositoryAsync()` wird mit den Daten des ausgewählten Repository aufgerufen
 - Das Repository wird dem Projekt zugeordnet
 - Das Projekt wird neu geladen, um die neuen Repositories anzuzeigen
 - Ein Projekt kann mehrere Repositories haben
@@ -79,7 +79,7 @@
 - Leere manuelle Eingaben werden als `"."` normalisiert.
 - Absolute Pfade, Pfade mit `..`-Segmenten und Pfade mit ungültigen Zeichen werden abgelehnt.
 
-**Umsetzung:** `DirectoryStructureBrowserService.GetDirectoryLoadResultAsync()` liefert einen `RepositoryStructureLoadResult`; `DirectoryStructureLoadHelper` übersetzt diesen in Auswahlmodus oder manuellen Eingabemodus. `RepositoryAssignViewModel` und `ArbeitsverzeichnisBearbeitenViewModel` synchronisieren gültige manuelle Eingaben nach `SelectedWorkingDirectory`, bevor `ProjektService` speichert.
+**Umsetzung:** `DirectoryStructureBrowserService.GetDirectoryLoadResultAsync()` liefert einen `RepositoryStructureLoadResult`; `DirectoryStructureLoadHelper` übersetzt diesen in Auswahlmodus oder manuellen Eingabemodus. `RepositoryAssignViewModel` und `WorkingDirectoryEditViewModel` synchronisieren gültige manuelle Eingaben nach `SelectedWorkingDirectory`, bevor `ProjectService` speichert.
 
 ## Filter-Status ist flüchtig
 
@@ -95,16 +95,16 @@
 - Alle Aufgaben werden angezeigt (kein Filter aktiv)
 - Der Filter-Status ist nur für die aktuelle Sitzung relevant
 
-**Umsetzung:** `ProjectDetailViewModel.AufgabenFilter` wird als Property gespeichert, aber nicht in der Datenbank persistiert; beim Laden des Projekts wird der Filter immer auf `AufgabenFilterTyp.Alle` zurückgesetzt
+**Umsetzung:** `ProjectDetailViewModel.WorkItemsFilter` wird als Property gespeichert, aber nicht in der Datenbank persistiert; beim Laden des Projekts wird der Filter immer auf `WorkItemFilterType.All` zurückgesetzt
 
 ## Aufgabenanzeige nach Abschlussstatus
 
 **Beschreibung:** Die Projektdetailansicht trennt Aufgaben nach Abschlussstatus, damit laufende Arbeit direkt sichtbar bleibt und abgeschlossene Arbeit die Ansicht nicht dominiert.
 
 **Bedingungen:**
-- Aufgabe hat Status `Neu`, `Gestartet` oder `Wartend`: nicht beendete Aufgabe
-- Aufgabe hat Status `Beendet`: beendete Aufgabe
-- Aufgabe hat Status `Archiviert`: nicht Teil der offenen oder beendeten Projektdetail-Aufgabenlisten
+- Aufgabe hat Status `New`, `Started` oder `Waiting`: nicht beendete Aufgabe
+- Aufgabe hat Status `Completed`: beendete Aufgabe
+- Aufgabe hat Status `Archived`: nicht Teil der offenen oder beendeten Projektdetail-Aufgabenlisten
 
 **Verhalten:**
 - Nicht beendete Aufgaben werden in der Aufgaben-Kachel direkt sichtbar angezeigt.
@@ -124,7 +124,7 @@
 - View ist vollständig initialisiert (`Loaded` Event)
 
 **Verhalten:**
-- Das `ProjektNameTextBox` Textfeld erhält automatisch den Fokus
+- Das `ProjectNameTextBox` Textfeld erhält automatisch den Fokus
 - Benutzer kann sofort mit der Eingabe beginnen, ohne zuerst ein Textfeld anklicken zu müssen
 
-**Umsetzung:** `ProjectDetailView.xaml.cs` im `Loaded` Event-Handler wird `ProjektNameTextBox.Focus()` aufgerufen
+**Umsetzung:** `ProjectDetailView.xaml.cs` im `Loaded` Event-Handler wird `ProjectNameTextBox.Focus()` aufgerufen

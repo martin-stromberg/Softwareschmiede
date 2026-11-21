@@ -84,7 +84,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public bool UpdateCheckRunning => _updateFlow.UpdateCheckRunning;
 
     /// <summary>Gibt an, ob gerade ein Update heruntergeladen oder vorbereitet wird.</summary>
-    public bool UpdateWillPrepared => _updateFlow.UpdateWillPrepared;
+    public bool UpdateBeingPrepared => _updateFlow.UpdateBeingPrepared;
 
     /// <summary>Optionaler Hinweis zur letzten Update-Prüfung.</summary>
     public string? UpdateNotice => _updateFlow.UpdateNotice;

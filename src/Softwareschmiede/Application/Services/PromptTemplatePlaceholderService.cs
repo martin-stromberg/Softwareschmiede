@@ -6,12 +6,12 @@ namespace Softwareschmiede.Application.Services;
 public sealed class PromptTemplatePlaceholderService
 {
     /// <summary>Ersetzt bekannte Platzhalter im Prompttext.</summary>
-    public string Resolve(string prompttext, WorkItem? workItem)
+    public string Resolve(string promptText, WorkItem? workItem)
     {
-        if (string.IsNullOrEmpty(prompttext))
+        if (string.IsNullOrEmpty(promptText))
             return string.Empty;
 
-        return prompttext
+        return promptText
             .Replace("%ProjectName%", workItem?.Project?.Name ?? string.Empty, StringComparison.Ordinal)
             .Replace("%TaskName%", workItem?.Title ?? string.Empty, StringComparison.Ordinal)
             .Replace("%RepositoryUrl%", workItem?.GitRepository?.RepositoryUrl ?? string.Empty, StringComparison.Ordinal);

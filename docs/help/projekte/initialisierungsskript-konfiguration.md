@@ -30,7 +30,7 @@ Die Konfiguration wird in der Datenbank gespeichert und ist persistent — auch 
 
 ### Automatische Ausführung beim Aufgabenstart
 
-Wenn Sie eine Aufgabe für das Repository starten (über `EntwicklungsprozessService.ProzessStartenAsync()`), läuft der folgende Ablauf ab:
+Wenn Sie eine Aufgabe für das Repository starten (über `DevelopmentProcessService.ProzessStartenAsync()`), läuft der folgende Ablauf ab:
 
 1. **Repository wird geklont** an den lokalen Pfad
 2. **Feature-Branch wird erstellt** (vom konfigurierten Basis-Branch, oder vom Standard-Branch, wenn nicht konfiguriert)

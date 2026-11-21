@@ -11,31 +11,31 @@ Das Terminal-System startet KI-CLI-Prozesse über die Windows Pseudo Console (Co
 ### 1. Session-Start über die zentrale Factory (Direct-Start ohne `cmd.exe`-Hülle)
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.StartCliAndUpdateStateAsync` — ruft `EntwicklungsprozessService.ProzessStartenUndCliStartenAsync`/`CliNeustartenAsync` auf, die `KiAusfuehrungsService.StartTerminalSessionAsync` aufrufen
-- `KiAusfuehrungsService.StartTerminalSessionAsync` — serialisiert den Start (`_startLock`), löst das Arbeitsverzeichnis auf, holt die Spec, erzeugt den Protokoll-Writer und delegiert an die Factory
-- `IKiPlugin.GetTerminalStartSpecAsync` — liefert die `TerminalSessionStartSpec` (Executable, Argumente, Arbeitsverzeichnis, Umgebungsvariablen, `TerminalCapabilities`, `PluginName`); bei `CliKiPluginBase`-Plugins mappt `BuildTerminalStartSpec` die `ProcessStartInfo` aus `BuildProcessStartInfo`
+- `TaskDetailViewModel.StartCliAndUpdateStateAsync` — ruft `DevelopmentProcessService.ProzessStartenUndCliStartenAsync`/`RestartCliAsync` auf, die `AiExecutionService.StartTerminalSessionAsync` aufrufen
+- `AiExecutionService.StartTerminalSessionAsync` — serialisiert den Start (`_startLock`), löst das Arbeitsverzeichnis auf, holt die Spec, erzeugt den Protokoll-Writer und delegiert an die Factory
+- `IKiPlugin.GetTerminalStartSpecAsync` — liefert die `TerminalSessionStartSpec` (Executable, Argumente, Arbeitsverzeichnis, Umgebungsvariablen, `TerminalCapabilities`, `PluginName`); bei `CliAiPluginBase`-Plugins mappt `BuildTerminalStartSpec` die `ProcessStartInfo` aus `BuildProcessStartInfo`
 - `TerminalExecutableResolver` — löst `spec.FileName` mit `where`-/PATHEXT-Semantik zu einer `CreateProcess`-fähigen Spec auf
 - `TerminalSessionDiagnostics` — Preflight-Einzelchecks (ConPTY-Verfügbarkeit, Executable, CLI-Health, Encoding, Terminalgröße, Pluginparameter) → `TerminalPreflightResult`
 - `ITerminalSessionFactory`/`TerminalSessionService` — zentrale Session-Erzeugung; wählt das Backend (PTY oder diagnostizierter Pipe-Fallback)
 - `IPseudoConsoleProcessLauncher` (`Win32PseudoConsoleProcessLauncher`/`SimulatedPseudoConsoleProcessLauncher`) — startet die normalisierte Spec direkt und erzeugt die `PseudoConsoleSession`
 - `PseudoConsole.Create` / `PseudoConsoleProcessStarter.Start` — HPCON-Handle plus Win32-Prozessstart mit `STARTUPINFOEX` und `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE` (nur PTY-Backend)
-- `CliOutputProtokollWriter` — optionale Output-Senke für automatische Aufgabenprotokollierung
+- `CliOutputLogWriter` — optionale Output-Senke für automatische Aufgabenprotokollierung
 - `CliProcessHandle.Session` — Referenz zur `ITerminalSession` für späteren Zugriff
 
 **Detailschritte:**
 
 1. `StartTerminalSessionAsync` ruft `kiPlugin.GetTerminalStartSpecAsync(localRepoPath, parameters)` auf → `TerminalSessionStartSpec`.
-2. `KiAusfuehrungsService` erzeugt einen `CliOutputProtokollWriter` für die `aufgabeId`.
-3. `ITerminalSessionFactory.StartAsync(aufgabeId, spec, outputWriter, kiPlugin.CheckHealthAsync, ct)` in `TerminalSessionService`:
+2. `AiExecutionService` erzeugt einen `CliOutputLogWriter` für die `workItemId`.
+3. `ITerminalSessionFactory.StartAsync(workItemId, spec, outputWriter, kiPlugin.CheckHealthAsync, ct)` in `TerminalSessionService`:
    a. `TerminalExecutableResolver.Resolve(spec)` normalisiert `spec.FileName` — Suchreihenfolge `WorkingDirectory` → `PATH` (aus den Spec-Umgebungsvariablen, sonst Prozess-Env); Kandidaten literaler Name bzw. Name + PATHEXT (Spec-Env → Prozess-Env → Default `.COM;.EXE;.BAT;.CMD`). Ergebnis `TerminalExecutableResolution` mit Status: `.exe`/endungsloses PE-Image → `Direct` (absoluter Pfad), `.cmd`/`.bat` → `CmdWrapped` (`FileName = "cmd.exe"`, `Arguments = "/d /s /c \"<pfad>\" <original-args>"`), sonstiger Treffer → `NotExecutable`, kein Treffer → `NotFound`.
-   b. `TerminalSessionDiagnostics.RunPreflightAsync(spec, resolution, healthCheck, forcePtyUnavailable, ct)` prüft und protokolliert: ConPTY-Verfügbarkeit (OS-Build ≥ 10.0.17763; per `AppEinstellungen`-Schlüssel `Terminal.ForcePtyUnavailable` als Test-Hook erzwingbar), Executable (aus dem Auflösungsergebnis), CLI-Health über den `healthCheck`-Delegate (nur bei erfolgreicher Auflösung aufgerufen; `false`/Exception → `Ok=false`-Eintrag, **nicht fatal**), Encoding (UTF-8), Terminalgröße (`DefaultCols`/`DefaultRows` aus `TerminalSessionOptions`), Pluginparameter.
-   c. `NotFound`/`NotExecutable` sowie `RequiresPty && !PtyVerfuegbar` → `[Terminal-Diagnose]`-Markerzeile + `InvalidOperationException` (kein stiller Pipe-Fallback — eine nicht auflösbare Executable startet auch auf dem Pipe-Backend nicht).
-   d. Backend-Wahl in fester Reihenfolge: (1) die Fehlerfälle aus c), (2) E2E-Modus (`SOFTWARESCHMIEDE_TEST_DB_PATH` gesetzt) → Pipe (`SimulatedPseudoConsoleProcessLauncher`), (3) `SupportsPty` nicht gesetzt → Pipe + Diagnose, (4) `PtyVerfuegbar` → `Win32PseudoConsoleProcessLauncher`, sonst → Pipe + Diagnose.
+   b. `TerminalSessionDiagnostics.RunPreflightAsync(spec, resolution, healthCheck, forcePtyUnavailable, ct)` prüft und protokolliert: ConPTY-Verfügbarkeit (OS-Build ≥ 10.0.17763; per `AppSettingen`-Schlüssel `Terminal.ForcePtyUnavailable` als Test-Hook erzwingbar), Executable (aus dem Auflösungsergebnis), CLI-Health über den `healthCheck`-Delegate (nur bei erfolgreicher Auflösung aufgerufen; `false`/Exception → `Ok=false`-Eintrag, **nicht fatal**), Encoding (UTF-8), Terminalgröße (`DefaultCols`/`DefaultRows` aus `TerminalSessionOptions`), Pluginparameter.
+   c. `NotFound`/`NotExecutable` sowie `RequiresPty && !PtyAvailable` → `[Terminal-Diagnose]`-Markerzeile + `InvalidOperationException` (kein stiller Pipe-Fallback — eine nicht auflösbare Executable startet auch auf dem Pipe-Backend nicht).
+   d. Backend-Wahl in fester Reihenfolge: (1) die Fehlerfälle aus c), (2) E2E-Modus (`SOFTWARESCHMIEDE_TEST_DB_PATH` gesetzt) → Pipe (`SimulatedPseudoConsoleProcessLauncher`), (3) `SupportsPty` nicht gesetzt → Pipe + Diagnose, (4) `PtyAvailable` → `Win32PseudoConsoleProcessLauncher`, sonst → Pipe + Diagnose.
    e. Der gewählte Launcher startet die **normalisierte** Spec direkt: `Win32PseudoConsoleProcessLauncher` über `PseudoConsole.Create(DefaultCols, DefaultRows)` + `PseudoConsoleProcessStarter.Start` (ConPTY); `SimulatedPseudoConsoleProcessLauncher` über `Process.Start` mit Stdin/Stdout/Stderr-Redirects (Pipe). Keine `cmd.exe`-Hülle und keine verzögert injizierte Befehlszeile mehr — es sei denn, der Resolver hat ein `.cmd`/`.bat`-Ziel zu `cmd.exe /d /s /c` normalisiert.
 4. `CliProcessHandle` wird mit `Session` (`ITerminalSession`) und `OutputSink` erstellt und in `_handles` eingetragen (vor der Event-Verdrahtung, damit ein früh ausgelöstes `Exited` das Handle vorfindet).
 5. `session.Exited`/`session.Failed` werden auf `HandleSessionEndedAsync`/`HandleSessionFailedAsync` verdrahtet; ein bereits vor der Verdrahtung beendeter Prozess wird über den `HasExited`-Check bereinigt.
-6. Event `CliProcessStatusChanged(Gestartet)` wird gefeuert.
-7. Event `TerminalSessionGestartet(session)` wird an `TaskDetailViewModel` propagiert.
+6. Event `CliProcessStatusChanged(Started)` wird gefeuert.
+7. Event `TerminalSessionStarted(session)` wird an `TaskDetailViewModel` propagiert.
 
 Bei jedem Nicht-PTY-Backend sowie bei jedem Preflight-Fehlschlag wird zusätzlich zum Log-Eintrag eine `[Terminal-Diagnose]`-Markerzeile (UTF-8, `\r\n`-terminiert) über `outputSink.OnOutputChunk` in das `CliOutput`-Protokoll geschrieben — nur dorthin, nicht in `TerminalReplayBuffer`/Terminal-Anzeige. Läuft die Session auf dem Pipe-Backend (`IsPseudoTerminal == false`), zeigt die Statuszeile der Aufgabenansicht zusätzlich den Suffix „ (eingeschränkter Modus – kein Pseudo-Terminal)" — der Fallback gilt damit nie stillschweigend als gleichwertiger interaktiver Modus.
 
@@ -44,19 +44,19 @@ Bei jedem Nicht-PTY-Backend sowie bei jedem Preflight-Fehlschlag wird zusätzlic
 Beteiligte Komponenten:
 - `PseudoConsoleSession.ReadLoopAsync` — liest Output-Bytes aus der ConPTY-Pipe
 - `ITerminalOutputSink` — optionale Schnittstelle für rohe Terminal-Output-Chunks
-- `CliOutputProtokollWriter` — kopiert Chunks, segmentiert Zeilen und schreibt im Hintergrund
+- `CliOutputLogWriter` — kopiert Chunks, segmentiert Zeilen und schreibt im Hintergrund
 - `CliOutputLineAccumulator` — dekodiert UTF-8 zustandsbehaftet und trennt auf `\n`, `\r\n` und einzelne `\r`
-- `ProtokollService.AddCliOutputAsync` — speichert eine Zeile als `ProtokollTyp.CliOutput`
+- `LogService.AddCliOutputAsync` — speichert eine Zeile als `LogEntryType.CliOutput`
 
 **Detailschritte:**
 
-1. `StartTerminalSessionAsync` erstellt pro Session-Start einen `CliOutputProtokollWriter`.
+1. `StartTerminalSessionAsync` erstellt pro Session-Start einen `CliOutputLogWriter`.
 2. Der Writer wird über `ITerminalSessionFactory.StartAsync(..., outputSink, ...)` → `IPseudoConsoleProcessLauncher.Start(..., outputSink)` an die `PseudoConsoleSession` übergeben.
 3. `ReadLoopAsync` liest einen Byte-Chunk aus `OutputStream`.
 4. Nach `MarkOutputActivity()` ruft die Session `outputSink.OnOutputChunk(...)` auf (bei aktivem Mitschnitt eine `CompositeTerminalOutputSink` aus Protokoll-Writer + `CliOutputRecorder` — siehe „1.6. Rohbyte-Mitschnitt"); danach wird das `OutputChunk`-Event mit den Rohbytes gefeuert. Erst danach legt die Session den Chunk unter dem Render-Lock im `TerminalReplayBuffer` ab und wendet ihn auf den Buffer an.
 5. Der Writer kopiert die Daten in die eigene Verarbeitung. `CliOutputLineAccumulator` hält UTF-8-Decoderzustand über Chunk-Grenzen und liefert abgeschlossene Zeilen.
-6. Abgeschlossene Zeilen werden in eine bounded Queue mit Backpressure geschrieben. Ein Hintergrund-Worker liest sequenziell und ruft für jede Zeile `ProtokollService.AddCliOutputAsync(aufgabeId, line)` in einem Async-Scope auf.
-7. Beim Ende der Leseschleife ruft `PseudoConsoleSession` `outputSink.Complete()` auf; beim Prozess-Cleanup ruft `KiAusfuehrungsService` zusätzlich `CompleteAsync(...)` mit Timeout auf.
+6. Abgeschlossene Zeilen werden in eine bounded Queue mit Backpressure geschrieben. Ein Hintergrund-Worker liest sequenziell und ruft für jede Zeile `LogService.AddCliOutputAsync(workItemId, line)` in einem Async-Scope auf.
+7. Beim Ende der Leseschleife ruft `PseudoConsoleSession` `outputSink.Complete()` auf; beim Prozess-Cleanup ruft `AiExecutionService` zusätzlich `CompleteAsync(...)` mit Timeout auf.
 8. Persistenzfehler werden geloggt. Sie beenden weder Prozess noch Terminal-Rendering.
 
 **Hinweis:** Der drainbare Abschluss wartet auf bereits angenommene Queue-Einträge. Die Queue-Phase eines aktiven `OnOutputChunk(...)` ist mit dem Abschluss synchronisiert: `CompleteAsync(...)` schliesst den Channel erst, nachdem bereits dekodierte Zeilen aus einem laufenden Chunk vollständig gequeut wurden.
@@ -66,22 +66,22 @@ Beteiligte Komponenten:
 Zusätzlich zur zeilenbasierten Protokollierung wird jede Terminal-Session als byte-exakter Mitschnitt mit Zeitstempel pro Chunk aufgezeichnet — Basis für den `.clireplay`-Export und das Konsolentestfenster.
 
 Beteiligte Komponenten:
-- `KiAusfuehrungsService.StartTerminalSessionAsync` — erzeugt Recorder und Composite-Senke beim Session-Start
+- `AiExecutionService.StartTerminalSessionAsync` — erzeugt Recorder und Composite-Senke beim Session-Start
 - `CliOutputRecorder` (`ITerminalOutputSink`) — zeichnet `OnOutputChunk`-Bytes unverändert mit Offset-Zeitstempel (`TimeProvider.GetUtcNow() - StartUtc`) auf; budgetbegrenzt über `TerminalSessionOptions.AufzeichnungByteBudget` (Default 8 MB)
 - `CompositeTerminalOutputSink` (`ITerminalOutputSink` + `ITerminalDiagnoseSink`) — fächert `OnOutputChunk` auf Protokoll-Writer und Recorder auf; `Complete`/`CompleteAsync` schließen beide innere Senken
-- `ITerminalDiagnoseSink` — Routing-Kanal für `[Terminal-Diagnose]`-Markerzeilen; `TerminalSessionService.WriteDiagnosis` ruft `OnDiagnoseChunk` auf, wenn die Senke das Interface implementiert (Fallback `OnOutputChunk`). Die Composite reicht Marker nur an innere Diagnose-Senken weiter (`CliOutputProtokollWriter`); der `CliOutputRecorder` implementiert das Interface bewusst nicht — Artefakt-Zeilen bleiben aus dem byte-exakten Mitschnitt ausgeschlossen
-- `KiAusfuehrungsService._aufzeichnungen` (`ConcurrentDictionary<Guid, CliOutputRecorder>`) + `RegistriereAufzeichnung` — Registry der Mitschnitte, auf die letzten `MaxAufzeichnungenAnzahl = 8` Aufgaben begrenzt (LRU über `_aufzeichnungsReihenfolge`; Neustart derselben Aufgabe zählt als jüngster Eintrag)
-- `KiAusfuehrungsService.GetCliAufzeichnung(aufgabeId)` — liefert einen `CliOutputAufzeichnung`-Snapshot, auch nach dem Session-Ende (der Recorder-Eintrag überlebt das `CliProcessHandle`)
+- `ITerminalDiagnoseSink` — Routing-Kanal für `[Terminal-Diagnose]`-Markerzeilen; `TerminalSessionService.WriteDiagnosis` ruft `OnDiagnoseChunk` auf, wenn die Senke das Interface implementiert (Fallback `OnOutputChunk`). Die Composite reicht Marker nur an innere Diagnose-Senken weiter (`CliOutputLogWriter`); der `CliOutputRecorder` implementiert das Interface bewusst nicht — Artefakt-Zeilen bleiben aus dem byte-exakten Mitschnitt ausgeschlossen
+- `AiExecutionService._recording` (`ConcurrentDictionary<Guid, CliOutputRecorder>`) + `RegisterRecording` — Registry der Mitschnitte, auf die letzten `MaxAufzeichnungenAnzahl = 8` Aufgaben begrenzt (LRU über `_recordingOrder`; Neustart derselben Aufgabe zählt als jüngster Eintrag)
+- `AiExecutionService.GetCliAufzeichnung(workItemId)` — liefert einen `CliOutputRecording`-Snapshot, auch nach dem Session-Ende (der Recorder-Eintrag überlebt das `CliProcessHandle`)
 
 **Detailschritte:**
 
-1. `StartTerminalSessionAsync` erzeugt bei `AufzeichnungByteBudget > 0` neben dem `CliOutputProtokollWriter` einen `CliOutputRecorder` (Parameter: `aufgabeId`, `spec.PluginName`, `DefaultCols`/`DefaultRows`, Budget, `TimeProvider`) und verpackt beide in `CompositeTerminalOutputSink`. Bei `AufzeichnungByteBudget <= 0` wird der Protokoll-Writer direkt übergeben — keine einelementige Composite.
+1. `StartTerminalSessionAsync` erzeugt bei `AufzeichnungByteBudget > 0` neben dem `CliOutputLogWriter` einen `CliOutputRecorder` (Parameter: `workItemId`, `spec.PluginName`, `DefaultCols`/`DefaultRows`, Budget, `TimeProvider`) und verpackt beide in `CompositeTerminalOutputSink`. Bei `AufzeichnungByteBudget <= 0` wird der Protokoll-Writer direkt übergeben — keine einelementige Composite.
 2. Die ermittelte Senke wird als `outputSink` an `ITerminalSessionFactory.StartAsync` durchgereicht; `CliProcessHandle.OutputSink` zeigt auf dieselbe Senke (damit drainet `DisposeSessionResourcesAsync` bei aktivem Recorder beide innere Senken).
-3. `PseudoConsoleSession.ReadLoopAsync` ruft pro Chunk `outputSink.OnOutputChunk` → die Composite ruft nacheinander `CliOutputProtokollWriter.OnOutputChunk` (Zeilenprotokoll) und `CliOutputRecorder.OnOutputChunk` (Bytes kopieren + Offset).
+3. `PseudoConsoleSession.ReadLoopAsync` ruft pro Chunk `outputSink.OnOutputChunk` → die Composite ruft nacheinander `CliOutputLogWriter.OnOutputChunk` (Zeilenprotokoll) und `CliOutputRecorder.OnOutputChunk` (Bytes kopieren + Offset).
 4. Bei Budget-Überschreitung stoppt der Recorder die Aufnahme und setzt `IstVollstaendig = false`; das intakte Präfix bleibt erhalten (ein Replay ab Position 0 braucht den Anfang für den Parser-Zustand — ein Ringpuffer-Verwerfen wie im `TerminalReplayBuffer` wäre hier falsch).
 5. Am Ende der Leseschleife bzw. beim Cleanup setzt `Complete`/`CompleteAsync` das `EndeUtc` der Aufzeichnung (idempotent).
 6. Schlägt `StartAsync` fehl, drainet der `catch`-Block die tatsächlich übergebene Senke; der Recorder wird verworfen (kein Registry-Eintrag).
-7. Nach erfolgreichem Start registriert `RegistriereAufzeichnung` den Recorder; `GetCliAufzeichnung` liefert jederzeit Snapshots.
+7. Nach erfolgreichem Start registriert `RegisterRecording` den Recorder; `GetCliAufzeichnung` liefert jederzeit Snapshots.
 
 ### 2. Zeilenvorschub-Normalisierung in der Textverarbeitung
 
@@ -159,7 +159,7 @@ und zeichnet bei jedem Ereignis den aktuellen Bufferinhalt neu.
 **Auto-Follow:** Solange der vertikale Offset am Ende des Verlaufs steht, setzt das Control den Offset bei neuer Ausgabe wieder auf das neue Ende. Wird manuell nach oben gescrollt, bleibt der Offset stabil und wird nur geklemmt, wenn alte Scrollback-Zeilen wegen der 1000-Zeilen-Grenze aus dem Ringpuffer fallen. Klicks in die Terminalfläche fokussieren weiterhin `TerminalControl`; Klicks auf die Scrollbar werden nicht als Terminalfokus-Eingriff behandelt.
 
 Beteiligte Komponenten:
-- `TaskDetailView.xaml.cs` — empfängt `OnTerminalSessionGestartet(session)`
+- `TaskDetailView.xaml.cs` — empfängt `OnTerminalSessionStarted(session)`
 - `TerminalControl.Session` — DependencyProperty, triggert `OnSessionChanged`
 - `PseudoConsoleSession.ReadLoopAsync` — liest bytes aus `OutputStream`, läuft ab Konstruktion der Session
 - `AnsiSequenceParser.Parse` — zerlegt Bytes in `TerminalEvent`-Instanzen
@@ -275,15 +275,15 @@ Beteiligte Komponenten:
 Beteiligte Komponenten:
 - `ITerminalSession.Exited` / `ITerminalSession.Failed` — Session-Events (statt `Process.Exited` auf Service-Ebene)
 - `PseudoConsoleSession` — erkennt Prozessende (`Process.Exited` bzw. Ende des Output-Streams) und ermittelt den Exit-Code PID-wiederverwendungs-sicher über `GetExitCodeProcess` auf dem nativen Prozess-Handle (ConPTY) bzw. `Process.ExitCode` (Pipe)
-- `KiAusfuehrungsService.HandleSessionEndedAsync`/`HandleSessionFailedAsync` → `HandleExitedCoreAsync` — entfernt Handle atomar aus `_handles`, mappt den Status, räumt auf
+- `AiExecutionService.HandleSessionEndedAsync`/`HandleSessionFailedAsync` → `HandleExitedCoreAsync` — entfernt Handle atomar aus `_handles`, mappt den Status, räumt auf
 - `PseudoConsoleSession.Dispose` — schließt Pipes, ConPTY und das native Prozess-Handle
 - `TaskDetailViewModel.OnCliProcessStatusChanged` — setzt `IsCliRunning = false`
 
 **Detailschritte:**
 
 1. Prozess endet → die Session löst `Exited` genau einmal aus (`TerminalSessionExitedEventArgs.ExitCode`); ein Ende des Output-Streams bei noch laufendem Prozess (`STILL_ACTIVE`) löst kein `Exited` aus.
-2. `KiAusfuehrungsService.HandleSessionEndedAsync` → `HandleExitedCoreAsync` wird aufgerufen: atomares `_handles.TryRemove`, Status-Mapping (`AbsichtlichGestoppt`/`ExitCode != 0` → `Gestoppt`/`Fehler`), `PersistAusfuehrungBeendetAsync`.
-3. `CliProcessStatusChanged(aufgabeId, Gestoppt|Fehler)` wird gefeuert.
+2. `AiExecutionService.HandleSessionEndedAsync` → `HandleExitedCoreAsync` wird aufgerufen: atomares `_handles.TryRemove`, Status-Mapping (`IntentionallyStopped`/`ExitCode != 0` → `Stopped`/`Fehler`), `PersistExecutionFinishedAsync`.
+3. `CliProcessStatusChanged(workItemId, Stopped|Fehler)` wird gefeuert.
 4. `TaskDetailViewModel.OnCliProcessStatusChanged` setzt `IsCliRunning = false`; `TaskDetailView` setzt `TerminalControl.Session = null`, wodurch der `BufferChanged`-Handler deregistriert wird.
 5. `DisposeSessionResourcesAsync` versucht einen kurzen `DrainOutputAsync` der Session, disposed danach die `ITerminalSession` (die dabei auch das native Prozess-Handle schließt) und ruft `OutputSink.CompleteAsync(...)` mit Timeout auf.
 6. `ReadLoopAsync` beendet sich (durch Abbruch oder EOF auf der Output-Pipe) — läuft bis dahin unabhängig davon weiter, ob ein `TerminalControl` gebunden war.
@@ -294,58 +294,58 @@ Beteiligte Komponenten:
 Ausgelöst durch den Button **Aufzeichnung exportieren** (`AutomationName="CliReplayExport"`) in der CLI-Ribbon-Gruppe der `TaskDetailView` — parallel zum bestehenden `.raw`-Export.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.ExportCliReplayCommand` / `ExportCliReplayAsync` — orchestriert Vorab-Prüfung, Dialog, Endungsvalidierung und Export (Fehler → `FehlerMeldung`)
-- `ICliReplayExportService` / `CliReplayExportService` (`Softwareschmiede.App.Services`) — `ExportCliReplayAsync` holt die Aufzeichnung über `KiAusfuehrungsService.GetCliAufzeichnung` und schreibt sie über `CliReplayAufzeichnungStore.SpeichernAsync`; `HatAufzeichnung` dient der Vorab-Prüfung vor dem Speicherdialog
-- `CliReplayAufzeichnungStore` — serialisiert `CliOutputAufzeichnung` im `.clireplay`-Binärformat: Header (Magic `SWCLRPLY`, Version `Int32` = 1, `AufgabeId`, `StartUtc`/`EndeUtc` als UTC-Ticks, `Cols`, `Rows`, `IstVollstaendig`, `PluginName` längenpräfixiert UTF-8), danach Records `[Int64 OffsetTicks][Int32 Length][Bytes]` bis EOF
-- `IDialogService.ShowSaveFileDialogAsync` — Speicherdialog mit Filter `CLI-Replay-Dateien (*.clireplay)|*.clireplay` und Default-Name `cli-replay-{aufgabeId:N}.clireplay`
+- `TaskDetailViewModel.ExportCliReplayCommand` / `ExportCliReplayAsync` — orchestriert Vorab-Prüfung, Dialog, Endungsvalidierung und Export (Fehler → `ErrorMessage`)
+- `ICliReplayExportService` / `CliReplayExportService` (`Softwareschmiede.App.Services`) — `ExportCliReplayAsync` holt die Aufzeichnung über `AiExecutionService.GetCliAufzeichnung` und schreibt sie über `CliReplayRecordingStore.SaveAsync`; `HasRecording` dient der Vorab-Prüfung vor dem Speicherdialog
+- `CliReplayRecordingStore` — serialisiert `CliOutputRecording` im `.clireplay`-Binärformat: Header (Magic `SWCLRPLY`, Version `Int32` = 1, `WorkItemId`, `StartUtc`/`EndeUtc` als UTC-Ticks, `Cols`, `Rows`, `IsComplete`, `PluginName` längenpräfixiert UTF-8), danach Records `[Int64 OffsetTicks][Int32 Length][Bytes]` bis EOF
+- `IDialogService.ShowSaveFileDialogAsync` — Speicherdialog mit Filter `CLI-Replay-Dateien (*.clireplay)|*.clireplay` und Default-Name `cli-replay-{workItemId:N}.clireplay`
 
 **Detailschritte:**
 
-1. Vorab-Prüfung über `HatAufzeichnung(aufgabeId)`: ohne Mitschnitt endet der Ablauf mit der `FehlerMeldung` „Für diese Aufgabe liegt noch keine Aufzeichnung vor — sie wird während einer CLI-Ausführung automatisch mitgeschnitten." — der Speicherdialog wird nicht umsonst geöffnet.
+1. Vorab-Prüfung über `HasRecording(workItemId)`: ohne Mitschnitt endet der Ablauf mit der `ErrorMessage` „Für diese Aufgabe liegt noch keine Aufzeichnung vor — sie wird während einer CLI-Ausführung automatisch mitgeschnitten." — der Speicherdialog wird nicht umsonst geöffnet.
 2. Speicherdialog; Abbruch → kein Export, kein Fehler.
 3. Endungsprüfung: endet der Zielpfad nicht auf `.clireplay`, erscheint „Export-Zielpfad muss auf .clireplay enden."
-4. `ExportCliReplayAsync` serialisiert Header + Chunk-Records gepuffert und schreibt die Datei async; Schreibfehler werden geloggt und als `FehlerMeldung` angezeigt.
+4. `ExportCliReplayAsync` serialisiert Header + Chunk-Records gepuffert und schreibt die Datei async; Schreibfehler werden geloggt und als `ErrorMessage` angezeigt.
 
 ### 11. Konsolentestfenster: Laden und zeitgesteuerte Wiedergabe
 
-Das Konsolentestfenster (`KonsolenTestDialog`, `Title="Konsolentest"`) ist ein **nicht-modales** Diagnosefenster (`WpfDialogService.ShowKonsolenTestDialogAsync` → `dialog.Show()`, `Owner = MainWindow`) — es bleibt parallel zur Live-Ansicht nutzbar. Einstieg: `SettingsViewModel.KonsolenTestOeffnenCommand` (Einstellungen → Allgemein → Diagnose → „Konsolentestfenster öffnen"), das das `KonsolenTestViewModel` per `IServiceProvider.GetRequiredService` auflöst.
+Das Konsolentestfenster (`ConsoleTestDialog`, `Title="Konsolentest"`) ist ein **nicht-modales** Diagnosefenster (`WpfDialogService.ShowConsoleTestDialogAsync` → `dialog.Show()`, `Owner = MainWindow`) — es bleibt parallel zur Live-Ansicht nutzbar. Einstieg: `SettingsViewModel.OpenConsoleTestCommand` (Einstellungen → Allgemein → Diagnose → „Konsolentestfenster öffnen"), das das `ConsoleTestViewModel` per `IServiceProvider.GetRequiredService` auflöst.
 
 Beteiligte Komponenten:
-- `KonsolenTestViewModel` — Dialog-Logik: `AufzeichnungOeffnenCommand`, `WiedergabeStartenCommand`, `WiedergabeNeustartenCommand`, `WiedergabePausierenCommand` (Toggle), `SchrittVorCommand`, `SchrittZurueckCommand`, `SchliessenCommand`; Properties `Session`, `QuellEintraege`, `AktuellerQuellEintrag`, `StatusText`, `PositionsText`, `ZeitrafferSchwelleText`, `FehlerMeldung`, `UnvollstaendigHinweis`; `CloseRequested`-Event
+- `ConsoleTestViewModel` — Dialog-Logik: `OpenRecordingCommand`, `StartReplayCommand`, `RestartPlaybackCommand`, `PauseReplayCommand` (Toggle), `StepBeforeCommand`, `StepBackCommand`, `CloseCommand`; Properties `Session`, `SourceEntries`, `CurrentSourceEntry`, `StatusText`, `PositionsText`, `TimelapseThresholdText`, `ErrorMessage`, `IncompleteNotice`; `CloseRequested`-Event
 - `IDialogService.ShowOpenFileDialogAsync` — Öffnen-Dialog (Filter `*.clireplay`)
-- `CliReplayAufzeichnungStore.LadeAsync` — Deserialisierung mit Magic-/Versions- und Header-Validierung (`Cols`/`Rows` > 0, konsistente Record-Längen) → `InvalidDataException` bei Formatfehlern → `FehlerMeldung`
-- `TerminalReplaySession` (`ITerminalSession`) — spielt die Aufzeichnung durch `AnsiSequenceParser` → `TerminalBuffer` ab; Abspiel-Member `WiedergabeStarten`, `Pausieren`, `Fortsetzen`, `SchrittVor`, `SchrittZurueck`, `IstPausiert`, `ZeitrafferSchwelle`, `AktuellerChunkIndex`
-- `CliChunkQuelltextFormatter` + `CliChunkAnzeigeEintrag` — Quell-Ansicht: ESC → `␛`, CR → `\r`, LF → `\n`, TAB → `\t`, übrige Steuerbytes → `\xNN`
+- `CliReplayRecordingStore.LoadAsync` — Deserialisierung mit Magic-/Versions- und Header-Validierung (`Cols`/`Rows` > 0, konsistente Record-Längen) → `InvalidDataException` bei Formatfehlern → `ErrorMessage`
+- `TerminalReplaySession` (`ITerminalSession`) — spielt die Aufzeichnung durch `AnsiSequenceParser` → `TerminalBuffer` ab; Abspiel-Member `StartReplay`, `Pausieren`, `Fortsetzen`, `StepForward`, `StepBack`, `IsPaused`, `TimeLapseThreshold`, `CurrentChunkIndex`
+- `CliChunkSourceTextFormatter` + `CliChunkDisplayEntry` — Quell-Ansicht: ESC → `␛`, CR → `\r`, LF → `\n`, TAB → `\t`, übrige Steuerbytes → `\xNN`
 - `TerminalControl` (`AutomationName="ReplayTerminal"`) — echtes Render-Control, `Session`-Bindung; ruft beim Binden `RebuildBufferFromReplay`; da `TerminalReplaySession.SupportsResize == false` ist, bleibt der Buffer in der Aufzeichnungs-Geometrie (kein Resize auf die Fenstergröße) — überschüssige Breite wird über den umgebenden `ScrollViewer` (`HorizontalScrollBarVisibility="Auto"`) horizontal scrollbar
-- `ListView` (`AutomationName="QuellChunkListe"`) — `SelectedItem` ↔ `AktuellerQuellEintrag`, `ScrollIntoView` im Code-behind
+- `ListView` (`AutomationName="QuellChunkListe"`) — `SelectedItem` ↔ `CurrentSourceEntry`, `ScrollIntoView` im Code-behind
 
 **Detailschritte:**
 
-1. „Aufzeichnung öffnen…" → `ShowOpenFileDialogAsync` → `LadeAsync` → bei Formatfehler `FehlerMeldung` („Die Aufzeichnung konnte nicht geladen werden: …").
-2. Das ViewModel erzeugt eine `TerminalReplaySession` aus der geladenen `CliOutputAufzeichnung` (Buffer-Geometrie aus den Header-Werten `Cols`/`Rows`), setzt `GeometrieText` („Aufzeichnung: {Cols}×{Rows}") und `Session` → `TerminalControl.OnSessionChanged` ruft `RebuildBufferFromReplay()` (leerer Buffer — noch nichts abgespielt). Weil `TerminalReplaySession.SupportsResize == false` ist, resized das Control den Buffer nicht — die Aufzeichnungs-Geometrie bleibt dauerhaft fixiert und überbreite Inhalte werden horizontal scrollbar. Bei `IstVollstaendig = false` wird das `UnvollstaendigHinweis`-Band eingeblendet („Aufzeichnung unvollständig — das Speicher-Limit wurde erreicht; die Wiedergabe endet vor dem tatsächlichen Ende der Session.").
-3. Die Quell-Liste wird mit `CliChunkAnzeigeEintrag`-Zeilen befüllt („#"-Nummer 1-basiert — deckungsgleich mit der Positionszählung „Chunk n/y", Offset, Bytes, Quelltext); die Formatierung großer Aufzeichnungen läuft abseits des UI-Threads.
-4. `WiedergabeStarten` startet den Wiedergabe-Task der Session: pro Chunk wartet die Schleife `min(realePause, ZeitrafferSchwelle)` (`Task.Delay(delay, _timeProvider, ct)`), respektiert das asynchrone Pause-Gate, feuert `OutputChunk`, wendet unter `_renderLock` `_parser.Parse(chunk)` + `Buffer.Apply` an und feuert `BufferChanged` — dieselbe Reihenfolge wie `PseudoConsoleSession.ReadLoopAsync`.
-5. Das ViewModel subscribed `BufferChanged`, aktualisiert über den Dispatcher `PositionsText` („Chunk x/y") und `AktuellerQuellEintrag` (Liste selektiert + scrollt synchron).
-6. `ZeitrafferSchwelleText` (Sekunden, Dezimalzahl ≥ 0) bindet validierend auf `session.ZeitrafferSchwelle` und wirkt live auf alle folgenden Pausen; ungültige Eingabe → `FehlerMeldung`, die letzte gültige Schwelle bleibt aktiv.
-7. `WiedergabePausierenCommand` toggelt `Pausieren`/`Fortsetzen` — das Gate ist ein `TaskCompletionSource` mit `RunContinuationsAsynchronously` (kein synchrones Wait: `Task.Delay`-Fortsetzungen können zeitprovider-bedingt synchron auf fremden Threads laufen, ein blockierendes Wait würde dort deadlocked parken); ein kurzer Render-Lock in `Pausieren` dient als Fence für in-flight Chunks.
-8. `WiedergabeNeustarten` entsorgt die laufende Session und erzeugt eine frische über derselben geladenen Aufzeichnung (Rebind über `Session` → `RebuildBufferFromReplay`) und startet sie sofort — aktiv während laufender Wiedergabe **und** im reinen Schrittmodus (`AktuellerChunkIndex > 0` ohne laufende Schleife) als direkter Rückweg zu Position 0. Nach regulärem Ende erzeugt `WiedergabeStarten` im ViewModel ebenfalls eine frische Session — allerdings nur solange das Ende noch gilt (`_wiedergabeBeendet`): Nach einem `SchrittZurueck` vom Ende wird `_wiedergabeBeendet` zurückgesetzt und `WiedergabeStarten` re-armiert stattdessen dieselbe Session (`_wiedergabeLoopAktiv`-CAS), die dann an der Schrittposition weiterläuft.
-9. Nach dem letzten Chunk setzt die Session `RuntimeStatus = Inaktiv` (`RuntimeStatusChanged`) und feuert `Exited` (`ExitCode = null`) → Statusanzeige „Wiedergabe beendet." — `Exited` ist ein Flanken-Ereignis („Ende wurde erreicht", kein Positions-Snapshot) und kann über die Session-Lebensdauer mehrfach feuern (z. B. beendet → `SchrittZurueck` → neuer Durchlauf). Fenster schließen → `Dispose` (Cancellation des Wiedergabe-Tasks, `ViewModel.Dispose` über den `Closed`-Handler).
+1. „Aufzeichnung öffnen…" → `ShowOpenFileDialogAsync` → `LoadAsync` → bei Formatfehler `ErrorMessage` („Die Aufzeichnung konnte nicht geladen werden: …").
+2. Das ViewModel erzeugt eine `TerminalReplaySession` aus der geladenen `CliOutputRecording` (Buffer-Geometrie aus den Header-Werten `Cols`/`Rows`), setzt `GeometryText` („Aufzeichnung: {Cols}×{Rows}") und `Session` → `TerminalControl.OnSessionChanged` ruft `RebuildBufferFromReplay()` (leerer Buffer — noch nichts abgespielt). Weil `TerminalReplaySession.SupportsResize == false` ist, resized das Control den Buffer nicht — die Aufzeichnungs-Geometrie bleibt dauerhaft fixiert und überbreite Inhalte werden horizontal scrollbar. Bei `IstVollstaendig = false` wird das `IncompleteNotice`-Band eingeblendet („Aufzeichnung unvollständig — das Speicher-Limit wurde erreicht; die Wiedergabe endet vor dem tatsächlichen Ende der Session.").
+3. Die Quell-Liste wird mit `CliChunkDisplayEntry`-Zeilen befüllt („#"-Nummer 1-basiert — deckungsgleich mit der Positionszählung „Chunk n/y", Offset, Bytes, Quelltext); die Formatierung großer Aufzeichnungen läuft abseits des UI-Threads.
+4. `StartReplay` startet den Wiedergabe-Task der Session: pro Chunk wartet die Schleife `min(realePause, TimeLapseThreshold)` (`Task.Delay(delay, _timeProvider, ct)`), respektiert das asynchrone Pause-Gate, feuert `OutputChunk`, wendet unter `_renderLock` `_parser.Parse(chunk)` + `Buffer.Apply` an und feuert `BufferChanged` — dieselbe Reihenfolge wie `PseudoConsoleSession.ReadLoopAsync`.
+5. Das ViewModel subscribed `BufferChanged`, aktualisiert über den Dispatcher `PositionsText` („Chunk x/y") und `CurrentSourceEntry` (Liste selektiert + scrollt synchron).
+6. `TimelapseThresholdText` (Sekunden, Dezimalzahl ≥ 0) bindet validierend auf `session.TimeLapseThreshold` und wirkt live auf alle folgenden Pausen; ungültige Eingabe → `ErrorMessage`, die letzte gültige Schwelle bleibt aktiv.
+7. `PauseReplayCommand` toggelt `Pausieren`/`Fortsetzen` — das Gate ist ein `TaskCompletionSource` mit `RunContinuationsAsynchronously` (kein synchrones Wait: `Task.Delay`-Fortsetzungen können zeitprovider-bedingt synchron auf fremden Threads laufen, ein blockierendes Wait würde dort deadlocked parken); ein kurzer Render-Lock in `Pausieren` dient als Fence für in-flight Chunks.
+8. `RestartPlayback` entsorgt die laufende Session und erzeugt eine frische über derselben geladenen Aufzeichnung (Rebind über `Session` → `RebuildBufferFromReplay`) und startet sie sofort — aktiv während laufender Wiedergabe **und** im reinen Schrittmodus (`CurrentChunkIndex > 0` ohne laufende Schleife) als direkter Rückweg zu Position 0. Nach regulärem Ende erzeugt `StartReplay` im ViewModel ebenfalls eine frische Session — allerdings nur solange das Ende noch gilt (`_replayExited`): Nach einem `StepBack` vom Ende wird `_replayExited` zurückgesetzt und `StartReplay` re-armiert stattdessen dieselbe Session (`_playbackLoopActive`-CAS), die dann an der Schrittposition weiterläuft.
+9. Nach dem letzten Chunk setzt die Session `RuntimeStatus = Inaktiv` (`RuntimeStatusChanged`) und feuert `Exited` (`ExitCode = null`) → Statusanzeige „Wiedergabe beendet." — `Exited` ist ein Flanken-Ereignis („Ende wurde erreicht", kein Positions-Snapshot) und kann über die Session-Lebensdauer mehrfach feuern (z. B. beendet → `StepBack` → neuer Durchlauf). Fenster schließen → `Dispose` (Cancellation des Wiedergabe-Tasks, `ViewModel.Dispose` über den `Closed`-Handler).
 
 ### 11.5. Einzelschritt-Wiedergabe (Schritt vor / Schritt zurück)
 
-Die `TerminalReplaySession` bietet neben der zeitgesteuerten Schleife Einzelschritte: `SchrittVor()` wendet genau einen Chunk zeitstempel-unabhängig an (kein `Task.Delay`, keine `ZeitrafferSchwelle`-Wirkung), `SchrittZurueck()` stellt den Zustand vor dem zuletzt angewendeten Chunk über einen deterministischen Präfix-Rebuild wieder her.
+Die `TerminalReplaySession` bietet neben der zeitgesteuerten Schleife Einzelschritte: `StepForward()` wendet genau einen Chunk zeitstempel-unabhängig an (kein `Task.Delay`, keine `TimeLapseThreshold`-Wirkung), `StepBack()` stellt den Zustand vor dem zuletzt angewendeten Chunk über einen deterministischen Präfix-Rebuild wieder her.
 
-**Vereinheitlichte Positionsführung:** `_abgespielteChunks.Count` ist die einzige mutierende Positionsquelle — ausschließlich unter `_renderLock`; `_aktuellerChunkIndex` spiegelt denselben Wert für lock-freie Leser (`Volatile`). `WiedergabeLoopAsync` iteriert daher nicht mehr über einen lokalen Schleifenindex, sondern liest pro Iteration unter `_renderLock` die Position `i = _abgespielteChunks.Count` (atomar mit dem Beenden-Flag) und leitet das Delay daraus ab (`chunks[i].Offset - chunks[i-1].Offset`). Vor dem Anwenden wird die Position erneut geprüft: Hat ein Einzelschritt sie seit Iterationsbeginn verändert, wird nichts angewendet und die Iteration neu begonnen — ein `Fortsetzen` nach `SchrittZurueck` wartet die aufgezeichnete Pause des zurückgenommenen Chunks regulär erneut ab.
+**Vereinheitlichte Positionsführung:** `_abgespielteChunks.Count` ist die einzige mutierende Positionsquelle — ausschließlich unter `_renderLock`; `_currentChunkIndex` spiegelt denselben Wert für lock-freie Leser (`Volatile`). `PlaybackLoopAsync` iteriert daher nicht mehr über einen lokalen Schleifenindex, sondern liest pro Iteration unter `_renderLock` die Position `i = _abgespielteChunks.Count` (atomar mit dem Beenden-Flag) und leitet das Delay daraus ab (`chunks[i].Offset - chunks[i-1].Offset`). Vor dem Anwenden wird die Position erneut geprüft: Hat ein Einzelschritt sie seit Iterationsbeginn verändert, wird nichts angewendet und die Iteration neu begonnen — ein `Fortsetzen` nach `StepBack` wartet die aufgezeichnete Pause des zurückgenommenen Chunks regulär erneut ab.
 
-**`SchrittVor()` → `bool`:** Guards (`_disposed` → `false`; Position ≥ `Chunks.Count` → `false` = No-Op am Ende). Unter `_renderLock` läuft die Chunk-Anwendung über den gemeinsamen Helper `WendeChunkAnUnterLock(position)` in derselben Reihenfolge wie die Schleife: `OutputChunk` (Rohbytes) → `_abgespielteChunks.Add` → `_parser.Parse`/`Buffer.Apply` → `_aktuellerChunkIndex`-Write. Nach dem Lock feuert `BufferChanged`. Wurde der letzte Chunk angewendet, setzt die Methode zusätzlich das Terminations-Flag `_schleifeBeendenAngefordert`, feuert `RaiseExited(nurAmEnde: true)` und ruft `Fortsetzen()` — eine evtl. pausiert parkende `WiedergabeLoopAsync` wacht dadurch auf und terminiert am gesetzten Flag deterministisch (auch wenn ein `SchrittZurueck` die Position zwischen Gate-Öffnung und Positions-Lesen wieder senkt), statt bis zum `Dispose` geparkt zu bleiben oder eine zeitgesteuerte „Geister-Wiedergabe" zu starten.
+**`StepForward()` → `bool`:** Guards (`_disposed` → `false`; Position ≥ `Chunks.Count` → `false` = No-Op am Ende). Unter `_renderLock` läuft die Chunk-Anwendung über den gemeinsamen Helper `ApplyChunkUnderLock(position)` in derselben Reihenfolge wie die Schleife: `OutputChunk` (Rohbytes) → `_abgespielteChunks.Add` → `_parser.Parse`/`Buffer.Apply` → `_currentChunkIndex`-Write. Nach dem Lock feuert `BufferChanged`. Wurde der letzte Chunk angewendet, setzt die Methode zusätzlich das Terminations-Flag `_loopExitRequested`, feuert `RaiseExited(onlyAtEnd: true)` und ruft `Fortsetzen()` — eine evtl. pausiert parkende `PlaybackLoopAsync` wacht dadurch auf und terminiert am gesetzten Flag deterministisch (auch wenn ein `StepBack` die Position zwischen Gate-Öffnung und Positions-Lesen wieder senkt), statt bis zum `Dispose` geparkt zu bleiben oder eine zeitgesteuerte „Geister-Wiedergabe" zu starten.
 
-**`SchrittZurueck()` → `bool`:** Guards (`_disposed` → `false`; Position 0 → `false` = No-Op). Unter `_renderLock`: `_abgespielteChunks` um den letzten Eintrag kürzen, `_aktuellerChunkIndex` zurücksetzen, `_exitedSignaled` auf 0 (das Ende wurde verlassen — ein späterer Durchlauf darf wieder `Exited` feuern; `_schleifeBeendenAngefordert` bleibt bewusst gesetzt, das Fortsetzen ist Aufgabe eines neuen Durchlaufs), dann `BaueBufferUndParserAusPraefixNeuAuf()`: `Buffer.Reset()` + `_parser.Reset()` (`AnsiSequenceParser.Reset` — `_parser` bleibt `readonly`) + Re-Parse aller verbleibenden Chunks mit `Buffer.Apply` je Event. Buffer **und** Parser stehen danach exakt auf dem Präfix-Zustand. `OutputChunk` feuert nicht (kein neuer Chunk wird angewendet), nach dem Lock nur `BufferChanged`.
+**`StepBack()` → `bool`:** Guards (`_disposed` → `false`; Position 0 → `false` = No-Op). Unter `_renderLock`: `_abgespielteChunks` um den letzten Eintrag kürzen, `_currentChunkIndex` zurücksetzen, `_exitedSignaled` auf 0 (das Ende wurde verlassen — ein späterer Durchlauf darf wieder `Exited` feuern; `_loopExitRequested` bleibt bewusst gesetzt, das Fortsetzen ist Aufgabe eines neuen Durchlaufs), dann `RebuildBufferAndParserFromPrefix()`: `Buffer.Reset()` + `_parser.Reset()` (`AnsiSequenceParser.Reset` — `_parser` bleibt `readonly`) + Re-Parse aller verbleibenden Chunks mit `Buffer.Apply` je Event. Buffer **und** Parser stehen danach exakt auf dem Präfix-Zustand. `OutputChunk` feuert nicht (kein neuer Chunk wird angewendet), nach dem Lock nur `BufferChanged`.
 
-**`RaiseExited(bool nurAmEnde)`:** Mit `nurAmEnde: true` werden Positions-Prüfung (Position noch am Ende) und Signal-Flag atomar unter `_renderLock` geprüft/gesetzt (Serialisierung gegen `SchrittZurueck` und den Flag-Reset in `WiedergabeStarten`); das `Exited`-Event selbst feuert bewusst erst nach Lock-Freigabe (kein Deadlock gegenüber Handlern, die synchron auf den UI-Thread marshaln). `Schleifen-finally` ruft `RaiseExited(nurAmEnde: !fehler)` und setzt `_wiedergabeLoopAktiv` auf 0 — `WiedergabeStarten` ist damit re-armierbar.
+**`RaiseExited(bool onlyAtEnd)`:** Mit `onlyAtEnd: true` werden Positions-Prüfung (Position noch am Ende) und Signal-Flag atomar unter `_renderLock` geprüft/gesetzt (Serialisierung gegen `StepBack` und den Flag-Reset in `StartReplay`); das `Exited`-Event selbst feuert bewusst erst nach Lock-Freigabe (kein Deadlock gegenüber Handlern, die synchron auf den UI-Thread marshaln). `Schleifen-finally` ruft `RaiseExited(onlyAtEnd: !fehler)` und setzt `_playbackLoopActive` auf 0 — `StartReplay` ist damit re-armierbar.
 
-**ViewModel-Seite:** `SchrittVorCommand`/`SchrittZurueckCommand` (`RelayCommand`) sind aktiv bei `_replaySession is not null && (!IstWiedergabeAktiv || IstPausiert)` plus Positionsgrenze (`AktuellerChunkIndex < QuellEintraege.Count` bzw. `> 0`). Da `RelayCommand.Execute` `CanExecute` nicht auswertet, ziehen die Handler den Wiedergabe-Zustandsteil der Sperre intern nach; `OnReplayBufferChanged` ist der einzige Synchronisationspfad für `PositionsText`/`AktuellerQuellEintrag` (Selektion `null` bei Index 0) und löst zusätzlich `RelayCommand.Refresh()` aus (Positionsgrenzen ändern CanExecute ohne Zustandswechsel), ebenso der `IstPausiert`-Setter. Die Handler setzen eigene `StatusText`-Meldungen — `„Einzelschritt — Chunk n/y angewendet."` (nicht am Ende: dort steht bereits „Wiedergabe beendet." aus dem synchron über `_dispatcherInvoke` gelaufenen `Exited`-Handler) und `„Schritt zurück — Chunk n/y zurückgenommen."`; `SchrittZurueck` löscht zudem `_wiedergabeBeendet`. In der `QuellChunkListe` ist `CliChunkAnzeigeEintrag.Index` 1-basiert — die selektierte Zeile „#n" markiert den zuletzt angewendeten Chunk passend zu „Chunk n/y".
+**ViewModel-Seite:** `StepBeforeCommand`/`StepBackCommand` (`RelayCommand`) sind aktiv bei `_replaySession is not null && (!IstWiedergabeAktiv || IstPausiert)` plus Positionsgrenze (`CurrentChunkIndex < QuellEintraege.Count` bzw. `> 0`). Da `RelayCommand.Execute` `CanExecute` nicht auswertet, ziehen die Handler den Wiedergabe-Zustandsteil der Sperre intern nach; `OnReplayBufferChanged` ist der einzige Synchronisationspfad für `PositionsText`/`CurrentSourceEntry` (Selektion `null` bei Index 0) und löst zusätzlich `RelayCommand.Refresh()` aus (Positionsgrenzen ändern CanExecute ohne Zustandswechsel), ebenso der `IsPaused`-Setter. Die Handler setzen eigene `StatusText`-Meldungen — `„Einzelschritt — Chunk n/y angewendet."` (nicht am Ende: dort steht bereits „Wiedergabe beendet." aus dem synchron über `_dispatcherInvoke` gelaufenen `Exited`-Handler) und `„Schritt zurück — Chunk n/y zurückgenommen."`; `StepBack` löscht zudem `_replayExited`. In der `SourceChunkList` ist `CliChunkDisplayEntry.Index` 1-basiert — die selektierte Zeile „#n" markiert den zuletzt angewendeten Chunk passend zu „Chunk n/y".
 
-**UI:** Zwei Buttons `AutomationProperties.Name="SchrittZurueck"`/`"SchrittVor"` („Schritt zurück"/„Schritt vor") zwischen „Pausieren/Fortsetzen" und der Zeitraffer-Eingabe; die Werkzeugleiste ist von `StackPanel` auf `WrapPanel` umgestellt, damit PositionsText und „Schließen" bei schmaler Fensterbreite nicht abgeschnitten werden.
+**UI:** Zwei Buttons `AutomationProperties.Name="SchrittZurueck"`/`"StepForward"` („Schritt zurück"/„Schritt vor") zwischen „Pausieren/Fortsetzen" und der Zeitraffer-Eingabe; die Werkzeugleiste ist von `StackPanel` auf `WrapPanel` umgestellt, damit PositionsText und „Schließen" bei schmaler Fensterbreite nicht abgeschnitten werden.
 
 ### 12. Behobene Streaming-/Parser-Defekte
 
@@ -361,7 +361,7 @@ Mit dem Konsolentestfenster nachgestellte Defekte wurden in den Bestandsklassen 
 ```mermaid
 sequenceDiagram
     participant VM as TaskDetailViewModel
-    participant SVC as KiAusfuehrungsService
+    participant SVC as AiExecutionService
     participant PLUGIN as IKiPlugin
     participant FACTORY as TerminalSessionService
     participant LAUNCHER as IPseudoConsoleProcessLauncher
@@ -371,28 +371,28 @@ sequenceDiagram
     participant PARSER as AnsiSequenceParser
     participant BUF as TerminalBuffer
 
-    VM->>SVC: StartTerminalSessionAsync(aufgabeId, kiPlugin, repoPath)
+    VM->>SVC: StartTerminalSessionAsync(workItemId, kiPlugin, repoPath)
     SVC->>PLUGIN: GetTerminalStartSpecAsync(repoPath, params)
     PLUGIN-->>SVC: TerminalSessionStartSpec
-    SVC->>SVC: new CliOutputProtokollWriter(aufgabeId)
-    SVC->>FACTORY: StartAsync(aufgabeId, spec, sink, healthCheck)
+    SVC->>SVC: new CliOutputLogWriter(workItemId)
+    SVC->>FACTORY: StartAsync(workItemId, spec, sink, healthCheck)
     FACTORY->>FACTORY: TerminalExecutableResolver.Resolve(spec)
     FACTORY->>FACTORY: TerminalSessionDiagnostics.RunPreflightAsync(...)
-    FACTORY->>LAUNCHER: Start(aufgabeId, normalizedSpec, sink)
+    FACTORY->>LAUNCHER: Start(workItemId, normalizedSpec, sink)
     Note over LAUNCHER: ConPTY (Win32) oder Pipe-Fallback —<br/>Direct-Start, keine cmd.exe-Hülle
     LAUNCHER-->>SVC: TerminalSessionStartResult(Process, Session, IsPseudoTerminal)
     activate SESSION
     SESSION->>SESSION: ReadLoopAsync() (Hintergrund-Task, startet sofort)
     SVC->>SESSION: Exited/Failed += HandleSessionEnded/Failed
-    SVC-->>VM: TerminalSessionGestartet(session)
-    VM-->>VIEW: OnTerminalSessionGestartet(session)
+    SVC-->>VM: TerminalSessionStarted(session)
+    VM-->>VIEW: OnTerminalSessionStarted(session)
     VIEW->>CTRL: Session = session
     CTRL->>SESSION: RebuildBufferFromReplay()
     CTRL->>SESSION: BufferChanged += OnBufferChanged
     par ReadLoop (läuft unabhängig vom Control weiter)
         SESSION->>SESSION: OutputStream.ReadAsync()
         SESSION->>SVC: ITerminalOutputSink.OnOutputChunk(bytes)
-        SVC->>SVC: CompositeTerminalOutputSink -> CliOutputProtokollWriter<br/>+ CliOutputRecorder (Rohbyte-Mitschnitt)
+        SVC->>SVC: CompositeTerminalOutputSink -> CliOutputLogWriter<br/>+ CliOutputRecorder (Rohbyte-Mitschnitt)
         SESSION->>SESSION: OutputChunk-Event (Rohbytes)
         SESSION->>SESSION: TerminalReplayBuffer.Append(bytes) (unter Render-Lock)
         SESSION->>PARSER: Parse(bytes)
@@ -420,13 +420,13 @@ sequenceDiagram
 | Unvollständige ANSI-Sequenz über Paket-Grenzen | `AnsiSequenceParser` speichert Zustand; nächstes Paket setzt Verarbeitung fort (chunk-übergreifendes UTF-8 über persistenten `Decoder`) |
 | `ResizePseudoConsole` schlägt fehl | Rückgabewert `false`; Buffer wird trotzdem angepasst, ConPTY-Größe stimmt nicht mit Buffer überein (seltener Fall) |
 | `ReadLoopAsync` bei Prozessende | EOF wird gelesen; Schleife terminiert ordnungsgemäß; `Exited` wird mit Exit-Code ausgelöst; Buffer bleibt im letzten Zustand erhalten |
-| Unerwartete Exception in `ReadLoopAsync` | `catch (Exception)` protokolliert (`LogError`) und feuert `Failed`; `KiAusfuehrungsService` behandelt den Fall wie einen Exit ohne Code → Status `Fehler` |
+| Unerwartete Exception in `ReadLoopAsync` | `catch (Exception)` protokolliert (`LogError`) und feuert `Failed`; `AiExecutionService` behandelt den Fall wie einen Exit ohne Code → Status `Fehler` |
 | `TerminalControl` nicht gebunden, während Prozess Ausgabe produziert | `ReadLoopAsync` liest und puffert die Ausgabe weiter in `Buffer` + `TerminalReplayBuffer`; `BufferChanged` hat dann keinen Abonnenten — kein Datenverlust; beim Rebinden baut `RebuildBufferFromReplay` den Buffer aus den Roh-Chunks neu auf |
-| Persistenz eines CLI-Ausgabeprotokolls schlägt fehl | `CliOutputProtokollWriter` loggt den Fehler; die Terminal-Leseschleife und das Rendering werden nicht abgebrochen |
+| Persistenz eines CLI-Ausgabeprotokolls schlägt fehl | `CliOutputLogWriter` loggt den Fehler; die Terminal-Leseschleife und das Rendering werden nicht abgebrochen |
 | CLI-Ausgabe erzeugt schneller Zeilen als die DB persistiert | Die bounded Queue des Writers erzeugt Backpressure; Warnungen zeigen an, dass Persistenz hinterherläuft |
 || Aufzeichnungs-Budget (`Terminal:AufzeichnungByteBudget`) überschritten | `CliOutputRecorder` stoppt die Aufnahme, setzt `IstVollstaendig = false` und behält das intakte Präfix; der Session-Betrieb läuft unverändert weiter |
-|| `.clireplay`-Export ohne vorhandenen Mitschnitt | `CliReplayExportService.HatAufzeichnung` meldet `false` → `FehlerMeldung` „Für diese Aufgabe liegt noch keine Aufzeichnung vor …" (Vorab-Prüfung vor dem Speicherdialog) |
-|| `.clireplay`-Datei beschädigt/fremdes Format | `CliReplayAufzeichnungStore.LadeAsync` wirft `InvalidDataException` (Magic, Version, Header-Geometrie `Cols`/`Rows > 0`, Record-Längen) → `FehlerMeldung` im Konsolentestfenster |
-|| Ungültige `ZeitrafferSchwelle`-Eingabe im Konsolentestfenster | `ZeitrafferSchwelleText`-Validierung → `FehlerMeldung`; die zuletzt gültige Schwelle bleibt wirksam |
-|| Fehler in der Wiedergabe-Schleife von `TerminalReplaySession` | `catch (Exception)` → `LogWarning`, Wiedergabe endet (`RaiseExited(nurAmEnde: false)` signalisiert das Ende trotz Fehler einmalig); bei Abbruch (`Dispose`/Cancellation) wird kein `Exited` gefeuert |
-|| `SchrittVor`/`SchrittZurueck` an Positionsgrenze (Ende bzw. Position 0) oder nach `Dispose` | Rückgabewert `false` — No-Op ohne Events; UI-seitig sind die Buttons in diesen Zuständen zusätzlich per CanExecute deaktiviert |
+|| `.clireplay`-Export ohne vorhandenen Mitschnitt | `CliReplayExportService.HasRecording` meldet `false` → `ErrorMessage` „Für diese Aufgabe liegt noch keine Aufzeichnung vor …" (Vorab-Prüfung vor dem Speicherdialog) |
+|| `.clireplay`-Datei beschädigt/fremdes Format | `CliReplayRecordingStore.LoadAsync` wirft `InvalidDataException` (Magic, Version, Header-Geometrie `Cols`/`Rows > 0`, Record-Längen) → `ErrorMessage` im Konsolentestfenster |
+|| Ungültige `TimeLapseThreshold`-Eingabe im Konsolentestfenster | `TimelapseThresholdText`-Validierung → `ErrorMessage`; die zuletzt gültige Schwelle bleibt wirksam |
+|| Fehler in der Wiedergabe-Schleife von `TerminalReplaySession` | `catch (Exception)` → `LogWarning`, Wiedergabe endet (`RaiseExited(onlyAtEnd: false)` signalisiert das Ende trotz Fehler einmalig); bei Abbruch (`Dispose`/Cancellation) wird kein `Exited` gefeuert |
+|| `StepForward`/`StepBack` an Positionsgrenze (Ende bzw. Position 0) oder nach `Dispose` | Rückgabewert `false` — No-Op ohne Events; UI-seitig sind die Buttons in diesen Zuständen zusätzlich per CanExecute deaktiviert |

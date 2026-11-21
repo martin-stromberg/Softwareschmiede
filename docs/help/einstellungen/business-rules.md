@@ -7,7 +7,7 @@
 **Beschreibung:** Die Anwendung verwaltet Standard-Plugins für SCM- und KI-Operationen separat. Diese Plugins werden bei der Erstellung neuer Aufgaben oder bei automatisierten Workflows als Fallback verwendet.
 
 **Bedingungen:**
-- Ein Standard-Plugin wird als String-Name in der `AppEinstellung`-Tabelle gespeichert
+- Ein Standard-Plugin wird als String-Name in der `AppSetting`-Tabelle gespeichert
 - Der String-Name entspricht der `PluginName`-Eigenschaft des Plugins
 - Es können mehrere SCM- und KI-Plugins gleichzeitig installiert sein
 - Nicht alle Plugins müssen als Standard-Plugin fungieren
@@ -22,9 +22,9 @@
 - Bei der CLI-Auflösung (`PluginSelectionService.ResolveDevelopmentAutomationPluginWithProjectScopeAsync`) bildet die unter `ki.plugin.default` gespeicherte Standard-KI-CLI die letzte Fallback-Stufe hinter Aufgaben-Plugin, Projekt-Standard und gespeichertem Global-Default; der gespeicherte `PluginName` wird dabei auf ein vorhandenes KI-Plugin abgebildet (robust auch per `PluginPrefix`), ohne Treffer wird nichts vermutet
 
 **Umsetzung:**
-- `SettingsViewModel.LadenAsync()` — Abgleich von String-Namen mit Plugin-Objekten (Zeile 181-183 für SCM, analog für KI)
-- `SettingsViewModel.SpeichernAsync()` — Speicherung des Plugin-Namens via `AppEinstellungService.SetSettingAsync()` (Zeile 226)
-- `AppEinstellungService` — Konstanten `DefaultScmPluginKey` und `DefaultKiPluginKey`
+- `SettingsViewModel.LoadAsync()` — Abgleich von String-Namen mit Plugin-Objekten (Zeile 181-183 für SCM, analog für KI)
+- `SettingsViewModel.SaveAsync()` — Speicherung des Plugin-Namens via `AppSettingService.SetSettingAsync()` (Zeile 226)
+- `AppSettingService` — Konstanten `DefaultScmPluginKey` und `DefaultAiPluginKey`
 
 ## Plugin-Einstellungen-Verwaltung
 
@@ -48,8 +48,8 @@
 - Beim Laden: Alle Werte werden als String aus dem Credential Store abgerufen; die UI interpretiert sie basierend auf `FieldType`
 
 **Umsetzung:**
-- `SettingsViewModel.LadePluginEinstellungen()` — Abruf von `GetSettingGroups()` und Wertladung (Zeile 269-279)
-- `SettingsViewModel.SpeicherePluginEinstellungen()` — Speicherung aller Werte (Zeile 281-293)
+- `SettingsViewModel.LoadPluginSettings()` — Abruf von `GetSettingGroups()` und Wertladung (Zeile 269-279)
+- `SettingsViewModel.SavePluginSettingsAsync()` — Speicherung aller Werte (Zeile 281-293)
 - `PluginSettingsService.GetValue()` / `SetValue()` — Interface zu Credential Store
 - `PluginSettingEntry` — übernimmt `DefaultValue` nur, wenn der Aufrufer Defaults für dieses Feld zulässt
 - Feldtypen: `PluginSettingFieldType` Enum (Text, Secret, Url, Integer, Boolean, Enum, FilePath, CommandLineParameters)
@@ -71,9 +71,9 @@
 
 **Umsetzung:**
 - `SettingsViewModel.IsCodexCommandLineParameters()` — erkennt ausschließlich `Softwareschmiede.Codex.CommandLineParameters`
-- `SettingsViewModel.LadePluginEinstellungen()` — übergibt für dieses Feld `useDefaultValue: false`
+- `SettingsViewModel.LoadPluginSettings()` — übergibt für dieses Feld `useDefaultValue: false`
 - `PluginSettingEntry` — initialisiert den UI-Wert ohne Default-Fallback, wenn `useDefaultValue` deaktiviert ist
-- `CliKiPluginBase.AppendCommandLineParameters()` — hängt nur nicht-leere gespeicherte Credential-Werte an die Prozessargumente an
+- `CliAiPluginBase.AppendCommandLineParameters()` — hängt nur nicht-leere gespeicherte Credential-Werte an die Prozessargumente an
 
 ## Validierung vor dem Speichern
 
@@ -87,7 +87,7 @@
 
 **Verhalten:**
 - Wenn Validierung fehlgeschlagen:
-  - `FehlerMeldung` wird mit einer sprechenden Nachricht gesetzt
+  - `ErrorMessage` wird mit einer sprechenden Nachricht gesetzt
   - Der Speichervorgang stoppt, kein Wert wird persistiert
   - Die Nachricht wird dem Anwender angezeigt
 - Wenn Validierung erfolgreich:
@@ -96,8 +96,8 @@
   - Die Einstellungen sind sofort verfügbar
 
 **Umsetzung:**
-- `SettingsViewModel.ValidierePflichtfelder()` — Orchestriert die Validierung (Zeile 295-299)
-- `SettingsViewModel.ValidierePflichtfelderFuerSettings()` — Konkrete Validierungslogik (Zeile 301-333)
+- `SettingsViewModel.ValidateRequiredFields()` — Orchestriert die Validierung (Zeile 295-299)
+- `SettingsViewModel.ValidateRequiredFieldsForSettings()` — Konkrete Validierungslogik (Zeile 301-333)
   - Zeilen 307-311: Pflichtfeld-Validierung
   - Zeilen 313-319: Integer-Typ-Validierung
   - Zeilen 321-328: Enum-Wert-Validierung
@@ -151,7 +151,7 @@
 - `SettingsViewModel.ScmPluginSelectedCommand` / `SettingsViewModel.KiPluginSelectedCommand` — Commands für Plugin-Wechsel
 - `SettingsViewModel.LoadScmPluginSettings()` / `SettingsViewModel.LoadKiPluginSettings()` — Laden der neuen Einstellungen ohne die alten zu löschen
 - `SelectedScmPluginSettings` / `SelectedKiPluginSettings` — Properties die in der UI gebunden sind und bei Plugin-Wechsel aktualisiert werden
-- `SpeichernAsync()` — Speichert **alle** aktuellen Einstellungen (von beiden Plugins, falls beide modifiziert wurden)
+- `SaveAsync()` — Speichert **alle** aktuellen Einstellungen (von beiden Plugins, falls beide modifiziert wurden)
 
 ## Arbeitsverzeichnis und Standardpfad
 
@@ -165,37 +165,37 @@
 **Verhalten:**
 - Bei der Eingabe: Keine Validierung in der UI (der Anwender kann jeden Pfad eingeben)
 - Beim Speichern: Der Pfad wird als String persistiert
-- Bei der Verwendung: `ArbeitsverzeichnisSettingsService` verwaltet den Pfad
+- Bei der Verwendung: `WorkingDirectorySettingsService` verwaltet den Pfad
   - Falls der Pfad ungültig oder nicht beschreibbar ist, wird auf das Temp-Verzeichnis zurückgegriffen
   - Der Fallback wird im Aufgabenprotokoll dokumentiert
 
 **Umsetzung:**
-- `SettingsViewModel.Arbeitsverzeichnis` — Property mit bidirektionaler Bindung (Zeile 33-37)
-- `ArbeitsverzeichnisSettingsService.SaveArbeitsverzeichnisAsync()` — Persistierung (aufgerufen in Zeile 224)
-- `ArbeitsverzeichnisSettingsService.GetArbeitsverzeichnisAsync()` — Laden mit Fallback-Logik
+- `SettingsViewModel.WorkingDirectory` — Property mit bidirektionaler Bindung (Zeile 33-37)
+- `WorkingDirectorySettingsService.SaveWorkingDirectoryAsync()` — Persistierung (aufgerufen in Zeile 224)
+- `WorkingDirectorySettingsService.GetWorkingDirectoryAsync()` — Laden mit Fallback-Logik
 
 ## Automatisches Herunterfahren — Zählung „laufend"
 
 **Beschreibung:** Der Auto-Shutdown zählt nicht rohe Prozess-Handles, sondern denselben fachlichen Zustand wie die Statusanzeige auf den Aufgabenkacheln — nur so stimmen Anzeige und Countdown-Auslöser überein.
 
 **Bedingungen:**
-- Gezählt wird ausschließlich der klassifizierte Zustand `KiAusfuehrungsZustand.Laeuft` über die gemeinsame `KiAusfuehrungsStatusKlassifikation`
-- `Wartet` (z. B. auf Eingabe wartende Session), `Pausiert`, `PromptInWartestellung` und `Bereit` zählen nicht als laufend
-- Eine pausierte Aufgabe mit physikalisch noch laufendem CLI-Prozess zählt nicht (Pause überlagert Laeuft); ein physisch wartender Prozess im Zustand „Wartet" verhindert den Shutdown nicht
+- Gezählt wird ausschließlich der klassifizierte Zustand `AiExecutionState.Running` über die gemeinsame `AiExecutionStatusClassification`
+- `Waiting` (z. B. auf Eingabe wartende Session), `Paused`, `PromptQueued` und `Ready` zählen nicht als laufend
+- Eine pausierte Aufgabe mit physikalisch noch laufendem CLI-Prozess zählt nicht (Pause überlagert Running); ein physisch wartender Prozess im Zustand „Wartet" verhindert den Shutdown nicht
 - Zusätzlich zählt jedes SCM-Inbox-Ereignis im Status `Verzögert` (per Verzögerungs-Keyword zurückgestellte Zustellung) als eine ausstehende Automatisierung — ein ausstehender Delay-Timer blockiert den Countdown unabhängig vom Aufgabenzustand
 
 **Verhalten:**
 - Der Countdown startet erst, wenn die fachliche Anzahl auf 0 fällt — nicht beim Wegfall des letzten Prozess-Handles
 - Wartende oder pausierte Sessions werden beim OS-Shutdown mit beendet (bei „Herunterfahren erzwingen" zwangsweise)
 
-**Umsetzung:** `LaufendeAutomatisierungenZaehlung.ZaehleAsync` — wendet `KiAusfuehrungsStatusKlassifikation.Klassifiziere` auf die Kandidatenmenge von `IAktiveAufgabenService.GetAktiveAufgabenAsync` an (gleiche Semantik wie `MainWindowViewModel.LaufendeAutomatisierungenAnzahl` auf der Seitenleisten-Liste) und addiert die Anzahl der `ScmIncomingEvents` mit Status `Verzögert`.
+**Umsetzung:** `RunningAutomationsCount.CountAsync` — wendet `AiExecutionStatusClassification.Classify` auf die Kandidatenmenge von `IActiveWorkItemsService.GetActiveWorkItemsAsync` an (gleiche Semantik wie `MainWindowViewModel.RunningAutomationsCount` auf der Seitenleisten-Liste) und addiert die Anzahl der `ScmIncomingEvents` mit Status `Verzögert`.
 
 ## Automatisches Herunterfahren — Countdown-Semantik
 
 **Beschreibung:** Jedes Statuswechsel-Ereignis bricht nicht blind den Countdown ab, sondern löst eine koaleszierte Neuauswertung aus. Das verhindert, dass periodische Heartbeat-Ereignisse einen armierten Countdown unendlich verlängern, ohne den Schutz vor einem Shutdown auf veraltetem Zustand aufzugeben.
 
 **Bedingungen:**
-- Trigger: `RunningCountChanged`, `LaufdatenChanged`, 5-s-Sicherheitstick, `SetEnabled`/`SetOptionen`
+- Trigger: `RunningCountChanged`, `RunDataChanged`, 5-s-Sicherheitstick, `SetEnabled`/`SetOptions`
 - Der Auto-Shutdown muss aktiviert sein (`SetEnabled(true)`)
 
 **Verhalten:**
@@ -203,10 +203,10 @@
 - Neuauswertung ergibt weiterhin Anzahl 0 → ein bereits armiertes Countdown läuft mit dem bestehenden Endzeitpunkt weiter (kein Zurücksetzen)
 - Deaktivieren (`SetEnabled(false)`) disarmiert den Countdown sofort
 - Änderung der Wartezeit bei laufendem Countdown armiert ihn ab sofort mit dem neuen Wert neu
-- Der Shutdown wird pro Null-Phase höchstens einmal ausgelöst (`_shutdownAusgeloest`); vor der Auslösung erfolgt ein Final-Recheck der Anzahl
+- Der Shutdown wird pro Null-Phase höchstens einmal ausgelöst (`_shutdownTriggered`); vor der Auslösung erfolgt ein Final-Recheck der Anzahl
 - Kein Abbruch-Dialog nach Auslösung — die Wartezeit ist die vorgesehene Abbruchmöglichkeit; endet die App vor Ablauf, wird kein Shutdown ausgelöst
 
-**Umsetzung:** `AutoShutdownOrchestrator.EvaluiereAsync`/`OnCountdownAbgelaufenAsync` (koaleszierte Auswertung mit `SemaphoreSlim` + Erneut-Flag; `TimeProvider`-Timer).
+**Umsetzung:** `AutoShutdownOrchestrator.EvaluateAsync`/`OnCountdownElapsedAsync` (koaleszierte Auswertung mit `SemaphoreSlim` + Erneut-Flag; `TimeProvider`-Timer).
 
 ## Automatisches Herunterfahren — Persistenz und Erzwingen
 
@@ -221,4 +221,4 @@
 - Ungültige Wartezeit-Eingaben werden in der UI abgelehnt (Fehlertext, letzter gültiger Wert bleibt wirksam)
 - „Herunterfahren erzwingen" wirkt nur unter Windows (`/f`-Flag); Linux/macOS haben kein Äquivalent und fahren regulär herunter
 
-**Umsetzung:** `AppEinstellungService` (`AutoShutdownErzwingenKey`, `AutoShutdownToleranzMinutenKey`, `AutoShutdownDefaultToleranzMinuten`, `AutoShutdownMaxToleranzMinuten`), `AutoShutdownEinstellungenService` (Singleton → Scope), `SystemShutdownService.ResolveShutdownCommand`.
+**Umsetzung:** `AppSettingService` (`AutoShutdownForceKey`, `AutoShutdownToleranceMinutesKey`, `AutoShutdownDefaultToleranceMinutes`, `AutoShutdownMaxToleranceMinutes`), `AutoShutdownSettingsService` (Singleton → Scope), `SystemShutdownService.ResolveShutdownCommand`.

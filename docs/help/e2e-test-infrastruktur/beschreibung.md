@@ -78,7 +78,7 @@ button.AsButton().Click();
 // Auf nächste Ansicht warten
 WaitForElement(mainWindow, cf => cf.ByName("Neu"), Short);
 
-// Projekt öffnen: direkter Element-Zugriff, Element-Namen müssen bekannt sein
+// Project öffnen: direkter Element-Zugriff, Element-Namen müssen bekannt sein
 var projectButton = WaitForElement(mainWindow, 
     cf => cf.ByName("MeinProjekt"), Short);
 projectButton.Click();

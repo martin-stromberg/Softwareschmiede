@@ -6,13 +6,13 @@
 |------------|-----|------|-------|
 | `App` | WPF-`Application` | `Softwareschmiede.App` | Registriert die drei globalen Exception-Handler in `OnStartup`; kapselt `StartupAsync` und dessen kritische Teilschritte in try-catch |
 | `AsyncTaskExtensions` | Statische Utility-Klasse | `Softwareschmiede.Application.Services` | Stellt `SafeFireAndForget(Task, ILogger, string)` bereit — zentrale Fehlerbehandlung für alle Fire-and-Forget-Aufrufe |
-| `KiAusfuehrungsService` | Singleton-Service | `Softwareschmiede.Application.Services` | Verwaltet CLI-Prozesse; `HandleExitedCoreAsync` bündelt die geschützte Behandlung des Prozessendes für klassischen Start (`process.Exited` → `HandleProcessExitedAsync`) und Terminal-Session (`session.Exited`/`Failed` → `HandleSessionEndedAsync`/`HandleSessionFailedAsync`) |
+| `AiExecutionService` | Singleton-Service | `Softwareschmiede.Application.Services` | Verwaltet CLI-Prozesse; `HandleExitedCoreAsync` bündelt die geschützte Behandlung des Prozessendes für klassischen Start (`process.Exited` → `HandleProcessExitedAsync`) und Terminal-Session (`session.Exited`/`Failed` → `HandleSessionEndedAsync`/`HandleSessionFailedAsync`) |
 | `Win32PseudoConsoleProcessLauncher` / `SimulatedPseudoConsoleProcessLauncher` | Backend-Launcher | `Softwareschmiede.Infrastructure.Terminal` | `Start`/`CreatePseudoConsoleSession` kapseln die native Ressourcen-Erstellung (ConPTY bzw. Pipes) inkl. Cleanup bei Fehlschlag |
 | `CliProcessManager` | Singleton-Service | `Softwareschmiede.Application.Services` | Heartbeat-Timer pro Aufgabe mit eigenem `SemaphoreSlim`; `OnCliProcessStatusChanged` als geschützter Event-Abonnent |
 | `PseudoConsoleSession` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Überwachter `ReadLoopAsync`-Task (`_readLoopTask`), läuft ab Konstruktion bis `Dispose()` unabhängig vom UI-Lebenszyklus (Issue-86), mit generischem Exception-Handling |
 | `TerminalControl` | WPF `FrameworkElement` | `Softwareschmiede.App.Controls` | Reiner Renderer; abonniert `PseudoConsoleSession.BufferChanged`, besitzt keine eigene Leseschleife |
 | `ProjectDetailView` | WPF Code-behind | `Softwareschmiede.App.Views` | `IssueDoubleClick` als geschützter UI-Event-Handler mit `SafeFireAndForget` |
-| `MainWindowViewModel`, `ProjectDetailViewModel`, `TaskDetailViewModel` | ViewModels | `Softwareschmiede.App.ViewModels` | Fire-and-Forget-Ladevorgänge in Property-Settern (`CurrentView`, `ProjektId`, `AufgabeId`) über `SafeFireAndForget` abgesichert |
+| `MainWindowViewModel`, `ProjectDetailViewModel`, `TaskDetailViewModel` | ViewModels | `Softwareschmiede.App.ViewModels` | Fire-and-Forget-Ladevorgänge in Property-Settern (`CurrentView`, `ProjectId`, `WorkItemId`) über `SafeFireAndForget` abgesichert |
 | Serilog (`Log.Logger`) | Logging-Infrastruktur | `App.xaml.cs` | Zentrale Senke für alle Fehlerprotokolle (Konsole + tägliche Rolling-Datei, 14 Tage Aufbewahrung) |
 
 ## Abhängigkeiten
@@ -27,7 +27,7 @@ App.OnStartup
        ├─ try/catch: GetRequiredService<CliProcessManager>()  → Log.Logger
        └─ try/catch: mainWindow.Show()                        → Log.Logger
 
-CliProcessManager / KiAusfuehrungsService / ViewModels / ProjectDetailView
+CliProcessManager / AiExecutionService / ViewModels / ProjectDetailView
   └─ Fire-and-Forget-Aufruf.SafeFireAndForget(_logger, "Bezeichnung")
        └─ ContinueWith (TaskScheduler.Default) → ILogger<T> → Serilog
 
@@ -35,12 +35,12 @@ PseudoConsoleSession.ReadLoopAsync
   └─ läuft ab Konstruktion bis Dispose() unabhängig vom TerminalControl-Lebenszyklus
        └─ internes try-catch (OperationCanceledException / Exception) → ILogger → Serilog
 
-KiAusfuehrungsService.StartCliAsync (klassischer Pipe-Start)
+AiExecutionService.StartCliAsync (klassischer Pipe-Start)
   └─ process.Exited += (_,_) => HandleProcessExitedAsync(...) → HandleExitedCoreAsync
-KiAusfuehrungsService.StartTerminalSessionAsync (Terminal-Session)
+AiExecutionService.StartTerminalSessionAsync (Terminal-Session)
   └─ session.Exited += (_,e) => HandleSessionEndedAsync / session.Failed += (_,e) => HandleSessionFailedAsync
        → HandleExitedCoreAsync
-       ├─ try/catch um gesamten Handler-Body → ILogger<KiAusfuehrungsService>
+       ├─ try/catch um gesamten Handler-Body → ILogger<AiExecutionService>
        └─ CliProcessStatusChanged?.Invoke(...)
             ├─ CliProcessManager.OnCliProcessStatusChanged (try-catch)
             └─ TaskDetailViewModel.OnCliProcessStatusChanged (try-catch)
@@ -59,7 +59,7 @@ graph TD
     A -->|registriert| D[TaskScheduler.UnobservedTaskException]
 
     E[CliProcessManager] -->|SafeFireAndForget| F[AsyncTaskExtensions]
-    G[KiAusfuehrungsService] -->|SafeFireAndForget| F
+    G[AiExecutionService] -->|SafeFireAndForget| F
     H[ViewModels: MainWindow/ProjectDetail/TaskDetail] -->|SafeFireAndForget| F
     I[PseudoConsoleSession.ReadLoopAsync\nlaeuft unabhaengig vom TerminalControl] -->|internes try-catch| L
     J[ProjectDetailView.IssueDoubleClick] -->|SafeFireAndForget| F

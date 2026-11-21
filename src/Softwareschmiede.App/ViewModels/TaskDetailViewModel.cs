@@ -126,9 +126,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(WorkItemTitle));
             OnPropertyChanged(nameof(WorkItemStatus));
             OnPropertyChanged(nameof(WorkItemBranchName));
-            OnPropertyChanged(nameof(StopCanCli));
-            OnPropertyChanged(nameof(StartCanCliNew));
-            OnPropertyChanged(nameof(CompleteCanWorkItem));
+            OnPropertyChanged(nameof(CanStopCli));
+            OnPropertyChanged(nameof(CanStartCli));
+            OnPropertyChanged(nameof(CanCompleteWorkItem));
             OnPropertyChanged(nameof(ShowEditPanel));
             OnPropertyChanged(nameof(ShowCliPanel));
             OnPropertyChanged(nameof(ShowDiffPanel));
@@ -148,7 +148,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(PausedUntilUtc));
             OnPropertyChanged(nameof(IsPaused));
             OnPropertyChanged(nameof(PauseDisplayText));
-            OnPropertyChanged(nameof(PauseCan));
+            OnPropertyChanged(nameof(CanPause));
             OnPropertyChanged(nameof(SendCanPromptTemplate));
             OnPropertyChanged(nameof(CanPromptPlan));
             SelectDefaultView();
@@ -180,7 +180,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             SetProperty(ref _isLoading, value);
             OnPropertyChanged(nameof(CanCreateIssue));
             OnPropertyChanged(nameof(ShowIssueGroup));
-            OnPropertyChanged(nameof(PauseCan));
+            OnPropertyChanged(nameof(CanPause));
         }
     }
 
@@ -198,9 +198,9 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         private set
         {
             SetProperty(ref _isCliRunning, value);
-            OnPropertyChanged(nameof(StopCanCli));
-            OnPropertyChanged(nameof(StartCanCliNew));
-            OnPropertyChanged(nameof(CompleteCanWorkItem));
+            OnPropertyChanged(nameof(CanStopCli));
+            OnPropertyChanged(nameof(CanStartCli));
+            OnPropertyChanged(nameof(CanCompleteWorkItem));
             OnPropertyChanged(nameof(SendCanPromptTemplate));
             OnPropertyChanged(nameof(SaveCan));
             OnPropertyChanged(nameof(DeleteCan));
@@ -229,15 +229,15 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Gibt an, ob der laufende CLI-Prozess gestoppt werden kann.</summary>
-    public bool StopCanCli => _isCliRunning;
+    public bool CanStopCli => _isCliRunning;
 
     /// <summary>Gibt an, ob die CLI fuer eine aktive Ausfuehrung wiederhergestellt werden kann.</summary>
-    public bool StartCanCliNew => _workItem?.ExecutionStatus.ShouldShowCli(_workItem.Status) == true
+    public bool CanStartCli => _workItem?.ExecutionStatus.ShouldShowCli(_workItem.Status) == true
         && !_isCliRunning
         && !IsPaused;
 
     /// <summary>Gibt an, ob die Aufgabe endgueltig abgeschlossen werden kann.</summary>
-    public bool CompleteCanWorkItem => _workItem?.Status.IsActiveOrWaiting() == true
+    public bool CanCompleteWorkItem => _workItem?.Status.IsActiveOrWaiting() == true
         && !_isCliRunning;
 
     /// <summary>Gewähltes KI-Plugin (Prefix).</summary>
@@ -514,7 +514,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         : null;
 
     /// <summary>true, wenn für die Aufgabe eine Pause eingestellt werden kann (Status ∈ {Neu, Gestartet, Wartend}, nicht am Laden).</summary>
-    public bool PauseCan => _workItem?.Status is Domain.Enums.WorkItemStatus.New
+    public bool CanPause => _workItem?.Status is Domain.Enums.WorkItemStatus.New
             or Domain.Enums.WorkItemStatus.Started
             or Domain.Enums.WorkItemStatus.Waiting
         && !_isLoading;
@@ -678,15 +678,15 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         _todoListViewModel.ErrorCallback = message => ErrorMessage = message;
 
         LoadCommand = new AsyncRelayCommand(ct => LoadAsync(ct));
-        StopCliCommand = new AsyncRelayCommand(StopCliAsync, () => StopCanCli);
-        RestartCliCommand = new AsyncRelayCommand(RestartCliAsync, () => StartCanCliNew);
+        StopCliCommand = new AsyncRelayCommand(StopCliAsync, () => CanStopCli);
+        RestartCliCommand = new AsyncRelayCommand(RestartCliAsync, () => CanStartCli);
         StartCommand = new AsyncRelayCommand(
             StartAsync,
             () => _workItem?.ExecutionStatus.MayStartExecution(_workItem.Status) == true
                 && !_isCliRunning
                 && !IsPaused);
         SwitchPluginCommand = new AsyncRelayCommand(SwitchPluginAsync, () => WorkItemStatus is Domain.Enums.WorkItemStatus.Started or Domain.Enums.WorkItemStatus.Waiting && _isCliRunning);
-        CompleteWorkItemCommand = new AsyncRelayCommand(CompleteWorkItemAsync, () => CompleteCanWorkItem);
+        CompleteWorkItemCommand = new AsyncRelayCommand(CompleteWorkItemAsync, () => CanCompleteWorkItem);
         SaveCommand = new AsyncRelayCommand(SaveAsync, () => SaveCan);
         DeleteCommand = new AsyncRelayCommand(DeleteAsync, () => DeleteCan);
         CreatePullRequestCommand = new AsyncRelayCommand(CreatePullRequestAsync, () => CreateCanPullRequest && !_isLoading);
@@ -708,7 +708,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             () => CurrentIssueReference?.IssueUrl != null);
         ExportCliRawCommand = new AsyncRelayCommand(ExportCliRawAsync, () => ExportCanCliRaw);
         ExportCliReplayCommand = new AsyncRelayCommand(ExportCliReplayAsync, () => ExportCanCliReplay);
-        SetPauseCommand = new AsyncRelayCommand(SetPauseAsync, () => PauseCan);
+        SetPauseCommand = new AsyncRelayCommand(SetPauseAsync, () => CanPause);
         SelectPromptTemplateCommand = new AsyncRelayCommand<PromptTemplate>(
             SelectPromptTemplateAsync,
             template => template is not null && SendCanPromptTemplate);
@@ -936,8 +936,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 if (_workItem is not null)
                 {
                     _workItem.ExecutionStatus = WorkItemExecutionStatus.Completed;
-                    OnPropertyChanged(nameof(StartCanCliNew));
-                    OnPropertyChanged(nameof(CompleteCanWorkItem));
+                    OnPropertyChanged(nameof(CanStartCli));
+                    OnPropertyChanged(nameof(CanCompleteWorkItem));
                     OnPropertyChanged(nameof(ShowCliPanel));
                     SelectDefaultView();
                 }
@@ -1531,8 +1531,8 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                     _workItem.ExecutionStatus = isRunning
                         ? WorkItemExecutionStatus.Active
                         : WorkItemExecutionStatus.Completed;
-                    OnPropertyChanged(nameof(StartCanCliNew));
-                    OnPropertyChanged(nameof(CompleteCanWorkItem));
+                    OnPropertyChanged(nameof(CanStartCli));
+                    OnPropertyChanged(nameof(CanCompleteWorkItem));
                     OnPropertyChanged(nameof(ShowCliPanel));
                     SelectDefaultView();
                 }
@@ -1961,7 +1961,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
     /// <param name="effectiveWorkdir">Das bereits über <see cref="ResolveEffectiveWorkingDirectoryAsync"/> aufgelöste effektive Arbeitsverzeichnis.</param>
     /// <param name="ct">Abbruchtoken.</param>
     /// <returns>Die aggregierte Liste der (Plugin, EntryPoint)-Tupel aller kompatiblen Plugins, die erfolgreich Einstiegspunkte geliefert haben.</returns>
-    private async Task<IReadOnlyList<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)>> ResolveAggregierteIdeEinstiegspunkteAsync(string effectiveWorkdir, CancellationToken ct)
+    private async Task<IReadOnlyList<(IIdePlugin Plugin, IdeEntryPoint EntryPoint)>> ResolveAggregatedIdeEntryPointsAsync(string effectiveWorkdir, CancellationToken ct)
     {
         var plugins = await _pluginSelectionService.ResolveAllCompatibleIdePluginsAsync(effectiveWorkdir, ct);
 
@@ -2023,7 +2023,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
         try
         {
             var effectiveWorkdir = await ResolveEffectiveWorkingDirectoryAsync(localClonePath, ct);
-            var entries = await ResolveAggregierteIdeEinstiegspunkteAsync(effectiveWorkdir, ct);
+            var entries = await ResolveAggregatedIdeEntryPointsAsync(effectiveWorkdir, ct);
             SelectCanIde = CalculateCanIdeSelect(entries.Count);
         }
         catch (OperationCanceledException)
@@ -2115,7 +2115,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
                 var (plugin, entryPoints) = await ResolveIdeEntryPointsAsync(effectiveWorkdir, ct);
 
                 // Zusätzlich: KannIdeAuswaehlen aus der aggregierten Ermittlung über alle kompatiblen Plugins aktualisieren.
-                var aggregierteEntries = await ResolveAggregierteIdeEinstiegspunkteAsync(effectiveWorkdir, ct);
+                var aggregierteEntries = await ResolveAggregatedIdeEntryPointsAsync(effectiveWorkdir, ct);
                 SelectCanIde = CalculateCanIdeSelect(aggregierteEntries.Count);
 
                 if (entryPoints.Count == 0)
@@ -2126,7 +2126,7 @@ public sealed class TaskDetailViewModel : ViewModelBase, IDisposable
             }
 
             // Dropdown-Button: ausschließlich die aggregierte Ermittlung über alle kompatiblen Plugins.
-            var entries = await ResolveAggregierteIdeEinstiegspunkteAsync(effectiveWorkdir, ct);
+            var entries = await ResolveAggregatedIdeEntryPointsAsync(effectiveWorkdir, ct);
             SelectCanIde = CalculateCanIdeSelect(entries.Count);
 
             if (entries.Count == 0)

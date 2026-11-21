@@ -8,7 +8,7 @@
 |-------------|---------|
 | Betriebssystem | Windows 10 Build 17763+ / Windows 11 (Pseudo Console API; ältere Builds → diagnostizierter Pipe-Fallback) |
 | .NET | .NET 11 mit TFM `net11.0-windows10.0.17763.0` |
-| KI-Plugin | Plugin muss `IKiPlugin.GetTerminalStartSpecAsync` liefern (bei `CliKiPluginBase`-Plugins automatisch aus `BuildProcessStartInfo` gemappt) und ein startfähiges CLI bereitstellen |
+| KI-Plugin | Plugin muss `IKiPlugin.GetTerminalStartSpecAsync` liefern (bei `CliAiPluginBase`-Plugins automatisch aus `BuildProcessStartInfo` gemappt) und ein startfähiges CLI bereitstellen |
 
 Das Terminal-System benötigt die Pseudo Console API (`CreatePseudoConsole`), die erst ab Windows 10 Build 17763 verfügbar ist — auf älteren Builds greift der Pipe-Fallback (sichtbar als „eingeschränkter Modus"), CLIs mit `RequiresPty`-Anforderung schlagen dort fehl. Das CLI-Tool selbst (z. B. `claude.exe`, `codex.cmd`) muss installiert und über die `PATH`-Umgebungsvariable erreichbar sein; nackte Befehlsnamen werden mit PATHEXT-Semantik aufgelöst, `.cmd`/`.bat`-Shims (z. B. npm-Installationen) werden intern zu `cmd.exe /d /s /c` normalisiert.
 
@@ -17,7 +17,7 @@ Das Terminal-System benötigt die Pseudo Console API (`CreatePseudoConsole`), di
 | Parameter | Schlüssel (AppEinstellung) | Standardwert | Beschreibung |
 |-----------|---------------------------|--------------|--------------|
 | Arbeitsverzeichnis | `WorkDir` | (leer) | Lokales Verzeichnis für Repository-Klons; muss beschreibbar sein |
-| Standard-KI-Plugin | `DefaultKiPlugin` | `"Claude"` | Plugin-Prefix des standardmäßig gewählten KI-Plugins |
+| Standard-KI-Plugin | `DefaultAiPlugin` | `"Claude"` | Plugin-Prefix des standardmäßig gewählten KI-Plugins |
 
 ### Plugin-spezifische Einstellungen
 
@@ -46,14 +46,14 @@ Die Sektion `Terminal` in `src/Softwareschmiede/appsettings.json` steuert die La
 
 | Schlüssel | Ort | Beschreibung |
 |-----------|-----|--------------|
-| `Terminal.ForcePtyUnavailable` | `AppEinstellungen`-Tabelle (Wert `"true"`) | Erzwingt den Fehlschlag des PTY-Verfügbarkeits-Checks im Preflight — treibt den Pipe-Fallback inkl. `[Terminal-Diagnose]`-Marker bzw. den `RequiresPty`-Fehler. Wird pro Session-Start gelesen; dient ausschließlich Tests/Diagnose und wird nie implizit gesetzt. |
+| `Terminal.ForcePtyUnavailable` | `AppSettingen`-Tabelle (Wert `"true"`) | Erzwingt den Fehlschlag des PTY-Verfügbarkeits-Checks im Preflight — treibt den Pipe-Fallback inkl. `[Terminal-Diagnose]`-Marker bzw. den `RequiresPty`-Fehler. Wird pro Session-Start gelesen; dient ausschließlich Tests/Diagnose und wird nie implizit gesetzt. |
 
 ## Plugin-Voraussetzungen
 
-Für den interaktiven Terminal-Pfad muss jedes KI-Plugin `IKiPlugin.GetTerminalStartSpecAsync` liefern — die `TerminalSessionStartSpec` enthält `FileName`, `Arguments`, `WorkingDirectory`, `EnvironmentVariables`, `Capabilities` und `PluginName`. Bei Plugins auf `CliKiPluginBase`-Basis geschieht das automatisch: `BuildTerminalStartSpec` mappt die `ProcessStartInfo` aus `BuildProcessStartInfo` auf die Spec; das Plugin implementiert weiterhin nur `BuildProcessStartInfo` und kann optional `TerminalCapabilities` überschreiben (`SupportsPty` ist der Default; `RequiresPty` für CLIs, die ein echtes TTY benötigen). `IKiPlugin.StartCliAsync` bleibt davon unberührt für den klassischen, nicht-interaktiven Pipe-Start bestehen.
+Für den interaktiven Terminal-Pfad muss jedes KI-Plugin `IKiPlugin.GetTerminalStartSpecAsync` liefern — die `TerminalSessionStartSpec` enthält `FileName`, `Arguments`, `WorkingDirectory`, `EnvironmentVariables`, `Capabilities` und `PluginName`. Bei Plugins auf `CliAiPluginBase`-Basis geschieht das automatisch: `BuildTerminalStartSpec` mappt die `ProcessStartInfo` aus `BuildProcessStartInfo` auf die Spec; das Plugin implementiert weiterhin nur `BuildProcessStartInfo` und kann optional `TerminalCapabilities` überschreiben (`SupportsPty` ist der Default; `RequiresPty` für CLIs, die ein echtes TTY benötigen). `IKiPlugin.StartCliAsync` bleibt davon unberührt für den klassischen, nicht-interaktiven Pipe-Start bestehen.
 
 ```csharp
-// CliKiPluginBase-Ableitung: nur die ProcessStartInfo bauen — Spec und Capabilities kommen aus der Basis.
+// CliAiPluginBase-Ableitung: nur die ProcessStartInfo bauen — Spec und Capabilities kommen aus der Basis.
 protected override ProcessStartInfo BuildProcessStartInfo(string localRepoPath, string? parameters)
     => new()
     {
@@ -87,7 +87,7 @@ public override TerminalProviderCapabilities TerminalCapabilities =>
 |---------|---------|--------|
 | Terminal bleibt leer | Prozess hat Fehler beim Start | Logs im `logs/`-Verzeichnis prüfen; `CodexPlugin.CheckHealthAsync` aufrufen |
 | Start schlägt mit „CLI-Executable '…' kann nicht gestartet werden" fehl | `TerminalExecutableResolver` meldet `NotFound` (Executable nicht im Arbeitsverzeichnis/`PATH`) oder `NotExecutable` (z. B. `.ps1`-Skript) | CLI installieren bzw. `PATH` prüfen oder den `ExecutablePath` des Plugins in den Einstellungen auf einen absoluten `.exe`-Pfad setzen; Details liefert die `[Terminal-Diagnose]`-Zeile im Aufgabenprotokoll |
-| Start schlägt mit „… erfordert ein Pseudo-Terminal (PTY)" fehl | Plugin deklariert `RequiresPty`, aber ConPTY ist nicht verfügbar (OS-Build < 17763 oder `Terminal.ForcePtyUnavailable`-Test-Hook aktiv) | Windows ≥ 10 Build 17763 verwenden; prüfen, ob der Test-Override `Terminal.ForcePtyUnavailable` in den `AppEinstellungen` gesetzt ist |
+| Start schlägt mit „… erfordert ein Pseudo-Terminal (PTY)" fehl | Plugin deklariert `RequiresPty`, aber ConPTY ist nicht verfügbar (OS-Build < 17763 oder `Terminal.ForcePtyUnavailable`-Test-Hook aktiv) | Windows ≥ 10 Build 17763 verwenden; prüfen, ob der Test-Override `Terminal.ForcePtyUnavailable` in den `AppSettingen` gesetzt ist |
 | Statuszeile zeigt „ (eingeschränkter Modus – kein Pseudo-Terminal)" | Session läuft auf dem Pipe-Fallback (PTY nicht verfügbar oder Plugin ohne `SupportsPty`) | Gewollter Fallback — die `[Terminal-Diagnose]`-Zeile im Aufgabenprotokoll nennt Grund und Einzelcheck-Ergebnisse; für PTY-Betrieb Windows-Build und Plugin-Capabilities prüfen |
 | Nur ASCII-Text, keine Farben | ANSI-Sequenzen nicht erkannt | Plugin-Output prüfen (z.B. `codex --version`); TERM-Umgebungsvariable auf `xterm-256color` setzen |
 | `Ctrl+C` löst „Batchdatei abbrechen (J/N)?" aus | CLI wurde über einen `.cmd`/`.bat`-Shim gestartet (z. B. npm-Installation) | Bekanntes Verhalten von Batch-Shims — die Rückfrage mit `J` bestätigen oder die CLI normal beenden |

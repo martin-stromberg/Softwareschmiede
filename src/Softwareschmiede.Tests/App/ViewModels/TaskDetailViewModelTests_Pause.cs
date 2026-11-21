@@ -148,23 +148,23 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
     [InlineData(WorkItemStatus.New)]
     [InlineData(WorkItemStatus.Started)]
     [InlineData(WorkItemStatus.Waiting)]
-    public async Task PauseCan_ShouldBeTrue_ForPausableStates(WorkItemStatus status)
+    public async Task CanPause_ShouldBeTrue_ForPausableStates(WorkItemStatus status)
     {
         var workItem = await CreateWorkItemAsync(status);
         var sut = await LoadSutAsync(workItem);
 
-        sut.PauseCan.Should().BeTrue();
+        sut.CanPause.Should().BeTrue();
         sut.SetPauseCommand.CanExecute(null).Should().BeTrue();
     }
 
     /// <summary>KannPausieren ist für beendete Aufgaben false.</summary>
     [Fact]
-    public async Task PauseCan_ShouldBeFalse_WhenStatusCompleted()
+    public async Task CanPause_ShouldBeFalse_WhenStatusCompleted()
     {
         var workItem = await CreateWorkItemAsync(WorkItemStatus.Completed);
         var sut = await LoadSutAsync(workItem);
 
-        sut.PauseCan.Should().BeFalse();
+        sut.CanPause.Should().BeFalse();
         sut.SetPauseCommand.CanExecute(null).Should().BeFalse();
     }
 
@@ -197,16 +197,16 @@ public sealed class TaskDetailViewModelTests_Pause : IDisposable
 
     /// <summary>Bei aktiver Pause darf der CLI-Neustart nicht ausführbar sein, obwohl der Ausführungsstatus ihn sonst erlauben würde (Issue 151).</summary>
     [Fact]
-    public async Task StartCanCliNew_False_WhenWorkItemPaused()
+    public async Task CanStartCli_False_WhenWorkItemPaused()
     {
         var workItem = await CreateWorkItemWithExecutionStatusAsync(WorkItemStatus.Started, WorkItemExecutionStatus.Completed);
         var sut = await LoadSutAsync(workItem);
-        sut.StartCanCliNew.Should().BeTrue("ohne Pause ist der CLI-Neustart bei beendeter Ausführung erlaubt");
+        sut.CanStartCli.Should().BeTrue("ohne Pause ist der CLI-Neustart bei beendeter Ausführung erlaubt");
 
         await _workItemService.SetPauseAsync(workItem.Id, DateTimeOffset.UtcNow.AddHours(1), TestContext.Current.CancellationToken);
         await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
 
-        sut.StartCanCliNew.Should().BeFalse("eine pausierte Aufgabe darf nicht neu gestartet werden");
+        sut.CanStartCli.Should().BeFalse("eine pausierte Aufgabe darf nicht neu gestartet werden");
         sut.RestartCliCommand.CanExecute(null).Should().BeFalse();
     }
 

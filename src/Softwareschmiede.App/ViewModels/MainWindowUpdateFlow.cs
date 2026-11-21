@@ -76,7 +76,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
     }
 
     /// <summary>Gibt an, ob gerade ein Update heruntergeladen oder vorbereitet wird.</summary>
-    public bool UpdateWillPrepared
+    public bool UpdateBeingPrepared
     {
         get => _updateWillPrepared;
         private set => SetProperty(ref _updateWillPrepared, value, RelayCommand.Refresh);
@@ -100,7 +100,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         => _updateService is not null
            && _currentUpdateSettings is { Mode: not UpdateMode.Off }
            && !UpdateCheckRunning
-           && !UpdateWillPrepared;
+           && !UpdateBeingPrepared;
 
     /// <summary>Gibt an, ob die Installation des angebotenen Updates aktuell gestartet werden kann.</summary>
     public bool StartCan()
@@ -111,7 +111,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
            && _currentUpdateSettings is { Mode: not UpdateMode.Off }
            && UpdateAvailable
            && !UpdateCheckRunning
-           && !UpdateWillPrepared;
+           && !UpdateBeingPrepared;
 
     /// <summary>
     /// Übernimmt einen per Settings-UI gespeicherten Einstellungs-Snapshot: erhöht die
@@ -245,7 +245,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
 
         _attemptLog?.BeginAttempt(attemptKind);
         if (preparatory)
-            UpdateWillPrepared = true;
+            UpdateBeingPrepared = true;
         else
             UpdateCheckRunning = true;
         UpdateNotice = null;
@@ -274,7 +274,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         finally
         {
             if (preparatory)
-                UpdateWillPrepared = false;
+                UpdateBeingPrepared = false;
             else
                 UpdateCheckRunning = false;
             // BeendeVersuch muss vor der Gate-Freigabe liegen: Sonst kann der nächste Versuch
@@ -290,7 +290,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         int generation,
         CancellationToken ct)
     {
-        UpdateWillPrepared = true;
+        UpdateBeingPrepared = true;
         using var updateCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         _updateFlowCts = updateCts;
         var progressViewModel = new UpdateProgressViewModel(updateCts.Cancel);
@@ -340,7 +340,7 @@ public sealed class MainWindowUpdateFlow : ViewModelBase
         finally
         {
             _updateFlowCts = null;
-            UpdateWillPrepared = false;
+            UpdateBeingPrepared = false;
         }
     }
 

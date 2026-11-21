@@ -1533,7 +1533,7 @@ public sealed class TaskDetailViewModelTests : IDisposable
 
         sut.IsCliRunning.Should().BeFalse();
         sut.ShowCliPanel.Should().BeTrue("der persistiert aktive Status soll sichtbar bleiben");
-        sut.StartCanCliNew.Should().BeTrue("der Nutzer soll explizit neu starten können");
+        sut.CanStartCli.Should().BeTrue("der Nutzer soll explizit neu starten können");
         _aiPluginMock.Verify(
             p => p.StartCliAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
             Times.Never);

@@ -8,11 +8,11 @@
 |------------|-----|------|-------|
 | `ITerminalSession` | Interface | `Softwareschmiede.Infrastructure.Terminal` | Einheitliche Session-Abstraktion: `Buffer`, `InputStream`, `WriteInputAsync`/`WritePromptAsync`, `Resize`, `IsPseudoTerminal`, `ExitCode`, `DrainOutputAsync`, `RebuildBufferFromReplay`, `Mark*Activity`, Events `OutputChunk`/`Exited`/`Failed`/`BufferChanged`/`RuntimeStatusChanged` |
 | `PseudoConsoleSession` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | `ITerminalSession`-Implementierung für Live-Sessions: koordiniert Prozess, ConPTY oder Pipes; betreibt die Leseschleife (`ReadLoopAsync`) ab Konstruktion bis `Dispose()` unabhängig vom UI-Lebenszyklus (Issue-86); feuert `BufferChanged`, `OutputChunk`, `Exited`, `Failed` |
-| `TerminalReplaySession` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Zweite `ITerminalSession`-Implementierung: spielt eine `CliOutputAufzeichnung` zeitgesteuert durch denselben Parser-Buffer-Pfad ab; Abspiel-Member `WiedergabeStarten`/`Pausieren`/`Fortsetzen`/`ZeitrafferSchwelle`/`AktuellerChunkIndex` sowie Einzelschritte `SchrittVor`/`SchrittZurueck` (deterministischer Präfix-Rebuild), asynchrones Pause-Gate, `Exited` am Ende |
+| `TerminalReplaySession` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Zweite `ITerminalSession`-Implementierung: spielt eine `CliOutputRecording` zeitgesteuert durch denselben Parser-Buffer-Pfad ab; Abspiel-Member `StartReplay`/`Pausieren`/`Fortsetzen`/`TimeLapseThreshold`/`CurrentChunkIndex` sowie Einzelschritte `StepForward`/`StepBack` (deterministischer Präfix-Rebuild), asynchrones Pause-Gate, `Exited` am Ende |
 | `TerminalSessionStartSpec` | Record | `Softwareschmiede.Plugin.Contracts` | Plugin-gelieferte Startbeschreibung: `FileName`, `Arguments`, `WorkingDirectory`, `EnvironmentVariables`, `Capabilities`, `PluginName`, `OptionalParameters` |
 | `TerminalProviderCapabilities` | Flags-Enum | `Softwareschmiede.Plugin.Contracts` | `None`, `SupportsPty`, `RequiresPty` — steuert die Backend-Wahl |
 | `TerminalExecutableResolver` | Statische Klasse | `Softwareschmiede.Infrastructure.Terminal` | PATHEXT-/PATH-Auflösung von `FileName`: `.exe`/endungslos → `Direct` (absoluter Pfad), `.cmd`/`.bat` → `CmdWrapped` (`cmd.exe /d /s /c "<pfad>"`), sonstiger Treffer → `NotExecutable`, kein Treffer → `NotFound` |
-| `TerminalSessionDiagnostics` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Preflight-Einzelchecks (`ConPTY-Verfügbarkeit`, `Executable`, `CLI-Health`, `Encoding`, `Terminalgröße`, `Pluginparameter`) → `TerminalPreflightResult` mit `BackendEmpfehlung` |
+| `TerminalSessionDiagnostics` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Preflight-Einzelchecks (`ConPTY-Verfügbarkeit`, `Executable`, `CLI-Health`, `Encoding`, `Terminalgröße`, `Pluginparameter`) → `TerminalPreflightResult` mit `BackendRecommendation` |
 | `ITerminalSessionFactory` / `TerminalSessionService` | Interface / Klasse | `Softwareschmiede.Infrastructure.Terminal` | Zentrale Session-Erzeugung: Spec-Validierung, Executable-Auflösung, Preflight, Backend-Wahl (PTY vs. Pipe), `[Terminal-Diagnose]`-Fallback-Marker |
 | `IPseudoConsoleProcessLauncher` | Interface | `Softwareschmiede.Infrastructure.Terminal` | Backend-Start: `Start(Guid, TerminalSessionStartSpec, ITerminalOutputSink?)` → `TerminalSessionStartResult`; `IsPseudoTerminal` |
 | `Win32PseudoConsoleProcessLauncher` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | ConPTY-Backend: startet die normalisierte Spec direkt via `CreateProcess` + `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE` — ohne `cmd.exe`-Hülle |
@@ -23,11 +23,11 @@
 | `ITerminalDiagnoseSink` | Interface | `Softwareschmiede.Infrastructure.Terminal` | Zusätzlicher Routing-Kanal einer Output-Senke für `[Terminal-Diagnose]`-Markerzeilen — hält Artefakt-Zeilen aus byte-exakten Mitschnitten heraus |
 | `CompositeTerminalOutputSink` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Fächert `OnOutputChunk` auf mehrere innere Senken auf (Protokoll-Writer + Recorder); `OnDiagnoseChunk` nur an innere `ITerminalDiagnoseSink`-Implementierungen |
 | `CliOutputRecorder` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | `ITerminalOutputSink`: zeichnet Rohbytes mit `TimeProvider`-Offset im Speicher auf; budgetbegrenzt (`AufzeichnungByteBudget`), bei Überschreitung `IstVollstaendig=false` und intaktes Präfix |
-| `CliOutputAufzeichnung` / `CliOutputChunkRecord` | Datenmodell | `Softwareschmiede.Infrastructure.Terminal` | Mitschnitt-Modell: Header (Aufgabe, Plugin, Start/Ende, Geometrie, Vollständigkeit) + Chunks `(Offset, Data)` |
-| `CliReplayAufzeichnungStore` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Serialisiert/Deserialisiert `CliOutputAufzeichnung` im `.clireplay`-Binärformat (Magic `SWCLRPLY`, Version 1, Header + Offset/Length-Records); Magic-/Versions-/Header-Validierung → `InvalidDataException` |
-| `ICliReplayExportService` / `CliReplayExportService` | Interface / Klasse | `Softwareschmiede.App.Services` | Exportiert den Mitschnitt einer Aufgabe als `.clireplay`-Datei (`HatAufzeichnung`-Vorab-Prüfung) |
-| `KonsolenTestViewModel` / `KonsolenTestDialog` | ViewModel / Window | `Softwareschmiede.App` | Nicht-modales Konsolentestfenster (`Title="Konsolentest"`): lädt `.clireplay`, steuert die `TerminalReplaySession` (Abspielen/Neu starten/Pause/Einzelschritt/Zeitraffer) und synchronisiert die Quell-Chunk-Liste; `AddTransient`, Auflösung per `IServiceProvider` aus `SettingsViewModel` |
-| `CliChunkQuelltextFormatter` / `CliChunkAnzeigeEintrag` | Statische Klasse / Datenmodell | `Softwareschmiede.App` | Quell-Ansicht: Steuerzeichen sichtbar (ESC → `␛`, CR → `\r` u. a.); Zeilenmodell `Index`/`Offset`/`Laenge`/`Quelltext` |
+| `CliOutputRecording` / `CliOutputChunkRecord` | Datenmodell | `Softwareschmiede.Infrastructure.Terminal` | Mitschnitt-Modell: Header (Aufgabe, Plugin, Start/Ende, Geometrie, Vollständigkeit) + Chunks `(Offset, Data)` |
+| `CliReplayRecordingStore` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | Serialisiert/Deserialisiert `CliOutputRecording` im `.clireplay`-Binärformat (Magic `SWCLRPLY`, Version 1, Header + Offset/Length-Records); Magic-/Versions-/Header-Validierung → `InvalidDataException` |
+| `ICliReplayExportService` / `CliReplayExportService` | Interface / Klasse | `Softwareschmiede.App.Services` | Exportiert den Mitschnitt einer Aufgabe als `.clireplay`-Datei (`HasRecording`-Vorab-Prüfung) |
+| `ConsoleTestViewModel` / `ConsoleTestDialog` | ViewModel / Window | `Softwareschmiede.App` | Nicht-modales Konsolentestfenster (`Title="Konsolentest"`): lädt `.clireplay`, steuert die `TerminalReplaySession` (Abspielen/Neu starten/Pause/Einzelschritt/Zeitraffer) und synchronisiert die Quell-Chunk-Liste; `AddTransient`, Auflösung per `IServiceProvider` aus `SettingsViewModel` |
+| `CliChunkSourceTextFormatter` / `CliChunkDisplayEntry` | Statische Klasse / Datenmodell | `Softwareschmiede.App` | Quell-Ansicht: Steuerzeichen sichtbar (ESC → `␛`, CR → `\r` u. a.); Zeilenmodell `Index`/`Offset`/`Length`/`Quelltext` |
 | `PseudoConsole` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | HPCON-Wrapper; Größenänderungen |
 | `PseudoConsoleProcessStarter` | Statische Klasse | `Softwareschmiede.Infrastructure.Terminal` | Win32-Prozessstart mit ConPTY |
 | `PseudoConsoleNativeMethods` | Statische Klasse | `Softwareschmiede.Infrastructure.Terminal` | P/Invoke-Deklarationen |
@@ -37,11 +37,11 @@
 | `AnsiSequenceParser` | Klasse | `Softwareschmiede.Infrastructure.Terminal` | VT100/ANSI-Zustandsmaschine mit chunk-übergreifendem UTF-8-Decoding |
 | `TerminalControl` | FrameworkElement | `Softwareschmiede.App.Controls` | Reiner Renderer: WPF-Rendering und Tastaturhandling; bindet `ITerminalSession`, ruft beim Reattach `RebuildBufferFromReplay`, unterdrückt Scrollback im Alternate Screen |
 | `KeyToVt100Encoder` | Statische Klasse | `Softwareschmiede.App.Controls` | WPF Key → VT100-Byte-Konversion |
-| `KiAusfuehrungsService` | Service | `Softwareschmiede.Application.Services` | Prozess-Lifecycle-Management; delegiert Session-Erzeugung an `ITerminalSessionFactory` |
+| `AiExecutionService` | Service | `Softwareschmiede.Application.Services` | Prozess-Lifecycle-Management; delegiert Session-Erzeugung an `ITerminalSessionFactory` |
 | `CliOutputLineAccumulator` | Klasse | `Softwareschmiede.Application.Services` | Dekodiert UTF-8 über Chunk-Grenzen und segmentiert Terminal-Output in Protokollzeilen |
-| `CliOutputProtokollWriter` | Klasse | `Softwareschmiede.Application.Services` | Implementiert `ITerminalOutputSink`; schreibt Ausgabezeilen über `ProtokollService.AddCliOutputAsync` in das Aufgabenprotokoll |
-| `ProtokollService` | Service | `Softwareschmiede.Application.Services` | Persistiert `ProtokollTyp.CliOutput` und erkennt Rate-Limit-Marker |
-| `TaskDetailViewModel` | ViewModel | `Softwareschmiede.App.ViewModels` | Event-Propagation (`TerminalSessionGestartet`) |
+| `CliOutputLogWriter` | Klasse | `Softwareschmiede.Application.Services` | Implementiert `ITerminalOutputSink`; schreibt Ausgabezeilen über `LogService.AddCliOutputAsync` in das Aufgabenprotokoll |
+| `LogService` | Service | `Softwareschmiede.Application.Services` | Persistiert `LogEntryType.CliOutput` und erkennt Rate-Limit-Marker |
+| `TaskDetailViewModel` | ViewModel | `Softwareschmiede.App.ViewModels` | Event-Propagation (`TerminalSessionStarted`) |
 | `TaskDetailView` | Ansicht | `Softwareschmiede.App.Views` | XAML-Hosting für `TerminalControl` |
 | Windows ConPTY API | Win32 | Windows Kernel | `CreatePseudoConsole`, `ResizePseudoConsole`, `ClosePseudoConsole` |
 
@@ -53,14 +53,14 @@ WPF (Presentation Layer):
     ↓ bindet an
   TaskDetailViewModel
     ↓ abonniert Event von
-  KiAusfuehrungsService
+  AiExecutionService
     ↓ delegiert Session-Erzeugung an
   TerminalSessionService (ITerminalSessionFactory)
 
 Session-Erzeugung:
   TerminalSessionService.StartAsync
     ├─ TerminalExecutableResolver.Resolve(spec)      → normalisierte Spec
-    ├─ TerminalSessionDiagnostics.RunPreflightAsync  → Checks + PtyVerfuegbar
+    ├─ TerminalSessionDiagnostics.RunPreflightAsync  → Checks + PtyAvailable
     └─ Backend-Wahl:
          ├─ PTY  → Win32PseudoConsoleProcessLauncher  → ConPTY-Prozess
          └─ Pipe → SimulatedPseudoConsoleProcessLauncher → Stdin/Stdout-Pipes
@@ -68,9 +68,9 @@ Session-Erzeugung:
 Protokollierungs-Pfad:
   PseudoConsoleSession (ITerminalSession)
     ↓ meldet Output-Chunks an
-  ITerminalOutputSink / CliOutputProtokollWriter
-    ↓ schreibt via ProtokollService
-  Protokolleintrag(Typ = CliOutput, AufgabeId)
+  ITerminalOutputSink / CliOutputLogWriter
+    ↓ schreibt via LogService
+  LogEntry(Typ = CliOutput, WorkItemId)
 
 Rendering-Pfad:
   ITerminalSession (PseudoConsoleSession)
@@ -108,10 +108,10 @@ Tastatureingaben (Reverse-Pfad):
 ### 1. Session-Start (Direct-Start, Issue #271)
 
 ```
-KiAusfuehrungsService.StartTerminalSessionAsync(aufgabeId, plugin, repoPath, optionalParameters)
+AiExecutionService.StartTerminalSessionAsync(workItemId, plugin, repoPath, optionalParameters)
   ├─ Ruft IKiPlugin.GetTerminalStartSpecAsync() auf → TerminalSessionStartSpec
-  ├─ Erzeugt CliOutputProtokollWriter (ITerminalOutputSink) für die Aufgabe
-  ├─ Ruft ITerminalSessionFactory.StartAsync(aufgabeId, spec, sink, plugin.CheckHealthAsync, ct) auf
+  ├─ Erzeugt CliOutputLogWriter (ITerminalOutputSink) für die Aufgabe
+  ├─ Ruft ITerminalSessionFactory.StartAsync(workItemId, spec, sink, plugin.CheckHealthAsync, ct) auf
   │    ├─ TerminalExecutableResolver.Resolve(spec)
   │    │    ├─ absoluter/relativer Pfad oder nackter Name
   │    │    ├─ Suche: WorkingDirectory → PATH (Spec-Env, sonst Prozess-Env)
@@ -125,13 +125,13 @@ KiAusfuehrungsService.StartTerminalSessionAsync(aufgabeId, plugin, repoPath, opt
   │    │    ├─ Executable-Check (aus Resolution: nicht gefunden / nicht ausführbar)
   │    │    ├─ CLI-Health (healthCheck-Delegate — nur bei erfolgreicher Auflösung; nicht fatal)
   │    │    ├─ Encoding (UTF-8), Terminalgröße (DefaultCols/DefaultRows), Pluginparameter
-  │    │    └─ → TerminalPreflightResult { Checks, PtyVerfuegbar, BackendEmpfehlung }
+  │    │    └─ → TerminalPreflightResult { Checks, PtyAvailable, BackendRecommendation }
   │    └─ Backend-Wahl (feste Reihenfolge):
   │         ├─ Executable NotFound/NotExecutable → InvalidOperationException + Marker
-  │         ├─ RequiresPty && !PtyVerfuegbar     → InvalidOperationException + Marker
+  │         ├─ RequiresPty && !PtyAvailable     → InvalidOperationException + Marker
   │         ├─ E2E-Modus (SOFTWARESCHMIEDE_TEST_DB_PATH) → Pipe
   │         ├─ !SupportsPty                      → Pipe + Diagnose-Marker
-  │         ├─ PtyVerfuegbar                     → PTY (Win32PseudoConsoleProcessLauncher)
+  │         ├─ PtyAvailable                     → PTY (Win32PseudoConsoleProcessLauncher)
   │         └─ sonst                             → Pipe + Diagnose-Marker
   │         (Fallback-Diagnose: LogWarning + "[Terminal-Diagnose]"-Zeile via outputSink.OnOutputChunk
   │          — landet nur im CliOutput-Protokoll, nicht im Terminal/Replay. Für die Anwenderin
@@ -140,13 +140,13 @@ KiAusfuehrungsService.StartTerminalSessionAsync(aufgabeId, plugin, repoPath, opt
   │          IsPseudoTerminal == false meldet)
   ├─ Erzeugt CliProcessHandle mit ITerminalSession-Referenz und OutputSink
   ├─ Verdrahtet session.Exited/Failed → HandleProcessExitedAsync / Status Fehler
-  ├─ Fired CliProcessStatusChanged(Gestartet)
-  └─ Fired TaskDetailViewModel.TerminalSessionGestartet(session)
+  ├─ Fired CliProcessStatusChanged(Started)
+  └─ Fired TaskDetailViewModel.TerminalSessionStarted(session)
 ```
 
 Der Plugin-Prozess wird direkt aus der Spec gestartet — es gibt keine `cmd.exe`-Zwischenschale mehr,
 in die der Befehl als Tastatureingabe getippt wird. Für `IKiPlugin`-Implementierungen auf
-`CliKiPluginBase`-Basis mappt `BuildTerminalStartSpec` die bestehende `ProcessStartInfo` auf die
+`CliAiPluginBase`-Basis mappt `BuildTerminalStartSpec` die bestehende `ProcessStartInfo` auf die
 Spec (inkl. Environment-Variablen, `OptionalParameters`).
 
 ### 2. Output-Rendering und Replay
@@ -156,7 +156,7 @@ Session und beendet erst in `Dispose()`. Sie läuft unabhängig davon, ob ein `T
 ist (Issue-86). Jeder gelesene Chunk:
 
 1. geht an die optionale `ITerminalOutputSink` (bei aktivem Mitschnitt eine `CompositeTerminalOutputSink`:
-   `CliOutputProtokollWriter` für das Zeilenprotokoll + `CliOutputRecorder` für die Rohbyte-Aufzeichnung
+   `CliOutputLogWriter` für das Zeilenprotokoll + `CliOutputRecorder` für die Rohbyte-Aufzeichnung
    mit Zeitstempel),
 2. löst `OutputChunk` (rohe Bytes) aus,
 3. wird unter dem Render-Lock im `TerminalReplayBuffer` (rohe Bytes, Budget aus
@@ -171,10 +171,10 @@ PseudoConsoleSession.OutputStream (ConPTY-Pipe bzw. Prozess-Stdout)
   ↓ async bytes gelesen in ReadLoopAsync (läuft ab Session-Konstruktion)
 ITerminalOutputSink.OnOutputChunk(bytes)
   ├─ CompositeTerminalOutputSink (bei AufzeichnungByteBudget > 0)
-  │    ├─ CliOutputProtokollWriter → ProtokollService.AddCliOutputAsync(aufgabeId, line)
+  │    ├─ CliOutputLogWriter → LogService.AddCliOutputAsync(workItemId, line)
   │    └─ CliOutputRecorder → CliOutputChunkRecord(Offset, Bytes) im Speicher
   │         (ITerminalDiagnoseSink-Kanal: [Terminal-Diagnose]-Marker nur an den Writer)
-  └─ (sonst: CliOutputProtokollWriter direkt)
+  └─ (sonst: CliOutputLogWriter direkt)
 OutputChunk-Event (Rohbytes)
 TerminalReplayBuffer.Append(bytes) ──┐ unter Render-Lock
 AnsiSequenceParser.Parse(bytes) → TerminalEvents ─┤
@@ -238,8 +238,8 @@ ResizePseudoConsole(hpcon, newSize)
 │ Application Layer                                            │
 │ ┌────────────────────────────────────────────────────────┐ │
 │ │ TaskDetailViewModel                                    │ │
-│ │ └─ Event: TerminalSessionGestartet                     │ │
-│ │ KiAusfuehrungsService (Lifecycle, CliProcessHandle)    │ │
+│ │ └─ Event: TerminalSessionStarted                     │ │
+│ │ AiExecutionService (Lifecycle, CliProcessHandle)    │ │
 │ └────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
                           ↑↓ StartTerminalSessionAsync / ITerminalSessionFactory
@@ -290,7 +290,7 @@ Sektion `Terminal` in `appsettings.json` (gebunden an `TerminalSessionOptions`):
 | `Terminal:DefaultCols` | 220 | Anfangsspalten der Session (ConPTY-Erstellung, Preflight-Check) |
 | `Terminal:DefaultRows` | 50 | Anfangszeilen der Session |
 | `Terminal:AufzeichnungByteBudget` | 8388608 (8 MB) | Byte-Budget des `CliOutputRecorder`-Mitschnitts pro Session; `<= 0` deaktiviert die Aufzeichnung |
-| `Terminal.ForcePtyUnavailable` (App-Einstellung, nicht JSON) | — | Test-/Debug-Hook: erzwingt `PtyVerfuegbar=false` im Preflight → Pipe-Fallback mit Diagnose-Marker; `RequiresPty`-Plugins schlagen fehl |
+| `Terminal.ForcePtyUnavailable` (App-Einstellung, nicht JSON) | — | Test-/Debug-Hook: erzwingt `PtyAvailable=false` im Preflight → Pipe-Fallback mit Diagnose-Marker; `RequiresPty`-Plugins schlagen fehl |
 
 ## Executable-Auflösung
 
@@ -306,32 +306,32 @@ Sektion `Terminal` in `appsettings.json` (gebunden an `TerminalSessionOptions`):
 
 ## Service-Integration
 
-### KiAusfuehrungsService
+### AiExecutionService
 
 Zentrale Lifecycle-Klasse:
 - Erzeugt `CliProcessHandle` mit `ITerminalSession`-Referenz und OutputSink
 - Verwaltet aktive Prozesse in Dictionary `_handles`, solange der zugehörige Prozess läuft — unabhängig davon, ob die Aufgabenseite angezeigt wird (parallele CLI-Ausführungen, Issue-86)
 - Delegiert die Session-Erzeugung an `ITerminalSessionFactory` (`TerminalSessionService`) und reicht `plugin.CheckHealthAsync` als Preflight-Probe durch
 - Propagiert Status-Änderungen via `CliProcessStatusChanged`-Event
-- `GetTerminalSession(aufgabeId)` ermöglicht Zugriff auf die Session unabhängig vom View-Lebenszyklus (z. B. für Resize/Stop oder erneutes Binden an ein `TerminalControl`)
+- `GetTerminalSession(workItemId)` ermöglicht Zugriff auf die Session unabhängig vom View-Lebenszyklus (z. B. für Resize/Stop oder erneutes Binden an ein `TerminalControl`)
 - Das `Exited`-Ereignis der Session (nicht mehr `Process.Exited` auf Service-Ebene) löst `HandleSessionEndedAsync` aus (→ `HandleExitedCoreAsync`) — die Session meldet ihren eigenen Exit-Code (`GetExitCodeProcess` auf dem nativen Handle bzw. `Process.ExitCode` im Pipe-Fallback); `Failed` geht über `HandleSessionFailedAsync` in denselben Pfad
-- `Dispose()` muss beim App-Shutdown aufgerufen werden, damit alle noch laufenden Sessions (und deren Leseschleifen) sauber beendet werden; dies geschieht automatisch, da `KiAusfuehrungsService` als Singleton im DI-Container registriert ist und beim Beenden des Hosts (`App.OnExit` → `_host.Dispose()`) disposed wird
+- `Dispose()` muss beim App-Shutdown aufgerufen werden, damit alle noch laufenden Sessions (und deren Leseschleifen) sauber beendet werden; dies geschieht automatisch, da `AiExecutionService` als Singleton im DI-Container registriert ist und beim Beenden des Hosts (`App.OnExit` → `_host.Dispose()`) disposed wird
 - Beim Aufräumen ruft `DisposeSessionResourcesAsync` zuerst einen kurzen `DrainOutputAsync` der Session und danach `OutputSink.CompleteAsync(...)` auf, damit bereits angenommene Protokollzeilen begrenzt persistiert werden können
 
 ### TaskDetailViewModel
 
-Holt die laufende Session vom Service (nach dem Start über `CliProcessStatusChanged` bzw. beim Laden via `GetTerminalSession`) und propagiert sie über das eigene `TerminalSessionGestartet`-Event an die View:
+Holt die laufende Session vom Service (nach dem Start über `CliProcessStatusChanged` bzw. beim Laden via `GetTerminalSession`) und propagiert sie über das eigene `TerminalSessionStarted`-Event an die View:
 ```csharp
-var session = _kiService.GetTerminalSession(_aufgabeId);
+var session = _kiService.GetTerminalSession(_workItemId);
 if (session is not null)
-    TerminalSessionGestartet?.Invoke(session); // Action<ITerminalSession>
+    TerminalSessionStarted?.Invoke(session); // Action<ITerminalSession>
 ```
 
 ### TaskDetailView.xaml.cs
 
 Abonniert das ViewModel-Event und setzt die Session auf das Control — beim erneuten Binden baut `TerminalControl` den Buffer über `RebuildBufferFromReplay()` neu auf:
 ```csharp
-ViewModel.TerminalSessionGestartet += session =>
+ViewModel.TerminalSessionStarted += session =>
 {
     TerminalConsole.Session = session;
 };
@@ -352,7 +352,7 @@ ViewModel.TerminalSessionGestartet += session =>
 | ANSI-Parser-Fehler | Fehlerhafte Sequenzen werden ignoriert; Zustand bleibt konsistent; `Failed`-Event signalisiert Lesefehler |
 | Unerwartete Exception in `ReadLoopAsync` | `catch (Exception)` protokolliert (`LogError`) und feuert `Failed`; Leseschleife endet geordnet |
 | `TerminalControl` nicht (mehr) gebunden, während Prozess Ausgabe produziert | Die Leseschleife der Session läuft unabhängig weiter und puffert Ausgabe in `Buffer` + `TerminalReplayBuffer` — kein Datenverlust (Issue-86); Reattach baut den Buffer aus dem Replay neu auf |
-| `CliOutputProtokollWriter` kann eine Zeile nicht persistieren | Fehler wird geloggt; die Terminal-Session, der Parser und das Rendering laufen weiter |
+| `CliOutputLogWriter` kann eine Zeile nicht persistieren | Fehler wird geloggt; die Terminal-Session, der Parser und das Rendering laufen weiter |
 | Output-Persistenz fällt hinter schnelle CLI-Ausgabe zurück | Bounded Queue erzeugt Backpressure und protokolliert Warnungen ab definierten Schwellen; der Terminal-Output-Reader wartet, bis wieder Queue-Kapazität verfügbar ist |
 | Plugin-Health-Check schlägt fehl / wirft | Nicht-fataler Preflight-Check-Eintrag `CLI-Health` (Ok=false) — Start läuft weiter |
 
@@ -361,5 +361,5 @@ ViewModel.TerminalSessionGestartet += session =>
 - **Speicherverbrauch:** 1000-Zeilen-Scrollback × Spaltenanzahl × `TerminalCell`-Größe (ca. 30 Bytes). Bei 120 Spalten: ~3.6 MB. Zusätzlich `TerminalReplayBuffer` ≤ `Terminal:ReplayBufferByteBudget` (Default 512 KiB) Rohbytes pro Session.
 - **CPU-Last:** Rendering per `DrawingContext` ist effizient; Parser läuft on-demand (Byte-basiert).
 - **Hängende Prozesse:** Keine speziellen Timeouts; das `Exited`-Ereignis der Session ist Source of Truth.
-- **CLI-Protokollierung:** `CliOutputProtokollWriter.QueueCapacity` begrenzt die ausstehenden Ausgabezeilen auf 4096. Der Abschluss ist idempotent, synchronisiert sich mit einer aktiven Producer-Queue-Phase und kann über `CompleteAsync(timeout)` begrenzt auf die Persistenz bereits angenommener Zeilen warten.
+- **CLI-Protokollierung:** `CliOutputLogWriter.QueueCapacity` begrenzt die ausstehenden Ausgabezeilen auf 4096. Der Abschluss ist idempotent, synchronisiert sich mit einer aktiven Producer-Queue-Phase und kann über `CompleteAsync(timeout)` begrenzt auf die Persistenz bereits angenommener Zeilen warten.
 - **Windows-Versionen:** ConPTY erfordert Windows 10 Build 17763+; auf älteren Builds läuft das Pipe-Backend mit Diagnose-Marker — `RequiresPty`-Plugins schlagen dort mit Fehler fehl.

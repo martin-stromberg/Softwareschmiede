@@ -9,7 +9,7 @@ Gemeinsame Basis aller Plugins.
 | `PluginName` | `string` | Anzeigename (z.B. `"GitHub"`) |
 | `PluginPrefix` | `string` | Eindeutiger Präfix für Credential-Store-Schlüssel |
 | `PluginType` | `PluginType` | `SourceCodeManagement` oder `DevelopmentAutomation` |
-| `PluginSymbol` | `string` | Unicode-Glyph für die Symbolzeile der Aufgabenkachel (z. B. `"🐙"`). Default-Interface-Member (`=> FallbackSymbol`) — binärkompatibel, bereits kompilierte Plugin-DLLs ohne eigenes Symbol laden weiter und erhalten den Fallback-Glyph. `GitPluginBase`/`CliKiPluginBase` deklarieren es als `virtual`-Eigenschaft. |
+| `PluginSymbol` | `string` | Unicode-Glyph für die Symbolzeile der Aufgabenkachel (z. B. `"🐙"`). Default-Interface-Member (`=> FallbackSymbol`) — binärkompatibel, bereits kompilierte Plugin-DLLs ohne eigenes Symbol laden weiter und erhalten den Fallback-Glyph. `GitPluginBase`/`CliAiPluginBase` deklarieren es als `virtual`-Eigenschaft. |
 | `FallbackSymbol` | `const string = "◻"` | Fallback-Glyph für Plugins ohne eigenes `PluginSymbol` und für nicht auflösbare Plugin-Referenzen |
 | `GetSettingGroups()` | `IReadOnlyList<PluginSettingGroup>` | Einstellungsfelder für die UI |
 
@@ -66,13 +66,13 @@ KI-Entwicklungsautomatisierung.
 
 ---
 
-## `CliKiPluginBase`
+## `CliAiPluginBase`
 
 Abstrakte Basisklasse für CLI-basierte KI-Plugins (`ClaudeCliPlugin`, `GitHubCopilotPlugin`, `CodexPlugin`).
 
 | Member | Beschreibung |
 |--------|--------------|
-| `ProviderDateiPraefix` | Provider-Kürzel für Dateinamen (`claude`, `copilot`) |
+| `ProviderFilePrefix` | Provider-Kürzel für Dateinamen (`claude`, `copilot`) |
 | `BuildContextFilePath(localRepoPath)` | Pfad zur nächsten freien Kontextdatei |
 | `GetLatestContextFilePath(localRepoPath)` | Pfad zur zuletzt erzeugten Kontextdatei |
 | `ClearContextFiles(localRepoPath)` | Alle Kontextdateien löschen |
@@ -91,15 +91,15 @@ CLI-basierte Plugins können zusätzliche Startargumente über das Feld `Command
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
 | `Name` | `string` | Anzeigename des Agenten |
-| `Beschreibung` | `string?` | Erste Zeile der Agent-Definitionsdatei |
-| `Pfad` | `string` | Absoluter Pfad zur Agent-Definitionsdatei |
+| `Description` | `string?` | Erste Zeile der Agent-Definitionsdatei |
+| `FilePath` | `string` | Absoluter Pfad zur Agent-Definitionsdatei |
 
 ### `PullRequest`
 
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
 | `Nummer` | `int` | PR-Nummer |
-| `Titel` | `string` | PR-Titel |
+| `Title` | `string` | PR-Titel |
 | `Url` | `string` | Direkt-URL zum PR |
 | `BranchName` | `string` | Name des Quell-Branches |
 | `Provider` | `PullRequestProvider` | Provider des Pull Requests, initial `GitHub` |
@@ -116,7 +116,7 @@ CLI-basierte Plugins können zusätzliche Startargumente über das Feld `Command
 | `MergeStatus` | `PullRequestMergeStatus` | Mergebarkeit beziehungsweise Merge-Status |
 | `HeadSha` | `string?` | Aktuelle Head-SHA |
 | `MergeCommitSha` | `string?` | Merge-Commit-SHA, sofern bekannt |
-| `LastUpdatedUtc` | `DateTimeOffset?` | Providerzeitpunkt der letzten Aktualisierung, sofern bekannt |
+| `CheckedAtUtc` | `DateTimeOffset?` | Providerzeitpunkt der letzten Aktualisierung, sofern bekannt |
 
 ### `PullRequestWorkflowRunInfo`
 
@@ -155,7 +155,7 @@ CLI-basierte Plugins können zusätzliche Startargumente über das Feld `Command
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
 | `Bestanden` | `bool` | `true` wenn alle Tests bestanden |
-| `Ergebnisse` | `IReadOnlyList<TestErgebnisInfo>` | Einzelne Testergebnisse |
+| `Results` | `IReadOnlyList<TestResultInfo>` | Einzelne Testergebnisse |
 
 ### `RepositoryDirectoryEntry`
 

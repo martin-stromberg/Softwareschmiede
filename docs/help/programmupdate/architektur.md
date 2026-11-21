@@ -57,14 +57,14 @@ flowchart LR
 | Komponente | Rolle |
 |------------|-------|
 | `MainWindow` | Registriert den einmaligen `ContentRendered`-Handler und stößt `InitializeUpdatesAfterWindowReadyAsync` an. |
-| `MainWindowViewModel` | Delegiert den Update-Bereich an `MainWindowUpdateFlow`: Commands `UpdatePruefenCommand`/`UpdateStartenCommand`, Zustands-Properties (`UpdateVerfuegbar`, `VerfuegbaresUpdate`, `UpdateCheckLaeuft`, `UpdateWirdVorbereitet`, `UpdateHinweis`, `UpdatePruefenTooltip`) und den Start-Einstieg. |
-| `MainWindowUpdateFlow` | Orchestriert alle Update-Versuche: `_updateGate` (nicht wartend), `_updateSettingsGeneration` (Aktualität), `_updateAblaufCts` (Abbruch), `PruefenAsync`/`StartenAsync`/`FuehreUpdateVersuchAsync`/`InstalliereUpdateAsync`, Startautomatik und Settings-Anwendung. |
-| `MainWindowUpdateDienste` | Record-Bündel der Update-Kollaborateure (`IUpdateService`, `ICliUpdateSafetyService`, `IUpdateProgressDialogService`, `IUpdateVersuchProtokoll`). |
-| `MainWindowOptionaleDienste` | Record-Bündel der optionalen `MainWindowViewModel`-Abhängigkeiten (DispatcherInvoke, `IDialogService`, `IApplicationVersionProvider`, `AufgabeLaufdatenChangedNotifier`, `MainWindowUpdateDienste`). |
-| `UpdateModusTexte` / `UpdateModusOption` | Zentrale Anzeige-Labels (`Aus`/`Nur prüfen`/`Bei Programmstart prüfen und ausführen`) und typisierte Auswahloptionen (`Alle`, `FuerModus`). |
-| `UpdatePfadTexte` / `UpdatePfadOption` (`UpdatePfadOptionen.cs`) | Zentrale Labels der zwei Update-Pfade (`Produktivversionen`/`Vorabversionen`) und der Kanal-Anzeigetexte (`KanalProduktiv`/`KanalReleaseCandidate`); typisierte Auswahloptionen (`Alle`, `FuerPfad` mit Produktiv-Fallback). |
-| `SettingsViewModel` | Bietet `UpdateModusOptionen` (`UpdateModusOption.Alle`), typisiertes `SelectedUpdateMode`, `UpdatePfadOptionen` (`UpdatePfadOption.Alle`), typisiertes `SelectedUpdatePfad`, die schreibgeschützte Kanal-Anzeige `AbgeleiteterUpdateKanal` und das Event `UpdateSettingsSaved` mit gespeichertem `UpdateSettings`-Snapshot. |
-| `SettingsView.xaml` | Abschnitt „Updates" im Register „Allgemein": ComboBoxen „Update-Modus" (`AutomationProperties.Name="Update-Modus"`) und „Update-Pfad" (`AutomationProperties.Name="Update-Pfad"`, jeweils `SelectedItem`-Binding mit `Label`-ItemTemplate) sowie schreibgeschützter TextBlock für den abgeleiteten Kanal (`AutomationProperties.Name="Update-Kanal"`, Binding `AbgeleiteterUpdateKanal`) mit Hinweistext zur exklusiven Kanalsemantik. |
+| `MainWindowViewModel` | Delegiert den Update-Bereich an `MainWindowUpdateFlow`: Commands `UpdatePruefenCommand`/`StartUpdateCommand`, Zustands-Properties (`UpdateAvailable`, `AvailableUpdate`, `UpdateCheckRunning`, `UpdateBeingPrepared`, `UpdateNotice`, `UpdateCheckTooltip`) und den Start-Einstieg. |
+| `MainWindowUpdateFlow` | Orchestriert alle Update-Versuche: `_updateGate` (nicht wartend), `_updateSettingsGeneration` (Aktualität), `_updateFlowCts` (Abbruch), `CheckAsync`/`StartenAsync`/`RunUpdateAttemptAsync`/`InstallUpdateAsync`, Startautomatik und Settings-Anwendung. |
+| `MainWindowUpdateServices` | Record-Bündel der Update-Kollaborateure (`IUpdateService`, `ICliUpdateSafetyService`, `IUpdateProgressDialogService`, `IUpdateAttemptLog`). |
+| `MainWindowOptionalServices` | Record-Bündel der optionalen `MainWindowViewModel`-Abhängigkeiten (DispatcherInvoke, `IDialogService`, `IApplicationVersionProvider`, `WorkItemRunDataChangedNotifier`, `MainWindowUpdateServices`). |
+| `UpdateModeText` / `UpdateModeOption` | Zentrale Anzeige-Labels (`Aus`/`Nur prüfen`/`Bei Programmstart prüfen und ausführen`) und typisierte Auswahloptionen (`All`, `ForMode`). |
+| `UpdatePathText` / `UpdatePathOption` (`UpdatePathOptions.cs`) | Zentrale Labels der zwei Update-Pfade (`Produktivversionen`/`Vorabversionen`) und der Kanal-Anzeigetexte (`ChannelStable`/`ChannelReleaseCandidate`); typisierte Auswahloptionen (`All`, `ForPath` mit Produktiv-Fallback). |
+| `SettingsViewModel` | Bietet `UpdateModeOptions` (`UpdateModeOption.All`), typisiertes `SelectedUpdateMode`, `UpdatePathOptions` (`UpdatePathOption.All`), typisiertes `SelectedUpdatePath`, die schreibgeschützte Kanal-Anzeige `DerivedUpdateChannel` und das Event `UpdateSettingsSaved` mit gespeichertem `UpdateSettings`-Snapshot. |
+| `SettingsView.xaml` | Abschnitt „Updates" im Register „Allgemein": ComboBoxen „Update-Modus" (`AutomationProperties.Name="Update-Modus"`) und „Update-Pfad" (`AutomationProperties.Name="Update-Pfad"`, jeweils `SelectedItem`-Binding mit `Label`-ItemTemplate) sowie schreibgeschützter TextBlock für den abgeleiteten Kanal (`AutomationProperties.Name="Update-Kanal"`, Binding `DerivedUpdateChannel`) mit Hinweistext zur exklusiven Kanalsemantik. |
 | `UpdateProgressViewModel` / `UpdateProgressDialog` | Fortschrittsdialog der Vorbereitung (Phasen, Prozent, Abbrechen, explizites „Schließen" in Fehler-/Abschlusszuständen). |
 | `WpfUpdateProgressDialogService` | `IUpdateProgressDialogService`-Implementierung; öffnet den Dialog modal mit Hauptfenster-Owner. |
 | `WpfApplicationShutdownService` | `IApplicationShutdownService`-Implementierung; geordnetes Beenden nach Updater-Start. |
@@ -75,19 +75,19 @@ flowchart LR
 |------------|-------|
 | `UpdateService` (`IUpdateService`) | Orchestriert `CheckForUpdateAsync(UpdateCheckOptions)`, `PrepareUpdateAsync` (Delegat an `IUpdatePackageService`) und `StartPreparedUpdateAsync` (Skriptstart → Shutdown). Serialisiert Prüfungen über `_checkGate`. |
 | `ApplicationVersionProvider` (`IApplicationVersionProvider`) | Liest und normalisiert die installierte Version aus `version.json`; `null` = nicht prüfbar. |
-| `CliUpdateSafetyService` (`ICliUpdateSafetyService`) | Bewertet aktive Aufgaben via `AufgabeLaufAktivitaet.IstAktiv`; liefert `CliUpdateSafetyResult`. |
+| `CliUpdateSafetyService` (`ICliUpdateSafetyService`) | Bewertet aktive Aufgaben via `WorkItemRunActivity.IstAktiv`; liefert `CliUpdateSafetyResult`. |
 | `UpdateVersionComparer` | Statische Fassade: `TryParse`, `Normalize`, `IsNewer` auf Basis von `SemanticUpdateVersion`. |
 | `SemanticUpdateVersion` | SemVer-2.0-Value-Object: `Major`/`Minor`/`Patch`, `PrereleaseIdentifiers`, `BuildMetadata`, `IsPrerelease`, `IComparable`/`IEquatable`. |
-| `UpdateModels.cs` | `UpdateMode`, `UpdateKanal`, `UpdateSettings`, `UpdateCheckOptions`, `UpdateDownloadRoute` (primäre Download-URL + optionaler API-Fallback, je Route), `UpdateInfo`, `UpdateReleaseLookupResult`, `UpdateCheckResult`/`UpdateCheckStatus`, `UpdatePreparationProgress`/`Phase` (inkl. `Verifizieren`), `UpdatePreparationResult`, `CliUpdateSafetyResult`, `InstalledVersionInfo`. |
-| `UpdatePfadKanalResolver` | Statische Pfad→Kanal-Abbildung: Konstanten `ProduktivversionenPfad`/`VorabversionenPfad`, `ErmittleKanal`, `NormalisierePfad` (Produktiv-Fallback), `IstGueltigerPfad` und `ErmittleKanalFuerTagName` („-rc"-Infix → `ReleaseCandidate`, gleiche Regel wie `DatenbankPfadResolver`). |
+| `UpdateModels.cs` | `UpdateMode`, `UpdateChannel`, `UpdateSettings`, `UpdateCheckOptions`, `UpdateDownloadRoute` (primäre Download-URL + optionaler API-Fallback, je Route), `UpdateInfo`, `UpdateReleaseLookupResult`, `UpdateCheckResult`/`UpdateCheckStatus`, `UpdatePreparationProgress`/`Phase` (inkl. `Verifizieren`), `UpdatePreparationResult`, `CliUpdateSafetyResult`, `InstalledVersionInfo`. |
+| `UpdatePathChannelResolver` | Statische Pfad→Kanal-Abbildung: Konstanten `StableVersionsPath`/`PrereleaseVersionsPath`, `ResolveChannel`, `NormalizePath` (Produktiv-Fallback), `IsValidPath` und `ResolveChannelForTagName` („-rc"-Infix → `ReleaseCandidate`, gleiche Regel wie `DatabasePathResolver`). |
 | `UpdateOptions` | Konfiguration: `RepositoryOwner`, `RepositoryName`, `AssetName` (`release.zip`), `ManifestAssetName` (`update.json`), `UpdateDirectoryName` (`updates`), `CheckTimeout` (15 s), `ExecutableName` (`Softwareschmiede.exe`). |
-| `AppEinstellungService` | `GetUpdateSettingsAsync`/`SetUpdateSettingsAsync` (Schlüssel `updates.mode`, `updates.pfad`; Abfragetag `UpdateSettings.Read`). |
+| `AppSettingService` | `GetUpdateSettingsAsync`/`SetUpdateSettingsAsync` (Schlüssel `updates.mode`, `updates.pfad`; Abfragetag `UpdateSettings.Read`). |
 
 ### Infrastruktur (`Softwareschmiede/Infrastructure/Services/Updates`)
 
 | Komponente | Rolle |
 |------------|-------|
-| `GitHubReleaseClient` (`IUpdateReleaseClient`) | Paginierte Release-Suche über die GitHub-REST-API, exklusiver Kandidatenfilter je `UpdateCheckOptions.Kanal` (Draft/Tag/Asset/Kanalzugehörigkeit), SemVer-Maximum, `UpdateReleaseLookupResult`. Befüllt pro Kandidat `UpdateInfo.PaketDownload` und — bei vorhandenem `update.json`-Asset — `UpdateInfo.ManifestDownload` als `UpdateDownloadRoute`; die optionalen `Fallback`-URLs leitet `CreateFallbackDownloadUrl` aus den Asset-Feldern `url`/`id` ab (Host auf `api.github.com` gepinnt via `IsAllowedAssetApiUrl`). Ein fehlendes Manifest-Asset disqualifiziert den Kandidaten nicht. |
+| `GitHubReleaseClient` (`IUpdateReleaseClient`) | Paginierte Release-Suche über die GitHub-REST-API, exklusiver Kandidatenfilter je `UpdateCheckOptions.Kanal` (Draft/Tag/Asset/Kanalzugehörigkeit), SemVer-Maximum, `UpdateReleaseLookupResult`. Befüllt pro Kandidat `UpdateInfo.PackageDownload` und — bei vorhandenem `update.json`-Asset — `UpdateInfo.ManifestDownload` als `UpdateDownloadRoute`; die optionalen `Fallback`-URLs leitet `CreateFallbackDownloadUrl` aus den Asset-Feldern `url`/`id` ab (Host auf `api.github.com` gepinnt via `IsAllowedAssetApiUrl`). Ein fehlendes Manifest-Asset disqualifiziert den Kandidaten nicht. |
 | `UpdatePackageService` (`IUpdatePackageService`) | Download (`*.download` → `release.zip`), SHA-256-Verifikation des Pakets gegen `update.json` (Phase `Verifizieren`: `DownloadManifestAsync` + `GetExpectedSha256` + `VerifyPackageHashAsync` — harter Abbruch bei fehlendem/ungültigem Manifest oder Hash-Mismatch), Entpacken nach `updates/extracted/{Version}`, Paketvalidierung (Executable + `version.json`), Schreibrechte-Probe (`RequiresElevation`), Pfadsicherung gegen Verzeichnisaustritt (`EnsureInsideBase`). Paket- und Manifest-Abruf teilen `SendWithFallbackAsync` (einmaliger Fallback auf `route.Fallback` bei HTTP-Status ≥ 500, via `SendDownloadRequestAsync` mit API-Headern). |
 | `UpdateScriptService` (`IUpdateScriptService`) | Schreibt `updates/update.ps1` (wartet auf App-Exit, kopiert Dateien, startet App neu, Logdatei) und startet es via `IUpdateProcessLauncher`. |
 | `UpdateProcessLauncher` (`IUpdateProcessLauncher`) | `ProcessStartInfo`-Kapselung; `Verb = "runas"` bei `RequiresElevation`. |
@@ -97,14 +97,14 @@ flowchart LR
 Registrierung in `App.xaml.cs`:
 
 - **Singletons:** `IUpdateService` → `UpdateService`, `IUpdateReleaseClient` → `GitHubReleaseClient`, `IUpdatePackageService` → `UpdatePackageService`, `IUpdateScriptService` → `UpdateScriptService`, `IUpdateProcessLauncher` → `UpdateProcessLauncher`, `IUpdateProgressDialogService` → `WpfUpdateProgressDialogService`, `IApplicationShutdownService` → `WpfApplicationShutdownService`, `IOptions<UpdateOptions>`.
-- **Scoped:** `ICliUpdateSafetyService` → `CliUpdateSafetyService` (nutzt den scoped `AufgabeService`/`DbContext`); `AppEinstellungService` wird pro Lesevorgang in einem frischen Scope aufgelöst.
-- **Transient:** `MainWindowOptionaleDienste` bündelt die optionalen `MainWindowViewModel`-Abhängigkeiten (inkl. `MainWindowUpdateDienste`); `MainWindowUpdateFlow` wird vom ViewModel direkt erzeugt.
+- **Scoped:** `ICliUpdateSafetyService` → `CliUpdateSafetyService` (nutzt den scoped `WorkItemService`/`DbContext`); `AppSettingService` wird pro Lesevorgang in einem frischen Scope aufgelöst.
+- **Transient:** `MainWindowOptionalServices` bündelt die optionalen `MainWindowViewModel`-Abhängigkeiten (inkl. `MainWindowUpdateServices`); `MainWindowUpdateFlow` wird vom ViewModel direkt erzeugt.
 
 Die Optionsverträge `UpdateSettings` und `UpdateCheckOptions` sind unveränderliche Records — der Singleton-`UpdateService` erhält nur Optionsparameter, nie eine scoped Service-Referenz.
 
 ## Persistenz
 
-Beide Einstellungen liegen in der bestehenden Key-Value-Tabelle `AppEinstellungen` — keine Schemaänderung:
+Beide Einstellungen liegen in der bestehenden Key-Value-Tabelle `AppSettingen` — keine Schemaänderung:
 
 | Schlüssel | Inhalt | Default |
 |-----------|--------|---------|
@@ -115,12 +115,12 @@ Der Altbestand `updates.includePrereleases` verfällt still — er wird nicht me
 
 ## Testarchitektur (E2E)
 
-Für E2E-Tests existiert eine kontrollierte Update-Umgebung unter `Softwareschmiede.App/Services/Testing/`, die sich nur bei gesetzter Szenario-Konfiguration aktiviert (`UpdateE2ETestConfiguration.LadeAusUmgebung`):
+Für E2E-Tests existiert eine kontrollierte Update-Umgebung unter `Softwareschmiede.App/Services/Testing/`, die sich nur bei gesetzter Szenario-Konfiguration aktiviert (`UpdateE2ETestConfiguration.LoadFromEnvironment`):
 
-- `UpdateFixtureHttpMessageHandler` — ersetzt den HTTP-Transport (Release-JSON-Seiten, Manifest- und ZIP-Downloads, Fehler, Freigaben). `Klassifiziere` ordnet Requests auf `.../releases/assets/...`-URLs der Request-Art „asset" zu (API-Fallback-Downloads zählen damit als Asset-Requests) und `*.json`-URLs der Art „manifest"; die `UpdateE2EFixture` serviert `update.json`-Antworten mit dem tatsächlichen SHA-256 der erzeugten Paket-ZIPs.
+- `UpdateFixtureHttpMessageHandler` — ersetzt den HTTP-Transport (Release-JSON-Seiten, Manifest- und ZIP-Downloads, Fehler, Freigaben). `Classify` ordnet Requests auf `.../releases/assets/...`-URLs der Request-Art „asset" zu (API-Fallback-Downloads zählen damit als Asset-Requests) und `*.json`-URLs der Art „manifest"; die `UpdateE2EFixture` serviert `update.json`-Antworten mit dem tatsächlichen SHA-256 der erzeugten Paket-ZIPs.
 - `RecordingUpdateProcessLauncher` / `RecordingApplicationShutdownService` — protokollieren Skriptstart/Shutdown ohne echte Prozess-/Systemgrenzen.
 - `FixtureCliUpdateSafetyService` — kontrollierte riskante Aufgaben für echte Bestätigungsdialoge.
 - `UpdateSettingsReadFailureInterceptor` — EF-Core-`DbCommandInterceptor`, der nur die getaggte `UpdateSettings.Read`-Abfrage gezielt fehlschlagen lässt.
-- `ProtokollierenderUpdateService` + `IUpdateVersuchProtokoll`/`UpdateE2EProtokoll` — strukturiertes Aufrufprotokoll der Update-Versuche.
+- `LoggingUpdateService` + `IUpdateAttemptLog`/`UpdateE2ELog` — strukturiertes Aufrufprotokoll der Update-Versuche.
 
 Transport-, Prozess-, Shutdown- und Sicherheitsgrenzen sind damit gesteuert; Release-Auswahl, Paket-/Skript-Pipeline und ViewModel-Ablauf bleiben echt.

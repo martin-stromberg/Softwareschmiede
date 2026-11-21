@@ -28,7 +28,7 @@ Das Dialog-Fenster ist ein modales WPF-Window mit der Größe 500×400 Pixel, ze
 ### ViewModel (`RepositoryAssignViewModel`)
 
 Das ViewModel verwaltet die Dialog-Logik und wird mit folgenden Dependencies injiziert:
-- `ProjektService` — lädt verfügbare Repositories
+- `ProjectService` — lädt verfügbare Repositories
 - `ILogger<RepositoryAssignViewModel>` — protokolliert Fehler
 - `IPluginManager` — lädt verfügbare SCM-Plugins
 
@@ -39,7 +39,7 @@ Das ViewModel verwaltet die Dialog-Logik und wird mit folgenden Dependencies inj
 | `AvailableScmPlugins` | `ObservableCollection<IGitPlugin>` | Liste aller verfügbaren SCM-Plugins |
 | `SelectedScmPlugin` | `IGitPlugin?` | Aktuell vom Benutzer gewähltes Plugin; triggert Repository-Reload bei Änderung |
 | `HasScmPlugins` | `bool` | Indikator, ob SCM-Plugins vorhanden sind; steuert Visibility von ComboBox und Hilfe-Panel |
-| `VerfuegbareRepositories` | `ObservableCollection<AvailableRepository>` | Gefilterte Liste von Repositories des ausgewählten Plugins |
+| `AvailableRepositories` | `ObservableCollection<AvailableRepository>` | Gefilterte Liste von Repositories des ausgewählten Plugins |
 | `SelectedRepository` | `AvailableRepository?` | Vom Benutzer ausgewähltes Repository; triggert Laden der Verzeichnisstruktur bei Änderung |
 | `IsLoading` | `bool` | Flag, das während async Operationen gesetzt ist |
 | `AvailableWorkingDirectories` | `ObservableCollection<string>` | Liste verfügbarer Arbeitsverzeichnisse des ausgewählten Repositories; enthält mindestens `"."` (Repository-Root) |
@@ -90,7 +90,7 @@ Das ausgewählte `SelectedWorkingDirectory` wird mit der `RepositoryStartKonfigu
 - Path-Traversal-Angriffe zu verhindern (Validierung, dass normalisierter Pfad innerhalb normalisierten Roots liegt)
 - Existenz des Zielverzeichnisses zu prüfen
 
-Der resultierende Pfad wird an `KiAusfuehrungsService.StartCliAsync()` / `StartTerminalSessionAsync()` als `ProcessStartInfo.WorkingDirectory` übergeben. Zusätzlich validiert `GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(...)` das konfigurierte Arbeitsverzeichnis bereits direkt nach dem Git-Klon (aufgerufen aus `EntwicklungsprozessService.ProzessStartenAsync`), sodass ein fehlendes oder ungültiges Verzeichnis früher und mit einem klareren Fehlerbild erkannt wird als erst beim CLI-Start.
+Der resultierende Pfad wird an `AiExecutionService.StartCliAsync()` / `StartTerminalSessionAsync()` als `ProcessStartInfo.WorkingDirectory` übergeben. Zusätzlich validiert `GitOrchestrationService.ValidateWorkingDirectoryAfterCloneAsync(...)` das konfigurierte Arbeitsverzeichnis bereits direkt nach dem Git-Klon (aufgerufen aus `DevelopmentProcessService.ProzessStartenAsync`), sodass ein fehlendes oder ungültiges Verzeichnis früher und mit einem klareren Fehlerbild erkannt wird als erst beim CLI-Start.
 
 Das einmal zugewiesene Arbeitsverzeichnis kann jederzeit nachträglich geändert werden, ohne das Repository neu zuzuweisen — siehe [Dialog „Arbeitsverzeichnis bearbeiten"](dialog-arbeitsverzeichnis-bearbeiten.md).
 
@@ -139,16 +139,16 @@ Das einmal zugewiesene Arbeitsverzeichnis kann jederzeit nachträglich geändert
 3. `IsLoading` wird auf `true` gesetzt
 4. Alle Repositories werden geladen und nach Plugin-Typ gefiltert
 5. Gefilterte Repositories werden nach Name sortiert
-6. `VerfuegbareRepositories` wird aktualisiert
+6. `AvailableRepositories` wird aktualisiert
 7. `SelectedRepository` wird auf `null` zurückgesetzt (für sauberen Zustand)
 8. `AvailableWorkingDirectories` wird geleert (neue Repositories = neue Verzeichnisstrukturen)
 9. `IsLoading` wird auf `false` gesetzt
 10. ListBox wird mit neuen Repositories aktualisiert
 
 **Fehlerfall:**
-- Wenn `ProjektService.GetAllRepositoriesAsync()` wirft Exception:
+- Wenn `ProjectService.GetAllRepositoriesAsync()` wirft Exception:
   - `Logger.LogError()` wird aufgerufen
-  - `VerfuegbareRepositories` wird geleert
+  - `AvailableRepositories` wird geleert
   - Keine Exception wird propagiert; Dialog bleibt responsiv
 
 ### Szenario 4: Repository-Auswahl mit Arbeitsverzeichnis-Laden
@@ -236,10 +236,10 @@ Der Dialog unterstützt beide Themes (Light und Dark) vollständig:
 
 | Test | Beschreibung |
 |---|---|
-| `LadenAsync_ShouldLoadAvailablePlugins_WhenPluginsExist` | Überprüft, dass `LadenAsync()` Plugins lädt |
-| `LadenAsync_ShouldSetHasScmPlugins_ToTrue_WhenPluginsAvailable` | Überprüft, dass `HasScmPlugins = true` wenn Plugins vorhanden |
-| `LadenAsync_ShouldSetHasScmPlugins_ToFalse_WhenNoPluginsAvailable` | Überprüft, dass `HasScmPlugins = false` wenn keine Plugins vorhanden |
-| `SelectedScmPluginChanged_ShouldReloadRepositories_FilteredByPluginType` | Überprüft, dass Repositories nach Plugin-Typ gefiltert werden |
+| `LoadAsync_ShouldLoadAvailablePlugins_WhenPluginsExist` | Überprüft, dass `LoadAsync()` Plugins lädt |
+| `LoadAsync_ShouldSetHasScmPlugins_ToTrue_WhenPluginsAvailable` | Überprüft, dass `HasScmPlugins = true` wenn Plugins vorhanden |
+| `LoadAsync_ShouldSetHasScmPlugins_ToFalse_WhenNoPluginsAvailable` | Überprüft, dass `HasScmPlugins = false` wenn keine Plugins vorhanden |
+| `SelectedScmPluginChanged_ShouldReloadRepositories_FromPlugin` | Überprüft, dass Repositories nach Plugin-Typ gefiltert werden |
 | `SelectedScmPluginChanged_ShouldClearRepositories_WhenPluginUnselected` | Überprüft, dass Repositories geleert werden wenn Plugin deselektiert |
 | `SelectedScmPluginChanged_ShouldSetIsLoading_FlagDuringReload` | Überprüft, dass `IsLoading` während Reload gesetzt wird |
 | `ReloadRepositoriesForSelectedPlugin_ShouldLogError_WhenServiceThrows` | Überprüft Error-Handling und Logging |
