@@ -9,7 +9,10 @@ namespace Softwareschmiede.Application.Services;
 /// Fordert eine SCM-Startprüfung außerhalb des Poll-Zyklus an. Wird von den Pausen-Setzpfaden
 /// (<see cref="WorkItemService.SetPauseAsync"/>, <see cref="ScmEventStore"/> für die
 /// Verzögerungsdirektive, <see cref="AiPluginLimitService.ProcessRateLimitAsync"/>,
-/// <see cref="ScmEventOrchestrator.CancelAsync"/>)
+/// <see cref="ScmEventOrchestrator.CancelAsync"/>), vom Übergang einer SCM-Promptsitzung in den
+/// verifizierten Eingabeprompt (<see cref="IScmPromptSessionAdapter.ReadyStatusChanged"/> nach
+/// <see cref="ScmPromptReadyStatus.Ready"/>, verdrahtet im <see cref="AiExecutionService"/>) und
+/// vom Erreichen eines Ereignis-Endstatus in <see cref="ScmEventOrchestrator"/>
 /// benachrichtigt; der <see cref="ScmStartCheckService"/> fasst Häufungen zusammen und
 /// führt die Prüfung serialisiert aus. Ohne Abonnenten verfällt eine Anforderung wirkungslos —
 /// der Poll des <see cref="ScmEventMonitoringService"/> bleibt als Fallback bestehen.
@@ -26,8 +29,9 @@ public sealed class ScmStartCheckTrigger
 /// <summary>
 /// Ereignisgesteuerter Auslöser der SCM-Startprüfung: Füllt frei werdende
 /// Ausführungsplätze ohne Wartezeit auf den nächsten Poll, sobald eine CLI-Ausführung
-/// endet (sinkende Laufzählung über <see cref="IRunningAutomationStatusSource.RunningCountChanged"/>)
-/// oder eine Aufgabe pausiert wird (<see cref="ScmStartCheckTrigger"/>). Jeder
+/// endet (sinkende Laufzählung über <see cref="IRunningAutomationStatusSource.RunningCountChanged"/>),
+/// eine Aufgabe pausiert wird oder eine SCM-Promptsitzung ihren Platz am verifizierten
+/// Eingabeprompt freigibt (<see cref="ScmStartCheckTrigger"/>). Jeder
 /// Durchlauf ruft dieselbe priorisierte Batch-Prüfung wie der Poll-Zyklus auf
 /// (<see cref="ScmEventOrchestrator.DispatchDueEventsAsync"/>); Serialisierung und
 /// Idempotenz kommen aus den bestehenden Aufgabensperren, Leases und der atomaren

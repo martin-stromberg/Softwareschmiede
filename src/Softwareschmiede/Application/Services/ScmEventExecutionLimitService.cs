@@ -4,11 +4,13 @@ using Softwareschmiede.Infrastructure.Data;
 namespace Softwareschmiede.Application.Services;
 
 /// <summary>Belegung laufender CLI-Ausführungen für die Ausführungsbegrenzung.
-/// Pausierte Aufgaben (<c>Aufgabe.PausedUntilUtc</c> in der Zukunft) belegen trotz
-/// weiterlaufendem Prozess keinen Platz und fehlen in beiden Zählern.</summary>
-/// <param name="Global">Anzahl aller Aufgaben mit laufender, nicht pausierter CLI-Ausführung
+/// Zwei Freigaberegeln lassen einen Platz trotz weiterlaufendem Prozess entfallen: pausierte
+/// Aufgaben (<c>Aufgabe.PausedUntilUtc</c> in der Zukunft) und Aufgaben mit lebender
+/// SCM-Promptsitzung am verifizierten Eingabeprompt (<see cref="ScmPromptReadyStatus.Ready"/>)
+/// ohne unverarbeitetes <c>ScmIncomingEvent</c> — beide fehlen in beiden Zählern.</summary>
+/// <param name="Global">Anzahl aller Aufgaben mit laufender, nicht freigegebener CLI-Ausführung
 /// (inklusive laufender Handles ohne auflösbare Aufgabenzeile).</param>
-/// <param name="ProPlugin">Anzahl laufender, nicht pausierter Ausführungen je zugeordnetem KI-Plugin-Prefix.</param>
+/// <param name="ProPlugin">Anzahl laufender, nicht freigegebener Ausführungen je zugeordnetem KI-Plugin-Prefix.</param>
 public sealed record CliExecutionOccupancy(int Global, IReadOnlyDictionary<string, int> ProPlugin)
 {
     /// <summary>Anzahl laufender Ausführungen, die dem angegebenen Plugin-Prefix zugeordnet sind.</summary>
@@ -182,10 +184,18 @@ public sealed class ScmEventExecutionLimitService(
     private static int? ParseLimit(string? value)
         => int.TryParse(value, out var limit) && limit >= 1 ? limit : null;
 
-    /// <summary>Zählt die laufenden CLI-Handles global und je Plugin. Pausierte Aufgaben
+    /// <summary>Zählt die laufenden CLI-Handles global und je Plugin. Zwei Freigaberegeln greifen
+    /// vor der globalen Zählung und der Plugin-Attribution: Pausierte Aufgaben
     /// (<c>PausedUntilUtc</c> in der Zukunft — ihr Prozess läuft bewusst weiter) belegen keinen
-    /// Platz und werden vor der globalen Zählung und der Plugin-Attribution herausgefiltert;
-    /// abgelaufene oder fehlende Pausenzeiten sowie Handles ohne Aufgabenzeile zählen voll.</summary>
+    /// Platz; eine Aufgabe mit lebender SCM-Promptsitzung am verifizierten Eingabeprompt
+    /// (<see cref="ScmPromptReadyStatus.Ready"/>) ohne unverarbeitetes <c>ScmIncomingEvent</c>
+    /// (Status außerhalb <c>"Verarbeitet"</c>/<c>"Abgebrochen"</c>) ebenfalls nicht — sie wartet
+    /// ehrlich auf Eingabe und blockiert keinen Folgestart. Konservativ voll zählen dagegen
+    /// fehlende Pausenzeiten, fehlende Sitzungen, jeder andere Bereitschaftsstand, jede Aufgabe
+    /// mit offenem Ereignis und Handles ohne Aufgabenzeile. Kehrt eine freigegebene Aufgabe zur
+    /// Arbeit zurück, zählt sie erst bei der nächsten Bewertung wieder voll — die dadurch
+    /// mögliche zeitweise Überschreitung des Limits ist toleriert (nur Starts werden begrenzt,
+    /// nie laufende Prozesse).</summary>
     private async Task<CliExecutionOccupancy> GetOccupancyAsync(CancellationToken ct)
     {
         var runningIds = cli.GetRunningWorkItemIds();
@@ -197,10 +207,25 @@ public sealed class ScmEventExecutionLimitService(
             .ToListAsync(ct);
         var now = time.GetUtcNow();
         var active = workItems.Where(x => !x.PausedUntilUtc.IsCurrentlyPaused(now)).ToList();
+        var sessions = active.ToDictionary(x => x.Id, x => cli.GetScmPromptSession(x.Id));
+        var readyIds = active
+            .Where(x => sessions[x.Id] is { IsAlive: true, ReadyStatus: ScmPromptReadyStatus.Ready })
+            .Select(x => x.Id)
+            .ToHashSet();
+        // Der Nachweis allein reicht nicht: Ein offenes Ereignis der Aufgabe hält den Platz
+        // belegt (Zustellfenster, Antwortabgleich). Die gebündelte Abfrage läuft nur, wenn es
+        // überhaupt einen verifizierten Kandidaten gibt.
+        var pending = readyIds.Count == 0
+            ? []
+            : await db.ScmIncomingEvents.AsNoTracking()
+                .Where(x => readyIds.Contains(x.WorkItemId) && x.Status != "Verarbeitet" && x.Status != "Abgebrochen")
+                .Select(x => x.WorkItemId)
+                .ToHashSetAsync(ct);
+        var occupied = active.Where(x => !readyIds.Contains(x.Id) || pending.Contains(x.Id)).ToList();
         var proPlugin = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var workItem in active)
+        foreach (var workItem in occupied)
         {
-            var session = cli.GetScmPromptSession(workItem.Id);
+            var session = sessions[workItem.Id];
             var prefix = session?.IsAlive == true && !string.IsNullOrWhiteSpace(session.PluginPrefix)
                 ? session.PluginPrefix
                 : workItem.AiPluginPrefix;
@@ -208,8 +233,8 @@ public sealed class ScmEventExecutionLimitService(
             proPlugin.TryGetValue(prefix, out var count);
             proPlugin[prefix] = count + 1;
         }
-        // Global = active Aufgaben plus laufende Handles ohne auflösbare Aufgabenzeile
-        // (letztere haben kein PausedUntilUtc und zählen bewusst weiterhin voll).
-        return new(active.Count + (runningIds.Count - workItems.Count), proPlugin);
+        // Global = belegte Aufgaben plus laufende Handles ohne auflösbare Aufgabenzeile
+        // (letztere haben weder PausedUntilUtc noch eine Promptsitzung und zählen bewusst voll).
+        return new(occupied.Count + (runningIds.Count - workItems.Count), proPlugin);
     }
 }

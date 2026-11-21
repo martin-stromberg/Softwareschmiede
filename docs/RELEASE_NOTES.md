@@ -6,7 +6,7 @@
 
 ## What's New
 
-- Fixed: SCM event monitoring no longer exhausts the GitHub REST rate limit — repository aliases are now resolved primarily via a single GraphQL query with a time-limited cache, alias spellings are grouped canonically, and an exhausted quota gates follow-up requests instead of firing further API calls; the monitoring stays functional and the REST quota remains free for the `gh` CLI and other API calls. Optionally tunable via the new `ScmEvents` setting `RepositoryResolutionCacheTtl` (default 15 minutes).
+- Fixed: the SCM execution limit now frees an occupied slot as soon as a task's CLI session is verifiably waiting at the input prompt and the task has no open event — the next queued event then starts event-driven instead of only at the next poll; a finished, prompt-waiting task no longer blocks its slot until process exit or a manual pause, which previously let the queue starve at per-plugin limit 1.
 
 ## Wichtige Hinweise vor dem Update
 
@@ -14,4 +14,4 @@
 
 ## Neuerungen
 
-- Fehlerkorrektur: Die SCM-Ereignisüberwachung erschöpft das GitHub-REST-Rate-Limit nicht mehr — Repository-Aliase werden jetzt primär über eine einzige GraphQL-Abfrage mit zeitlich begrenztem Cache aufgelöst, Alias-Schreibweisen laufen kanonisch gruppiert zusammen, und ein erschöpftes Kontingent sperrt Folgeaufrufe statt weiterer API-Calls; die Überwachung bleibt funktionsfähig und das REST-Kontingent bleibt für die `gh`-CLI und andere API-Aufrufe frei. Optional über die neue `ScmEvents`-Einstellung `RepositoryResolutionCacheTtl` einstellbar (Standard 15 Minuten).
+- Fehlerkorrektur: Die SCM-Ausführungsbegrenzung gibt einen belegten Platz jetzt frei, sobald die CLI-Sitzung einer Aufgabe nachweislich am Eingabeprompt wartet und kein offenes Ereignis der Aufgabe existiert — das nächste wartende Ereignis startet anschließend ereignisgesteuert statt erst beim nächsten Poll; eine fertige, am Prompt wartende Aufgabe blockiert ihren Platz damit nicht mehr bis zum Prozessende oder einer manuellen Pause, wodurch die Queue bisher bei Plugin-Limit 1 verhungern konnte.

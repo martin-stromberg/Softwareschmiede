@@ -69,11 +69,19 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     private void SetRunning(params Guid[] ids)
         => _cli.Setup(x => x.GetRunningWorkItemIds()).Returns(ids.ToList());
 
-    private static Mock<IScmPromptSessionAdapter> LiveSession(string pluginPrefix)
+    private async Task AddEventAsync(Guid workItemId, string status)
+    {
+        _db.ScmIncomingEvents.Add(new ScmIncomingEvent { WorkItemId = workItemId, Status = status });
+        await _db.SaveChangesAsync();
+    }
+
+    private static Mock<IScmPromptSessionAdapter> LiveSession(string pluginPrefix,
+        ScmPromptReadyStatus readyStatus = ScmPromptReadyStatus.Unknown, bool isAlive = true)
     {
         var session = new Mock<IScmPromptSessionAdapter>();
-        session.SetupGet(x => x.IsAlive).Returns(true);
+        session.SetupGet(x => x.IsAlive).Returns(isAlive);
         session.SetupGet(x => x.PluginPrefix).Returns(pluginPrefix);
+        session.SetupGet(x => x.ReadyStatus).Returns(readyStatus);
         return session;
     }
 
@@ -403,6 +411,133 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
         await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
         SetRunning(await RunningWorkItemAsync("Pausiert", PrefixA,
             pausedUntilUtc: DateTimeOffset.UtcNow.AddHours(1)));
+
+        var first = await _sut.CheckAndReserveStartSlotAsync(PrefixA, TestContext.Current.CancellationToken);
+        first.WaitReason.Should().BeNull();
+        first.Reservation.Should().NotBeNull();
+
+        (await _sut.CheckAndReserveStartSlotAsync(PrefixB, TestContext.Current.CancellationToken)).WaitReason.Should().Contain("globale Limit");
+
+        first.Reservation!.Dispose();
+
+        var free = await _sut.CheckAndReserveStartSlotAsync(PrefixB, TestContext.Current.CancellationToken);
+        free.WaitReason.Should().BeNull();
+        free.Reservation!.Dispose();
+    }
+
+    /// <summary>Eine Aufgabe am verifizierten Eingabeprompt ohne offenes Ereignis belegt keinen globalen Platz.</summary>
+    [Fact]
+    public async Task GetStartBlockReasonAsync_ReadySessionNoPending_ReturnsGlobalSlotFree()
+    {
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("Bereit", PrefixA, LiveSession(PrefixA, ScmPromptReadyStatus.Ready)));
+
+        (await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken)).Should().BeNull();
+    }
+
+    /// <summary>Die Prompt-Freigabe belegt auch das Plugin-Limit ihres Prefix nicht.</summary>
+    [Fact]
+    public async Task GetStartBlockReasonAsync_ReadySessionNoPending_ReturnsPluginSlotFree()
+    {
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.PluginLimitKey(PrefixA), "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("Bereit", PrefixA, LiveSession(PrefixA, ScmPromptReadyStatus.Ready)));
+
+        (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().BeNull();
+    }
+
+    /// <summary>Ein offenes Ereignis der Aufgabe hält den Platz trotz verifiziertem Eingabeprompt belegt.</summary>
+    [Theory]
+    [InlineData("Aufgenommen")]
+    [InlineData("Wartend")]
+    [InlineData("Verzögert")]
+    [InlineData("Zugestellt")]
+    [InlineData("InBearbeitung")]
+    [InlineData("ZustellungUngewiss")]
+    [InlineData("VerarbeitungUngeklärt")]
+    public async Task GetStartBlockReasonAsync_ReadySessionWithPendingEvent_CountsAsOccupied(string status)
+    {
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        var workItemId = await RunningWorkItemAsync("Bereit", PrefixA, LiveSession(PrefixA, ScmPromptReadyStatus.Ready));
+        await AddEventAsync(workItemId, status);
+        SetRunning(workItemId);
+
+        (await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken)).Should().Contain("globale Limit");
+    }
+
+    /// <summary>Ereignisse im Endstatus gelten nicht als offen — die Prompt-Freigabe greift.</summary>
+    [Theory]
+    [InlineData("Verarbeitet")]
+    [InlineData("Abgebrochen")]
+    public async Task GetStartBlockReasonAsync_ReadySessionEventInEndStatus_ReturnsSlotFree(string status)
+    {
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        var workItemId = await RunningWorkItemAsync("Bereit", PrefixA, LiveSession(PrefixA, ScmPromptReadyStatus.Ready));
+        await AddEventAsync(workItemId, status);
+        SetRunning(workItemId);
+
+        (await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken)).Should().BeNull();
+    }
+
+    /// <summary>Ohne verifiziertes Ready zählt die Aufgabe konservativ als belegt.</summary>
+    [Theory]
+    [InlineData(ScmPromptReadyStatus.Unknown)]
+    [InlineData(ScmPromptReadyStatus.Busy)]
+    [InlineData(ScmPromptReadyStatus.TrustPrompt)]
+    [InlineData(ScmPromptReadyStatus.Exited)]
+    public async Task GetStartBlockReasonAsync_SessionNotReady_CountsAsOccupied(ScmPromptReadyStatus readyStatus)
+    {
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("Aktiv", PrefixA, LiveSession(PrefixA, readyStatus)));
+
+        (await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken)).Should().Contain("globale Limit");
+    }
+
+    /// <summary>Eine nicht mehr lebende Sitzung gibt den Platz trotz gemeldetem Ready nicht frei.</summary>
+    [Fact]
+    public async Task GetStartBlockReasonAsync_SessionDead_CountsAsOccupied()
+    {
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("Beendet", PrefixA, LiveSession(PrefixA, ScmPromptReadyStatus.Ready, isAlive: false)));
+
+        (await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken)).Should().Contain("globale Limit");
+    }
+
+    /// <summary>Ein offenes Ereignis einer anderen Aufgabe blockiert die Freigabe nicht.</summary>
+    [Fact]
+    public async Task GetStartBlockReasonAsync_ReadySession_PendingOfOtherTask_Ignored()
+    {
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "2", TestContext.Current.CancellationToken);
+        var ready = await RunningWorkItemAsync("Bereit", PrefixA, LiveSession(PrefixA, ScmPromptReadyStatus.Ready));
+        var other = await RunningWorkItemAsync("Aktiv", PrefixA, LiveSession(PrefixA, ScmPromptReadyStatus.Busy));
+        await AddEventAsync(other, "InBearbeitung");
+        SetRunning(ready, other);
+
+        (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().BeNull();
+    }
+
+    /// <summary>Gemischte Belegung: Die am Prompt wartende Aufgabe zählt nicht, die aktive
+    /// weiterhin — bei globalem Limit 2 bleibt der Start frei, bei Limit 1 belegt sie den Platz.</summary>
+    [Fact]
+    public async Task GetStartBlockReasonAsync_MixedReadyFreeAndActive_CountsOnlyActive()
+    {
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "2", TestContext.Current.CancellationToken);
+        SetRunning(
+            await RunningWorkItemAsync("Bereit", PrefixA, LiveSession(PrefixA, ScmPromptReadyStatus.Ready)),
+            await RunningWorkItemAsync("Aktiv", PrefixA, LiveSession(PrefixA, ScmPromptReadyStatus.Busy)));
+
+        (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().BeNull();
+
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().Contain("globale Limit");
+    }
+
+    /// <summary>Ein am Prompt wartender Lauf gibt den Handle-Platz frei, eine offene Reservierung
+    /// belegt ihn aber weiterhin regulär — bis zu ihrer Freigabe.</summary>
+    [Fact]
+    public async Task CheckAndReserveStartSlotAsync_ReadyRunAndOpenReservation_ReservationOccupiedSlot()
+    {
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        SetRunning(await RunningWorkItemAsync("Bereit", PrefixA, LiveSession(PrefixA, ScmPromptReadyStatus.Ready)));
 
         var first = await _sut.CheckAndReserveStartSlotAsync(PrefixA, TestContext.Current.CancellationToken);
         first.WaitReason.Should().BeNull();
