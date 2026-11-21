@@ -10,7 +10,7 @@ namespace Softwareschmiede.Tests.E2E;
 ///
 /// Konfiguriert das LocalDirectoryPlugin bewusst im <c>SeparateWorkingDirectory</c>-Modus: Nur dort
 /// kopiert der Klon-Schritt den tatsächlichen Repository-Inhalt (inkl. des zuvor im Quellverzeichnis
-/// hinterlegten Initialisierungsskripts) in das Arbeitsverzeichnis, das <c>Aufgabe.LokalerKlonPfad</c>
+/// hinterlegten Initialisierungsskripts) in das Arbeitsverzeichnis, das <c>Aufgabe.LocalClonePath</c>
 /// entspricht. Im <c>InSourceDirectory</c>-Modus enthält dieser Pfad dagegen nur eine Pointer-Datei auf
 /// das Quellverzeichnis (siehe <see cref="Softwareschmiede.Domain.Interfaces.IGitPlugin.ResolveEffectiveRepositoryPathAsync"/>),
 /// wodurch das Skript dort nicht auffindbar wäre.

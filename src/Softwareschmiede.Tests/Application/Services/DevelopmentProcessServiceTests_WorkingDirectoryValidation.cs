@@ -15,7 +15,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// Arbeitsverzeichnisses soll direkt nach einem erfolgreichen Git-Klon erfolgen (frühes, klares Fehlerbild),
 /// statt erst beim späteren CLI-Start.
 /// </summary>
-public sealed class DevelopmentprocessServiceTests_WorkingDirectoryValidation : IDisposable
+public sealed class DevelopmentProcessServiceTests_WorkingDirectoryValidation : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly WorkItemService _workItemService;
@@ -28,7 +28,7 @@ public sealed class DevelopmentprocessServiceTests_WorkingDirectoryValidation : 
     private readonly Guid _projectId = new("66666666-6666-6666-6666-666666666666");
 
     /// <summary>EntwicklungsprozessServiceTests_WorkingDirectoryValidation.</summary>
-    public DevelopmentprocessServiceTests_WorkingDirectoryValidation()
+    public DevelopmentProcessServiceTests_WorkingDirectoryValidation()
     {
         _db = TestDbContextFactory.Create();
         _workItemService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
@@ -139,7 +139,7 @@ public sealed class DevelopmentprocessServiceTests_WorkingDirectoryValidation : 
     }
 
     /// <summary>
-    /// ProzessStartenAsync bricht sofort nach dem Klon mit einer DirectoryNotFoundException ab, wenn das
+    /// StartProcessAsync bricht sofort nach dem Klon mit einer DirectoryNotFoundException ab, wenn das
     /// konfigurierte Arbeitsverzeichnis im geklonten Repository nicht existiert — ohne dass zuvor ein
     /// Branch angelegt wird (frühes Fehlerbild direkt nach dem Klon, wie im Plan beschrieben).
     /// </summary>
@@ -168,7 +168,7 @@ public sealed class DevelopmentprocessServiceTests_WorkingDirectoryValidation : 
     }
 
     /// <summary>
-    /// ProzessStartenAsync setzt den Prozess normal fort, wenn das konfigurierte Arbeitsverzeichnis nach
+    /// StartProcessAsync setzt den Prozess normal fort, wenn das konfigurierte Arbeitsverzeichnis nach
     /// dem Klon existiert.
     /// </summary>
     [Fact]
@@ -201,7 +201,7 @@ public sealed class DevelopmentprocessServiceTests_WorkingDirectoryValidation : 
     }
 
     /// <summary>
-    /// ProzessStartenAsync validiert das Arbeitsverzeichnis nicht, wenn kein
+    /// StartProcessAsync validiert das Arbeitsverzeichnis nicht, wenn kein
     /// <see cref="GitOrchestrationService"/> konfiguriert ist (Rückwärtskompatibilität für Aufrufer, die
     /// den optionalen Dienst nicht bereitstellen).
     /// </summary>

@@ -70,7 +70,7 @@ public sealed class ProjectListViewModelTests : IDisposable
         return mock;
     }
 
-    /// <summary>LadenRepositorienSuggestionsAsync befüllt UnassignedRepositories und setzt IsLoadingRepositories korrekt.</summary>
+    /// <summary>LoadRepositoriesSuggestionsAsync befüllt UnassignedRepositories und setzt IsLoadingRepositories korrekt.</summary>
     [Fact]
     public async Task LoadRepositoriesSuggestionAsync_ShouldLoadAndPopulateUnassignedRepositories()
     {
@@ -140,7 +140,7 @@ public sealed class ProjectListViewModelTests : IDisposable
         sut.UnassignedRepositories.Should().BeEmpty();
     }
 
-    /// <summary>KehreZuProjectZurueck lädt unzugeordnete Repositories neu.</summary>
+    /// <summary>NavigateBackToProject lädt unzugeordnete Repositories neu.</summary>
     [Fact]
     public async Task ReturnToProjectBack_ShouldReloadUnassignedRepositories()
     {
@@ -179,7 +179,7 @@ public sealed class ProjectListViewModelTests : IDisposable
         sut.UnassignedRepositories.Single().Url.Should().Be("https://github.com/owner/reload-repo");
     }
 
-    /// <summary>ZeigeTaskDetailView setzt DetailViewModel auf das übergebene TaskDetailViewModel.</summary>
+    /// <summary>ShowTaskDetailView setzt DetailViewModel auf das übergebene TaskDetailViewModel.</summary>
     [Fact]
     public async Task ProjectListViewModel_ShowTaskDetailView_SetsDetailViewModelToTask()
     {
@@ -205,7 +205,7 @@ public sealed class ProjectListViewModelTests : IDisposable
         sut.DetailViewModel.Should().BeOfType<TaskDetailViewModel>();
     }
 
-    /// <summary>KehreZuProjectZurueck setzt DetailViewModel zurück zum ProjectDetailViewModel.</summary>
+    /// <summary>NavigateBackToProject setzt DetailViewModel zurück zum ProjectDetailViewModel.</summary>
     [Fact]
     public async Task ProjectListViewModel_ReturnToProjectBack_RestoresProjectDetailView()
     {

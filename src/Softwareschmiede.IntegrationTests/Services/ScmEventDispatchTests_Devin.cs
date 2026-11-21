@@ -6,10 +6,10 @@ using Softwareschmiede.TestSupport;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
-/// <summary>End-to-end dispatch of an SCM event to a Devin-bound task through the proven channel.</summary>
+/// <summary>End-to-End-Dispatch eines SCM-Ereignisses an eine Devin-gebundene Aufgabe über den bewährten Kanal.</summary>
 public sealed class ScmEventDispatchTests_Devin
 {
-    /// <summary>Readiness, channel proof and prompt delivery reach Zugestellt for a Devin task.</summary>
+    /// <summary>Bereitschaft, Kanalnachweis und Prompt-Zustellung erreichen für eine Devin-Aufgabe den Status Zugestellt.</summary>
     [Fact]
     public async Task DevinTask_WithGrantingStartContract_DeliversEvent()
     {
@@ -20,7 +20,7 @@ public sealed class ScmEventDispatchTests_Devin
         {
             if (prompt.Contains("challengePath", StringComparison.Ordinal)) { probes.Add(prompt); await ScmDispatchFixture.CompleteProbeAsync(prompt); }
             else prompts.Add(prompt);
-            // A real CLI redraws and returns to its prompt after a turn; only new output
+            // Eine echte CLI zeichnet neu und kehrt nach einem Turn zu ihrer Eingabeaufforderung zurück; nur neue Ausgabe
             // revisions let the adapter leave the busy state again.
             fixture!.Sessions.Values.Single().Raise(x => x.BufferChanged += null, EventArgs.Empty);
         }));
@@ -29,8 +29,8 @@ public sealed class ScmEventDispatchTests_Devin
             await fixture.InitializeAsync();
             var (taskId, eventId) = await fixture.AddAsync(configured: true);
 
-            // First dispatch sends the content-free channel probe; the next dispatch reads the
-            // completed proof, prepares the run-bound attempt and writes the event prompt.
+            // Der erste Dispatch sendet die inhaltsfreie Kanal-Probe; der nächste Dispatch liest den
+            // abgeschlossenen Nachweis, bereitet den laufgebundenen Versuch vor und schreibt den Event-Prompt.
             ScmIncomingEvent item;
             var attempts = 0;
             do
@@ -45,7 +45,7 @@ public sealed class ScmEventDispatchTests_Devin
             fixture.Sessions.Should().ContainKey(taskId);
             prompts.Should().ContainSingle("only the event prompt itself is recorded; the probe ran through the file tool");
             prompts[0].Should().Contain("\"request\"").And.NotContain("challengePath");
-            // The handshake names the CLI session after the task so sessions stay distinguishable.
+            // Der Handshake benennt die CLI-Sitzung nach der Aufgabe, damit Sitzungen unterscheidbar bleiben.
             probes.Should().ContainSingle().Which.Should().Contain("\"sessionName\":\"SCM task\"");
         }
         finally
@@ -54,7 +54,7 @@ public sealed class ScmEventDispatchTests_Devin
         }
     }
 
-    /// <summary>A newer Devin minor inside the supported major delivers like the pinned version.</summary>
+    /// <summary>Ein neueres Devin-Minor innerhalb des unterstützten Majors liefert wie die angepinnte Version.</summary>
     [Fact]
     public async Task DevinTask_WithNewerMinorVersion_DeliversEvent()
     {
@@ -89,7 +89,7 @@ public sealed class ScmEventDispatchTests_Devin
         }
     }
 
-    /// <summary>An out-of-range Devin version waits with an honest reason naming CLI and version.</summary>
+    /// <summary>Eine ausserhalb des Bereichs liegende Devin-Version wartet mit einem ehrlichen Grund, der CLI und Version nennt.</summary>
     [Fact]
     public async Task DevinTask_WithUnsupportedVersion_WaitsWithHonestReason()
     {
@@ -105,7 +105,7 @@ public sealed class ScmEventDispatchTests_Devin
         fixture.Prompts.Should().BeEmpty();
     }
 
-    /// <summary>A non-granting Devin mode leaves the event waiting; no prompt and no probe is sent.</summary>
+    /// <summary>Ein nicht freigebender Devin-Modus lässt das Ereignis warten; es wird weder ein Prompt noch eine Probe gesendet.</summary>
     [Fact]
     public async Task DevinTask_WithAutoPermissionMode_WaitsWithoutPrompt()
     {
@@ -121,7 +121,7 @@ public sealed class ScmEventDispatchTests_Devin
         fixture.Prompts.Should().BeEmpty();
     }
 
-    /// <summary>The environment-provided permission mode is part of the evaluated start contract.</summary>
+    /// <summary>Der umgebungsseitig bereitgestellte Berechtigungsmodus ist Teil des ausgewerteten Startvertrags.</summary>
     [Theory]
     [InlineData("dangerous", ScmExchangeAccessStatus.Supported)]
     [InlineData("bypass", ScmExchangeAccessStatus.Supported)]

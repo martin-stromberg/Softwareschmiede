@@ -6,7 +6,7 @@ Ein Projekt bündelt einen thematischen Entwicklungsbereich. Es hält mindestens
 
 ## Funktionsweise
 
-Ein Projekt hat einen Namen, eine optionale Beschreibung und einen Status (`Aktiv` oder `Archiviert`). Nur aktive Projekte erscheinen im Dashboard und können Aufgaben erhalten.
+Ein Projekt hat einen Namen, eine optionale Beschreibung und einen Status (`Active` oder `Archived`). Nur aktive Projekte erscheinen im Dashboard und können Aufgaben erhalten.
 
 ### Projektdetailansicht
 

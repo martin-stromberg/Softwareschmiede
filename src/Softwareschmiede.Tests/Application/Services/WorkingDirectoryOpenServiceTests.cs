@@ -9,7 +9,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Tests für den ArbeitsverzeichnisOeffnenService.</summary>
 public sealed class WorkingDirectoryOpenServiceTests
 {
-    /// <summary>Prüft, dass Oeffne unter Windows den Befehl "explorer.exe" mit dem gequoteten Verzeichnis als Argument an IProzessStarter übergibt. Läuft nur unter Windows, da ArbeitsverzeichnisOeffnenService auf den Windows-Fall reduziert ist (siehe Oeffne_AufNichtWindows_WirftPlatformNotSupportedException).</summary>
+    /// <summary>Prüft, dass Oeffne unter Windows den Befehl "explorer.exe" mit dem gequoteten Verzeichnis als Argument an IProcessStarter übergibt. Läuft nur unter Windows, da ArbeitsverzeichnisOeffnenService auf den Windows-Fall reduziert ist (siehe Oeffne_AufNichtWindows_WirftPlatformNotSupportedException).</summary>
     [Fact]
     public void Open_StartsPlatformcommandWithDirectory()
     {
@@ -29,7 +29,7 @@ public sealed class WorkingDirectoryOpenServiceTests
             Times.Once);
     }
 
-    /// <summary>Prüft, dass Oeffne auf Nicht-Windows-Betriebssystemen eine PlatformNotSupportedException wirft, ohne IProzessStarter aufzurufen. Läuft nur auf Nicht-Windows-Runnern; auf Windows wird der Test übersprungen, da ResolveOeffnenBefehl dort den Windows-Zweig nimmt.</summary>
+    /// <summary>Prüft, dass Oeffne auf Nicht-Windows-Betriebssystemen eine PlatformNotSupportedException wirft, ohne IProcessStarter aufzurufen. Läuft nur auf Nicht-Windows-Runnern; auf Windows wird der Test übersprungen, da ResolveOeffnenBefehl dort den Windows-Zweig nimmt.</summary>
     [Fact]
     public void Open_OnNotWindows_ThrowsPlatformNotSupportedException()
     {
@@ -44,7 +44,7 @@ public sealed class WorkingDirectoryOpenServiceTests
         processStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
-    /// <summary>Prüft, dass Oeffne bei leerem/whitespace Arbeitsverzeichnis eine ArgumentException wirft, ohne IProzessStarter aufzurufen.</summary>
+    /// <summary>Prüft, dass Oeffne bei leerem/whitespace Arbeitsverzeichnis eine ArgumentException wirft, ohne IProcessStarter aufzurufen.</summary>
     /// <param name="workingDirectory">Der zu prüfende leere/whitespace Verzeichnispfad.</param>
     [Theory]
     [InlineData("")]
@@ -60,7 +60,7 @@ public sealed class WorkingDirectoryOpenServiceTests
         processStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
-    /// <summary>Prüft, dass eine von IProzessStarter.Starten geworfene Ausnahme unverändert an den Aufrufer weitergereicht wird.</summary>
+    /// <summary>Prüft, dass eine von IProcessStarter.Starten geworfene Ausnahme unverändert an den Aufrufer weitergereicht wird.</summary>
     [Fact]
     public void Open_ThrowsWhenProcessStarter_SufficesExceptionUnchangedFurther()
     {

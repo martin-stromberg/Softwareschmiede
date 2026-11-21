@@ -146,7 +146,7 @@ public sealed class VisualStudioIdePluginTests : IDisposable
         entryPoints.Should().BeEmpty();
     }
 
-    /// <summary>OpenEntryPointAsync startet den übergebenen Einstiegspunkt per Shell-Execute über IProzessStarter.</summary>
+    /// <summary>OpenEntryPointAsync startet den übergebenen Einstiegspunkt per Shell-Execute über IProcessStarter.</summary>
     [Fact]
     public async Task OpenEntryPointAsync_CallsOpenSolutionFileOn()
     {

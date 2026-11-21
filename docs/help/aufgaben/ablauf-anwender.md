@@ -261,7 +261,7 @@ Die **Todos-Ansicht** ermöglicht es, Aufgaben in kleinere Arbeitsschritte zu un
 - Im Ribbon-Menü (Gruppe „Aufgabe") wird angezeigt, wie viele To-Dos noch offen sind (z. B. „⚠ 3 offen").
 - Das Badge wird verborgen wenn alle To-Dos erledigt sind.
 
-> **Hinweis:** Die To-Do-Liste dient der Aufgabengliederung. Sie können nur Aufgaben abschließen (Status: `Beendet`), wenn alle To-Dos erledigt sind. Ein Versuch, die Aufgabe zu beenden, zeigt die Fehlermeldung: „Diese Aufgabe kann nicht beendet werden, solange noch X offene To-Do(s) vorhanden sind."
+> **Hinweis:** Die To-Do-Liste dient der Aufgabengliederung. Sie können nur Aufgaben abschließen (Status: `Completed`), wenn alle To-Dos erledigt sind. Ein Versuch, die Aufgabe zu beenden, zeigt die Fehlermeldung: „Diese Aufgabe kann nicht beendet werden, solange noch X offene To-Do(s) vorhanden sind."
 
 ## Sonderfälle
 

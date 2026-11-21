@@ -328,7 +328,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
 
             // Rohbyte-Mitschnitt (Diagnose-Werkzeug): läuft ab Session-Erzeugung mit und erfasst
             // damit auch frühe Chunks ohne Race-Bedingung. Bei deaktiviertem Budget wird der
-            // Protokoll-Writer direkt übergeben (keine einelementige Composite).
+            // Protokoll-Writer direkt übergeben (kein einelementiges Composite).
             var options = _terminalOptions.Value;
             CliOutputRecorder? recorder = options.RecordingByteBudget > 0
                 ? new CliOutputRecorder(
@@ -484,14 +484,14 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
     /// auch nach dem Session-Ende abrufbar (der Eintrag überlebt das Handle).</summary>
     /// <param name="workItemId">ID der Aufgabe.</param>
     /// <returns>Ein Snapshot der <see cref="CliOutputRecording"/>, oder null wenn keine Aufzeichnung
-    /// existiert (kein Session-Start oder Aufzeichnung via <c>AufzeichnungByteBudget</c> deaktiviert).</returns>
+    /// existiert (kein Session-Start oder Aufzeichnung via <c>RecordingByteBudget</c> deaktiviert).</returns>
     public CliOutputRecording? GetCliRecording(Guid workItemId)
         => _recordings.TryGetValue(workItemId, out var recorder) ? recorder.GetRecording() : null;
 
     /// <summary>Registriert einen Recorder für den Export. Die Registry ist auf die letzten
     /// <see cref="MaxRecordingCount"/> Aufgaben begrenzt — ältere Mitschnitte werden
     /// verworfen, damit der Speicherverbrauch nicht unbegrenzt mit der Zahl gestarteter
-    /// Sessions wächst (ein Eintrag kann bis zu <c>AufzeichnungByteBudget</c> Bytes halten).
+    /// Sessions wächst (ein Eintrag kann bis zu <c>RecordingByteBudget</c> Bytes halten).
     /// Ein Neustart derselben Aufgabe zählt als jüngster Eintrag.</summary>
     private void RegisterRecording(Guid workItemId, CliOutputRecorder recorder)
     {

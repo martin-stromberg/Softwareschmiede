@@ -13,7 +13,7 @@ using Softwareschmiede.Tests.Helpers;
 namespace Softwareschmiede.Tests.Application.Services;
 
 /// <summary>Tests für den EntwicklungsprozessService.</summary>
-public sealed class DevelopmentprocessServiceTests : IDisposable
+public sealed class DevelopmentProcessServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly WorkItemService _workItemService;
@@ -27,7 +27,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
     private const string CloneBaseDirectory = DevelopmentProcessService.CloneBaseDirectory;
 
     /// <summary>EntwicklungsprozessServiceTests.</summary>
-    public DevelopmentprocessServiceTests()
+    public DevelopmentProcessServiceTests()
     {
         _db = TestDbContextFactory.Create();
         _workItemService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
@@ -152,7 +152,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         return repository;
     }
 
-    /// <summary>ProzessStartenAsync klont das Repository und legt einen Branch an.</summary>
+    /// <summary>StartProcessAsync klont das Repository und legt einen Branch an.</summary>
     [Fact]
     public async Task StartProcessAsync_ShouldCloneAndCreateBranch_WhenWorkItemExists()
     {
@@ -172,7 +172,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         updatedWorkItem.BranchName.Should().Contain("login-feature");
     }
 
-    /// <summary>ProzessStartenUndCliStartenAsync klont, setzt Status auf Gestartet und startet die CLI.</summary>
+    /// <summary>StartProcessAndCliAsync klont, setzt Status auf Started und startet die CLI.</summary>
     [Fact]
     public async Task StartProcessStartAndCliAsync_ShouldStartCliAndSetStatusStarted_WhenStartSucceeds()
     {
@@ -198,7 +198,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         _aiExecutionService.IsRunning(workItem.Id).Should().BeTrue();
     }
 
-    /// <summary>ProzessStartenUndCliStartenAsync setzt Status zurück, wenn das Klonen fehlschlägt.</summary>
+    /// <summary>StartProcessAndCliAsync setzt Status zurück, wenn das Klonen fehlschlägt.</summary>
     [Fact]
     public async Task StartProcessStartAndCliAsync_ShouldRollbackStatus_WhenRepositoryCloneFails()
     {
@@ -216,7 +216,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         updatedWorkItem!.Status.Should().Be(WorkItemStatus.New);
     }
 
-    /// <summary>ProzessStartenUndCliStartenAsync setzt Status zurück, wenn der CLI-Start fehlschlägt.</summary>
+    /// <summary>StartProcessAndCliAsync setzt Status zurück, wenn der CLI-Start fehlschlägt.</summary>
     [Fact]
     public async Task StartProcessStartAndCliAsync_ShouldRollbackStatus_WhenCliStartFails()
     {
@@ -236,7 +236,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
     }
 
     /// <summary>
-    /// ProzessStartenUndCliStartenAsync übergibt dem KI-Plugin das konfigurierte Arbeitsunterverzeichnis
+    /// StartProcessAndCliAsync übergibt dem KI-Plugin das konfigurierte Arbeitsunterverzeichnis
     /// (aus der RepositoryStartKonfiguration), statt den Repository-Root zu verwenden.
     /// </summary>
     [Fact]
@@ -288,7 +288,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
     }
 
     /// <summary>
-    /// ProzessStartenUndCliStartenAsync bricht mit Rollback ab, wenn das konfigurierte Arbeitsverzeichnis
+    /// StartProcessAndCliAsync bricht mit Rollback ab, wenn das konfigurierte Arbeitsverzeichnis
     /// nach dem Klon nicht existiert.
     /// </summary>
     [Fact]
@@ -335,7 +335,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         }
     }
 
-    /// <summary>ProzessStartenAsync blockiert den Start nicht, wenn das Repository-Startskript fehlschlägt.</summary>
+    /// <summary>StartProcessAsync blockiert den Start nicht, wenn das Repository-Startskript fehlschlägt.</summary>
     [Fact]
     public async Task StartProcessAsync_ShouldContinue_WhenRepositoryStartScriptFails()
     {
@@ -378,7 +378,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
             && entry.Content.Contains("Hinweis: Das Repository-Startskript konnte nicht ausgeführt werden", StringComparison.Ordinal));
     }
 
-    /// <summary>ProzessStartenAsync erstellt einen Issue-Branch wenn die Aufgabe eine Issue-Referenz hat.</summary>
+    /// <summary>StartProcessAsync erstellt einen Issue-Branch wenn die Aufgabe eine Issue-Referenz hat.</summary>
     [Fact]
     public async Task StartProcessAsync_ShouldCreateIssueBranch_WhenWorkItemHasIssueReference()
     {
@@ -399,7 +399,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         updatedWorkItem!.BranchName.Should().StartWith($"task/issue-321-{workItem.Id:N}");
     }
 
-    /// <summary>ProzessStartenUndCliStartenAsync startet Aufgaben ohne Issue über das eindeutige Projekt-Repository.</summary>
+    /// <summary>StartProcessAndCliAsync startet Aufgaben ohne Issue über das eindeutige Projekt-Repository.</summary>
     [Fact]
     public async Task StartProcessStartAndCliAsync_ShouldStartTaskWithoutIssueReference_WhenSingleProjectRepositoryExists()
     {
@@ -436,7 +436,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         }
     }
 
-    /// <summary>ProzessStartenAsync wirft Exception wenn Aufgabe nicht gefunden.</summary>
+    /// <summary>StartProcessAsync wirft Exception wenn Aufgabe nicht gefunden.</summary>
     [Fact]
     public async Task StartProcessAsync_ShouldThrowInvalidOperationException_WhenWorkItemDoesNotExist()
     {
@@ -450,7 +450,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    /// <summary>ProzessStartenAsync lehnt eine aktiv pausierte Aufgabe ab, ohne das Repository zu klonen (Issue 151).</summary>
+    /// <summary>StartProcessAsync lehnt eine aktiv pausierte Aufgabe ab, ohne das Repository zu klonen (Issue 151).</summary>
     [Fact]
     public async Task StartProcessAsync_ShouldThrow_WhenWorkItemPaused()
     {
@@ -472,7 +472,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
             Times.Never);
     }
 
-    /// <summary>ProzessStartenUndCliStartenAsync lehnt eine pausierte Aufgabe ab, ohne den Rollback-Pfad auszulösen (Issue 151).</summary>
+    /// <summary>StartProcessAndCliAsync lehnt eine pausierte Aufgabe ab, ohne den Rollback-Pfad auszulösen (Issue 151).</summary>
     [Fact]
     public async Task StartProcessStartAndCliAsync_ShouldThrowWithoutRollback_WhenWorkItemPaused()
     {
@@ -535,7 +535,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
     }
 
     /// <summary>AbschliessenAsync zieht einen geplanten zeitgesteuerten Prompt zurück, wenn
-    /// PromptZeitVersandService in den Options konfiguriert ist.</summary>
+    /// PromptScheduleDispatchService in den Options konfiguriert ist.</summary>
     [Fact]
     public async Task CompleteAsync_ShouldCancelScheduledPrompt_WhenPromptPlanned()
     {
@@ -591,7 +591,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         }
     }
 
-    /// <summary>CommitDurchfuehrenAsync wirft Exception wenn kein LokalerKlonPfad gesetzt.</summary>
+    /// <summary>CommitDurchfuehrenAsync wirft Exception wenn kein LocalClonePath gesetzt.</summary>
     [Fact]
     public async Task CommitPerformAsync_ShouldThrowInvalidOperationException_WhenNoClonePath()
     {
@@ -606,7 +606,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
             .WithMessage("*lokalen Klonpfad*");
     }
 
-    /// <summary>PushDurchfuehrenAsync wirft Exception wenn kein LokalerKlonPfad gesetzt.</summary>
+    /// <summary>PushDurchfuehrenAsync wirft Exception wenn kein LocalClonePath gesetzt.</summary>
     [Fact]
     public async Task PushPerformAsync_ShouldThrowInvalidOperationException_WhenNoClonePath()
     {
@@ -661,7 +661,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         log.Should().Contain(e => e.Type == LogEntryType.GitAction && e.Content.Contains("Issue #17"));
     }
 
-    /// <summary>ProzessStartenAsync verwendet das konfigurierte Arbeitsverzeichnis als Basis für den Klon-Pfad.</summary>
+    /// <summary>StartProcessAsync verwendet das konfigurierte Arbeitsverzeichnis als Basis für den Klon-Pfad.</summary>
     [Fact]
     public async Task StartProcessAsync_ShouldUseConfiguredWorkdirBase_ForClonePath()
     {
@@ -683,7 +683,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    /// <summary>ProzessStartenAsync verwendet den Fallback-Pfad wenn der Resolver einen Fallback zurückgibt.</summary>
+    /// <summary>StartProcessAsync verwendet den Fallback-Pfad wenn der Resolver einen Fallback zurückgibt.</summary>
     [Fact]
     public async Task StartProcessAsync_ShouldUseFallbackPath_WhenResolverReturnsFallback()
     {
@@ -705,7 +705,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    /// <summary>ProzessStartenAsync checkt einen existierenden Branch aus wenn der Basis-Branch nicht der Default-Branch ist.</summary>
+    /// <summary>StartProcessAsync checkt einen existierenden Branch aus wenn der Basis-Branch nicht der Default-Branch ist.</summary>
     [Fact]
     public async Task StartProcessAsync_ShouldCheckoutExistingBranch_WhenBaseBranchIsNotDefault()
     {
@@ -732,7 +732,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         updatedWorkItem!.BranchName.Should().Be("feature/existing-branch");
     }
 
-    /// <summary>ProzessStartenAsync erstellt einen neuen Task-Branch, wenn Basis- und Default-Branch nur in der Groß-/Kleinschreibung abweichen.</summary>
+    /// <summary>StartProcessAsync erstellt einen neuen Task-Branch, wenn Basis- und Default-Branch nur in der Groß-/Kleinschreibung abweichen.</summary>
     [Fact]
     public async Task StartProcessAsync_ShouldCreateTaskBranch_WhenBaseBranchEqualsDefaultBranch_CaseInsensitive()
     {
@@ -762,7 +762,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         updatedWorkItem.BranchName.Should().NotBe("MAIN");
     }
 
-    /// <summary>ProzessStartenAsync löscht ein bereits vorhandenes Klon-Verzeichnis vor dem Klonen.</summary>
+    /// <summary>StartProcessAsync löscht ein bereits vorhandenes Klon-Verzeichnis vor dem Klonen.</summary>
     [Fact]
     public async Task StartProcessAsync_ShouldDeleteExistingCloneDirectory_BeforeClone()
     {
@@ -792,7 +792,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         DeleteDirectoryIfExists(configuredBase);
     }
 
-    /// <summary>ProzessStartenAsync wirft eine Exception wenn der Repository-Kontext mehrdeutig ist.</summary>
+    /// <summary>StartProcessAsync wirft eine Exception wenn der Repository-Kontext mehrdeutig ist.</summary>
     [Fact]
     public async Task StartProcessAsync_ShouldThrow_WhenRepositoryContextIsAmbiguous()
     {
@@ -1051,7 +1051,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
     }
 
     /// <summary>
-    /// ProzessStartenAsync schreibt issue.md und den .gitignore-Eintrag in das konfigurierte Arbeitsverzeichnis
+    /// StartProcessAsync schreibt issue.md und den .gitignore-Eintrag in das konfigurierte Arbeitsverzeichnis
     /// (RepositoryStartKonfiguration.WorkingDirectoryRelativePath), statt in den Repository-Root.
     /// </summary>
     [Fact]
@@ -1138,7 +1138,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         DeleteDirectoryIfExists(uniqueBase);
     }
 
-    /// <summary>ProzessStartenAsync setzt den Prozess fort wenn CreateIssueFileAsync fehlschlägt.</summary>
+    /// <summary>StartProcessAsync setzt den Prozess fort wenn CreateIssueFileAsync fehlschlägt.</summary>
     [Fact]
     public async Task StartProcessAsync_ShouldContinue_WhenIssueFileCreationFails()
     {
@@ -1156,7 +1156,7 @@ public sealed class DevelopmentprocessServiceTests : IDisposable
         updatedWorkItem!.Status.Should().Be(WorkItemStatus.Started);
     }
 
-    /// <summary>ProzessStartenAsync setzt den Prozess fort wenn UpdateGitignoreAsync fehlschlägt.</summary>
+    /// <summary>StartProcessAsync setzt den Prozess fort wenn UpdateGitignoreAsync fehlschlägt.</summary>
     [Fact]
     public async Task StartProcessAsync_ShouldContinue_WhenGitignoreUpdateFails()
     {

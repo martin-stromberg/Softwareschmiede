@@ -145,7 +145,7 @@ public partial class End2EndTest
 
     /// <summary>
     /// Szenario: Aufgabe starten mit ConPTY. Nach erfolgreichem Start muss der Stoppen-Button
-    /// erscheinen (IsCliRunning=true — belegt, dass TerminalSessionGestartet gefeuert und die
+    /// erscheinen (IsCliRunning=true — belegt, dass TerminalSessionStarted gefeuert und die
     /// Session gesetzt wurde) und das <c>cmd.exe /k</c>-Banner der Simulator-Shell im
     /// CliOutput-Protokoll eingehen (direkter Prozessstart aus der TerminalSessionStartSpec —
     /// kein Befehls-Echo über eine 300-ms-Verzögerung mehr).

@@ -40,10 +40,10 @@ Beteiligte Komponenten:
 - `AsyncTaskExtensions.SafeFireAndForget(this Task task, ILogger logger, string operationName)`
 
 Ablauf:
-1. Eine Codestelle löst einen asynchronen Aufruf aus, dessen Ergebnis nicht abgewartet werden soll (z. B. `CliProcessManager.StartHeartbeat`, `KiAusfuehrungsService.PersistFehlgeschlagenAsync`, die `CurrentView`-/`ProjektId`-/`AufgabeId`-Setter der ViewModels, `ProjectDetailView.IssueDoubleClick`). `PseudoConsoleSession.ReadLoopAsync` bildet eine Ausnahme: Sie fängt alle Exceptions bereits intern ab und läuft als eigenständiger, ab Konstruktion gestarteter Hintergrund-Task (`_readLoopTask`), unabhängig vom UI-Lebenszyklus.
+1. Eine Codestelle löst einen asynchronen Aufruf aus, dessen Ergebnis nicht abgewartet werden soll (z. B. `CliProcessManager.StartHeartbeat`, `AiExecutionService.PersistFailureAsync`, die `CurrentView`-/`ProjectId`-/`WorkItemId`-Setter der ViewModels, `ProjectDetailView.IssueDoubleClick`). `PseudoConsoleSession.ReadLoopAsync` bildet eine Ausnahme: Sie fängt alle Exceptions bereits intern ab und läuft als eigenständiger, ab Konstruktion gestarteter Hintergrund-Task (`_readLoopTask`), unabhängig vom UI-Lebenszyklus.
 2. Statt `_ = task;` wird `task.SafeFireAndForget(_logger, "Bezeichnung")` aufgerufen.
 3. `SafeFireAndForget` registriert `task.ContinueWith(...)` auf `TaskScheduler.Default` (läuft also nicht zwingend auf dem UI-Thread):
-   - Ist der Task fehlgeschlagen (`t.IsFaulted`): `logger.LogError(t.Exception, "Unerwarteter Fehler in {OperationName}", operationName)`.
+   - Ist der Task fehlgeschlagen (`t.IsFaulted`): `logger.LogError(t.Exception, "Unexpecteder Fehler in {OperationName}", operationName)`.
    - Ist der Task abgebrochen (`t.IsCanceled`): `logger.LogInformation("Operation {OperationName} wurde abgebrochen", operationName)`.
    - Bei Erfolg: keine Aktion.
 4. Die aufrufende Methode kehrt sofort zurück; die Exception wird niemals zum Aufrufer propagiert.
@@ -51,71 +51,71 @@ Ablauf:
 ### 4. Heartbeat-Update mit Concurrency-Schutz pro Aufgabe
 
 Beteiligte Komponenten:
-- `CliProcessManager.StartHeartbeat(Guid aufgabeId)` / `StopHeartbeat(Guid aufgabeId)`
+- `CliProcessManager.StartHeartbeat(Guid workItemId)` / `StopHeartbeat(Guid workItemId)`
 - `CliProcessManager._updateSemaphores` — `ConcurrentDictionary<Guid, SemaphoreSlim>`, ein Semaphore je Aufgabe statt eines einzigen klassenweiten Semaphores
-- `CliProcessManager.AktualisierungAsync(Guid aufgabeId)`
+- `CliProcessManager.UpdateAsync(Guid workItemId)`
 - `CliProcessManager._lifecycleLock` / `_disposed` — Blattsperre und Abschaltsignal aller Timer-/Subscription-Anlagepfade
 
 Ablauf:
-1. `StartHeartbeat(aufgabeId)` läuft unter `_lifecycleLock`: Bei gesetztem `_disposed` kehrt es sofort zurück; sonst ersetzt `StartHeartbeatCore` einen etwaigen Alt-Timer — es legt `_updateSemaphores[aufgabeId] = new SemaphoreSlim(1, 1)` an und startet danach einen `Timer` mit 30-Sekunden-Intervall. Eine zweite, konditionalisierte Anlage existiert in `LaufdatenSicherstellenAsync` (nur wenn noch kein Timer läuft — siehe Abschnitt 4a).
-2. Jeder Timer-Tick ruft `AktualisierungAsync(aufgabeId).SafeFireAndForget(_logger, "CliProcessManager.AktualisierungAsync")` auf.
-3. `AktualisierungAsync`:
+1. `StartHeartbeat(workItemId)` läuft unter `_lifecycleLock`: Bei gesetztem `_disposed` kehrt es sofort zurück; sonst ersetzt `StartHeartbeatCore` einen etwaigen Alt-Timer — es legt `_updateSemaphores[workItemId] = new SemaphoreSlim(1, 1)` an und startet danach einen `Timer` mit 30-Sekunden-Intervall. Eine zweite, konditionalisierte Anlage existiert in `EnsureRunDataAsync` (nur wenn noch kein Timer läuft — siehe Abschnitt 4a).
+2. Jeder Timer-Tick ruft `UpdateAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.UpdateAsync")` auf.
+3. `UpdateAsync`:
    - Ermittelt das zur Aufgabe gehörende Semaphore; ist es nicht mehr vorhanden (Heartbeat zwischenzeitlich gestoppt), kehrt die Methode sofort zurück.
    - `await semaphore.WaitAsync()` serialisiert überlappende Ticks **derselben** Aufgabe. Heartbeats anderer Aufgaben sind davon unberührt, da jede Aufgabe ihr eigenes Semaphore besitzt.
-   - Im try-Block: Prüft, ob der Prozess noch läuft (`KiAusfuehrungsService.IsRunning`); wenn nicht, wird der Heartbeat gestoppt. Sonst wird der In-Memory-`LastHeartbeat` des Handles aktualisiert und die Laufdaten über `LaufdatenSicherstellenAsync` → `AufgabeService.AktivenLaufSicherstellenAsync` sichergestellt (heilt zugleich fehlende `AktiveRunId`-Werte — siehe Abschnitt 4a).
+   - Im try-Block: Prüft, ob der Prozess noch läuft (`AiExecutionService.IsRunning`); wenn nicht, wird der Heartbeat gestoppt. Sonst wird der In-Memory-`LastHeartbeat` des Handles aktualisiert und die Laufdaten über `EnsureRunDataAsync` → `WorkItemService.EnsureActiveRunAsync` sichergestellt (heilt zugleich fehlende `ActiveRunId`-Werte — siehe Abschnitt 4a).
    - Bei Exception: `LogWarning`, kein Rethrow — der nächste Tick versucht es erneut.
    - Im finally-Block: `semaphore.Release()`, abgesichert gegen `ObjectDisposedException` (falls das Semaphore innerhalb desselben Aufrufs durch `StopHeartbeat` bereits disposed wurde).
-4. `StopHeartbeat(aufgabeId)` entfernt unter `_lifecycleLock` sowohl den Timer als auch das Semaphore aus den jeweiligen Dictionaries und disposed beide.
+4. `StopHeartbeat(workItemId)` entfernt unter `_lifecycleLock` sowohl den Timer als auch das Semaphore aus den jeweiligen Dictionaries und disposed beide.
 
 ### 4a. Laufdaten-Selbstheilung und periodischer Abgleich
 
-Damit die persistierten Laufdaten (`AktiveRunId`, `LastHeartbeatUtc`, `LaufStatus`, `AusfuehrungsStatus`) eines laufenden CLI-Prozesses auch dann (wieder)hergestellt werden, wenn das `Gestartet`-Ereignis nie feuerte (Session-Wiederverwendung) oder ein Persistenzschritt scheiterte, existiert im `CliProcessManager` ein zentraler Selbstheilungspunkt mit vier Auslösern — davon einer unabhängig von jeglicher Event-Zustellung (Issue #342).
+Damit die persistierten Laufdaten (`ActiveRunId`, `LastHeartbeatUtc`, `RunStatus`, `ExecutionStatus`) eines laufenden CLI-Prozesses auch dann (wieder)hergestellt werden, wenn das `Started`-Ereignis nie feuerte (Session-Wiederverwendung) oder ein Persistenzschritt scheiterte, existiert im `CliProcessManager` ein zentraler Selbstheilungspunkt mit vier Auslösern — davon einer unabhängig von jeglicher Event-Zustellung (Issue #342).
 
 Beteiligte Komponenten:
-- `CliProcessManager.LaufdatenSicherstellenAsync(Guid aufgabeId)` — zentraler Selbstheilungspunkt
-- `CliProcessManager._abgleichTimer` / `AbgleichTickAsync` / `AbgleichAsync` — periodischer Abgleich im 30-s-Rhythmus (`AbgleichIntervall` = `HeartbeatInterval`)
-- `CliProcessManager._abgleichLaeuft` — `Interlocked`-Überlappungswächter des Abgleichs
+- `CliProcessManager.EnsureRunDataAsync(Guid workItemId)` — zentraler Selbstheilungspunkt
+- `CliProcessManager._abgleichTimer` / `AbgleichTickAsync` / `ReconcileTickAsync` — periodischer Abgleich im 30-s-Rhythmus (`ReconcileInterval` = `HeartbeatInterval`)
+- `CliProcessManager._reconcileRunning` — `Interlocked`-Überlappungswächter des Abgleichs
 - `CliProcessManager._lifecycleLock` / `_disposed` — atomare, dispose-sichere Anlage von Heartbeat-Timern und `RuntimeStatusChanged`-Subscriptions aus allen parallelen Auslösepfaden
-- `KiAusfuehrungsService.GetLaufendeAufgabenIds` — IDs aller Aufgaben mit laufendem Handle (`!HasExited`, Exception-tolerant)
-- `KiAusfuehrungsService.CliLaufAktiv` / `NotifyLaufAktiv` — Signal „laufender Prozess ohne Gestartet-Ereignis" (Wiederverwendungspfade)
-- `AufgabeService.LaufGates` — statische `ConcurrentDictionary<Guid, SemaphoreSlim>`; serialisiert prozessweit alle Laufdaten-Mutationen einer Aufgabe (`StartenAsync`, `AbschliessenAsync`, `StartZuruecksetzenAsync`, `AktivenLaufSetzen/Beenden/SicherstellenAsync`)
-- `AufgabeService.AktivenLaufSicherstellenAsync` — idempotente Persistenzoperation; `laeuftGuard` und `laufStatusProvider` werden erst innerhalb der gehaltenen Sperre ausgewertet
-- `CliRuntimeStatusExtensions.ToAufgabeLaufStatus` — zentrales Mapping `CliRuntimeStatus` → `AufgabeLaufStatus?`
+- `AiExecutionService.GetRunningWorkItemIds` — IDs aller Aufgaben mit laufendem Handle (`!HasExited`, Exception-tolerant)
+- `AiExecutionService.CliRunActive` / `NotifyRunActive` — Signal „laufender Prozess ohne Started-Ereignis" (Wiederverwendungspfade)
+- `WorkItemService.RunGates` — statische `ConcurrentDictionary<Guid, SemaphoreSlim>`; serialisiert prozessweit alle Laufdaten-Mutationen einer Aufgabe (`StartAsync`, `CompleteAsync`, `ResetStartAsync`, `SetActiveRunAsync/EndActiveRunAsync/EnsureActiveRunAsync`)
+- `WorkItemService.EnsureActiveRunAsync` — idempotente Persistenzoperation; `runningGuard` und `runStatusProvider` werden erst innerhalb der gehaltenen Sperre ausgewertet
+- `CliRuntimeStatusExtensions.ToWorkItemRunStatus` — zentrales Mapping `CliRuntimeStatus` → `WorkItemRunStatus?`
 
 Ablauf:
-1. **Auslöser:** `OnCliLaufAktiv` (Signal auf Wiederverwendungspfaden), `OnRuntimeStatusChanged` (Session wechselt zu `Laeuft`/`WartetAufEingabe`), `AktualisierungAsync` (Heartbeat-Tick) und `AbgleichAsync` rufen jeweils `LaufdatenSicherstellenAsync(aufgabeId)` auf.
-2. `LaufdatenSicherstellenAsync`:
+1. **Auslöser:** `OnCliRunActive` (Signal auf Wiederverwendungspfaden), `OnRuntimeStatusChanged` (Session wechselt zu `Running`/`WaitingForInput`), `UpdateAsync` (Heartbeat-Tick) und `ReconcileTickAsync` rufen jeweils `EnsureRunDataAsync(workItemId)` auf.
+2. `EnsureRunDataAsync`:
    - `IsRunning` `false` → Rückkehr ohne Aktion (verwaiste Zustände werden nie wieder aktiv geschrieben).
    - Unter `_lifecycleLock`: `_disposed` → Rückkehr; sonst `StartHeartbeatCore` nur, wenn noch kein Timer läuft (der Takt wird nicht zurückgesetzt).
    - `SubscribeRuntimeStatus` — unter `_lifecycleLock` atomar und idempotent (dieselbe Session → keine Doppel-Registrierung; Alt-Registrierung wird vorab bereinigt).
-   - `ExecuteWithAufgabeServiceAsync` → `AktivenLaufSicherstellenAsync` mit `laeuftGuard` (`IsRunning`) und `laufStatusProvider` (Live-Substatus der Session) — TOCTOU-/Stale-Write-Schutz durch Auswertung innerhalb der `LaufGates`-Sperre.
-3. `AbgleichTickAsync` (Timer-Callback, fire-and-forget): `Interlocked.Exchange(ref _abgleichLaeuft, 1)` — läuft noch ein vorheriger Durchlauf, wird der Tick übersprungen statt sich aufzustauen; danach `AbgleichAsync`: `GetLaufendeAufgabenIds()` iterieren und pro Aufgabe `LaufdatenSicherstellenAsync` aufrufen. Fehler je Aufgabe werden isoliert geloggt (`LogWarning`) und brechen den Durchlauf nicht ab.
+   - `ExecuteWithWorkItemServiceAsync` → `EnsureActiveRunAsync` mit `runningGuard` (`IsRunning`) und `runStatusProvider` (Live-Substatus der Session) — TOCTOU-/Stale-Write-Schutz durch Auswertung innerhalb der `RunGates`-Sperre.
+3. `AbgleichTickAsync` (Timer-Callback, fire-and-forget): `Interlocked.Exchange(ref _reconcileRunning, 1)` — läuft noch ein vorheriger Durchlauf, wird der Tick übersprungen statt sich aufzustauen; danach `ReconcileTickAsync`: `GetRunningWorkItemIds()` iterieren und pro Aufgabe `EnsureRunDataAsync` aufrufen. Fehler je Aufgabe werden isoliert geloggt (`LogWarning`) und brechen den Durchlauf nicht ab.
 4. `Dispose()` räumt `_abgleichTimer` ab, meldet beide Events ab und setzt unter `_lifecycleLock` `_disposed = true`, **bevor** die Dictionaries geleert werden — ein in-flight Abgleich-/Heartbeat-Tick oder ein knapp vor der Event-Abmeldung eintreffender Aufruf kann danach keine Timer oder Subscriptions mehr anlegen (Dispose-Race).
 
 ### 5. Geschützte Prozessende-Behandlung (klassischer Start und Terminal-Session)
 
 Beteiligte Komponenten:
-- `KiAusfuehrungsService.HandleExitedCoreAsync(Guid aufgabeId, CliProcessHandle handle, int? exitCode, string logKontext, Func<Task>? vorAufraeumenAsync)` — gemeinsame Implementierung für beide Start-Varianten
-- `KiAusfuehrungsService.StartCliAsync` (klassischer Pipe-Start) — registriert `process.Exited += (_, _) => HandleProcessExitedAsync(aufgabeId, process, handle, "Standard");` (Exit-Code via `TryGetExitCode`)
-- `KiAusfuehrungsService.StartTerminalSessionAsync` — registriert `session.Exited += (_, e) => HandleSessionEndedAsync(aufgabeId, handle, e.ExitCode, "Terminal")` und `session.Failed += (_, e) => HandleSessionFailedAsync(aufgabeId, handle, e)`; die Session erkennt das Prozessende selbst (`Process.Exited` bzw. Ende des Output-Streams) und ermittelt den Exit-Code PID-wiederverwendungs-sicher über `GetExitCodeProcess` auf dem nativen Prozess-Handle (ConPTY) bzw. `Process.ExitCode` (Pipe)
+- `AiExecutionService.HandleExitedCoreAsync(Guid workItemId, CliProcessHandle handle, int? exitCode, string logContext, Func<Task>? vorAufraeumenAsync)` — gemeinsame Implementierung für beide Start-Varianten
+- `AiExecutionService.StartCliAsync` (klassischer Pipe-Start) — registriert `process.Exited += (_, _) => HandleProcessExitedAsync(workItemId, process, handle, "Standard");` (Exit-Code via `TryGetExitCode`)
+- `AiExecutionService.StartTerminalSessionAsync` — registriert `session.Exited += (_, e) => HandleSessionEndedAsync(workItemId, handle, e.ExitCode, "Terminal")` und `session.Failed += (_, e) => HandleSessionFailedAsync(workItemId, handle, e)`; die Session erkennt das Prozessende selbst (`Process.Exited` bzw. Ende des Output-Streams) und ermittelt den Exit-Code PID-wiederverwendungs-sicher über `GetExitCodeProcess` auf dem nativen Prozess-Handle (ConPTY) bzw. `Process.ExitCode` (Pipe)
 
 Ablauf:
 1. Der Prozess endet; der klassische Pfad löst `process.Exited` aus, die Terminal-Session ihr `Exited`-Event (bzw. `Failed` bei einem fatalen Laufzeitfehler — wird wie ein Exit ohne Code behandelt → Status `Fehler`).
 2. `HandleExitedCoreAsync` wird ausgeführt — der **gesamte** Methodenkörper liegt in einem try-catch.
-3. `_handles.TryRemove(aufgabeId, out _)` entfernt das Handle atomar; gibt `TryRemove` `false` zurück (Handle bereits anderweitig entfernt), kehrt die Methode sofort zurück — jede Aktion wird so nur genau einmal ausgeführt. Wurde zwischenzeitlich ein **neuer** Prozess für dieselbe Aufgabe gestartet (entfernter Handle ≠ übergebener Handle), wird der neue Handle wieder eingetragen und das alte Exit-Event ignoriert.
+3. `_handles.TryRemove(workItemId, out _)` entfernt das Handle atomar; gibt `TryRemove` `false` zurück (Handle bereits anderweitig entfernt), kehrt die Methode sofort zurück — jede Aktion wird so nur genau einmal ausgeführt. Wurde zwischenzeitlich ein **neuer** Prozess für dieselbe Aufgabe gestartet (entfernter Handle ≠ übergebener Handle), wird der neue Handle wieder eingetragen und das alte Exit-Event ignoriert.
 4. Das optionale `vorAufraeumenAsync`-Callback wird ausgeführt (beim Terminal-Pfad: `DisposeSessionResourcesAsync` — kurzer `DrainOutputAsync`, dann `Session.Dispose()`, was bei parallelem Dispose eine `ObjectDisposedException` werfen kann, danach `OutputSink.CompleteAsync(...)` mit Timeout).
 5. Das Ereignis wird mit Exit-Code geloggt, `RaiseRunningCountChanged()` wird aufgerufen.
-6. Je nach Zustand wird der Status bestimmt: `Gestoppt` (absichtlich beendet oder ExitCode 0/null), `Fehler` (ExitCode ≠ 0 und nicht absichtlich beendet). Bei `Fehler` wird zusätzlich `PersistFehlgeschlagenAsync(...).SafeFireAndForget(...)` aufgerufen.
-7. `CliProcessStatusChanged?.Invoke(aufgabeId, status)` benachrichtigt alle Abonnenten (u. a. `CliProcessManager.OnCliProcessStatusChanged`, `TaskDetailViewModel.OnCliProcessStatusChanged`).
+6. Je nach Zustand wird der Status bestimmt: `Stopped` (absichtlich beendet oder ExitCode 0/null), `Fehler` (ExitCode ≠ 0 und nicht absichtlich beendet). Bei `Fehler` wird zusätzlich `PersistFailureAsync(...).SafeFireAndForget(...)` aufgerufen.
+7. `CliProcessStatusChanged?.Invoke(workItemId, status)` benachrichtigt alle Abonnenten (u. a. `CliProcessManager.OnCliProcessStatusChanged`, `TaskDetailViewModel.OnCliProcessStatusChanged`).
 8. Tritt in einem der obigen Schritte eine Exception auf, wird sie im äußeren catch-Block als `LogError` protokolliert; der Handler beendet sich normal, ohne die Exception weiterzuwerfen.
 
 Da `CliProcessStatusChanged` ein Multicast-Delegate mit mehreren Abonnenten ist, sind zusätzlich die einzelnen Abonnenten selbst geschützt: `CliProcessManager.OnCliProcessStatusChanged` und `TaskDetailViewModel.OnCliProcessStatusChanged` kapseln ihren jeweiligen Verarbeitungscode in try-catch, damit ein Fehler bei einem Abonnenten die Benachrichtigung der übrigen Abonnenten nicht verhindert.
 
 ### 6. Ressourcenfreigabe beim Aufbau der ConPTY-Session
 
-Beteiligte Komponenten (liegen seit der Einführung der Session-Factory in den Launchern, nicht mehr im `KiAusfuehrungsService`):
-- `Win32PseudoConsoleProcessLauncher.Start(Guid aufgabeId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink)` — startet die normalisierte Spec direkt über die ConPTY-API (keine `cmd.exe`-Hülle mehr)
-- `Win32PseudoConsoleProcessLauncher.CreatePseudoConsoleSession(Guid aufgabeId, PseudoConsole pseudoConsole, Process process, IntPtr nativeProcessHandle, ITerminalOutputSink? outputSink)` — erstellt die Ein-/Ausgabe-`FileStream`s und die `PseudoConsoleSession`
+Beteiligte Komponenten (liegen seit der Einführung der Session-Factory in den Launchern, nicht mehr im `AiExecutionService`):
+- `Win32PseudoConsoleProcessLauncher.Start(Guid workItemId, TerminalSessionStartSpec spec, ITerminalOutputSink? outputSink)` — startet die normalisierte Spec direkt über die ConPTY-API (keine `cmd.exe`-Hülle mehr)
+- `Win32PseudoConsoleProcessLauncher.CreatePseudoConsoleSession(Guid workItemId, PseudoConsole pseudoConsole, Process process, IntPtr nativeProcessHandle, ITerminalOutputSink? outputSink)` — erstellt die Ein-/Ausgabe-`FileStream`s und die `PseudoConsoleSession`
 - `SimulatedPseudoConsoleProcessLauncher.Start` — analoges Aufräumen auf dem Pipe-Backend (`process.Kill()` + `Dispose` bei fehlgeschlagener Session-Erzeugung)
 
 Ablauf (`Win32PseudoConsoleProcessLauncher.CreatePseudoConsoleSession`):
@@ -183,9 +183,9 @@ flowchart TD
 | Fehler bei einem Abonnenten von `CliProcessStatusChanged` | Try-catch im jeweiligen Abonnenten (`CliProcessManager`, `TaskDetailViewModel`) verhindert Abbruch der Multicast-Kette. |
 | Fehler beim Erstellen der ConPTY-Streams | `CreatePseudoConsoleSession` disposed bereits erstellte Streams, loggt und wirft weiter. |
 | Überlappende Heartbeat-Ticks derselben Aufgabe | Pro-Aufgabe-`SemaphoreSlim` serialisiert; andere Aufgaben bleiben unbeeinflusst. |
-| Abgleich-Durchlauf dauert länger als das Timer-Intervall | `AbgleichTickAsync` überspringt überlappende Ticks per `Interlocked`-Guard `_abgleichLaeuft` — kein Aufstauen der Durchläufe. |
+| Abgleich-Durchlauf dauert länger als das Timer-Intervall | `AbgleichTickAsync` überspringt überlappende Ticks per `Interlocked`-Guard `_reconcileRunning` — kein Aufstauen der Durchläufe. |
 | Timer-/Subscription-Anlage parallel aus Event-, Heartbeat- und Abgleichpfaden | `_lifecycleLock` serialisiert alle mutierenden Zugriffe auf `_heartbeatTimers`/`_updateSemaphores`/`_runtimeStatusSubscriptions` — keine verwaisten Doppel-Anlagen oder nicht abmeldbare Subscriptions. |
 | `CliProcessManager.Dispose` während in-flight Tick/Event-Aufruf | `_disposed` (unter `_lifecycleLock` gesetzt und geprüft) verhindert nachträgliche Timer-/Subscription-Anlage — kein dauerhaft tickender Leichnam. |
-| Sicherstellen-/Setzen-Save konkurriert mit Beenden-Save | `AufgabeService.LaufGates` serialisiert alle Laufdaten-Mutationen pro Aufgabe prozessweit; `laeuftGuard` (erneute `IsRunning`-Prüfung in der Sperre) lässt die Sicherstellung verstummen, wenn der Prozess bereits endete — kein Phantom-Lauf. |
-| Veralteter Live-Substatus als letzter Schreiber | `laufStatusProvider` wird erst innerhalb der `LaufGates`-Sperre ausgewertet — geschrieben wird der frischeste Session-Stand, kein Stale-Write. |
-| Persistenzfehler in `ExecuteWithAufgabeServiceAsync` | Wird geloggt und geschluckt — heilt aber strukturell: Der nächste Heartbeat-Tick, `RuntimeStatusChanged`-Wechsel oder der 30-s-Abgleich wiederholt `LaufdatenSicherstellenAsync` automatisch. |
+| Sicherstellen-/Setzen-Save konkurriert mit Beenden-Save | `WorkItemService.RunGates` serialisiert alle Laufdaten-Mutationen pro Aufgabe prozessweit; `runningGuard` (erneute `IsRunning`-Prüfung in der Sperre) lässt die Sicherstellung verstummen, wenn der Prozess bereits endete — kein Phantom-Lauf. |
+| Veralteter Live-Substatus als letzter Schreiber | `runStatusProvider` wird erst innerhalb der `RunGates`-Sperre ausgewertet — geschrieben wird der frischeste Session-Stand, kein Stale-Write. |
+| Persistenzfehler in `ExecuteWithWorkItemServiceAsync` | Wird geloggt und geschluckt — heilt aber strukturell: Der nächste Heartbeat-Tick, `RuntimeStatusChanged`-Wechsel oder der 30-s-Abgleich wiederholt `EnsureRunDataAsync` automatisch. |

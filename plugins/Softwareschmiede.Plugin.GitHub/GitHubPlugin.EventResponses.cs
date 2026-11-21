@@ -25,7 +25,7 @@ public sealed partial class GitHubPlugin
             ScmResponseKind.Reaction => ReactionEndpoint(request) + "?per_page=100",
             _ => throw Permanent("Unbekannte GitHub-Antwortaktion.")
         };
-        // Read all pages before reporting absence; a failed later page must not permit a second POST.
+        // Alle Seiten lesen, bevor Abwesenheit gemeldet wird; eine fehlgeschlagene spätere Seite darf keinen zweiten POST
         var candidates = await RestPagesAsync(client, repository.Host, endpoint, ct);
         foreach (var candidate in candidates)
         {
@@ -45,7 +45,7 @@ public sealed partial class GitHubPlugin
         ValidateResponse(request);
         var repository = request.Reference.Repository;
         var client = ClientFor(repository.Account);
-        // A renamed/replaced repository or changed credential must not redirect a persisted answer.
+        // Ein umbenanntes/ersetztes Repository oder geänderte Anmeldedaten dürfen eine persistierte Antwort nicht umleiten.
         var current = await GetEventRepositoryAsync(new(Guid.NewGuid(), PluginPrefix,
             $"https://{repository.Host}/{repository.Owner}/{repository.Name}", repository.Account), ct);
         if (current.RepositoryId != repository.RepositoryId || current.ViewerId != repository.ViewerId)
@@ -165,7 +165,7 @@ public sealed partial class GitHubPlugin
             case ScmResponseKind.PullRequest:
                 if (string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.HeadBranch) || string.IsNullOrWhiteSpace(request.BaseBranch))
                     throw Permanent("Titel und Branches des Pull Requests fehlen.");
-                // Branches are JSON data; only a branch of this repository can be selected.
+                // Branches sind JSON-Daten; nur ein Branch dieses Repositories kann ausgewählt werden.
                 if (request.HeadBranch.Contains(':') || request.BaseBranch.Contains(':')
                     || request.HeadBranch.Any(char.IsControl) || request.BaseBranch.Any(char.IsControl))
                     throw Permanent("Pull-Request-Branches müssen zum gespeicherten Repository gehören.");

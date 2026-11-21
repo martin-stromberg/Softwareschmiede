@@ -20,14 +20,14 @@ public sealed class NotificationService
     public NotificationService(
         NotificationSettingsService settingsService,
         NotificationAuditService auditService,
-        IUserContextService benutzerkontextService,
+        IUserContextService userContextService,
         ILogger<NotificationService> logger,
         INotificationAudioService? audioService = null,
         INotificationBannerService? bannerService = null)
     {
         _settingsService = settingsService;
         _auditService = auditService;
-        _userContextService = benutzerkontextService;
+        _userContextService = userContextService;
         _logger = logger;
         _audioService = audioService;
         _bannerService = bannerService;

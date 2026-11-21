@@ -11,7 +11,7 @@
 | `FileExplorerView` | UI (App) | XAML-UserControl; Split-View mit Mode-Buttons, TreeView und Inhalts-/Diff-Anzeige |
 | `DiffViewer` | UI (App) | Wiederverwendbarer UserControl für zeilenweises Diff-Rendering mit Farbkodierung |
 | `DiffLineStatusToBrushConverter` | UI (App) | IValueConverter für Umwandlung von DiffLineStatus in Hintergrund-Brush |
-| `DateibrowserAnsichtsmodus` | Presentation (App) | Enum für Modus-Steuerung (Standard vs. Vergleich) |
+| `FileBrowserViewMode` | Presentation (App) | Enum für Modus-Steuerung (Standard vs. Vergleich) |
 | `IGitWorkspaceBrowserService` | Application | Interface für Git-Backend-Operationen (Arbeitsbaum mit Lazy-Loading, Commits, Dateivorschauen) |
 | `GitWorkspaceBrowserService` | Application | Konkrete Implementierung mit Directory-Walk, Lazy-Loading-Support; nutzt `ICliRunner` für Git-Aufrufe und File-System-APIs |
 | `WorkingTreeWalkContext` | Application | Interne Hilfsklasse für Directory-Walk-Kontext (speichert `RootPath`, `MaxDepth`, `CancellationToken`, `NodeCount`) |
@@ -43,7 +43,7 @@ graph TB
         NODE["WorkspaceFileNode"]
         DIFF["TextDiffLine<br/>InlineDiffSegment<br/>FileTextDiff"]
         SNAP["WorkspaceSnapshot<br/>BranchCommit<br/>FilePreview"]
-        ENUM["DiffLineStatus<br/>DateibrowserAnsichtsmodus"]
+        ENUM["DiffLineStatus<br/>FileBrowserViewMode"]
     end
 
     TDVM -->|komponiert| FEVM
@@ -82,7 +82,7 @@ graph TB
 ### Presentation-Schicht (App.ViewModels)
 - **FileExplorerViewModel** ist das Presentation Model für alle Explorer-Funktionen
 - Verwaltet Observable Collections (`Wurzelknoten`, `CommitGruppen`, `DiffZeilen`)
-- Commands für Benutzer-Interaktionen (`StandardAnsichtCommand`, `VergleichCommand`, `AktualisierenCommand`)
+- Commands für Benutzer-Interaktionen (`DefaultViewCommand`, `CompareCommand`, `AktualisierenCommand`)
 - Delegation an Application-Layer Services, nicht direkte Datenbankzugriffe
 
 ### Application-Schicht
@@ -97,7 +97,7 @@ graph TB
 
 ### Domain-Schicht
 - **Value Objects** für Datenmodelle: `WorkspaceFileNode`, `TextDiffLine`, `InlineDiffSegment`, `FileTextDiff`, `BranchCommit`, `FilePreview`, etc.
-- **Enums** für Typsicherheit: `DiffLineStatus`, `DateibrowserAnsichtsmodus`
+- **Enums** für Typsicherheit: `DiffLineStatus`, `FileBrowserViewMode`
 - Keine Geschäftslogik, reine Datenschichten
 
 ## Datenfluss
@@ -107,7 +107,7 @@ graph TB
 ```
 Benutzer öffnet Register
   ↓
-TaskDetailViewModel.Aufgabe.LokalerKlonPfad
+TaskDetailViewModel.WorkItem.LocalClonePath
   ↓
 FileExplorerViewModel.InitialisierenAsync(pfad)
   ↓
@@ -160,7 +160,7 @@ Speicher wird freigegeben, Invariante bleibt konsistent
 ```
 Benutzer: Klick auf "Vergleich"
   ↓
-FileExplorerViewModel.VergleichAsync()
+FileExplorerViewModel.CompareAsync()
   ↓
 IGitWorkspaceBrowserService.LoadSnapshotAsync(pfad)
   ↓
@@ -187,7 +187,7 @@ TreeView zeigt Dateien des Commits
   
 Benutzer: Klick auf geänderte Datei
   ↓
-FileExplorerViewModel.DateiLadenAsync(knoten)
+FileExplorerViewModel.DateiLoadAsync(knoten)
   ↓
 IGitWorkspaceBrowserService.LoadCommitPreviewAsync(pfad, knoten)
   ↓
@@ -232,7 +232,7 @@ Inline-Runs für geänderte Wortteile
 - **UI-Rendering:** TreeView ist virtualisiert; DiffViewer ist nicht virtualisiert (kann bei 1000+ Zeilen langsam werden)
 - **Speicher:** Lazy-Loading spielt bei tiefen Navigationen gut — pro Knoten ist maximal eine Ebene mehr geladen als angezeigt; Zuklappen-Bereinigung gibt Speicher frei
 
-## Zuverlässigkeit und Fehlertoleranz
+## Zuverlässigkeit und FehlertoleranceMinutes
 
 - **Git-Fehler** beim Snapshot-Laden: Exception wird geloggt; `CommitGruppen` wird nicht gefüllt, Hinweis wird angezeigt
 - **Nicht existierender Pfad**: `LoadWorkingTreeAsync()` liefert leere Liste; UI zeigt leeren Baum

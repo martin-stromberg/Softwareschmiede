@@ -105,7 +105,7 @@ public sealed class AiSimulatorPlugin : CliAiPluginBase, IIssueTemplateTextGener
         return Path.Combine(root, "simulator");
     }
 
-    // Fixed program only. Remote text is parsed as JSON from stdin and is never evaluated as PowerShell.
+    // Nur festes Programm. Remote-Text wird als JSON von stdin gelesen und nie als PowerShell
     private const string ScmSimulatorProgram = """
         $ErrorActionPreference = 'Stop'
         [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)

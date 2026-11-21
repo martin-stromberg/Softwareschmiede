@@ -19,7 +19,7 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
     private readonly ILogger _logger;
     private readonly DateTimeOffset _startUtc;
     private int _bufferedBytes;
-    private bool _istVollstaendig = true;
+    private bool _isComplete = true;
     private DateTimeOffset? _endeUtc;
 
     /// <summary>Erstellt einen neuen Recorder.</summary>
@@ -60,11 +60,11 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
         {
             // Bei Budget-Überschreitung wird das intakte Präfix behalten (ein Replay ab Position 0
             // braucht den Anfang für den Parser-Zustand) — statt älteste Chunks zu verwerfen.
-            if (!_istVollstaendig || _bufferedBytes + bytes.Length > _byteBudget)
+            if (!_isComplete || _bufferedBytes + bytes.Length > _byteBudget)
             {
-                if (_istVollstaendig)
+                if (_isComplete)
                 {
-                    _istVollstaendig = false;
+                    _isComplete = false;
                     _logger.LogInformation(
                         "CLI-Aufzeichnung für Aufgabe {AufgabeId} gestoppt: Byte-Budget {ByteBudget} überschritten (vollständiges Präfix von {BufferedBytes} Bytes bleibt erhalten).",
                         _workItemId, _byteBudget, _bufferedBytes);
@@ -106,7 +106,7 @@ public sealed class CliOutputRecorder : ITerminalOutputSink
                 StartUtc = _startUtc,
                 Cols = _cols,
                 Rows = _rows,
-                IsComplete = _istVollstaendig,
+                IsComplete = _isComplete,
                 EndUtc = _endeUtc,
                 Chunks = _chunks.ToArray(),
             };

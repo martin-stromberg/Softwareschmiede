@@ -46,7 +46,7 @@ public sealed class WorkItemServiceTests_ActiveRun : IDisposable
     public void Dispose() => _db.Dispose();
 
     /// <summary>
-    /// AktivenLaufSetzenAsync setzt AktiveRunId, LastHeartbeatUtc und LetzterCliStartUtc sofort (Issue 108:
+    /// AktivenLaufSetzenAsync setzt ActiveRunId, LastHeartbeatUtc und LastCliStartUtc sofort (Issue 108:
     /// die Seitenleisten-Kachel darf nicht bis zu 30s auf den ersten periodischen Heartbeat warten müssen).
     /// Setzt außerdem LaufStatus auf Laeuft (Standardwert von PseudoConsoleSession.RuntimeStatus beim Start).
     /// </summary>
@@ -75,7 +75,7 @@ public sealed class WorkItemServiceTests_ActiveRun : IDisposable
         loaded.ExecutionStatus.Should().Be(WorkItemExecutionStatus.Active);
     }
 
-    /// <summary>AktivenLaufBeendenAsync entfernt eine zuvor gesetzte AktiveRunId und den LaufStatus.</summary>
+    /// <summary>AktivenLaufBeendenAsync entfernt eine zuvor gesetzte ActiveRunId und den LaufStatus.</summary>
     [Fact]
     public async Task EndActiveRunAsync_ShouldClearActiveRunId_WhenPreviouslySet()
     {
@@ -260,8 +260,8 @@ public sealed class WorkItemServiceTests_ActiveRun : IDisposable
     }
 
     /// <summary>
-    /// AktivenLaufSicherstellenAsync stellt bei fehlender AktiveRunId den vollständigen Lauf-Zustand
-    /// her (AusfuehrungsStatus Aktiv, neue AktiveRunId, LastHeartbeatUtc, LaufStatus) — die zentrale
+    /// AktivenLaufSicherstellenAsync stellt bei fehlender ActiveRunId den vollständigen Lauf-Zustand
+    /// her (AusfuehrungsStatus Aktiv, neue ActiveRunId, LastHeartbeatUtc, LaufStatus) — die zentrale
     /// Selbstheilung für Läufe ohne Gestartet-Persistierung (Issue 342).
     /// </summary>
     [Fact]
@@ -299,7 +299,7 @@ public sealed class WorkItemServiceTests_ActiveRun : IDisposable
     }
 
     /// <summary>
-    /// Idempotenz: Bei bereits vorhandener AktiveRunId bleiben AktiveRunId und LetzterCliStartUtc
+    /// Idempotenz: Bei bereits vorhandener ActiveRunId bleiben ActiveRunId und LastCliStartUtc
     /// erhalten; nur der Heartbeat wird aufgefrischt und der Substatus nur bei übergebenem Parameter
     /// geändert.
     /// </summary>

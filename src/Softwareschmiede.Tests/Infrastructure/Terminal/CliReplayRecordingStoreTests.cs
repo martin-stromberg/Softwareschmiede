@@ -50,7 +50,7 @@ public sealed class CliReplayRecordingStoreTests
         loaded.Chunks[2].Data.Should().BeEmpty();
     }
 
-    /// <summary>Ein <c>EndeUtc</c> von <c>null</c> überlebt den Roundtrip (laufende Aufzeichnung).</summary>
+    /// <summary>Ein <c>EndUtc</c> von <c>null</c> überlebt den Roundtrip (laufende Aufzeichnung).</summary>
     [Fact]
     public async Task Roundtrip_EndUtcNull_RemainsNull()
     {
@@ -215,7 +215,7 @@ public sealed class CliReplayRecordingStoreTests
         await act.Should().ThrowAsync<InvalidDataException>();
     }
 
-    /// <summary><c>StartUtc</c>/<c>EndeUtc</c> werden UTC-normalisiert gespeichert: ein Zeitstempel
+    /// <summary><c>StartUtc</c>/<c>EndUtc</c> werden UTC-normalisiert gespeichert: ein Zeitstempel
     /// mit lokalem Offset landet nach dem Roundtrip als identischer Zeitpunkt mit Offset 0.</summary>
     [Fact]
     public async Task Roundtrip_TimestampWithOffset_BeUtcNormalizes()

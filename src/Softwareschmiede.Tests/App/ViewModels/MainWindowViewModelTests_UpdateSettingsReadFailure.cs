@@ -29,7 +29,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
     {
         /// <summary>Einmalige Startautomatik nach Fensterbereitschaft.</summary>
         Startautomatik,
-        /// <summary>Manuelle Prüfung über UpdatePruefenCommand.</summary>
+        /// <summary>Manuelle Prüfung über CheckUpdateCommand.</summary>
         CheckManual,
         /// <summary>Manueller Installationsstart über UpdateStartenCommand.</summary>
         InstallManual
@@ -107,7 +107,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         sut.UpdateAvailable.Should().BeFalse();
         sut.AvailableUpdate.Should().BeNull();
         sut.UpdateCheckRunning.Should().BeFalse();
-        sut.UpdateWillPrepared.Should().BeFalse();
+        sut.UpdateBeingPrepared.Should().BeFalse();
 
         // Wiederherstellung: Fehler deaktivieren, Settings über die UI neu laden und speichern
         _interceptor.DeactivateFailure();
@@ -183,7 +183,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         sut.UpdateAvailable.Should().BeFalse();
         sut.AvailableUpdate.Should().BeNull();
         sut.UpdateCheckRunning.Should().BeFalse();
-        sut.UpdateWillPrepared.Should().BeFalse();
+        sut.UpdateBeingPrepared.Should().BeFalse();
 
         // Wiederherstellung über die Einstellungen-UI: Neue Prüfung findet das Update erneut.
         var checksBeforeRestore = checkCalls;
@@ -249,7 +249,7 @@ public sealed class MainWindowViewModelTests_UpdateSettingsReadFailure : MainWin
         sut.UpdateNotice.Should().NotBeNullOrEmpty();
         sut.UpdateAvailable.Should().BeFalse();
         sut.AvailableUpdate.Should().BeNull();
-        sut.UpdateWillPrepared.Should().BeFalse();
+        sut.UpdateBeingPrepared.Should().BeFalse();
 
         // Wiederherstellung über die Einstellungen-UI: Neue Prüfung findet das Update erneut.
         _interceptor.DeactivateFailure();

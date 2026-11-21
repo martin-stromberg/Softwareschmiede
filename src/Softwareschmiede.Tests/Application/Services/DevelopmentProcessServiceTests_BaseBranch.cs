@@ -16,7 +16,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// Aufgabenstart: Validierung gegen die Remote-Branches vor dem Klon und Feature-Branch-Erstellung vom
 /// konfigurierten Basis-Branch statt vom HEAD.
 /// </summary>
-public sealed class DevelopmentprocessServiceTests_BaseBranch : IDisposable
+public sealed class DevelopmentProcessServiceTests_BaseBranch : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly WorkItemService _workItemService;
@@ -27,7 +27,7 @@ public sealed class DevelopmentprocessServiceTests_BaseBranch : IDisposable
     private readonly Guid _projectId = new("77777777-7777-7777-7777-777777777777");
 
     /// <summary>EntwicklungsprozessServiceTests_BasisBranch.</summary>
-    public DevelopmentprocessServiceTests_BaseBranch()
+    public DevelopmentProcessServiceTests_BaseBranch()
     {
         _db = TestDbContextFactory.Create();
         _workItemService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));
@@ -119,7 +119,7 @@ public sealed class DevelopmentprocessServiceTests_BaseBranch : IDisposable
     }
 
     /// <summary>
-    /// ProzessStartenAsync bricht mit einer <see cref="GitBranchNotFoundException"/> ab, wenn der konfigurierte
+    /// StartProcessAsync bricht mit einer <see cref="GitBranchNotFoundException"/> ab, wenn der konfigurierte
     /// Basis-Branch nicht in den Remote-Branches des Repositories enthalten ist. Der Klon darf dabei nicht
     /// gestartet werden (Validierung vor dem Klon, wie im Plan beschrieben).
     /// </summary>
@@ -144,7 +144,7 @@ public sealed class DevelopmentprocessServiceTests_BaseBranch : IDisposable
     }
 
     /// <summary>
-    /// ProzessStartenAsync setzt den Prozess normal fort, wenn der konfigurierte Basis-Branch in den
+    /// StartProcessAsync setzt den Prozess normal fort, wenn der konfigurierte Basis-Branch in den
     /// Remote-Branches des Repositories vorhanden ist.
     /// </summary>
     [Fact]
@@ -180,7 +180,7 @@ public sealed class DevelopmentprocessServiceTests_BaseBranch : IDisposable
     }
 
     /// <summary>
-    /// ProzessStartenAsync setzt den Prozess normal fort und validiert nicht gegen die Remote-Branches, wenn
+    /// StartProcessAsync setzt den Prozess normal fort und validiert nicht gegen die Remote-Branches, wenn
     /// kein Basis-Branch konfiguriert ist (Abwärtskompatibilität, Fallback auf Standard-Branch).
     /// </summary>
     [Fact]

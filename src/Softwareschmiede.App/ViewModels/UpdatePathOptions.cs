@@ -13,12 +13,12 @@ public static class UpdatePathText
     public const string StableVersions = UpdatePathChannelResolver.StableVersionsPath;
 
     /// <summary>Pfad-Label: ausschließlich Vorabversionen (Release-Kandidaten).</summary>
-    public const string Vorabversionen = UpdatePathChannelResolver.PrereleaseVersionsPath;
+    public const string PrereleaseVersions = UpdatePathChannelResolver.PrereleaseVersionsPath;
 
     /// <summary>Kanal-Anzeigetext für den aus dem Pfad <see cref="StableVersions"/> resultierenden Kanal.</summary>
     public const string ChannelStable = "Produktiv (nur stabile Versionen)";
 
-    /// <summary>Kanal-Anzeigetext für den aus dem Pfad <see cref="Vorabversionen"/> resultierenden Kanal.</summary>
+    /// <summary>Kanal-Anzeigetext für den aus dem Pfad <see cref="PrereleaseVersions"/> resultierenden Kanal.</summary>
     public const string ChannelReleaseCandidate = "Release Candidate (nur Vorabversionen)";
 }
 
@@ -34,7 +34,7 @@ public sealed record UpdatePathOption(string Path, string Label)
     public static IReadOnlyList<UpdatePathOption> All { get; } =
     [
         new(UpdatePathChannelResolver.StableVersionsPath, UpdatePathText.StableVersions),
-        new(UpdatePathChannelResolver.PrereleaseVersionsPath, UpdatePathText.Vorabversionen)
+        new(UpdatePathChannelResolver.PrereleaseVersionsPath, UpdatePathText.PrereleaseVersions)
     ];
 
     /// <summary>Liefert die Auswahloption zu einem gespeicherten Pfad; unbekannte oder leere Werte fallen auf die Produktiv-Option zurück.</summary>

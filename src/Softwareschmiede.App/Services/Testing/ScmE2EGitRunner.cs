@@ -4,7 +4,7 @@ using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.App.Services.Testing;
 
-// Only remote transport is replaced: the production clone/branch/workspace code runs real git.
+// Nur der Remote-Transport wird ersetzt: der Produktions-Clone-/Branch-/Workspace-Code führt echtes git aus.
 internal sealed class ScmE2EGitRunner(ICliRunner inner, ScmE2ETestConfiguration configuration) : ICliRunner
 {
     public Task<CliResult> RunAsync(string command, IEnumerable<string> args, string? workingDirectory,

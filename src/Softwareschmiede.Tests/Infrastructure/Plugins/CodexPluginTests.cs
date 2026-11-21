@@ -43,7 +43,7 @@ public sealed class CodexPluginTests
         commandLineParameterField.IsRequired.Should().BeFalse();
     }
 
-    /// <summary>SupportsSessionContinuation returns false until a stable local CLI pattern exists.</summary>
+    /// <summary>SupportsSessionContinuation gibt false zurück, bis ein stabiles lokales CLI-Muster existiert.</summary>
     [Fact]
     public void SupportsSessionContinuation_ShouldReturnFalse()
     {
@@ -121,7 +121,7 @@ public sealed class CodexPluginTests
         psi.Arguments.Should().Be("--some-flag");
     }
 
-    /// <summary>StartCliAsync does not set an auth environment variable by default.</summary>
+    /// <summary>StartCliAsync setzt standardmäßig keine Auth-Umgebungsvariable.</summary>
     [Fact]
     public async Task StartCliAsync_ShouldNotSetAuthEnvironmentVariable()
     {

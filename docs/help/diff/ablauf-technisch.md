@@ -8,7 +8,7 @@ Der Diff wird durch `DiffService` berechnet, optional von `DiffCachingService` g
 
 ### 1. Diff anfordern
 
-Ausgelöst durch Button „🔎 Diff anzeigen" in `AufgabeDetail.razor` oder durch Klick auf eine Datei im Projektverzeichnis.
+Ausgelöst durch Button „🔎 Diff anzeigen" in `TaskDetailView.xaml` oder durch Klick auf eine Datei im Projektverzeichnis.
 
 Beteiligte Komponenten:
 - `DiffController` — REST-Endpunkte für Diff-Anfragen
@@ -20,13 +20,13 @@ Beteiligte Komponenten:
 Beteiligte Komponenten:
 - `DiffAlgorithmService` — Myers-Diff-Algorithmus oder git-diff-Aufruf
 - `DiffBlock` — Zusammenhängende Änderungsblöcke
-- `DiffLine` — Einzelne Zeile mit `DiffLineStatus` (`Hinzugefuegt`, `Entfernt`, `Unveraendert`)
+- `DiffLine` — Einzelne Zeile mit `DiffLineStatus` (`Added`, `Removed`, `Context`)
 
 ### 3. Ergebnis speichern
 
 Beteiligte Komponenten:
 - `DiffCachingService` — Speichert `DiffResult` + `DiffBlock` + `DiffLine` in SQLite
-- `DiffResult.Status` — `Erfolgreich`, `Fehlgeschlagen`, `NochNichtBerechnet`
+- `DiffResult.Status` — `Generated`, `Error`, `Pending`
 
 ### 4. Ergebnis anzeigen
 

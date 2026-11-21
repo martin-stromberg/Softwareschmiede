@@ -16,7 +16,7 @@ namespace Softwareschmiede.IntegrationTests.Services;
 /// Integrationstests für <see cref="DevelopmentProcessService"/> mit echter SQLite-Datenbank.
 /// CLI-Plugins (IGitPlugin, IKiPlugin) werden gemockt.
 /// </summary>
-public sealed class DevelopmentprocessServiceTests
+public sealed class DevelopmentProcessServiceTests
 {
     /// <summary>Hilfsmethode: Erstellt Testprojekt und Testaufgabe ohne AgentenpaketName.</summary>
     private static async Task<(Guid ProjectId, Guid WorkItemId)> CreateTestDataAsync(
@@ -71,7 +71,7 @@ public sealed class DevelopmentprocessServiceTests
     }
 
     /// <summary>
-    /// Testet, dass ProzessStartenAsync BranchName und LokalerKlonPfad in der DB persistiert.
+    /// Testet, dass StartProcessAsync BranchName und LocalClonePath in der DB persistiert.
     /// </summary>
     [Fact]
     public async Task StartProcessAsync_ShouldPersistBranchAndClonePath_WhenWorkItemExists()
@@ -130,7 +130,7 @@ public sealed class DevelopmentprocessServiceTests
     }
 
     /// <summary>
-    /// Testet, dass ProzessStartenAsync einen GitAktion-Protokolleintrag in der DB anlegt.
+    /// Testet, dass StartProcessAsync einen GitAktion-Protokolleintrag in der DB anlegt.
     /// </summary>
     [Fact]
     public async Task StartProcessAsync_ShouldCreateGitActionLogEntry_WhenProcessStarted()

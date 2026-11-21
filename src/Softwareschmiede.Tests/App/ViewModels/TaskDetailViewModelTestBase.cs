@@ -21,31 +21,31 @@ public abstract class TaskDetailViewModelTestBase : IDisposable
     /// <summary>_aufgabeService.</summary>
     protected readonly WorkItemService _workItemService;
 
-    /// <summary>_protokollService.</summary>
+    /// <summary>_logService.</summary>
     protected readonly LogService _logService;
 
     /// <summary>_todoService.</summary>
     protected readonly TodoService _todoService;
 
-    /// <summary>_kiService.</summary>
+    /// <summary>_aiService.</summary>
     protected readonly AiExecutionService _aiService;
 
-    /// <summary>_promptVorlagenService.</summary>
+    /// <summary>_promptTemplatesService.</summary>
     protected readonly PromptTemplateService _promptTemplatesService;
 
-    /// <summary>_promptVorlagenPlatzhalterService.</summary>
+    /// <summary>_promptTemplatesPlaceholderService.</summary>
     protected readonly PromptTemplatePlaceholderService _promptTemplatesPlaceholderService = new();
 
-    /// <summary>_promptZeitVersandService.</summary>
+    /// <summary>_promptScheduleDispatchService.</summary>
     protected readonly PromptScheduleDispatchService _promptScheduleDispatchService;
 
-    /// <summary>_einstellungService.</summary>
+    /// <summary>_settingService.</summary>
     protected readonly AppSettingService _settingService;
 
     /// <summary>_dialogServiceMock.</summary>
     protected readonly Mock<IDialogService> _dialogServiceMock;
 
-    /// <summary>_projektId.</summary>
+    /// <summary>_projectId.</summary>
     protected readonly Guid _projectId = Guid.NewGuid();
 
     /// <summary>_tempDirectoryFixture.</summary>
@@ -91,7 +91,7 @@ public abstract class TaskDetailViewModelTestBase : IDisposable
         => _tempDirectoryFixture.CreateTempDirectory(TempDirectoryPrefix);
 
     /// <summary>Erzeugt ein einsatzbereites TaskDetailViewModel für den Test.</summary>
-    /// <param name="processStarterMock">Optionaler Mock für IProzessStarter zur Prüfung gestarteter Prozesse.</param>
+    /// <param name="processStarterMock">Optionaler Mock für IProcessStarter zur Prüfung gestarteter Prozesse.</param>
     /// <param name="visualStudioCodeLocator">Optionaler IVisualStudioCodeLocator zur Steuerung der VS-Code-Verfügbarkeit.</param>
     /// <param name="idePlugins">Optionale Überschreibung der aktiven IDE-Plugins (Standard: Visual Studio + Visual Studio Code).</param>
     /// <param name="serviceProvider">Optionaler IServiceProvider (Standard: leerer Mock ohne Registrierungen).</param>

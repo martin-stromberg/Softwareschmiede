@@ -13,7 +13,7 @@ namespace Softwareschmiede.Tests.E2E;
 /// Voraussetzungen:
 /// - Windows-Desktop-Session (kein Headless-CI)
 /// - Softwareschmiede.App muss im Debug-Modus gebaut sein
-/// - Im Testmodus (SOFTWARESCHMIEDE_TEST_DB_PATH gesetzt) zeichnet IProzessStarter
+/// - Im Testmodus (SOFTWARESCHMIEDE_TEST_DB_PATH gesetzt) zeichnet IProcessStarter
 ///   (AufzeichnenderProzessStarter) jeden Prozessstart in einer Logdatei auf, statt einen echten
 ///   Prozess zu starten - siehe WpfTestBase.WaitForProzessStartEintragAsync.
 ///
@@ -41,12 +41,12 @@ public partial class End2EndTest
         ConfirmLocalDirectoryGitInitInSourceDirectory();
         var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
 
-        // Nach erfolgreichem Start ist das Repository geklont (LokalerKlonPfad gesetzt).
+        // Nach erfolgreichem Start ist das Repository geklont (LocalClonePath gesetzt).
         taskDetail.WaitForCliRunning();
 
         var localClonePath = await GetLocalClonePathAsync();
 
-        // Phase 1: "Arbeitsverzeichnis öffnen" zeichnet den OS-Dateiexplorer-Start mit dem LokalerKlonPfad auf.
+        // Phase 1: "Arbeitsverzeichnis öffnen" zeichnet den OS-Dateiexplorer-Start mit dem LocalClonePath auf.
         taskDetail.OpenWorkingDirectory();
         await WaitForProcessStartEntryAsync(localClonePath);
 

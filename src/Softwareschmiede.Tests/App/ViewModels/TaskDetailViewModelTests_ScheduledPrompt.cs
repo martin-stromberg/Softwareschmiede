@@ -147,7 +147,7 @@ public sealed class TaskDetailViewModelTests_ScheduledPrompt : IDisposable
         changedProperties.Should().Contain(nameof(TaskDetailViewModel.ScheduledPromptTargetMinutes));
     }
 
-    /// <summary>Sind beide Zeitfelder leer, ist KannPromptPlanen false und der Sofortversand über die ComboBox bleibt unverändert möglich.</summary>
+    /// <summary>Sind beide Zeitfelder leer, ist CanPromptPlan false und der Sofortversand über die ComboBox bleibt unverändert möglich.</summary>
     [Fact]
     public async Task SchedulePrompt_EmptyField_NoScheduling()
     {
@@ -324,7 +324,7 @@ public sealed class TaskDetailViewModelTests_ScheduledPrompt : IDisposable
         _promptScheduleDispatchService.GetScheduledPromptStatus(workItem.Id).Should().BeNull();
     }
 
-    /// <summary>KannPromptPlanen hängt auch von IsCliRunning ab; ein Wechsel des CLI-Laufstatus muss daher PropertyChanged für KannPromptPlanen auslösen.</summary>
+    /// <summary>CanPromptPlan hängt auch von IsCliRunning ab; ein Wechsel des CLI-Laufstatus muss daher PropertyChanged für CanPromptPlan auslösen.</summary>
     [Fact]
     public async Task IsCliRunning_Changes_TriggersCanPromptPlanPropertyChangedOut()
     {
@@ -342,7 +342,7 @@ public sealed class TaskDetailViewModelTests_ScheduledPrompt : IDisposable
         changedProperties.Should().Contain(nameof(TaskDetailViewModel.CanPromptPlan));
     }
 
-    /// <summary>KannPromptPlanen hängt auch von SelectedPromptVorlage ab; eine geänderte Vorlagenauswahl muss daher PropertyChanged für KannPromptPlanen auslösen.</summary>
+    /// <summary>CanPromptPlan hängt auch von SelectedPromptVorlage ab; eine geänderte Vorlagenauswahl muss daher PropertyChanged für CanPromptPlan auslösen.</summary>
     [Fact]
     public async Task SelectedPromptTemplate_Changes_TriggersCanPromptPlanPropertyChangedOut()
     {

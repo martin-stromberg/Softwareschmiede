@@ -30,7 +30,7 @@ Die Plugin-Aktivierung erfolgt zentral im Einstellungsfenster (Menü → Einstel
 
 Der Aktivierungsstatus wird pro Plugin persistiert:
 
-- Speicherort: `AppEinstellung`-Datenbanktabelle (Key-Value-Store, verwaltet über `AppEinstellungService`)
+- Speicherort: `AppSetting`-Datenbanktabelle (Key-Value-Store, verwaltet über `AppSettingService`)
 - Schlüsselformat: `plugins.enabled.<PluginPrefix>` (z. B. `plugins.enabled.Softwareschmiede.GitHub`)
 - Wert: `true` (aktiviert) oder `false` (deaktiviert)
 - **Default bei fehlendem Schlüssel:** `true` — neue oder bisher nicht konfigurierte Plugins sind automatisch aktiviert
@@ -119,9 +119,9 @@ Die Aktivierungsfilterung ist an folgenden Stellen implementiert:
 
 | Komponente | Methode | Quelle |
 |-----------|---------|--------|
-| `PluginSelectionService` | `GetAvailableKiPluginPrefixesAsync()` | Filtert KI-Plugins für Aufgabenauswahl |
-| `TaskDetailViewModel` | `LadeVerfuegbarePluginsAsync()` | Setzt `ZeigeKiPluginAuswahl` basierend auf aktiven Plugins |
-| `RepositoryAssignViewModel` | `LadenAsync()` | Lädt SCM-Plugins über `GetEnabledSourceCodeManagementPluginsAsync()` |
+| `PluginSelectionService` | `GetAvailableAiPluginPrefixesAsync()` | Filtert KI-Plugins für Aufgabenauswahl |
+| `TaskDetailViewModel` | `LoadAvailablePluginsAsync()` | Setzt `ZeigeKiPluginAuswahl` basierend auf aktiven Plugins |
+| `RepositoryAssignViewModel` | `LoadAsync()` | Lädt SCM-Plugins über `GetEnabledSourceCodeManagementPluginsAsync()` |
 | `IssueCreateDialogViewModel` | Konstruktor/Laden | Filtert KI-Plugins für Issue-Text-Generierung |
 
 ### Persistierungs-Details
@@ -139,7 +139,7 @@ Wert: false
 ```
 
 - Keine separaten Tabellen nötig
-- Existing `AppEinstellung`-Tabelle wird verwendet
+- Existing `AppSetting`-Tabelle wird verwendet
 - Keine Datenbank-Migration erforderlich
 - Fehlende Einträge gelten als `true` (aktiviert)
 

@@ -12,7 +12,7 @@ Drei globale Exception-Handler werden beim Start der Anwendung registriert (`App
 
 Alle bewusst nicht abgewarteten (Fire-and-Forget) asynchronen Aufrufe verwenden die Erweiterungsmethode `AsyncTaskExtensions.SafeFireAndForget`, die Exceptions des Tasks über einen `ILogger` protokolliert, statt sie unbeobachtet zu lassen oder zum Aufrufer zu propagieren.
 
-Die Prozessende-Behandlung von `KiAusfuehrungsService` — ausgelöst über `Process.Exited` beim klassischen Start bzw. über die Session-Events `Exited`/`Failed` beim Terminal-Session-Start — läuft vollständig in einer zentralen, try-catch-geschützten Methode (`HandleExitedCoreAsync`), damit ein Fehler in einem Teilschritt (z. B. beim Dispose einer bereits geschlossenen `PseudoConsoleSession`) nicht die Ausführung der übrigen Schritte oder die Benachrichtigung anderer Event-Abonnenten verhindert.
+Die Prozessende-Behandlung von `AiExecutionService` — ausgelöst über `Process.Exited` beim klassischen Start bzw. über die Session-Events `Exited`/`Failed` beim Terminal-Session-Start — läuft vollständig in einer zentralen, try-catch-geschützten Methode (`HandleExitedCoreAsync`), damit ein Fehler in einem Teilschritt (z. B. beim Dispose einer bereits geschlossenen `PseudoConsoleSession`) nicht die Ausführung der übrigen Schritte oder die Benachrichtigung anderer Event-Abonnenten verhindert.
 
 Der Heartbeat-Mechanismus, der den Bearbeitungsfortschritt periodisch in der Datenbank aktualisiert, verwendet pro Aufgabe eine eigene Sperre (`SemaphoreSlim`), damit sich überlappende Timer-Ticks nur innerhalb derselben Aufgabe serialisieren — Heartbeats unabhängiger Aufgaben blockieren sich nicht gegenseitig.
 

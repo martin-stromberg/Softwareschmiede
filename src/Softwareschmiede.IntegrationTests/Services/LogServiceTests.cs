@@ -49,7 +49,7 @@ public sealed class LogServiceTests
     }
 
     /// <summary>
-    /// Testet, dass GetByAufgabeAsync Einträge chronologisch aufsteigend zurückgibt.
+    /// Testet, dass GetByWorkItemAsync Einträge chronologisch aufsteigend zurückgibt.
     /// </summary>
     [Fact]
     public async Task GetByWorkItemAsync_ShouldReturnEntriesChronologicallyAscending_WhenMultipleEntriesExist()
@@ -122,7 +122,7 @@ public sealed class LogServiceTests
     }
 
     /// <summary>
-    /// Testet, dass AddTestErgebnisseAsync einen Protokolleintrag mit TestErgebnissen speichert.
+    /// Testet, dass AddTestResultsAsync einen Protokolleintrag mit TestErgebnissen speichert.
     /// </summary>
     [Fact]
     public async Task AddTestResultsAsync_ShouldPersistTestResultsWithLogEntry_WhenTestResultGiven()
@@ -160,7 +160,7 @@ public sealed class LogServiceTests
     }
 
     /// <summary>
-    /// Testet, dass AddTestErgebnisseAsync die Dauer der Tests korrekt speichert (TimeSpan-Konvertierung).
+    /// Testet, dass AddTestResultsAsync die Dauer der Tests korrekt speichert (TimeSpan-Konvertierung).
     /// </summary>
     [Fact]
     public async Task AddTestResultsAsync_ShouldPersistTestDuration_WhenTimeSpanGiven()
@@ -216,7 +216,7 @@ public sealed class LogServiceTests
     }
 
     /// <summary>
-    /// Testet, dass GetByAufgabeAsync TestErgebnisse via Include mitlädt.
+    /// Testet, dass GetByWorkItemAsync TestErgebnisse via Include mitlädt.
     /// </summary>
     [Fact]
     public async Task GetByWorkItemAsync_ShouldIncludeTestResults_WhenLogEntryHasTestResults()

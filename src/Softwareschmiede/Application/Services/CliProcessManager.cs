@@ -60,12 +60,12 @@ public sealed class CliProcessManager : IDisposable
 
     /// <summary>Erstellt eine neue Instanz des <see cref="CliProcessManager"/>.</summary>
     public CliProcessManager(
-        AiExecutionService kiService,
+        AiExecutionService aiService,
         IServiceScopeFactory scopeFactory,
         ILogger<CliProcessManager> logger,
         WorkItemRunDataChangedNotifier runDataChangedNotifier)
     {
-        _aiService = kiService;
+        _aiService = aiService;
         _scopeFactory = scopeFactory;
         _logger = logger;
         _runDataChangedNotifier = runDataChangedNotifier;
@@ -182,7 +182,7 @@ public sealed class CliProcessManager : IDisposable
             {
                 case CliProcessStatus.Started:
                     StartHeartbeat(workItemId);
-                    // AktiveRunId muss sofort persistiert werden (nicht erst beim ersten periodischen
+                    // ActiveRunId muss sofort persistiert werden (nicht erst beim ersten periodischen
                     // Heartbeat nach 30s) — sonst zeigt die Seitenleisten-Kachel (KiAusfuehrungsStatusConverter,
                     // Issue 108) für bis zu 30s nach dem Start weiterhin "✓ Bereit" statt "▶ Läuft" an.
                     SetActiveRunAsync(workItemId).SafeFireAndForget(_logger, "CliProcessManager.SetActiveRunAsync");
@@ -254,7 +254,7 @@ public sealed class CliProcessManager : IDisposable
         {
             // Klassischer Start ohne ConPTY: keine Sitzung, also kein Laufzeit-Substatus verfügbar.
             // KiAusfuehrungsStatusConverter fällt in diesem Fall auf das bisherige Verhalten zurück
-            // (LaufStatus bleibt null → "▶ Läuft", solange AktiveRunId gesetzt und Heartbeat aktuell ist).
+            // (LaufStatus bleibt null → "▶ Läuft", solange ActiveRunId gesetzt und Heartbeat aktuell ist).
             return;
         }
 

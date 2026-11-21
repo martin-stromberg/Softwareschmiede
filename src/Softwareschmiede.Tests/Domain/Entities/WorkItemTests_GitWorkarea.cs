@@ -25,7 +25,7 @@ public sealed class WorkItemTests_GitWorkarea
         gitWorkarea.Should().Be(new GitWorkspace("feature/x", @"C:\repos\task-1"));
     }
 
-    /// <summary>Der Setter schreibt BranchName und LokalerKlonPfad korrekt in die zugrunde liegenden Felder.</summary>
+    /// <summary>Der Setter schreibt BranchName und LocalClonePath korrekt in die zugrunde liegenden Felder.</summary>
     [Fact]
     public void GitWorkarea_Set_ShouldWriteBranchNameAndLocalClonePath()
     {
@@ -40,7 +40,7 @@ public sealed class WorkItemTests_GitWorkarea
         workItem.LocalClonePath.Should().Be(@"C:\repos\task-2");
     }
 
-    /// <summary>Der Setter mit null löscht BranchName und LokalerKlonPfad.</summary>
+    /// <summary>Der Setter mit null löscht BranchName und LocalClonePath.</summary>
     [Fact]
     public void GitWorkarea_SetNull_ShouldClearBranchNameAndLocalClonePath()
     {
@@ -59,7 +59,7 @@ public sealed class WorkItemTests_GitWorkarea
         workItem.LocalClonePath.Should().BeNull();
     }
 
-    /// <summary>Der Getter liefert null, wenn nur LokalerKlonPfad gesetzt ist und BranchName fehlt (Teilzustand).</summary>
+    /// <summary>Der Getter liefert null, wenn nur LocalClonePath gesetzt ist und BranchName fehlt (Teilzustand).</summary>
     [Fact]
     public void GitWorkarea_Get_ShouldReturnNull_WhenOnlyLocalClonePathIsSet()
     {
@@ -77,7 +77,7 @@ public sealed class WorkItemTests_GitWorkarea
         gitWorkarea.Should().BeNull();
     }
 
-    /// <summary>Der Getter liefert null, wenn nur BranchName gesetzt ist und LokalerKlonPfad fehlt (Teilzustand).</summary>
+    /// <summary>Der Getter liefert null, wenn nur BranchName gesetzt ist und LocalClonePath fehlt (Teilzustand).</summary>
     [Fact]
     public void GitWorkarea_Get_ShouldReturnNull_WhenOnlyBranchNameIsSet()
     {

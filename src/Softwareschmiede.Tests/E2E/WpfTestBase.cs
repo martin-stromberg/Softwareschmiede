@@ -168,7 +168,7 @@ public abstract class WpfTestBase : IDisposable
     /// <summary>
     /// Wartet, bis die Logdatei des <see cref="Softwareschmiede.Infrastructure.Services.RecordingProcessStarter"/> einen
     /// Eintrag enthält, der <paramref name="substring"/> enthält. Voraussetzung: die App läuft im Testmodus
-    /// (<see cref="LaunchApp"/> wurde aufgerufen), sodass <c>IProzessStarter</c> auf
+    /// (<see cref="LaunchApp"/> wurde aufgerufen), sodass <c>IProcessStarter</c> auf
     /// <see cref="Softwareschmiede.Infrastructure.Services.RecordingProcessStarter"/> zeigt.
     /// </summary>
     /// <param name="substring">Der erwartete Teilstring innerhalb eines Logeintrags.</param>

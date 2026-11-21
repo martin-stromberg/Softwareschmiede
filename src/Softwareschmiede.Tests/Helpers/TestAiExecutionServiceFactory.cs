@@ -24,7 +24,7 @@ public static class TestAiExecutionServiceFactory
     /// <param name="launcher">Optionaler Launcher für den Terminal-Session-Pfad; Default ist der
     /// deterministische In-Memory-Launcher.</param>
     /// <param name="terminalOptions">Optionale <see cref="TerminalSessionOptions"/> (z. B. zum
-    /// Deaktivieren der Rohbyte-Aufzeichnung via <c>AufzeichnungByteBudget</c>); Default: <c>new()</c>.</param>
+    /// Deaktivieren der Rohbyte-Aufzeichnung via <c>RecordingByteBudget</c>); Default: <c>new()</c>.</param>
     /// <param name="timeProvider">Optionale Zeitquelle für die Aufzeichnungs-Zeitstempel; Default: <see cref="TimeProvider.System"/>.</param>
     public static AiExecutionService Create(
         IServiceScopeFactory scopeFactory,

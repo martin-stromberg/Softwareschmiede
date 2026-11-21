@@ -10,8 +10,7 @@ using Xunit;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
-/// <summary>End-to-end dispatch of configured SCM prompt appendices: the combined suffix reaches the
-/// CLI prompt as a dedicated field while the stored event text and request.json stay unchanged.</summary>
+/// <summary>End-to-End-Dispatch konfigurierter SCM-Prompt-Anhänge: das kombinierte Suffix erreicht den CLI-Prompt als eigenes Feld, während gespeicherter Ereignistext und request.json unverändert bleiben.</summary>
 public sealed class ScmEventDispatchTests_PromptAppendix
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);

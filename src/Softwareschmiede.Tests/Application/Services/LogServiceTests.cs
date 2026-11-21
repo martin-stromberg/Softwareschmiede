@@ -10,7 +10,7 @@ using TestRunResult = Softwareschmiede.Domain.ValueObjects.TestRunResult;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Tests für den ProtokollService.</summary>
+/// <summary>Tests für den LogService.</summary>
 public sealed class LogServiceTests : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
@@ -19,7 +19,7 @@ public sealed class LogServiceTests : IDisposable
     private readonly Guid _workItemId = new Guid("22222222-2222-2222-2222-222222222222");
     private readonly Guid _projectId = new Guid("33333333-3333-3333-3333-333333333333");
 
-    /// <summary>ProtokollServiceTests.</summary>
+    /// <summary>LogServiceTests.</summary>
     public LogServiceTests()
     {
         _db = TestDbContextFactory.Create();
@@ -64,7 +64,7 @@ public sealed class LogServiceTests : IDisposable
         result.AgentName.Should().Be("TestAgent");
     }
 
-    /// <summary>GetByAufgabeAsync gibt Einträge chronologisch sortiert zurück.</summary>
+    /// <summary>GetByWorkItemAsync gibt Einträge chronologisch sortiert zurück.</summary>
     [Fact]
     public async Task GetByWorkItemAsync_ShouldReturnEntriesOrderedByTimestamp_WhenMultipleEntriesExist()
     {
@@ -82,7 +82,7 @@ public sealed class LogServiceTests : IDisposable
         result[1].Content.Should().Be("Zweiter Eintrag");
     }
 
-    /// <summary>AddTestErgebnisseAsync erstellt Protokolleintrag mit TestErgebnissen.</summary>
+    /// <summary>AddTestResultsAsync erstellt Protokolleintrag mit TestErgebnissen.</summary>
     [Fact]
     public async Task AddTestResultsAsync_ShouldCreateEntryWithTestResults_WhenAllTestPassed()
     {
@@ -104,7 +104,7 @@ public sealed class LogServiceTests : IDisposable
         result.TestResults.Should().HaveCount(2);
     }
 
-    /// <summary>AddTestErgebnisseAsync erstellt korrekten Inhalt wenn Tests fehlgeschlagen.</summary>
+    /// <summary>AddTestResultsAsync erstellt korrekten Inhalt wenn Tests fehlgeschlagen.</summary>
     [Fact]
     public async Task AddTestResultsAsync_ShouldCreateFailureMessage_WhenSomeTestFailed()
     {

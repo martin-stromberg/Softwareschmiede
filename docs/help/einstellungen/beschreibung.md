@@ -61,7 +61,7 @@ Für das Codex-Plugin gilt eine zusätzliche Schutzregel: Der Wert `Softwareschm
 
 ### Arbeitsverzeichnis
 
-Das Arbeitsverzeichnis bestimmt, wo die Softwareschmiede lokale Repository-Klons anlegt. Der Pfad wird als `AppEinstellung` in der SQLite-Datenbank gespeichert. Ist kein Verzeichnis konfiguriert oder ist der Pfad ungültig, greift ein Fallback auf das Temp-Verzeichnis. Der Fallback wird im Aufgabenprotokoll protokolliert.
+Das Arbeitsverzeichnis bestimmt, wo die Softwareschmiede lokale Repository-Klons anlegt. Der Pfad wird als `AppSetting` in der SQLite-Datenbank gespeichert. Ist kein Verzeichnis konfiguriert oder ist der Pfad ungültig, greift ein Fallback auf das Temp-Verzeichnis. Der Fallback wird im Aufgabenprotokoll protokolliert.
 
 ### Automatisierung
 
@@ -125,11 +125,11 @@ Die Aktion **IDE öffnen** in der Aufgabendetailansicht löst das zu verwendende
 
 ### Benachrichtigungen
 
-Der `KiAufgabenBenachrichtigungsHub` publiziert `KiAufgabenAbschlussEreignis` nach jedem KI-Lauf. Der `BenachrichtigungsAuditService` entscheidet, ob und auf welchem Kanal eine Benachrichtigung ausgelöst wird. Jede Benachrichtigungsentscheidung wird als `BenachrichtigungsDispatchLog` persistiert.
+Der `AiWorkItemsNotificationHub` publiziert `AiWorkItemCompletionEvent` nach jedem KI-Lauf. Der `NotificationAuditService` entscheidet, ob und auf welchem Kanal eine Benachrichtigung ausgelöst wird. Jede Benachrichtigungsentscheidung wird als `NotificationDispatchLog` persistiert.
 
 ### Dark Mode
 
-Der `DarkModeService` wechselt das WPF-`ResourceDictionary` zwischen `LightTheme.xaml` und `DarkTheme.xaml`. Der Wechsel erfolgt sofort ohne Neustart. Die Einstellung wird in der `AppEinstellung`-Tabelle gespeichert und beim nächsten Start automatisch angewendet.
+Der `DarkModeService` wechselt das WPF-`ResourceDictionary` zwischen `LightTheme.xaml` und `DarkTheme.xaml`. Der Wechsel erfolgt sofort ohne Neustart. Die Einstellung wird in der `AppSetting`-Tabelle gespeichert und beim nächsten Start automatisch angewendet.
 
 Das Design wird in den Einstellungen über die Dropdown-Liste **Design** (Registerkarte „Allgemein") gesteuert. Verfügbare Optionen sind „Hell" und „Dunkel".
 

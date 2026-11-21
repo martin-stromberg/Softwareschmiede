@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace Softwareschmiede.App.Services.Testing;
 
-// Deliberately internal: a file fixture, not an application control API.
+// Bewusst internal: ein Datei-Fixture, keine Anwendungs-Steuerungs-API.
 internal sealed class ScmE2ETestConfiguration
 {
     public const string EnvironmentVariable = "SOFTWARESCHMIEDE_SCM_TEST_CONFIG";
@@ -38,8 +38,8 @@ internal sealed class ScmE2ETestConfiguration
 
     public ScmE2EScenario ReadScenario()
     {
-        // The fixture publishes snapshots by rename while the monitor reads them.
-        // Delete sharing keeps that atomic replacement legal on Windows.
+        // Die Fixture veröffentlicht Snapshots per Umbenennung, während der Monitor sie liest.
+        // Delete-Sharing hält diesen atomaren Austausch unter Windows legal.
         using var stream = new FileStream(ScenarioPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         return JsonSerializer.Deserialize<ScmE2EScenario>(stream)
                ?? throw new InvalidOperationException("Leeres SCM-Testszenario.");

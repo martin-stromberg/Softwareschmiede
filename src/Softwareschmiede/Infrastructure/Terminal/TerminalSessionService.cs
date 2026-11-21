@@ -18,7 +18,7 @@ public sealed class TerminalSessionService : ITerminalSessionFactory
     public const string ForcePtyUnavailableKey = "Terminal.ForcePtyUnavailable";
 
     /// <summary>Umgebungsvariable, die den E2E-Testmodus (Test-Datenbankpfad) kennzeichnet. Zentrale
-    /// Definition — referenziert u. a. aus <c>App.xaml.cs</c> (IProzessStarter-Auswahl) und
+    /// Definition — referenziert u. a. aus <c>App.xaml.cs</c> (IProcessStarter-Auswahl) und
     /// <see cref="Softwareschmiede.Infrastructure.Plugins.PluginManager"/>.</summary>
     public const string TestDatabasePathVariable = "SOFTWARESCHMIEDE_TEST_DB_PATH";
 

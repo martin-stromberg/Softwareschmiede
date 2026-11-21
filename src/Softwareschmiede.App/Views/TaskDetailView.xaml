@@ -58,7 +58,7 @@
                                                         ButtonText="Pause einstellen"
                                                         AutomationName="SetPause"
                                                         ButtonCommand="{Binding SetPauseCommand}"
-                                                        Visibility="{Binding PauseCan, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                        Visibility="{Binding CanPause, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <TextBlock Text="{Binding PauseDisplayText}"
                                        AutomationProperties.Name="PauseDisplayText"
                                        Foreground="{DynamicResource SecondaryTextBrush}"
@@ -93,12 +93,12 @@
                                                         ButtonText="CLI starten"
                                                         AutomationName="RestartCli"
                                                         ButtonCommand="{Binding RestartCliCommand}"
-                                                        Visibility="{Binding StartCanCliNew, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                        Visibility="{Binding CanStartCli, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="■"
                                                         ButtonText="Stoppen"
                                                         AutomationName="StopCli"
                                                         ButtonCommand="{Binding StopCliCommand}"
-                                                        Visibility="{Binding StopCanCli, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                        Visibility="{Binding CanStopCli, Converter={StaticResource BoolToVisibilityConverter}}" />
                             <controls:RibbonLargeButton ButtonIcon="🗎"
                                                         ButtonText="Rohausgabe exportieren"
                                                         AutomationName="CliRawExport"

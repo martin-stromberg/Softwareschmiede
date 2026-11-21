@@ -26,7 +26,7 @@ Beteiligte Komponenten:
 - `PluginActivationService.IsPluginEnabledAsync(pluginPrefix)` — Prüft, ob Plugin aktiviert ist (fehlender Eintrag = aktiviert)
 - `PluginActivationService.GetEnabledSourceCodeManagementPluginsAsync()` — Liefert nur aktive SCM-Plugins
 - `PluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync()` — Liefert nur aktive KI-Plugins
-- `AppEinstellungService.GetSettingAsync(key)` — Liest Aktivierungsstatus aus `AppEinstellung`-Tabelle via Schlüssel `plugins.enabled.<PluginPrefix>`
+- `AppSettingService.GetSettingAsync(key)` — Liest Aktivierungsstatus aus `AppSetting`-Tabelle via Schlüssel `plugins.enabled.<PluginPrefix>`
 
 ### 3. Plugin-Auswahl für eine Aufgabe
 
@@ -34,7 +34,7 @@ Beim Starten oder KI-Ausführen einer Aufgabe bestimmt `PluginSelectionService` 
 
 Beteiligte Komponenten:
 - `PluginSelectionService.ResolveSourceCodeManagementPluginAsync` — Prüft gespeicherten Prefix in aktiven SCM-Plugins, fällt auf Default zurück
-- `PluginSelectionService.ResolveDevelopmentAutomationPluginAsync` — Wie oben für KI-Plugin; nutzt `GetAvailableKiPluginPrefixesAsync()` die nur aktive Plugins berücksichtigt
+- `PluginSelectionService.ResolveDevelopmentAutomationPluginAsync` — Wie oben für KI-Plugin; nutzt `GetAvailableAiPluginPrefixesAsync()` die nur aktive Plugins berücksichtigt
 - `PluginActivationService.GetEnabledDevelopmentAutomationPluginsAsync()` — Filtert KI-Plugins vor Auswahl
 - `PluginSettingsService` — Liest gespeicherte Plugin-Einstellungen aus dem Credential Store
 
@@ -50,19 +50,19 @@ Beteiligte Komponenten:
 Benutzer öffnet den neuen „Plugins"-Tab in den Einstellungen und ändert Aktivierungsstatus je Plugin.
 
 Beteiligte Komponenten:
-- `SettingsViewModel.LadenAsync()` — Lädt via `PluginActivationService.IsPluginEnabledAsync()` den Status je Plugin und erzeugt `PluginActivationEntry`-Instanzen
+- `SettingsViewModel.LoadAsync()` — Lädt via `PluginActivationService.IsPluginEnabledAsync()` den Status je Plugin und erzeugt `PluginActivationEntry`-Instanzen
 - `PluginActivationEntry` — Darstellbarer Listeneintrag mit bindbarem `IsEnabled`-Property
 - `SettingsView.xaml` — Master-Detail-Oberfläche mit Aktivierungs-CheckBoxen
-- `SettingsViewModel.SpeichernAsync()` — Ruft `PluginActivationService.SetPluginEnabledAsync()` auf für geänderte Einträge
-- `PluginActivationService.SetPluginEnabledAsync()` — Speichert Status in `AppEinstellung`-Tabelle
+- `SettingsViewModel.SaveAsync()` — Ruft `PluginActivationService.SetPluginEnabledAsync()` auf für geänderte Einträge
+- `PluginActivationService.SetPluginEnabledAsync()` — Speichert Status in `AppSetting`-Tabelle
 
 ### 6. Single-Plugin-Verhalten in UI
 
 Wenn nur ein Plugin einer Kategorie aktiv ist, wird der Selector ausgeblendet.
 
 Beteiligte Komponenten:
-- `TaskDetailViewModel.LadeVerfuegbarePluginsAsync()` — Zählt aktive KI-Plugins über `PluginSelectionService.GetAvailableKiPluginPrefixesAsync()`, setzt `ZeigeKiPluginAuswahl = false` bei genau einem Plugin
-- `RepositoryAssignViewModel.LadenAsync()` — Lädt aktive SCM-Plugins über `PluginActivationService.GetEnabledSourceCodeManagementPluginsAsync()`, setzt `HasMultipleScmPlugins = false` bei genau einem Plugin
+- `TaskDetailViewModel.LoadAvailablePluginsAsync()` — Zählt aktive KI-Plugins über `PluginSelectionService.GetAvailableAiPluginPrefixesAsync()`, setzt `ZeigeKiPluginAuswahl = false` bei genau einem Plugin
+- `RepositoryAssignViewModel.LoadAsync()` — Lädt aktive SCM-Plugins über `PluginActivationService.GetEnabledSourceCodeManagementPluginsAsync()`, setzt `HasMultipleScmPlugins = false` bei genau einem Plugin
 - `TaskDetailView.xaml`, `RepositoryAssignDialog.xaml` — Binden Sichtbarkeit der Selectors an entsprechende Boolean-Properties
 
 ### 7. Agentenpaket-Discovery
@@ -71,7 +71,7 @@ Ein KI-Plugin liest verfügbare Agenten aus dem Agentenpaket-Verzeichnis.
 
 Beteiligte Komponenten:
 - `IKiPlugin.GetAvailableAgentsAsync(agentPackagePath)` — Gibt `IEnumerable<AgentInfo>` zurück
-- `CliKiPluginBase.DiscoverAgents(path, relativeAgentDirectory)` — Liest `.md`-Dateien aus dem Agentenverzeichnis
+- `CliAiPluginBase.DiscoverAgents(path, relativeAgentDirectory)` — Liest `.md`-Dateien aus dem Agentenverzeichnis
 - `ClaudeCliPlugin` liest aus `.claude/commands/`
 - `GitHubCopilotPlugin` liest aus `.github/prompts/`
 - `CodexPlugin` startet die lokal verfügbare `codex`-CLI und kann optional über `Softwareschmiede.Codex.ExecutablePath` auf eine konkrete Executable zeigen
@@ -111,7 +111,7 @@ Beteiligte Komponenten:
 - `BitbucketPlugin.ResolveNetrcPath()` — `_netrc`-Pfad-Auflösung in der Reihenfolge optionaler `netrcPath`-Konstruktorparameter → Umgebungsvariable `SOFTWARESCHMIEDE_NETRC_PATH` (`NetrcPathEnvironmentVariable`) → `Environment.SpecialFolder.UserProfile` + `_netrc`/`.netrc`; Produktionsverhalten unverändert, dient als Testseam.
 - `GitHubPlugin.GetGitEnvironment` / `BitbucketPlugin.GetGitEnvironment` — beide liefern kein `GIT_SSH_COMMAND` mehr; `GIT_TERMINAL_PROMPT=0` sowie die jeweilige HTTPS-Auth (GitHub: `GH_TOKEN` + hostgebundener `GIT_CONFIG_*`-`http.extraheader`; Bitbucket: `UpdateNetrcEntry`-Pflege + `-c http.extraheader`-Args bei SelfHosted) bleiben unverändert.
 
-Der `http.extraheader`-Key des GitHub-Plugins ist hostgebunden (`http.https://<host>[:port]/.extraheader`): Er wird je Operation aus der tatsächlich kontaktierten Remote-URL gebildet — Clone/`ls-remote`/Credential-Konfiguration aus der übergebenen Repository-URL, Push/Pull/PR-Checkout (Same-Repository) aus der `remote.origin.url` der Arbeitskopie, PR-Checkout (Fork) aus der normalisierten `SourceRepositoryUrl`, Agenten-Terminal-Sessions aus der `repository.RepositoryUrl` der Aufgabe (`EntwicklungsprozessService` → `KiAusfuehrungsService` → `IScmAgentAccess.GetAgentEnvironmentAsync(konto, repositoryUrl, ct)`). HTTPS-git authentifiziert damit sowohl gegen `github.com` als auch gegen GitHub-Enterprise-Hosts. Lässt sich kein Zielhost bestimmen, entsteht kein `GIT_CONFIG_*`-Block (fail-closed); ein generischer, hostloser `http.extraheader` bleibt bewusst ausgeschlossen, damit der Token nicht an Fremd-Hosts leakt.
+Der `http.extraheader`-Key des GitHub-Plugins ist hostgebunden (`http.https://<host>[:port]/.extraheader`): Er wird je Operation aus der tatsächlich kontaktierten Remote-URL gebildet — Clone/`ls-remote`/Credential-Konfiguration aus der übergebenen Repository-URL, Push/Pull/PR-Checkout (Same-Repository) aus der `remote.origin.url` der Arbeitskopie, PR-Checkout (Fork) aus der normalisierten `SourceRepositoryUrl`, Agenten-Terminal-Sessions aus der `repository.RepositoryUrl` der Aufgabe (`DevelopmentProcessService` → `AiExecutionService` → `IScmAgentAccess.GetAgentEnvironmentAsync(konto, repositoryUrl, ct)`). HTTPS-git authentifiziert damit sowohl gegen `github.com` als auch gegen GitHub-Enterprise-Hosts. Lässt sich kein Zielhost bestimmen, entsteht kein `GIT_CONFIG_*`-Block (fail-closed); ein generischer, hostloser `http.extraheader` bleibt bewusst ausgeschlossen, damit der Token nicht an Fremd-Hosts leakt.
 
 Bekannte Einschränkung: `GH_TOKEN`/`gh`-CLI adressiert ohne gesetztes `GH_HOST` weiterhin `github.com` — `gh`-Aufrufe gegen GitHub-Enterprise-Hosts sind nicht Teil dieser Anbindung.
 

@@ -17,7 +17,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// Regressionstests für Issue 108 (Kundenrückmeldung): <see cref="CliProcessManager"/> muss beim Start und
 /// Stopp eines CLI-Prozesses <see cref="WorkItem.ActiveRunId"/> über <see cref="WorkItemService"/> persistieren,
 /// damit der <c>KiAusfuehrungsStatusConverter</c> die Seitenleisten-Kachel korrekt auf "▶ Läuft" umschaltet.
-/// Vor dem Fix wurde <c>AktiveRunId</c> nirgends im Produktivcode gesetzt — der zugehörige E2E-Test simulierte
+/// Vor dem Fix wurde <c>ActiveRunId</c> nirgends im Produktivcode gesetzt — der zugehörige E2E-Test simulierte
 /// den Heartbeat direkt in der Datenbank und deckte diese Lücke daher nicht auf.
 /// </summary>
 public sealed class CliProcessManagerTests_ActiveRun : IDisposable

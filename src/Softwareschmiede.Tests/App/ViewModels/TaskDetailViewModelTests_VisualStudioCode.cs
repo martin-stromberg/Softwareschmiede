@@ -9,7 +9,7 @@ using Softwareschmiede.Tests.Helpers;
 namespace Softwareschmiede.Tests.App.ViewModels;
 
 /// <summary>
-/// Unit-Tests für TaskDetailViewModel.OeffneIdeAsync() bezüglich des automatischen Visual-Studio-Code-Fallbacks
+/// Unit-Tests für TaskDetailViewModel.OpenIdeAsync() bezüglich des automatischen Visual-Studio-Code-Fallbacks
 /// (via PluginSelectionService.ResolveIdePluginAsync, wenn kein Visual-Studio-Plugin explizit kompatibel ist)
 /// und der Nutzung des WorkingDirectoryResolver.
 /// </summary>
@@ -43,7 +43,7 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
             Times.Once);
     }
 
-    /// <summary>Ohne RepositoryStartKonfiguration wird der Visual-Studio-Code-Fallback weiterhin mit dem Repository-Root (LokalerKlonPfad) gestartet.</summary>
+    /// <summary>Ohne RepositoryStartKonfiguration wird der Visual-Studio-Code-Fallback weiterhin mit dem Repository-Root (LocalClonePath) gestartet.</summary>
     [Fact]
     public async Task OpenIdeAsync_WithoutSolutionWithoutConfiguration_CallsVsCodeWithRepositoryRootOn()
     {
@@ -86,7 +86,7 @@ public sealed class TaskDetailViewModelTests_VisualStudioCode : TaskDetailViewMo
         processStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
-    /// <summary>Ohne Solutions im aufgelösten (konfigurierten) Arbeitsverzeichnis fällt OeffneIdeAsync auf Visual Studio Code mit dem aufgelösten Verzeichnis zurück, selbst wenn im Repository-Root eine .sln-Datei liegt.</summary>
+    /// <summary>Ohne Solutions im aufgelösten (konfigurierten) Arbeitsverzeichnis fällt OpenIdeAsync auf Visual Studio Code mit dem aufgelösten Verzeichnis zurück, selbst wenn im Repository-Root eine .sln-Datei liegt.</summary>
     [Fact]
     public async Task OpenIdeAsync_WithoutSolutionsInWorkingDirectory_FallsToVsCodeBack()
     {

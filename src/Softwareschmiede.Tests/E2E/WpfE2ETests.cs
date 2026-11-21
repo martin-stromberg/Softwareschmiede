@@ -99,7 +99,7 @@ public sealed class WpfE2ETests : WpfTestBase
         var settingsAgain = dashboardAfterDarkMode.Menu.NavigateToSettings();
 
         // Nach Rückkehr: Design-ComboBox zeigt den gespeicherten Wert. SettingsView.Loaded löst
-        // vm.LadenCommand.Execute(null) als Fire-and-Forget aus; DesignMode wird darin erst nach mehreren
+        // vm.LoadCommand.Execute(null) als Fire-and-Forget aus; DesignMode wird darin erst nach mehreren
         // vorausgehenden awaits (Arbeitsverzeichnis, Standard-KI-Plugin) neu gesetzt. GetDesignMode liest
         // daher nicht einmalig, sondern über SetDesignMode-artiges Polling - hier genügt ein direkter Read,
         // da NavigateToSettings bereits auf die geladenen Plugins-Tabs gewartet hat; falls doch noch ein

@@ -19,7 +19,7 @@ public sealed class AiPluginLimitServiceTests : IDisposable
     private readonly AiPluginLimitService _sut;
     private readonly Guid _projectId = new Guid("55555555-5555-5555-5555-555555555555");
 
-    /// <summary>KiPluginLimitServiceTests.</summary>
+    /// <summary>AiPluginLimitServiceTests.</summary>
     public AiPluginLimitServiceTests()
     {
         _db = TestDbContextFactory.Create();
@@ -44,7 +44,7 @@ public sealed class AiPluginLimitServiceTests : IDisposable
     /// <summary>Dispose.</summary>
     public void Dispose() => _db.Dispose();
 
-    /// <summary>VerarbeiteRateLimitAsync persistiert den Reset-Zeitpunkt unter dem Prefix-Schlüssel.</summary>
+    /// <summary>ProcessRateLimitAsync persistiert den Reset-Zeitpunkt unter dem Prefix-Schlüssel.</summary>
     [Fact]
     public async Task ProcessRateLimitAsync_ShouldPersistSessionLimitKey()
     {
@@ -62,7 +62,7 @@ public sealed class AiPluginLimitServiceTests : IDisposable
             .Should().BeCloseTo(resetUtc, TimeSpan.FromSeconds(5));
     }
 
-    /// <summary>VerarbeiteRateLimitAsync pausiert alle aktiv laufenden Aufgaben desselben Prefix, lässt fremde Prefixe unberührt und feuert den Notifier je Aufgabe.</summary>
+    /// <summary>ProcessRateLimitAsync pausiert alle aktiv laufenden Aufgaben desselben Prefix, lässt fremde Prefixe unberührt und feuert den Notifier je Aufgabe.</summary>
     [Fact]
     public async Task ProcessRateLimitAsync_ShouldPauseSamePrefixTasks_AndNotify()
     {
@@ -108,7 +108,7 @@ public sealed class AiPluginLimitServiceTests : IDisposable
             .Should().NotBeNull("der Wert wird auch bei abgelaufenem Limit persistiert");
     }
 
-    /// <summary>GetAktiveSessionLimitsAsync liefert nur zukünftige Limits und ignoriert abgelaufene Werte.</summary>
+    /// <summary>GetActiveSessionLimitsAsync liefert nur zukünftige Limits und ignoriert abgelaufene Werte.</summary>
     [Fact]
     public async Task GetActiveSessionLimitAsync_ShouldReturnOnlyFutureLimit()
     {
@@ -153,7 +153,7 @@ public sealed class AiPluginLimitServiceTests : IDisposable
             .Should().BeEmpty();
     }
 
-    /// <summary>Eine beendete Aufgabe mit demselben Prefix bleibt unverändert (kein PausiertBisUtc, kein Notify).</summary>
+    /// <summary>Eine beendete Aufgabe mit demselben Prefix bleibt unverändert (kein PausedUntilUtc, kein Notify).</summary>
     [Fact]
     public async Task ProcessRateLimitAsync_ShouldNotPause_WhenWorkItemCompleted()
     {

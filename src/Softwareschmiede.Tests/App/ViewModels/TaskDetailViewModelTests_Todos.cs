@@ -97,7 +97,7 @@ public sealed class TaskDetailViewModelTests_Todos : IDisposable
         allTodos.Should().ContainSingle();
     }
 
-    /// <summary>TodoLoeschenCommand löscht ein Todo aus Datenbank und Collection.</summary>
+    /// <summary>TodoDeleteCommand löscht ein Todo aus Datenbank und Collection.</summary>
     [Fact]
     public async Task DeleteTodoCommand_DeletesTodo()
     {

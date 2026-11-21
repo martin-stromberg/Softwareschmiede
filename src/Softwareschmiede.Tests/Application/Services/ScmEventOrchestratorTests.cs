@@ -15,7 +15,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Dispatch guards and run-bound confirmations against persisted events and real session adapters.</summary>
 public sealed class ScmEventOrchestratorTests
 {
-    /// <summary>A token lacking repository write access leaves an actionable settings path without starting the CLI.</summary>
+    /// <summary>Ein Token ohne Repository-Schreibzugriff hinterlässt einen umsetzbaren Einstellungspfad, ohne die CLI zu starten.</summary>
     [Fact]
     public async Task MissingWriteAccess_ExplainsTokenSettingsBeforeCliStart()
     {
@@ -36,8 +36,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Empty(fixture.Prompts);
     }
 
-    /// <summary>A stored observation carrying a viewer reaction (legacy data or manual inserts)
-    /// is never delivered: the dispatch revalidation parks it with a dedicated reason.</summary>
+    /// <summary>Eine gespeicherte Beobachtung mit Viewer-Reaktion (Altdaten oder manuelle Inserts) wird niemals zugestellt: die Dispatch-Revalidierung parkt sie mit eigenem Grund.</summary>
     [Fact]
     public async Task Dispatch_ReactedStoredObservation_Waits()
     {
@@ -75,7 +74,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Empty(fixture.Prompts);
     }
 
-    /// <summary>A valid reception activates a new task even while CLI selection is still required.</summary>
+    /// <summary>Ein gültiger Empfang aktiviert eine neue Aufgabe, auch solange noch eine CLI-Auswahl nötig ist.</summary>
     [Fact]
     public async Task NoDefault_ActivatesTaskBeforeWaitingForSelection()
     {
@@ -91,8 +90,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Equal(2, fixture.Responses.Count);
     }
 
-    /// <summary>A task without a plugin uses the settings-configured default CLI (ki.plugin.default)
-    /// and the start persists the resolved prefix on the task.</summary>
+    /// <summary>Eine Aufgabe ohne Plugin nutzt die in den Einstellungen konfigurierte Standard-CLI (ki.plugin.default), und der Start persistiert das aufgelöste Präfix an der Aufgabe.</summary>
     [Fact]
     public async Task SettingsDefaultCli_StartsTaskAndDelivers()
     {
@@ -113,8 +111,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Equal(ScmDispatchFixture.AiPrefix, task!.AiPluginPrefix);
     }
 
-    /// <summary>A settings default that names no installed plugin is not guessed around:
-    /// the event keeps an actionable waiting state that names the ignored assignment.</summary>
+    /// <summary>Ein Einstellungs-Standard, der kein installiertes Plugin nennt, wird nicht umrissen: das Ereignis behält einen umsetzbaren Wartezustand, der die ignorierte Zuordnung nennt.</summary>
     [Fact]
     public async Task UnresolvableSettingsDefaultCli_KeepsWaitingState()
     {
@@ -133,8 +130,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Empty(fixture.Prompts);
     }
 
-    /// <summary>A deactivated task plugin assignment is ignored: the dispatch falls back to the
-    /// activated global default plugin, delivers the event and persists the used prefix.</summary>
+    /// <summary>Eine deaktivierte Aufgaben-Plugin-Zuordnung wird ignoriert: der Dispatch fällt auf das aktivierte globale Standard-Plugin zurück, stellt das Ereignis zu und persistiert das genutzte Präfix.</summary>
     [Fact]
     public async Task DisabledTaskPlugin_IfBackToGlobalDefault_Delivers()
     {
@@ -164,9 +160,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Equal(ScmDispatchFixture.AiPrefix, task!.AiPluginPrefix);
     }
 
-    /// <summary>With no executable plugin configured the event waits honestly: an understandable
-    /// reason and a protocol entry are recorded, no hard NextAttemptUtc lock is applied, and the
-    /// delivery proceeds once the plugin is activated again.</summary>
+    /// <summary>Ohne konfiguriertes ausführbares Plugin wartet das Ereignis ehrlich: ein verständlicher Grund und ein Protokolleintrag werden aufgezeichnet, kein harter NextAttemptUtc-Lock wird gesetzt, und die Zustellung geht weiter, sobald das Plugin wieder aktiviert wird.</summary>
     [Fact]
     public async Task UnavailablePlugins_EventWaitsWithoutHardLock_ResumesAfterFix()
     {
@@ -202,8 +196,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Prompts);
     }
 
-    /// <summary>An explicit user selection stays strict: a deactivated explicit prefix keeps the
-    /// existing failure path with a hard NextAttemptUtc lock instead of a silent fallback.</summary>
+    /// <summary>Eine explizite Benutzerauswahl bleibt strikt: ein deaktiviertes explizites Präfix behält den bestehenden Fehlerpfad mit hartem NextAttemptUtc-Lock statt eines stillen Fallbacks.</summary>
     [Fact]
     public async Task ExplicitPluginPrefix_RemainsStrict_LocksOnUnavailable()
     {
@@ -245,7 +238,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Equal("Wartend", (await fixture.EventAsync(eventId)).Status);
     }
 
-    /// <summary>A failed channel check cannot reuse an old user confirmation after another input in the same run.</summary>
+    /// <summary>Eine fehlgeschlagene Kanalprüfung kann nach einer weiteren Eingabe im selben Lauf keine alte Benutzerbestätigung wiederverwenden.</summary>
     [Fact]
     public async Task Confirmation_ChannelFailureThenManualInput_DoesNotAuthorizeLaterUnknownPrompt()
     {
@@ -278,8 +271,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Equal(adapter.CliRunId.ToString("D"), item.CliRunId);
     }
 
-    /// <summary>A workspace trust dialog is its own wait state: no prompt is sent, the confirm action stays
-    /// unavailable, and delivery resumes automatically once the user answers in the terminal.</summary>
+    /// <summary>Ein Workspace-Vertrauensdialog ist ein eigener Wartezustand: es wird kein Prompt gesendet, die Bestätigungsaktion bleibt unverfügbar, und die Zustellung läuft automatisch weiter, sobald der Benutzer im Terminal antwortet.</summary>
     [Fact]
     public async Task TrustDialog_BlocksUntilAnswered_ThenDeliversAutomatically()
     {
@@ -308,7 +300,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Prompts);
     }
 
-    /// <summary>A deliberate ready confirmation is an explicit retry and lifts an earlier hard stop.</summary>
+    /// <summary>Eine bewusste Bereit-Bestätigung ist eine explizite Wiederholung und hebt einen früheren harten Stopp auf.</summary>
     [Fact]
     public async Task ConfirmReady_LiftsNextAttemptLock()
     {
@@ -331,7 +323,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Single(fixture.Prompts);
     }
 
-    /// <summary>A CLI without a prompt-format profile waits honestly without offering a confirmation.</summary>
+    /// <summary>Eine CLI ohne Prompt-Format-Profil wartet ehrlich, ohne eine Bestätigung anzubieten.</summary>
     [Fact]
     public async Task UnknownCliFormat_WaitsWithoutConfirmOption()
     {
@@ -354,7 +346,7 @@ public sealed class ScmEventOrchestratorTests
         Assert.Empty(fixture.Prompts);
     }
 
-    /// <summary>An explicit confirmation of an out-of-range version lets the file-tool channel probe prove access.</summary>
+    /// <summary>Eine explizite Bestätigung einer ausserhalb des Bereichs liegenden Version lässt die Datei-Tool-Kanal-Probe den Zugriff beweisen.</summary>
     [Fact]
     public async Task ConfirmReady_UnsupportedVersion_DeliversAfterChannelProbe()
     {

@@ -51,7 +51,7 @@ public partial class End2EndTest
         ConfirmLocalDirectoryGitInitInSourceDirectory();
         var taskDetail = new TaskDetailView(mainWindow).Start("Softwareschmiede.KiSimulator", forProjectUse: false);
 
-        // Nach erfolgreichem Start ist das Repository geklont (LokalerKlonPfad gesetzt) und
+        // Nach erfolgreichem Start ist das Repository geklont (LocalClonePath gesetzt) und
         // das CLI-Panel sichtbar - das bestätigt, dass der kombinierte Klon-/Start-Ablauf durchlief.
         // Ab hier bleiben ShowCliPanel (Status=Gestartet) und ShowFileExplorerPanel (Klonpfad
         // existiert) für den Rest des Tests durchgehend true.
@@ -61,11 +61,11 @@ public partial class End2EndTest
         // "Dateien" dagegen nicht - obwohl das Arbeitsverzeichnis (ShowFileExplorerPanel) bereits existiert.
         taskDetail.WaitForPluginChangeButton();
         var fileExplorer = new FileExplorerView(mainWindow);
-        fileExplorer.WaitUntilNodeGone("DateiStandard");
+        fileExplorer.WaitUntilNodeGone("DefaultFile");
 
         fileExplorer.ForceShow();
 
-        fileExplorer.WaitForNode("DateiStandard");
+        fileExplorer.WaitForNode("DefaultFile");
         Assert.True(fileExplorer.HasModeButtons());
 
         // Sobald zur Dateien-Ansicht gewechselt wurde, muss die Ribbon-Gruppe "CLI" verschwinden -
@@ -82,7 +82,7 @@ public partial class End2EndTest
         // Ribbon-Gruppen müssen daher verschwinden, obwohl ShowCliPanel und ShowFileExplorerPanel
         // beide weiterhin true sind.
         taskDetail.WaitUntilPluginChangeButtonGone();
-        fileExplorer.WaitUntilNodeGone("DateiStandard");
+        fileExplorer.WaitUntilNodeGone("DefaultFile");
 
         taskDetail.SwitchPanel("CliViewButton");
 
@@ -90,7 +90,7 @@ public partial class End2EndTest
 
         // Zurück in der CLI-Ansicht: Ribbon-Gruppe "CLI" erscheint wieder, "Dateien" bleibt verborgen.
         taskDetail.WaitForPluginChangeButton();
-        fileExplorer.WaitUntilNodeGone("DateiStandard");
+        fileExplorer.WaitUntilNodeGone("DefaultFile");
 
         taskDetail.ForceClose(recurseToDashboard: false);
         var projectDetail = Assert.IsType<ProjectDetailView>(mainWindow.CurrentView());

@@ -83,8 +83,8 @@ public static class TaskDetailViewModelTestFactory
             new Mock<ITextDiffService>().Object,
             NullLogger<FileExplorerViewModel>.Instance);
 
-    /// <summary>Erstellt einen ArbeitsverzeichnisOeffnenService mit dem übergebenen (oder einem neuen) IProzessStarter-Mock.</summary>
-    /// <param name="processStarterMock">Der zu verwendende IProzessStarter-Mock, oder null um einen neuen Mock zu erstellen.</param>
+    /// <summary>Erstellt einen ArbeitsverzeichnisOeffnenService mit dem übergebenen (oder einem neuen) IProcessStarter-Mock.</summary>
+    /// <param name="processStarterMock">Der zu verwendende IProcessStarter-Mock, oder null um einen neuen Mock zu erstellen.</param>
     /// <returns>Ein einsatzbereiter ArbeitsverzeichnisOeffnenService.</returns>
     public static WorkingDirectoryOpenService CreateWorkingDirectoryOpenService(
         Mock<IProcessStarter>? processStarterMock = null)

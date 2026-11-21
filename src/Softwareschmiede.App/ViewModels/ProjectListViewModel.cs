@@ -62,7 +62,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
 
             // Wenn weder die alte noch die neue Anzeige dem zurückgehaltenen ProjectDetailViewModel
             // entspricht, wurde von der Aufgabenansicht direkt weg navigiert (z. B. SchliesseDetailCommand)
-            // statt über KehreZuProjectZurueck() — das zurückgehaltene ViewModel ist dann verwaist.
+            // statt über NavigateBackToProject() — das zurückgehaltene ViewModel ist dann verwaist.
             if (_currentProjectDetailViewModel is not null
                 && !ReferenceEquals(old, _currentProjectDetailViewModel)
                 && !ReferenceEquals(value, _currentProjectDetailViewModel))
@@ -294,7 +294,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         };
         viewModel.RefreshProjectListCallback = AddNewProject;
         viewModel.NavigateToTaskViewCallback = ShowTaskDetailView;
-        viewModel.NavigateBackToProjectCallback = KehreToProjectBack;
+        viewModel.NavigateBackToProjectCallback = NavigateBackToProject;
         _currentProjectDetailViewModel = viewModel;
     }
 
@@ -333,7 +333,7 @@ public sealed class ProjectListViewModel : ViewModelBase, IDisposable
         DetailTitleChangeAction?.Invoke(string.IsNullOrWhiteSpace(vm.WorkItem?.Title) ? "Aufgabe" : vm.WorkItem.Title);
     }
 
-    private void KehreToProjectBack()
+    private void NavigateBackToProject()
     {
         DetailViewModel = _currentProjectDetailViewModel;
         if (_currentProjectDetailViewModel is not null)

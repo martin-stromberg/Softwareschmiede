@@ -45,7 +45,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
 
     /// <summary>
     /// Nach Fensterbereitschaft läuft der Startfluss exakt einmal; Aus führt keine Prüfung aus,
-    /// NurPruefen meldet nur, der Startmodus installiert das gefundene Update sofort.
+    /// CheckOnly meldet nur, der Startmodus installiert das gefundene Update sofort.
     /// </summary>
     [Theory]
     [InlineData(UpdateMode.Off)]
@@ -85,7 +85,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
 
         sut.UpdateAvailable.Should().Be(mode != UpdateMode.Off);
         sut.UpdateCheckRunning.Should().BeFalse();
-        sut.UpdateWillPrepared.Should().BeFalse();
+        sut.UpdateBeingPrepared.Should().BeFalse();
     }
 
     /// <summary>
@@ -231,7 +231,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             Times.Never, "eine Einstellungsänderung während der Vorbereitung muss den Updater-Start verhindern");
         sut2.UpdateAvailable.Should().BeFalse();
-        sut2.UpdateWillPrepared.Should().BeFalse();
+        sut2.UpdateBeingPrepared.Should().BeFalse();
     }
 
     /// <summary>
@@ -263,7 +263,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
             Times.Never);
         sut.UpdateAvailable.Should().BeFalse();
         sut.UpdateCheckRunning.Should().BeFalse();
-        sut.UpdateWillPrepared.Should().BeFalse();
+        sut.UpdateBeingPrepared.Should().BeFalse();
         if (notCheckable)
             sut.UpdateNotice.Should().Contain("Release-Quelle nicht erreichbar");
         else
@@ -302,7 +302,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         _updateServiceMock.Verify(
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             Times.Never);
-        sut.UpdateWillPrepared.Should().BeFalse();
+        sut.UpdateBeingPrepared.Should().BeFalse();
     }
 
     /// <summary>
@@ -351,7 +351,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         _updateServiceMock.Verify(
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             Times.Never);
-        sut.UpdateWillPrepared.Should().BeFalse();
+        sut.UpdateBeingPrepared.Should().BeFalse();
         sut.UpdateNotice.Should().NotBeNullOrEmpty();
 
         // Der Vorgang ist vollständig freigegeben: Eine neue manuelle Prüfung ist möglich.
@@ -406,7 +406,7 @@ public sealed class MainWindowViewModelTests_UpdateStartup : MainWindowViewModel
         _updateServiceMock.Verify(
             s => s.StartPreparedUpdateAsync(It.IsAny<UpdatePreparationResult>(), It.IsAny<CancellationToken>()),
             errorAtStart ? Times.Once() : Times.Never());
-        sut.UpdateWillPrepared.Should().BeFalse();
+        sut.UpdateBeingPrepared.Should().BeFalse();
         sut.UpdateNotice.Should().NotBeNullOrEmpty();
 
         // Das Gate ist freigegeben: Eine neue manuelle Prüfung läuft durch.

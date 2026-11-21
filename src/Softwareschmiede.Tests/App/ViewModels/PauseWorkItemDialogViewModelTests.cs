@@ -5,7 +5,7 @@ using Softwareschmiede.App.ViewModels;
 namespace Softwareschmiede.Tests.App.ViewModels;
 
 /// <summary>Unit-Tests für <see cref="PauseWorkItemDialogViewModel"/> (Issue 151).</summary>
-public sealed class WorkItemPauseDialogViewModelTests
+public sealed class PauseWorkItemDialogViewModelTests
 {
     private static readonly DateTimeOffset ReferenceTime = new(2026, 7, 12, 10, 0, 0, TimeSpan.Zero);
 
@@ -15,7 +15,7 @@ public sealed class WorkItemPauseDialogViewModelTests
     public void Ctor_ShouldDefaultToCurrentLocalTime()
     {
         // LocalTimeZone = Machine-Zone, damit GetLocalNow() zur Interpretation der Eingabefelder
-        // (LocalTimeZone des TimeProviders in BerechnePausiertBisUtc) konsistent ist.
+        // (LocalTimeZone des TimeProviders in BerechnePausedUntilUtc) konsistent ist.
         var timeProvider = new FakeTimeProvider(ReferenceTime);
         timeProvider.SetLocalTimeZone(TimeZoneInfo.Local);
         var sut = new PauseWorkItemDialogViewModel(timeProvider);

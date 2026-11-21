@@ -684,7 +684,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
         try
         {
-            if (!ValidatePflichtfelder())
+            if (!ValidateRequiredFields())
                 return;
 
             if (SelectedUpdateMode is not { Mode: var updateMode })
@@ -1005,10 +1005,10 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private bool ValidatePflichtfelder()
+    private bool ValidateRequiredFields()
     {
         return ValidatePluginActivation()
-            && ValidatePflichtfelderForSettings(_selectedPluginSettings)
+            && ValidateRequiredFieldsForSettings(_selectedPluginSettings)
             && ValidatePromptTemplates()
             && ValidateScmTriggerKeyword()
             && ValidateScmDelayKeyword()
@@ -1138,7 +1138,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         return true;
     }
 
-    private bool ValidatePflichtfelderForSettings(IReadOnlyList<PluginSettingGroupEntry> settings)
+    private bool ValidateRequiredFieldsForSettings(IReadOnlyList<PluginSettingGroupEntry> settings)
     {
         foreach (var group in settings)
         {
@@ -1264,14 +1264,14 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 public sealed class PromptTemplateEntry : ViewModelBase
 {
     private string _name;
-    private string _prompttext;
+    private string _promptText;
 
     /// <inheritdoc cref="PromptTemplateEntry"/>
-    public PromptTemplateEntry(Guid id, string name, string prompttext, bool isNew)
+    public PromptTemplateEntry(Guid id, string name, string promptText, bool isNew)
     {
         Id = id;
         _name = name;
-        _prompttext = prompttext;
+        _promptText = promptText;
         IsNew = isNew;
     }
 
@@ -1291,8 +1291,8 @@ public sealed class PromptTemplateEntry : ViewModelBase
     /// <summary>Prompttext.</summary>
     public string PromptText
     {
-        get => _prompttext;
-        set => SetProperty(ref _prompttext, value);
+        get => _promptText;
+        set => SetProperty(ref _promptText, value);
     }
 }
 

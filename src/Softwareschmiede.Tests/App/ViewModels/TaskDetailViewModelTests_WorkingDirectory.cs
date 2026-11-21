@@ -7,7 +7,7 @@ using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Tests.App.ViewModels;
 
-/// <summary>Unit-Tests für TaskDetailViewModel.OeffneArbeitsverzeichnisAsync() und OeffneIdeAsync() bezüglich Nutzung des WorkingDirectoryResolver.</summary>
+/// <summary>Unit-Tests für TaskDetailViewModel.OeffneArbeitsverzeichnisAsync() und OpenIdeAsync() bezüglich Nutzung des WorkingDirectoryResolver.</summary>
 public sealed class TaskDetailViewModelTests_WorkingDirectory : TaskDetailViewModelTestBase
 {
     /// <summary>Präfix für über CreateTempDirectory() erzeugte temporäre Verzeichnisse.</summary>
@@ -35,7 +35,7 @@ public sealed class TaskDetailViewModelTests_WorkingDirectory : TaskDetailViewMo
             Times.Once);
     }
 
-    /// <summary>Ohne RepositoryStartKonfiguration (bzw. ohne WorkingDirectoryRelativePath) wird weiterhin der Repository-Root (LokalerKlonPfad) verwendet.</summary>
+    /// <summary>Ohne RepositoryStartKonfiguration (bzw. ohne WorkingDirectoryRelativePath) wird weiterhin der Repository-Root (LocalClonePath) verwendet.</summary>
     [Fact]
     public async Task OpenWorkingDirectory_WithoutConfiguration_CallsServiceWithRepositoryRootOn()
     {
@@ -74,7 +74,7 @@ public sealed class TaskDetailViewModelTests_WorkingDirectory : TaskDetailViewMo
         processStarterMock.Verify(p => p.Start(It.IsAny<ProcessStartRequest>()), Times.Never);
     }
 
-    /// <summary>OeffneIdeAsync findet über das aufgelöste IDE-Plugin (FindEntryPointsAsync) eine Solution im über WorkingDirectoryResolver aufgelösten Arbeitsverzeichnis und öffnet sie, obwohl im Repository-Root keine .sln-Datei liegt.</summary>
+    /// <summary>OpenIdeAsync findet über das aufgelöste IDE-Plugin (FindEntryPointsAsync) eine Solution im über WorkingDirectoryResolver aufgelösten Arbeitsverzeichnis und öffnet sie, obwohl im Repository-Root keine .sln-Datei liegt.</summary>
     [Fact]
     public async Task OpenIdeAsync_FindsSolutionInResolvedWorkingDirectory()
     {

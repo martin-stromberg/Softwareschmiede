@@ -12,15 +12,15 @@ using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.Application.Services;
 
-/// <summary>Unit-Tests für PromptZeitVersandService.</summary>
-public sealed class PromptTimeDispatchServiceTests : IDisposable
+/// <summary>Unit-Tests für PromptScheduleDispatchService.</summary>
+public sealed class PromptScheduleDispatchServiceTests : IDisposable
 {
     private readonly AiExecutionService _aiService;
     private readonly FakeTimeProvider _timeProvider;
     private readonly PromptScheduleDispatchService _sut;
 
-    /// <summary>PromptZeitVersandServiceTests.</summary>
-    public PromptTimeDispatchServiceTests()
+    /// <summary>PromptScheduleDispatchServiceTests.</summary>
+    public PromptScheduleDispatchServiceTests()
     {
         _aiService = TestAiExecutionServiceFactory.Create();
         _timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -85,7 +85,7 @@ public sealed class PromptTimeDispatchServiceTests : IDisposable
         }
     }
 
-    /// <summary>Erstellt einen ServiceProvider mit InMemory-DbContext und seedet eine Aufgabe mit dem übergebenen PausiertBisUtc-Wert.</summary>
+    /// <summary>Erstellt einen ServiceProvider mit InMemory-DbContext und seedet eine Aufgabe mit dem übergebenen PausedUntilUtc-Wert.</summary>
     private async Task<ServiceProvider> CreatePausedTaskProviderAsync(DateTimeOffset? pausedUntilUtc, Guid workItemId)
     {
         // Der Datenbankname muss AUSSERHALB des Options-Lambdas erzeugt werden: AddDbContext führt
@@ -127,9 +127,9 @@ public sealed class PromptTimeDispatchServiceTests : IDisposable
     /// <summary>
     /// Erstellt einen ServiceProvider mit InMemory-DbContext, <see cref="ScheduledPromptStore"/>,
     /// <see cref="WorkItemService"/> und <see cref="LogService"/> und seedet eine Aufgabe
-    /// mit dem übergebenen PausiertBisUtc-Wert (Muster <see cref="CreatePausedTaskProviderAsync"/>).
+    /// mit dem übergebenen PausedUntilUtc-Wert (Muster <see cref="CreatePausedTaskProviderAsync"/>).
     /// </summary>
-    /// <param name="pausedUntilUtc">Der zu seedende PausiertBisUtc-Wert der Aufgabe.</param>
+    /// <param name="pausedUntilUtc">Der zu seedende PausedUntilUtc-Wert der Aufgabe.</param>
     /// <param name="workItemId">Die ID der zu seedenden Aufgabe.</param>
     /// <param name="withLogService">Bei <c>false</c> wird <see cref="LogService"/> bewusst nicht registriert (Fehlerpfad-Protokollierung).</param>
     private async Task<ServiceProvider> CreateStoreProviderAsync(DateTimeOffset? pausedUntilUtc, Guid workItemId, bool withLogService = true)
@@ -329,7 +329,7 @@ public sealed class PromptTimeDispatchServiceTests : IDisposable
 
         var status = sut.GetScheduledPromptStatus(workItemId);
         status.Should().NotBeNull("der Prompt muss gepuffert statt sofort versendet werden");
-        // BeCloseTo statt Be: PausiertBisUtc läuft durch den Unix-Millisekunden-Converter und
+        // BeCloseTo statt Be: PausedUntilUtc läuft durch den Unix-Millisekunden-Converter und
         // verliert dabei Sub-Millisekunden-Genauigkeit.
         status!.TargetTime.Should().BeCloseTo(pausedUntil, TimeSpan.FromSeconds(1), "die Zielzeit wird auf das Pausenende verschoben");
     }
@@ -366,7 +366,7 @@ public sealed class PromptTimeDispatchServiceTests : IDisposable
         versendet.Task.IsCompleted.Should().BeFalse("während einer aktiven Pause darf der Prompt nicht versendet werden");
         var status = sut.GetScheduledPromptStatus(workItemId);
         status.Should().NotBeNull("der Prompt muss auf das Pausenende umgeplant werden");
-        // BeCloseTo statt Be: PausiertBisUtc läuft durch den Unix-Millisekunden-Converter und
+        // BeCloseTo statt Be: PausedUntilUtc läuft durch den Unix-Millisekunden-Converter und
         // verliert dabei Sub-Millisekunden-Genauigkeit.
         status!.TargetTime.Should().BeCloseTo(pausedUntil, TimeSpan.FromSeconds(1),
             "die gemeldete Zielzeit muss dem Pausenende entsprechen, nicht dem verstrichenen ursprünglichen Zeitpunkt");
@@ -620,7 +620,7 @@ public sealed class PromptTimeDispatchServiceTests : IDisposable
     public async Task LogEntry_AtDeletedWorkItem_CancelsDispatchNot()
     {
         var workItemId = Guid.NewGuid();
-        // Ohne registrierten ProtokollService schlägt die Protokoll-Auflösung fehl — der
+        // Ohne registrierten LogService schlägt die Protokoll-Auflösung fehl — der
         // Versandpfad darf dadurch nicht brechen (gleicher Schutzpfad wie eine gelöschte Aufgabe).
         await using var provider = await CreateStoreProviderAsync(null, workItemId, withLogService: false);
         var sut = new PromptScheduleDispatchService(

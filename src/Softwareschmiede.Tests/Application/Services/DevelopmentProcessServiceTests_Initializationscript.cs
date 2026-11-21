@@ -15,7 +15,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <see cref="DevelopmentProcessService"/>: Ausführung nach dem Klonen, Fehlertoleranz und Reihenfolge
 /// gegenüber dem Repository-Startskript.
 /// </summary>
-public sealed class DevelopmentprocessServiceTests_Initializationscript : IDisposable
+public sealed class DevelopmentProcessServiceTests_Initializationscript : IDisposable
 {
     private readonly Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext _db;
     private readonly WorkItemService _workItemService;
@@ -26,7 +26,7 @@ public sealed class DevelopmentprocessServiceTests_Initializationscript : IDispo
     private readonly Guid _projectId = new("88888888-8888-8888-8888-888888888888");
 
     /// <summary>EntwicklungsprozessServiceTests_Initialisierungsskript.</summary>
-    public DevelopmentprocessServiceTests_Initializationscript()
+    public DevelopmentProcessServiceTests_Initializationscript()
     {
         _db = TestDbContextFactory.Create();
         _workItemService = new WorkItemService(_db, new Mock<ILogger<WorkItemService>>().Object, new TodoService(_db, new Mock<ILogger<TodoService>>().Object));

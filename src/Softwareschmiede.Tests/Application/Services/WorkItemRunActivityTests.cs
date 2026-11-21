@@ -6,7 +6,7 @@ namespace Softwareschmiede.Tests.Application.Services;
 /// <summary>Tests für <see cref="WorkItemRunActivity"/>.</summary>
 public sealed class WorkItemRunActivityTests
 {
-    /// <summary>IstAktiv liefert true, wenn AktiveRunId gesetzt und der Heartbeat frisch ist.</summary>
+    /// <summary>IsActive liefert true, wenn ActiveRunId gesetzt und der Heartbeat frisch ist.</summary>
     [Fact]
     public void IsActive_ShouldReturnTrue_WhenRunIdSetAndHeartbeatFresh()
     {
@@ -18,7 +18,7 @@ public sealed class WorkItemRunActivityTests
         result.Should().BeTrue();
     }
 
-    /// <summary>IstAktiv liefert false, wenn der Heartbeat älter als die Timeout-Schwelle ist.</summary>
+    /// <summary>IsActive liefert false, wenn der Heartbeat älter als die Timeout-Schwelle ist.</summary>
     [Fact]
     public void IsActive_ShouldReturnFalse_WhenHeartbeatOlderThanTimeout()
     {
@@ -30,7 +30,7 @@ public sealed class WorkItemRunActivityTests
         result.Should().BeFalse();
     }
 
-    /// <summary>IstAktiv liefert false, wenn der Heartbeat exakt die Timeout-Schwelle alt ist (striktes Kleiner-als).</summary>
+    /// <summary>IsActive liefert false, wenn der Heartbeat exakt die Timeout-Schwelle alt ist (striktes Kleiner-als).</summary>
     [Fact]
     public void IsActive_ShouldReturnFalse_WhenHeartbeatExactlyAtTimeout()
     {
@@ -42,7 +42,7 @@ public sealed class WorkItemRunActivityTests
         result.Should().BeFalse();
     }
 
-    /// <summary>IstAktiv liefert false, wenn kein Heartbeat vorhanden ist.</summary>
+    /// <summary>IsActive liefert false, wenn kein Heartbeat vorhanden ist.</summary>
     [Fact]
     public void IsActive_ShouldReturnFalse_WhenHeartbeatNull()
     {
@@ -51,7 +51,7 @@ public sealed class WorkItemRunActivityTests
         result.Should().BeFalse();
     }
 
-    /// <summary>IstAktiv liefert false, wenn keine aktive RunId vorhanden ist, selbst bei frischem Heartbeat.</summary>
+    /// <summary>IsActive liefert false, wenn keine aktive RunId vorhanden ist, selbst bei frischem Heartbeat.</summary>
     [Fact]
     public void IsActive_ShouldReturnFalse_WhenRunIdNull()
     {
