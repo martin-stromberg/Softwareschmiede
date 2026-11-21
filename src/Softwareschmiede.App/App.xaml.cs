@@ -14,6 +14,7 @@ using Softwareschmiede.App.Views;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.Options;
 using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.Infrastructure.Plugins;
 using Softwareschmiede.Infrastructure.Services;
@@ -220,6 +221,12 @@ public sealed partial class App : System.Windows.Application
         services.AddScoped<GitOrchestrationService>();
         services.AddScoped<PullRequestReferenceService>();
         services.Configure<ScmEventOptions>(context.Configuration.GetSection("ScmEvents"));
+        // Technischer Auflösungscache der SCM-Plugins (gleiche „ScmEvents“-Sektion); der Optionswert
+        // wird als Singleton bereitgestellt, damit ActivatorUtilities ihn in Plugin-Konstruktoren injiziert.
+        services.Configure<ScmResolutionCacheOptions>(context.Configuration.GetSection("ScmEvents"));
+        services.PostConfigure<ScmResolutionCacheOptions>(o =>
+            o.RepositoryResolutionCacheTtl = o.EffectiveRepositoryResolutionCacheTtl());
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<ScmResolutionCacheOptions>>().Value);
         services.AddSingleton(ScmTaskCoordinator.Shared);
         services.AddSingleton<ScmEventStartupGate>();
         services.AddSingleton<ScmEventChangeNotifier>();

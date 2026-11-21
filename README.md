@@ -281,6 +281,8 @@ Die Konfigurationsbasis liegt in `src/Softwareschmiede/appsettings*.json`. Im ak
 - `Terminal:DefaultRows`
 - `Terminal:RecordingByteBudget`
 
+Zusätzlich bindet die Sektion `ScmEvents` technische Laufzeitoptionen der SCM-Ereignisüberwachung (kein UI-Schalter): `ScmEvents:PollInterval`, `ScmEvents:AcceptanceTimeout`, `ScmEvents:CompletionTimeout` und `ScmEvents:RepositoryResolutionCacheTtl` (Lebensdauer des plugin-internen Auflösungscaches, Standard `00:15:00`). Details siehe [GitHub-Ereignisüberwachung — Technische Konfiguration](docs/help/plugins/github-ereignisse/installation.md).
+
 ### Datenbank und Logs
 
 - **Produktive Releases:** `%LocalAppData%\Softwareschmiede\softwareschmiede.db`

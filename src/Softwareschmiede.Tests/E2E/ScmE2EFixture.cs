@@ -115,6 +115,16 @@ internal sealed class ScmE2EFixture
         await settings.SetScmAccountModeAsync(mode);
     }
 
+    /// <summary>Setzt den Prüfmodus der SCM-Abschlussüberwachung direkt in der Testdatenbank;
+    /// AllWorkItems erzeugt pro Zyklus regulären REST-Leseverkehr (Issue-Status je Aufgabe)
+    /// als Messgröße für den Rate-Limit-Gate.</summary>
+    public async Task SetTaskCompletionCheckMode(ScmTaskCompletionCheckMode mode)
+    {
+        await using var db = OpenDatabase();
+        var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        await settings.SetScmTaskCompletionCheckModeAsync(mode);
+    }
+
     public void SaveScenario()
     {
         var temporary = Configuration.ScenarioPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
@@ -204,6 +214,9 @@ internal sealed class ScmE2EFixture
 
     public IReadOnlyList<ScmE2ERemoteResponse> Responses() => ReadLines(Configuration.ResponsesPath).Select(x => JsonSerializer.Deserialize<ScmE2ERemoteResponse>(x)!).ToArray();
     public IReadOnlyList<JsonElement> Prompts() => ReadLines(Path.Combine(Configuration.SimulatorDirectory, "prompts.jsonl")).Select(x => JsonSerializer.Deserialize<JsonElement>(x)).ToArray();
+    /// <summary>Alle bisher protokollierten Transportaufrufe aus scm-calls.jsonl als JSON-Elemente
+    /// (Host/Method/Endpoint/JsonBody; Upload-Zeilen tragen andere Felder).</summary>
+    public IReadOnlyList<JsonElement> Calls() => ReadLines(Configuration.CallsPath).Select(x => JsonSerializer.Deserialize<JsonElement>(x)).ToArray();
 
     public string BeginRuntimeCommand(int number, bool replace = false)
     {

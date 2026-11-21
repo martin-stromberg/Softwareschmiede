@@ -4,6 +4,7 @@ using System.Text.Json;
 using Softwareschmiede.Domain.Abstractions;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.Options;
 using Softwareschmiede.Domain.ValueObjects;
 
 namespace Softwareschmiede.Infrastructure.Plugins;
@@ -16,7 +17,7 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 /// Der GitHub-Token wird als GH_TOKEN Umgebungsvariable bzw. Authorization-Header übergeben,
 /// niemals als CLI-Argument oder in URLs.
 /// </summary>
-public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEventSource, IScmEventResponder, IScmAgentAccess, IScmNotificationSource
+public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEventSource, IScmEventResponder, IScmAgentAccess, IScmNotificationSource, IScmRepositoryAliasNormalizer
 {
     private const string GitHubTokenCredentialKey = "Softwareschmiede.GitHub.Token";
     private const string GitHubAgentTokenCredentialKey = "Softwareschmiede.GitHub.AgentToken";
@@ -129,15 +130,21 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     ];
 
     /// <summary>Erstellt eine neue Instanz des <see cref="GitHubPlugin"/>.</summary>
-    public GitHubPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<GitHubPlugin> logger)
-        : this(cliRunner, credentialStore, logger, null)
+    /// <param name="resolutionOptions">Optionen des Auflösungscaches; <see langword="null"/> nutzt den
+    /// 15-Minuten-Default (<see cref="ScmResolutionCacheOptions"/>).</param>
+    /// <param name="timeProvider">Zeitquelle für Cache- und Gate-Verfalldaten; <see langword="null"/>
+    /// nutzt <see cref="TimeProvider.System"/>.</param>
+    public GitHubPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<GitHubPlugin> logger,
+        ScmResolutionCacheOptions? resolutionOptions = null, TimeProvider? timeProvider = null)
+        : this(cliRunner, credentialStore, logger, null, resolutionOptions, timeProvider)
     {
     }
 
     /// <summary>Erstellt den Provider mit austauschbarem Ereignis-API-Transport.</summary>
+    /// <inheritdoc cref="GitHubPlugin(ICliRunner, ICredentialStore, ILogger{GitHubPlugin}, ScmResolutionCacheOptions?, TimeProvider?)"/>
     public GitHubPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<GitHubPlugin> logger,
-        IGitHubEventApiClient? eventApiClient)
-        : this(cliRunner, credentialStore, logger, eventApiClient, null)
+        IGitHubEventApiClient? eventApiClient, ScmResolutionCacheOptions? resolutionOptions = null, TimeProvider? timeProvider = null)
+        : this(cliRunner, credentialStore, logger, eventApiClient, null, null, resolutionOptions, timeProvider)
     {
     }
 
@@ -145,14 +152,21 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     /// <param name="netrcPath">Optionaler Pfad-Override der <c>_netrc</c>/<c>.netrc</c>-Datei für die
     /// einmalige Legacy-Bereinigung (Testseam); <see langword="null"/> ist der Produktiv-Default und
     /// löst den Pfad über <see cref="NetrcPathEnvironmentVariable"/> bzw. das Benutzerprofil auf.</param>
+    /// <inheritdoc cref="GitHubPlugin(ICliRunner, ICredentialStore, ILogger{GitHubPlugin}, ScmResolutionCacheOptions?, TimeProvider?)"/>
     public GitHubPlugin(ICliRunner cliRunner, ICredentialStore credentialStore, ILogger<GitHubPlugin> logger,
-        IGitHubEventApiClient? eventApiClient, IGitHubEventApiClient? agentEventApiClient, string? netrcPath = null)
+        IGitHubEventApiClient? eventApiClient, IGitHubEventApiClient? agentEventApiClient, string? netrcPath = null,
+        ScmResolutionCacheOptions? resolutionOptions = null, TimeProvider? timeProvider = null)
         : base(cliRunner)
     {
         _cliRunner = cliRunner;
         _credentialStore = credentialStore;
         _logger = logger;
         _netrcPath = netrcPath;
+        // Konfigurierte Werte sind an der Optionsbindung bereits auf [1 min, 24 h] geklemmt;
+        // direkt konstruierte Optionsobjekte (Test-Fixtures) dürfen kürzere Laufzeiten vorgeben.
+        _resolutionTtl = resolutionOptions?.RepositoryResolutionCacheTtl
+            is { } ttl && ttl > TimeSpan.Zero ? ttl : ScmResolutionCacheOptions.DefaultRepositoryResolutionCacheTtl;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _eventApiClient = eventApiClient ?? new GitHubHttpApiClient(() => _credentialStore.GetCredential(GitHubTokenCredentialKey));
         _agentEventApiClient = agentEventApiClient ?? new GitHubHttpApiClient(() => _credentialStore.GetCredential(GitHubAgentTokenCredentialKey));
 

@@ -17,7 +17,7 @@ namespace Softwareschmiede.Application.Services;
 /// (<see cref="ScmAccountMode.UserAccount"/>), damit die Entdeckung auch im SeparatesKonto-Modus
 /// funktioniert, in dem die Notifications-Inbox die Enumeration der Ereignisüberwachung ersetzt.</summary>
 /// <remarks>
-/// Repository-Auflösungen werden je Alias unter <c>issueaufbereitung-repository/{prefix}/{alias}</c>,
+/// Repository-Auflösungen werden je kanonischem Alias unter <c>issueaufbereitung-repository/{prefix}/{alias}</c>,
 /// die repository-weite Enumeration unter <c>issueaufbereitung-enumeration/{provider}/{host}/{repoId}</c>
 /// und die abgeschlossene Auswertung je Issue unter
 /// <c>issueaufbereitung-issue/{provider}/{host}/{repoId}/{number}</c> in
@@ -58,15 +58,22 @@ public sealed class ScmIssuePreparationMonitoringService(
                 continue;
             var repositoriesForEnumeration = new List<ScmEventRepository>();
             var localRepositories = new Dictionary<ScmEventRepository, List<GitRepository>>();
+            // Kanonische Alias-Gruppierung: HTTPS-/SSH-URL, owner/name- und .git-Formen desselben
+            // Remote laufen auf eine Gruppe, einen Checkpoint und eine Auflösung zusammen.
             var aliasGroups = repositories
                 .Where(x => ScmPluginMatcher.MatchesPlugin(plugin, x) && !string.IsNullOrWhiteSpace(x.RepositoryUrl))
-                .GroupBy(x => x.RepositoryUrl, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(x => ScmRepositoryAliasKey.CanonicalOrRaw(source, x.RepositoryUrl, logger), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(x => x.Key, x => x.ToList(), StringComparer.OrdinalIgnoreCase);
+            // Verwaiste Auflösungs-Checkpoints (Alt-Alias-Keys, entfernte Repositories) entfernen,
+            // bevor die aktuellen Gruppen aufgelöst werden.
+            await ScmCheckpointSupport.PruneResolutionCheckpointsAsync(scopes,
+                $"issueaufbereitung-repository/{plugin.PluginPrefix.ToLowerInvariant()}/", aliasGroups.Keys, ct);
             foreach (var (alias, aliasGroup) in aliasGroups)
             {
                 using var resolutionScope = scopes.CreateScope();
                 var resolutionDb = resolutionScope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
-                var resolutionKey = $"issueaufbereitung-repository/{plugin.PluginPrefix.ToLowerInvariant()}/{Uri.EscapeDataString(alias.ToLowerInvariant())}";
+                var resolutionKey = ScmCheckpointSupport.ResolutionKey(
+                    $"issueaufbereitung-repository/{plugin.PluginPrefix.ToLowerInvariant()}/", alias);
                 var checkpoint = await resolutionDb.ScmObservationCheckpoints.FindAsync([resolutionKey], ct);
                 if (checkpoint?.NextAttemptUtc > _time.GetUtcNow().ToUnixTimeMilliseconds())
                     continue;

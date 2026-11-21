@@ -1,6 +1,7 @@
 using System.IO;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Interfaces;
+using Softwareschmiede.Domain.Options;
 using Softwareschmiede.Infrastructure.Plugins;
 
 namespace Softwareschmiede.App.Services.Testing;
@@ -26,7 +27,10 @@ internal sealed class ScmE2EPluginManager : IPluginManager
         // Plugins nicht die echte %USERPROFILE%\_netrc des ausführenden Benutzers verändert.
         _gitHub = new GitHubPlugin(new ScmE2EGitRunner(cliRunner, configuration), credentialStore, logger,
             new ScmE2EApiClient(configuration), new ScmE2EApiClient(configuration, "scm-bot", "BOT"),
-            netrcPath: Path.Combine(configuration.TestRoot, "_netrc"));
+            netrcPath: Path.Combine(configuration.TestRoot, "_netrc"),
+            // Kurze Fixture-TTL, damit Cache-Miss-Erneuerungen im E2E-Zeitfenster (Poll ≈ 300 ms)
+            // beobachtbar sind — produktiv gilt der 15-Minuten-Default.
+            resolutionOptions: new ScmResolutionCacheOptions { RepositoryResolutionCacheTtl = TimeSpan.FromSeconds(3) });
     }
 
     public IReadOnlyList<IGitPlugin> GetSourceCodeManagementPlugins() => [_gitHub];

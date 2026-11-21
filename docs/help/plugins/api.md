@@ -51,6 +51,16 @@ GitHub implementiert diese Erweiterung initial für Code-Scanning-Alerts. Bitbuc
 
 ---
 
+## `IScmRepositoryAliasNormalizer`
+
+Optionale Erweiterung einer `IScmEventSource`: überführt einen lokalen Repository-Alias in eine kanonische Vergleichsform. Der Host verwendet die kanonische Form als Gruppierungs- und Checkpoint-Schlüssel der Auflösung, damit Alias-Mischformen desselben Remote (HTTPS-/SSH-URL, `owner/name`, `.git`-Suffix) auf eine Gruppe, einen Auflösungs-Checkpoint und eine Remote-Auflösung zusammenlaufen. Quellen ohne diese Fähigkeit behalten die Roh-Alias-Gruppierung.
+
+|| Methode | Parameter | Rückgabe | Beschreibung |
+||---------|-----------|---------|--------------|
+|| `NormalizeRepositoryAlias` | `alias` | `string` | Liefert die kanonische Form des Alias (bei GitHub `https://{host}/{owner}/{name}`). Die kanonische Form muss selbst ein parsebarer Alias sein, da sie zugleich als Auflösungseingabe (`ScmRepositoryContext.RepositoryId`) dient. Wirft `ScmProviderException` (`Permanent`) bei einem für die Quelle nicht parsebaren Alias — der Host fällt dann auf den Roh-Alias zurück. |
+
+---
+
 ## `IKiPlugin` : `IPlugin`
 
 KI-Entwicklungsautomatisierung.

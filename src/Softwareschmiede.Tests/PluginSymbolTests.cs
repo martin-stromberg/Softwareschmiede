@@ -42,7 +42,10 @@ public sealed class PluginSymbolTests
         var ctor = pluginType.GetConstructors()
             .OrderBy(c => c.GetParameters().Length)
             .First();
-        var arguments = ctor.GetParameters().Select(p => CreateArgument(p.ParameterType)).ToArray();
+        // Optionale Parameter (z. B. Options/TimeProvider des Auflösungscaches) bleiben auf ihrem
+        // Default — Mock<T> für konkrete Optionsklassen scheitert (sealed/property-Konflikt).
+        var arguments = ctor.GetParameters()
+            .Select(p => p.HasDefaultValue ? Type.Missing : CreateArgument(p.ParameterType)).ToArray();
         return (IPlugin)ctor.Invoke(arguments);
     }
 

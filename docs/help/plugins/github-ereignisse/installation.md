@@ -44,3 +44,14 @@ Einrichtung, Gültigkeitsdauer und Erneuerung dieses Secrets sowie das Troublesh
 - Weitere Optionen für Ereignisabfrage und Verarbeitungsfristen sind derzeit nicht in der Benutzeroberfläche konfigurierbar.
 - Standard-SCM-Plugins wie Bitbucket und Local Directory werden nicht automatisch ereignisfähig, nur weil sie in der Anwendung verfügbar sind. Derzeit implementiert ausschließlich GitHub diese Fähigkeit.
 - Bei Codex, Claude und Devin CLI genügt die Auswahl des Plugins nicht: Versionen außerhalb der unterstützten Bereiche (Codex `v0.114.x`, Claude Code `v2.1.x`, Devin CLI `v3000.x`), unbekannte Promptformate, nicht unterstützte Berechtigungen oder ein fehlender tatsächlicher Kanalzugriff lassen das Ereignis wartend. Eine erkannte, aber außerhalb des Bereichs liegende Version kann in der Ereignisübersicht ausdrücklich bestätigt werden. GitHub Copilot CLI unterstützt den Ereignis-Antwortkanal derzeit nicht. Der KI-Simulator dient nur der lokalen Entwicklung und wird für diesen Zweck im SCM-Modus gestartet.
+
+## Technische Konfiguration (Betreiber)
+
+Für Betreiber bindet die Konfigurationssektion `ScmEvents` technische Laufzeitoptionen (appsettings-Umgebung, kein UI-Schalter). Ohne gesetzte Werte gelten die Standardwerte.
+
+| Parameter | Typ | Standardwert | Beschreibung |
+|-----------|-----|--------------|--------------|
+| `ScmEvents:PollInterval` | `TimeSpan` | `00:01:00` | Poll-Rhythmus der SCM-Hintergrunddienste (`ScmEventOptions`). |
+| `ScmEvents:AcceptanceTimeout` | `TimeSpan` | `00:02:00` | Frist für die korrelierte Annahme (`ScmEventOptions`). |
+| `ScmEvents:CompletionTimeout` | `TimeSpan` | `00:30:00` | Frist für den korrelierten Abschluss (`ScmEventOptions`). |
+| `ScmEvents:RepositoryResolutionCacheTtl` | `TimeSpan` | `00:15:00` | Lebensdauer eines erfolgreich aufgelösten Repository-Ergebnisses im plugin-internen Auflösungscache (`ScmResolutionCacheOptions`). Werte außerhalb 1 Minute bis 24 Stunden werden auf die Grenzen geklemmt; ungültige oder nicht-positive Werte fallen auf den Standard zurück. Längere Laufzeiten sparen API-Aufrufe, verzögern aber die Erkennung von Berechtigungsentzug und Repository-Umbenennungen entsprechend. |

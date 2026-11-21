@@ -61,6 +61,43 @@ internal static class ScmCheckpointSupport
             ? long.MaxValue : ScmEventStore.RetryAt(checkpoint.Failures, nowUtcMs, failure?.RetryAfterUtc);
     }
 
+    /// <summary>Der Auflösungs-Checkpoint-Schlüssel eines Alias:
+    /// <paramref name="prefix"/> + escapeter Kleinschreib-Alias. Einzige Stelle der Formel,
+    /// damit Leser (<c>FindAsync</c>) und Prune identisch schlüsseln.</summary>
+    /// <param name="prefix">Vollständiger Schlüssel-Präfix inklusive Provider-Teil,
+    /// z. B. <c>repository/softwareschmiede.github/</c>.</param>
+    /// <param name="alias">Der Gruppenschlüssel (kanonisch oder Roh-Fallback).</param>
+    internal static string ResolutionKey(string prefix, string alias)
+        => prefix + Uri.EscapeDataString(alias.ToLowerInvariant());
+
+    /// <summary>Entfernt verwaiste Auflösungs-Checkpoints unter <paramref name="resolutionKeyPrefix"/>:
+    /// Zeilen, deren <c>SourceKey</c> keiner aktuellen Alias-Gruppe entspricht (verwaiste
+    /// Alt-Alias-Keys nach dem Wechsel auf kanonische Schlüssel sowie Checkpoints entfernter
+    /// Repositories). Läuft je Dienst und Plugin vor der Auflösungsschleife; bei Löschungen
+    /// werden die Ansichten benachrichtigt.</summary>
+    /// <param name="scopes">Scope-Factory für einen eigenen Datenbankkontext.</param>
+    /// <param name="resolutionKeyPrefix">Vollständiger Schlüssel-Präfix inklusive Provider-Teil,
+    /// z. B. <c>repository/softwareschmiede.github/</c>.</param>
+    /// <param name="keepAliases">Alias-Schlüssel der aktuellen Gruppen (kanonisch oder Roh-Fallback);
+    /// deren Checkpoint-Keys (<paramref name="resolutionKeyPrefix"/> + escapeter Kleinschreib-Alias)
+    /// bleiben bestehen.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    internal static async Task PruneResolutionCheckpointsAsync(IServiceScopeFactory scopes,
+        string resolutionKeyPrefix, IEnumerable<string> keepAliases, CancellationToken ct)
+    {
+        var keep = new HashSet<string>(keepAliases.Select(
+            alias => ResolutionKey(resolutionKeyPrefix, alias)), StringComparer.Ordinal);
+        using var scope = scopes.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var stale = await db.ScmObservationCheckpoints
+            .Where(x => x.SourceKey.StartsWith(resolutionKeyPrefix) && !keep.Contains(x.SourceKey))
+            .ToListAsync(ct);
+        if (stale.Count == 0) return;
+        db.ScmObservationCheckpoints.RemoveRange(stale);
+        await db.SaveChangesAsync(ct);
+        scope.ServiceProvider.GetRequiredService<ScmEventChangeNotifier>().Notify();
+    }
+
     /// <summary>Enumeriert ein kanonisch aufgelöstes Repository einmal pro Lauf und verwaltet dessen
     /// eigenen Watermark-/Backoff-Checkpoint unter <paramref name="checkpointKeyPrefix"/>/<c>{provider}/{host}/{repoId}</c>.
     /// Enumerationsfehler werden als Checkpoint-Fehler aufgezeichnet und isoliert.</summary>
