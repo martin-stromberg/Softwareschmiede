@@ -9,15 +9,15 @@ Issues: #456, #452, #451, #436, #433, #457
 - [x] Verzeichnis/Tracking angelegt
 - [x] Einstiegspunkt: neues Projekt
 - [x] Anforderung aufbereitet (`requirement.md`)
-- [ ] Bestandsaufnahme (`inventory.md`)
-- [ ] Projektplan (`project-plan.md`)
-- [ ] Offene Punkte geklärt (Nutzerentscheidungen)
-- [ ] Planprüfung (`project-plan-check.md`)
-- [ ] Planungscommit
-- [ ] Entwicklungsschritte-Tracking (`steps.md`)
-- [ ] Entwicklungsschleife (je Schritt: lifecycle-Skill, Abnahme, Merge)
+- [x] Bestandsaufnahme (`inventory.md`)
+- [x] Projektplan (`project-plan.md`)
+- [x] Offene Punkte geklärt (Nutzerentscheidungen)
+- [x] Planprüfung (`project-plan-check.md`)
+- [x] Planungscommit
+- [x] Entwicklungsschritte-Tracking (`steps.md`)
+- [ ] Entwicklungsschleife (je Schritt: lifecycle-Skill, Abnahme, Merge) — Schritt 1 abgeschlossen (df0d1cac, Merge fa7c230b); Schritt 2 in Arbeit
 - [ ] Aufräumen + Abschlusscommit
-- [ ] Issue-Kommentare zum Bearbeitungsstatus (vom Nutzer autorisiert)
+- [x] Issue-Kommentare zum Bearbeitungsstatus (vom Nutzer autorisiert)
 - [ ] PR gegen `staging` mit Closing-Keywords für alle 6 Issues, Checks grün
 
 ## Hinweise
