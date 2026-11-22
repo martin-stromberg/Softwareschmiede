@@ -338,7 +338,7 @@ Die Repository-Automation ist branchbasiert aufgebaut:
 
 - **`pr-staging-ci.yml`** prüft Pull Requests nach `staging` mit Format-Check, Security Scan, Build und Tests.
 - **`staging-ci.yml`** baut auf Push nach `staging`, erzeugt bei Versionsänderungen Pre-Releases und prüft die Coverage-Schwelle.
-- **`staging-to-main-promotion.yml`** erstellt nach erfolgreichem Staging-Lauf einen Draft-PR von `staging` nach `main`.
+- **`staging-to-main-promotion.yml`** erstellt direkt nach jedem Push auf `staging` einen Draft-PR von `staging` nach `main`, sobald `main` hinter `staging` zurückliegt.
 - **`verify-pr-source.yml`** erlaubt Pull Requests nach `main` ausschließlich aus `staging`.
 - **`release.yml`** erstellt auf `main`-Pushes oder `v*.*.*`-Tags GitHub-Releases.
 - **`sync-staging-with-main.yml`** erstellt nach einem Release einen automatischen Backmerge-PR von `main` nach `staging`.
