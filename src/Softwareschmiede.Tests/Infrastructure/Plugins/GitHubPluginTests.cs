@@ -732,6 +732,22 @@ public sealed class GitHubPluginTests
         result.Should().BeFalse();
     }
 
+    /// <summary>GET /user antwortet für Installationstokens mit 403 statt 401 —
+    /// CheckHealthAsync liefert ebenfalls false (fixiert die ghs_-403-Konsequenz).</summary>
+    [Fact]
+    public async Task CheckHealthAsync_Forbidden_ReturnsFalse()
+    {
+        // Arrange
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns("token");
+        _api.AddStatus("user", 403);
+
+        // Act
+        var result = await _sut.CheckHealthAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
     /// <summary>PluginMetadata_ShouldExposeExpectedValues.</summary>
     [Fact]
     public void PluginMetadata_ShouldExposeExpectedValues()
@@ -1589,6 +1605,82 @@ public sealed class GitHubPluginTests
         field.FieldType.Should().Be(PluginSettingFieldType.Secret);
         field.IsRequired.Should().BeFalse();
         field.Description.Should().Contain("notifications").And.Contain("repo");
+    }
+
+    /// <summary>GetAgentEnvironmentAsync reicht ein ~520-stelliges ghs_-Installationstoken
+    /// unverändert als GH_TOKEN und Base64-eingebetteten http.extraheader weiter — der
+    /// GIT_CONFIG_VALUE_0-Wert erreicht dabei ~720 Zeichen (Kettenglieder Agenten-/git-Umgebung).</summary>
+    [Fact]
+    public async Task GetAgentEnvironmentAsync_GhsToken_ProvidesGhAndGitAuth()
+    {
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns(TestTokens.GhsInstallationToken);
+
+        var environment = await _sut.GetAgentEnvironmentAsync(Softwareschmiede.Domain.Enums.ScmAccountMode.UserAccount, "https://github.com/owner/repo", TestContext.Current.CancellationToken);
+
+        environment["GH_TOKEN"].Should().Be(TestTokens.GhsInstallationToken);
+        environment["GIT_CONFIG_COUNT"].Should().Be("1");
+        environment["GIT_CONFIG_KEY_0"].Should().Be("http.https://github.com/.extraheader");
+        var expected = "AUTHORIZATION: basic " + Convert.ToBase64String(
+            System.Text.Encoding.UTF8.GetBytes("x-access-token:" + TestTokens.GhsInstallationToken));
+        environment["GIT_CONFIG_VALUE_0"].Should().Be(expected);
+        environment.Should().NotContainKey("GIT_SSH_COMMAND");
+    }
+
+    /// <summary>CloneRepositoryAsync übergibt ein ~520-stelliges ghs_-Token unverändert über die
+    /// Prozessumgebung (GH_TOKEN + http.extraheader) an den git-Kindprozess — niemals als Argument.</summary>
+    [Fact]
+    public async Task CloneRepositoryAsync_GhsToken_PassesEnvironmentToCli()
+    {
+        // Arrange
+        _credentialStoreMock.Setup(c => c.GetCredential(It.IsAny<string>())).Returns(TestTokens.GhsInstallationToken);
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<string?>(),
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, string.Empty, string.Empty));
+
+        // Act
+        await _sut.CloneRepositoryAsync("https://github.com/test/repo", "/target/path", TestContext.Current.CancellationToken);
+
+        // Assert
+        _cliRunnerMock.Verify(c => c.RunAsync(
+            "git",
+            It.Is<IEnumerable<string>>(a => a.Contains("clone") && a.All(x => !x.Contains(TestTokens.GhsInstallationToken, StringComparison.Ordinal))),
+            null,
+            It.Is<IDictionary<string, string>?>(env => env != null && env["GH_TOKEN"] == TestTokens.GhsInstallationToken
+                && HasGitHubExtraHeader(env, TestTokens.GhsInstallationToken, "http.https://github.com/.extraheader") && !env.ContainsKey("GIT_SSH_COMMAND")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>SanitizeSensitiveOutput maskiert ein ~520-stelliges ghs_-Token literal und in
+    /// der oauth2:-Einbettung — die Maskierung ist längenunabhängig.</summary>
+    [Fact]
+    public async Task SanitizeSensitiveOutput_GhsToken_IsMasked()
+    {
+        var token = TestTokens.GhsInstallationToken;
+        _credentialStoreMock.Setup(c => c.GetCredential("Softwareschmiede.GitHub.Token")).Returns(token);
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => SequenceEqual(a, "config", "remote.origin.url")),
+                "/repo",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(0, "https://github.com/owner/repo.git", string.Empty));
+        _cliRunnerMock.Setup(c => c.RunAsync(
+                "git",
+                It.Is<IEnumerable<string>>(a => a.Contains("push")),
+                "/repo",
+                It.IsAny<IDictionary<string, string>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CliResult(1, string.Empty, $"fatal: {token} unable to access 'https://oauth2:{token}@github.com/owner/repo.git/': push failed"));
+
+        Func<Task> act = () => _sut.PushBranchAsync("/repo", "feature/a");
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        exception.Which.Message.Should().NotContain(token);
+        exception.Which.Message.Should().Contain("oauth2:***@");
     }
 
     /// <summary>SanitizeSensitiveOutput maskiert auch das AgentToken in Fehlertexten.</summary>

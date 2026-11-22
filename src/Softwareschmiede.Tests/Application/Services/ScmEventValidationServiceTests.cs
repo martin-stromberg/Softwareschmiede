@@ -141,6 +141,28 @@ public sealed class ScmEventValidationServiceTests
         Assert.Null(ScmEventValidationService.GetRejection(Observe("$Softwareschmiede bitte", "42", null, false)));
     }
 
+    /// <summary>Ein ghs_-Installationstoken meldet sich als <c>&lt;app-slug&gt;[bot]</c>-Viewer an,
+    /// der nie der Repository-Owner ist — im Benutzerkonto-Modus wird jedes Ereignis
+    /// verworfen (fixiert die dokumentierte funktionale Nichteignung als Dauer-Credential).</summary>
+    [Fact]
+    public void GetRejection_BotViewerNotOwner_IsRejected()
+    {
+        var observation = Observe("$Softwareschmiede bitte", "42", null, false);
+        observation = observation with
+        {
+            Reference = observation.Reference with
+            {
+                Repository = observation.Reference.Repository with
+                {
+                    ViewerId = "BOT_ID",
+                    ViewerLogin = "meine-app[bot]"
+                }
+            }
+        };
+        Assert.Equal("Angemeldeter Benutzer ist nicht Repository-Owner",
+            ScmEventValidationService.GetRejection(observation));
+    }
+
     /// <summary>Eine Reaktion des Ereignis-Kontos auf einem Kommentar gilt als bereits bearbeitet.</summary>
     [Theory]
     [InlineData(ScmContentKind.IssueComment)]

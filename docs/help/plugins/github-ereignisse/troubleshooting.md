@@ -61,6 +61,12 @@
 
 > **Hinweis:** Die Anwendung schont das Kontingent bereits aktiv — Repository-Auflösungen laufen gecacht und über das eigene, meist freie GraphQL-Kontingent. Eine tatsächliche Erschöpfung deutet daher meist auf externe Verbraucher desselben Tokens oder eine sehr große überwachte Repository-Menge hin.
 
+## Beim Speichern erscheint der Hinweis „GitHub-Installationstoken“
+
+**Ursache:** Ein Secret-Feld der gerade ausgewählten Plugin-Einstellungen enthält einen Wert im Format `ghs_…` — ein GitHub-App-Installationstoken. Die Anwendung warnt, weil solche Tokens nach ca. einer Stunde ablaufen und keine Benutzeridentität liefern (`GET /user` antwortet mit 403, der GraphQL-Viewer ist `<app-slug>[bot]`) — als dauerhafte Zugangsdaten sind sie ungeeignet. Abgelehnt wird der Wert nicht; **Ja** übernimmt ihn unverändert, **Nein** verwirft den gesamten Speichervorgang.
+
+**Lösung:** Für den Dauerbetrieb einen Personal Access Token (z. B. `ghp_…` oder `github_pat_…`) eintragen (siehe [Einrichtung — Unterstützte Token-Formate](installation.md#unterstützte-token-formate)). Wird das Installationstoken bewusst für einen kurzlebigen Einsatz verwendet, mit **Ja** bestätigen. Die Token-Erneuerung liegt außerhalb der Anwendung: Nach Ablauf (erkennbar an pauschalen 401-/403-Fehlern, etwa „GitHub-Anmeldung oder Repositoryzugriff schlägt fehl") muss ein neues Installationstoken aus der GitHub App erzeugt und eingetragen — oder besser ein Personal Access Token verwendet — werden.
+
 ## Das Speichern meldet einen fehlenden Token des separaten Kontos
 
 **Ursache:** Unter **Einstellungen → Automatisierung → Aufgaben ausführen** wurde der **Überwachungsmodus „Separates Konto"** gewählt, ohne dass ein Token des separaten Kontos hinterlegt ist.

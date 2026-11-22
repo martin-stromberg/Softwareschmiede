@@ -80,6 +80,20 @@ public sealed class SettingsView : BaseWindowView
         return this;
     }
 
+    /// <summary>Klickt den "Speichern"-Button ohne auf eine Bestätigung zu warten — für
+    /// Pfade, bei denen zuerst ein Hinweis-/Bestätigungsdialog erscheint (z. B. die
+    /// ghs_-Installationstoken-Warnung).</summary>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView ClickSave()
+    {
+        WaitForElement(Window, cf => cf.ByName("Save"), Short).AsButton().ClickInForeground();
+        return this;
+    }
+
+    /// <summary>Prüft, ob die Speicher-Bestätigung "Settings gespeichert." aktuell sichtbar ist.</summary>
+    /// <returns><c>true</c>, wenn das Erfolgsbanner im UIA-Baum enthalten ist.</returns>
+    public bool IsSettingsSavedVisible() => ElementExists(Window, cf => cf.ByName("Settings gespeichert."));
+
     /// <summary>
     /// Wählt im "Plugins"-Tab den Eintrag des LocalDirectoryPlugin aus, setzt WorkspaceMode und
     /// Quellverzeichnis und speichert. Navigiert anschließend zurück zum Dashboard. Bildet dieselbe
@@ -767,6 +781,9 @@ public sealed class SettingsView : BaseWindowView
         field.Focus();
         Assert.True(field.Properties.HasKeyboardFocus.Value,
             $"Secret-Feld '{fieldKey}' hat vor der Eingabe keinen Tastaturfokus.");
+        // Vorbefüllte Werte (z. B. ein persistiertes Token) zuerst vollständig markieren,
+        // damit die Eingabe ersetzt statt angehängt wird.
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_A);
         foreach (var rune in value.EnumerateRunes())
         {
             var runeText = rune.ToString();

@@ -87,6 +87,22 @@ public sealed class GitHubHttpApiClientTests
         }
     }
 
+    /// <summary>Ein ~520-stelliges ghs_-Installationstoken (JWT-Zeichensatz .-_) passiert den
+    /// Bearer-Header exakt und unbeanstandet (Kettenglied HTTP-Transport).</summary>
+    [Fact]
+    public async Task SendAsync_GhsInstallationToken_BearerHeaderCarriesExactToken()
+    {
+        HttpRequestMessage? captured = null;
+        var client = Client(request =>
+        {
+            captured = request;
+            return Task.FromResult(Response(HttpStatusCode.OK, "{}"));
+        }, () => TestTokens.GhsInstallationToken);
+        await client.SendAsync(new("github.com", "GET", "user"), TestContext.Current.CancellationToken);
+        captured!.Headers.Authorization!.Scheme.Should().Be("Bearer");
+        captured.Headers.Authorization.Parameter.Should().Be(TestTokens.GhsInstallationToken);
+    }
+
     /// <summary>Der Token-Selektor wird pro Request ausgewertet (Wechsel wirkt ohne Neustart).</summary>
     [Fact]
     public async Task SendAsync_TokenProviderIsEvaluatedPerRequest()

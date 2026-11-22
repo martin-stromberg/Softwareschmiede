@@ -28,6 +28,7 @@ public sealed class SettingsViewModelTests : IDisposable
     private readonly InMemoryCredentialStoreForSettings _credentialStore;
     private readonly PluginSettingsService _pluginSettingsService;
     private readonly PromptTemplateService _promptTemplatesService;
+    private readonly Mock<IDialogService> _dialogServiceMock;
 
     /// <summary>SettingsViewModelTests.</summary>
     public SettingsViewModelTests()
@@ -51,6 +52,7 @@ public sealed class SettingsViewModelTests : IDisposable
         _credentialStore = new InMemoryCredentialStoreForSettings();
         _pluginSettingsService = new PluginSettingsService(_credentialStore, NullLogger<PluginSettingsService>.Instance);
         _promptTemplatesService = new PromptTemplateService(_db, NullLogger<PromptTemplateService>.Instance);
+        _dialogServiceMock = new Mock<IDialogService>();
     }
 
     /// <summary>Dispose.</summary>
@@ -67,7 +69,7 @@ public sealed class SettingsViewModelTests : IDisposable
             _promptTemplatesService,
             new ProjectService(_db, NullLogger<ProjectService>.Instance),
             NullLogger<SettingsViewModel>.Instance,
-            new Mock<IDialogService>().Object,
+            _dialogServiceMock.Object,
             new Mock<IServiceProvider>().Object);
 
     private static Mock<IGitPlugin> CreateScmPluginMock(string pluginName, IReadOnlyList<PluginSettingGroup>? groups = null)
@@ -217,6 +219,80 @@ public sealed class SettingsViewModelTests : IDisposable
 
         var savedPlugin = await _settingService.GetSettingAsync(AppSettingService.DefaultScmPluginKey, TestContext.Current.CancellationToken);
         savedPlugin.Should().Be("GitHub");
+    }
+
+    /// <summary>Ein ghs_-Installationstoken in einem Secret-Feld löst den Hinweisdialog aus;
+    /// bei Bestätigung („Ja“) wird der Wert regulär persistiert.</summary>
+    [Fact]
+    public async Task Save_GhsToken_ConfirmDialogConfirmed_Persists()
+    {
+        var field = new PluginSettingField("Token", "Personal Access Token", PluginSettingFieldType.Secret);
+        var group = new PluginSettingGroup("Authentifizierung", [field]);
+        var scmPlugin = CreateScmPluginMock("GitHub", [group]).Object;
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        _dialogServiceMock.Setup(d => d.ConfirmDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.ScmPluginSelectedCommand.Execute(scmPlugin);
+
+        sut.SelectedPluginSettings[0].Entries[0].Value = TestTokens.GhsInstallationToken;
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
+
+        _dialogServiceMock.Verify(d => d.ConfirmDialog(
+            It.Is<string>(m => m.Contains("Personal Access Token")),
+            "GitHub-Installationstoken"), Times.Once);
+        sut.ErrorMessage.Should().BeNull();
+        _pluginSettingsService.GetValue(scmPlugin, field).Should().Be(TestTokens.GhsInstallationToken);
+    }
+
+    /// <summary>Wird der ghs_-Hinweisdialog abgebrochen („Nein“), wird gar nichts persistiert —
+    /// weder Credential noch Host-Einstellungen.</summary>
+    [Fact]
+    public async Task Save_GhsToken_ConfirmDialogCancelled_PersistsNothing()
+    {
+        var field = new PluginSettingField("Token", "Personal Access Token", PluginSettingFieldType.Secret);
+        var group = new PluginSettingGroup("Authentifizierung", [field]);
+        var scmPlugin = CreateScmPluginMock("GitHub", [group]).Object;
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        _dialogServiceMock.Setup(d => d.ConfirmDialog(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.ScmPluginSelectedCommand.Execute(scmPlugin);
+
+        sut.SelectedPluginSettings[0].Entries[0].Value = TestTokens.GhsInstallationToken;
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
+
+        _dialogServiceMock.Verify(d => d.ConfirmDialog(It.IsAny<string>(), "GitHub-Installationstoken"), Times.Once);
+        sut.SuccessMessage.Should().BeNull();
+        sut.ErrorMessage.Should().BeNull();
+        _pluginSettingsService.GetValue(scmPlugin, field).Should().BeNull();
+        (await _settingService.GetSettingAsync(AppSettingService.DefaultScmPluginKey, TestContext.Current.CancellationToken))
+            .Should().BeNull();
+    }
+
+    /// <summary>Ein Personal Access Token (ghp_) löst den Hinweisdialog nicht aus und wird
+    /// ohne Rückfrage persistiert.</summary>
+    [Fact]
+    public async Task Save_PatValue_NoConfirmDialog()
+    {
+        var pat = "ghp_" + new string('a', 36);
+        var field = new PluginSettingField("Token", "Personal Access Token", PluginSettingFieldType.Secret);
+        var group = new PluginSettingGroup("Authentifizierung", [field]);
+        var scmPlugin = CreateScmPluginMock("GitHub", [group]).Object;
+        _pluginManagerMock.Setup(m => m.GetSourceCodeManagementPlugins()).Returns([scmPlugin]);
+        _pluginManagerMock.Setup(m => m.GetDevelopmentAutomationPlugins()).Returns([]);
+        var sut = CreateSut();
+        await ((AsyncRelayCommand)sut.LoadCommand).ExecuteAsync();
+        sut.ScmPluginSelectedCommand.Execute(scmPlugin);
+
+        sut.SelectedPluginSettings[0].Entries[0].Value = pat;
+        await ((AsyncRelayCommand)sut.SaveCommand).ExecuteAsync();
+
+        _dialogServiceMock.Verify(d => d.ConfirmDialog(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        sut.ErrorMessage.Should().BeNull();
+        _pluginSettingsService.GetValue(scmPlugin, field).Should().Be(pat);
     }
 
     /// <summary>SpeichernAsync speichert DefaultAiPlugin Name und alle KI-Einstellungswerte.</summary>

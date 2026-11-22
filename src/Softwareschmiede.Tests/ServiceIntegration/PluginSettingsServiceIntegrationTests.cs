@@ -4,6 +4,7 @@ using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Domain.ValueObjects;
+using Softwareschmiede.Tests.Helpers;
 
 namespace Softwareschmiede.Tests.ServiceIntegration;
 
@@ -64,6 +65,20 @@ public sealed class PluginSettingsServiceIntegrationTests
         _sut.DeleteValue(plugin, field);
 
         _sut.HasValue(plugin, field).Should().BeFalse();
+    }
+
+    /// <summary>Ein ~520-stelliges ghs_-Installationstoken (JWT-Zeichensatz .-_) durchläuft
+    /// SetValue/GetValue über den Credential Store unverändert (Kettenglied Einstellungs-Persistenz).</summary>
+    [Fact]
+    public void SetValue_GhsInstallationToken_RoundtripsUnchanged()
+    {
+        var plugin = new FakeSettingsPlugin("GitHub", "Softwareschmiede.GitHub");
+        var field = new PluginSettingField("Token", "Personal Access Token", PluginSettingFieldType.Secret);
+
+        _sut.SetValue(plugin, field, TestTokens.GhsInstallationToken);
+        var loaded = _sut.GetValue(plugin, field);
+
+        loaded.Should().Be(TestTokens.GhsInstallationToken);
     }
 
     /// <summary>GetValue_GibtNull_OhneGespeichertenWert.</summary>

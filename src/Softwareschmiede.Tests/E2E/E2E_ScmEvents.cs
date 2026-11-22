@@ -1,11 +1,16 @@
 using System.Text.Json;
 using FlaUI.Core.AutomationElements;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Softwareschmiede.App.Services.Testing;
 using Softwareschmiede.Application.Services;
+using Softwareschmiede.Application.Services.Updates;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Infrastructure.Data;
 using Softwareschmiede.Tests.E2E.Views.Dialogs;
 using Softwareschmiede.Tests.E2E.Views;
+using Softwareschmiede.Tests.Helpers;
 using Xunit;
 
 namespace Softwareschmiede.Tests.E2E;
@@ -695,6 +700,111 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.True(after.Count(x => Endpoint(x) == "graphql") > calls.Count(x => Endpoint(x) == "graphql"),
             "GraphQL muss trotz REST-Sperre eigenständig weiterlaufen.");
         output.WriteLine($"Phase B: REST eingefroren bei {frozen} Calls, GraphQL läuft weiter.");
+    }
+
+    /// <summary>Issue #453: ein ~520-stelliges <c>ghs_</c>-Installationstoken in den
+    /// GitHub-Einstellungen löst den Hinweisdialog aus — SCM-E2E-Modus, weil nur dort das
+    /// echte GitHub-Plugin samt prozessgebundenem <c>ScmE2ECredentialStore</c> geladen wird.
+    /// Ein App-Prozess deckt die drei Teilflüsse ab: 1) Warnhinweis erscheint (BoundingBox
+    /// im Bildschirm, Screenshot im TestRoot) und „Ja" persistiert; die Panel-Neuwahl lädt
+    /// das Token erneut, der erneute Warnhinweis belegt den Roundtrip PasswordBox →
+    /// PluginSettingsService → Credential Store → PasswordBox. 2) Ein PAT speichert ohne
+    /// Hinweis. 3) Ein ghs_-Wert mit „Nein" wird vollständig verworfen — die Neuwahl lädt
+    /// den zuvor persistierten PAT, der ohne Hinweis speichert.</summary>
+    [Fact]
+    public async Task ScmEvents_GitHubGhsTokenWarning_UiRoundtrip_E2E()
+    {
+        SkipWhenWpfE2ENotAvailable();
+
+        // Schlankes SCM-Setup ohne die 17-Workspace-Initialisierung: Für Einstellungen,
+        // GitHub-Plugin und prozessgebundenen Credential Store reichen TestRoot,
+        // Konfiguration, leeres Szenario und eine migrierte Testdatenbank.
+        var testRoot = Path.Combine(Path.GetTempPath(), "softwareschmiede_scm_e2e_" + Guid.NewGuid().ToString("N"));
+        var configurationPath = Path.Combine(testRoot, "scm-config.json");
+        var databasePath = Path.Combine(testRoot, "test.db");
+        var configuration = new ScmE2ETestConfiguration { TestRoot = testRoot };
+        Directory.CreateDirectory(testRoot);
+        Directory.CreateDirectory(configuration.SimulatorDirectory);
+        File.WriteAllText(configurationPath, JsonSerializer.Serialize(configuration));
+        File.WriteAllText(configuration.ScenarioPath, JsonSerializer.Serialize(new ScmE2EScenario()));
+        await using (var db = new SoftwareschmiedeDbContext(
+            new DbContextOptionsBuilder<SoftwareschmiedeDbContext>().UseSqlite($"Data Source={databasePath}").Options))
+        {
+            await db.Database.MigrateAsync(TestContext.Current.CancellationToken);
+            var settingService = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+            await settingService.SetUpdateSettingsAsync(
+                new UpdateSettings(UpdateMode.Off, UpdatePathChannelResolver.StableVersionsPath), TestContext.Current.CancellationToken);
+            await settingService.SetSettingAsync(AppSettingService.DefaultAiPluginKey, null, TestContext.Current.CancellationToken);
+            await settingService.SetSettingAsync(WorkingDirectorySettingsService.RepositoriesWorkdirKey, testRoot, TestContext.Current.CancellationToken);
+            // Die Ereignisüberwachung ist für diesen Test ohne Belang — deaktiviert hält
+            // sie den Simulator und den UI-Pfad frei von Hintergrund-Polling.
+            await settingService.SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, false, TestContext.Current.CancellationToken);
+        }
+        var window = WaitOnRealMainwindow(LaunchApp(false, new Dictionary<string, string?>
+        {
+            [ScmE2ETestConfiguration.EnvironmentVariable] = configurationPath,
+            ["SOFTWARESCHMIEDE_TEST_DB_PATH"] = databasePath
+        }));
+        output.WriteLine("ghs_-Warnhinweis SCM-TestRoot: " + testRoot);
+
+        var settings = new SettingsView(window).ForceShow();
+        settings.SwitchTab("Plugins");
+        WaitForElement(window, cf => cf.ByName("Softwareschmiede.GitHub.Entry"), Long).ClickInForeground();
+        var warning = new GhsTokenWarningDialogView(window);
+
+        // Teilfluss 1: ghs_-Token eintragen → Warnhinweis → Ja → persistiert.
+        settings.SetPluginSecretField("Token", TestTokens.GhsInstallationToken);
+        settings.ClickSave();
+        var dialog = warning.WaitForDialog();
+        var screen = Automation.GetDesktop().BoundingRectangle;
+        Assert.True(screen.Contains(dialog.BoundingRectangle),
+            $"Warndialog {dialog.BoundingRectangle} liegt nicht vollständig im Bildschirm {screen}.");
+        var screenshotPath = Path.Combine(testRoot, "ghs-installationstoken-warning.png");
+        dialog.CaptureToFile(screenshotPath);
+        Assert.True(File.Exists(screenshotPath));
+        output.WriteLine("Warnhinweis-Screenshot: " + screenshotPath);
+        warning.Confirm();
+        settings.WaitForSettingsSaved();
+
+        // Roundtrip-Beweis über die UI: SCM- und KI-Plugin liegen in getrennten Listen —
+        // ein erneuter Klick auf den unverändert selektierten GitHub-Eintrag löst kein
+        // SelectionChanged aus. „Verwerfen" (LoadAsync) baut die Listen neu auf, setzt die
+        // Selektion zurück und lädt beim nächsten Klick das Panel mit dem persistierten
+        // ghs_-Token — ohne Roundtrip käme beim Speichern kein Hinweis mehr.
+        settings.DiscardChanges();
+        WaitForElement(window, cf => cf.ByName("Softwareschmiede.GitHub.Entry"), Long).ClickInForeground();
+        settings.ClickSave();
+        warning.WaitForDialog();
+        warning.Confirm();
+        settings.WaitForSettingsSaved();
+        output.WriteLine("ghs_ bestätigt+gespeichert; Panel-Neuwahl warnte erneut (Roundtrip).");
+
+        // Teilfluss 2: PAT speichert ohne Installationstoken-Hinweis.
+        settings.SetPluginSecretField("Token", "ghp_" + new string('a', 36));
+        settings.ClickSave();
+        settings.WaitForSettingsSaved();
+        Assert.False(warning.IsVisible, "Bei einem PAT darf kein Installationstoken-Hinweis erscheinen.");
+        output.WriteLine("PAT: kein Warnhinweis, direkte Speicherung.");
+
+        // Teilfluss 3: ghs_-Wert eintragen → Warnhinweis → Nein → nichts persistiert.
+        settings.SetPluginSecretField("Token", TestTokens.GhsInstallationToken);
+        settings.ClickSave();
+        warning.WaitForDialog();
+        warning.Cancel();
+        // SaveAsync bricht vor jeder Persistenz ab — das Erfolgsbanner darf nie erscheinen.
+        var bannerDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+        while (DateTime.UtcNow < bannerDeadline && !settings.IsSettingsSavedVisible())
+            Thread.Sleep(100);
+        Assert.False(settings.IsSettingsSavedVisible(), "Nach Abbruch des Hinweises darf kein Erfolgsbanner erscheinen.");
+
+        // Die Panel-Neuwahl lädt den zuletzt persistierten PAT — ein Speichern ohne
+        // Warnhinweis belegt, dass der abgebrochene ghs_-Wert nicht persistiert wurde.
+        settings.DiscardChanges();
+        WaitForElement(window, cf => cf.ByName("Softwareschmiede.GitHub.Entry"), Long).ClickInForeground();
+        settings.ClickSave();
+        settings.WaitForSettingsSaved();
+        Assert.False(warning.IsVisible, "Nach Abbruch wurde der ghs_-Wert nicht persistiert — das Panel lädt den PAT.");
+        output.WriteLine("ghs_-Warnhinweis: Ja persistiert (Roundtrip), PAT ohne Hinweis, Nein verwirft.");
     }
 
     private static bool IsResolutionCall(JsonElement call)

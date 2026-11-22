@@ -18,6 +18,30 @@
 4. Prüfe in einer Aufgabe, dass Repository und Issue- oder Pull-Request-Referenz korrekt verknüpft sind.
 5. Schreibe als Repository-Owner einen Text mit dem Trigger-Keyword (Standard `$Softwareschmiede`) in die Beschreibung oder Diskussion und prüfe **SCM-Ereignisse**.
 
+## Unterstützte Token-Formate
+
+Die Felder **Personal Access Token** und **Personal Access Token des separaten Kontos** sind für GitHub-Personal-Access-Tokens vorgesehen (klassisch `ghp_…`, fine-grained `github_pat_…`). Andere GitHub-Tokens — etwa **GitHub-App-Installationstokens** (Präfix `ghs_…`, mehrere hundert Zeichen im JWT-Zeichensatz `A-Z a-z 0-9 . - _`) — werden **technisch unverändert übernommen, sind aber als dauerhafte Zugangsdaten ungeeignet**. Denselben Hinweis tragen die Beschreibungstexte unter beiden Feldern bereits vor dem Speichern sichtbar. Beim Speichern erscheint deshalb ein Hinweisdialog, der die betroffenen Felder benennt und eine ausdrückliche Bestätigung verlangt; **Nein** verwirft den gesamten Speichervorgang.
+
+**Technisch geprüft** (durch automatisierte Tests belegt) ist der unveränderte Transport eines ~520-stelligen Installationstokens durch jedes Glied der Token-Kette:
+
+| Kettenglied | Ergebnis |
+|---|---|
+| Einstellungsfeld (`PasswordBox`) | Wert unverändert |
+| `PluginSettingsService` → Windows Credential Manager | Roundtrip exakt — ~520 Zeichen ≙ ~1040 Byte UTF-16, deutlich unter der 2560-Byte-Grenze `CRED_MAX_CREDENTIAL_BLOB_SIZE` von `CredWriteW`. Einzige Längen-Hartgrenze: Werte über ~1280 UTF-16-Zeichen scheitern mit einer `CredWriteW`-Fehlermeldung. |
+| HTTP-Transport (`GitHubHttpApiClient`) | exakt als `Authorization: Bearer`-Header |
+| Agenten-/git-Umgebung | `GH_TOKEN` plus `GIT_CONFIG_*`/`http.…extraheader` (Base64 `x-access-token:<token>`) — beide Wege längenunabhängig |
+| Ausgabemaskierung | wird wie jedes gespeicherte Secret als `***` maskiert, auch in `oauth2:…@`-URLs |
+| `gh`-CLI (Agenten) | `gh` unterstützt Installationstokens offiziell — dokumentarische Aussage, nicht automatisiert geprüft |
+
+**Funktional ungeeignet** bleibt ein Installationstoken trotzdem — eine dokumentierte Grenze der Technik, kein Fehler der Anwendung. Sie wird bewusst **nicht** durch Token-Erneuerung oder GitHub-App-Integration umgangen:
+
+- **Ablauf nach ca. einer Stunde**: Danach scheitern alle Aufrufe mit 401/403, bis das Token manuell ersetzt wird. Eine automatische Erneuerung ist nicht implementiert — sie erfordert die Private-Key-Authentifizierung einer installierten GitHub App.
+- **Keine Benutzeridentität**: `GET /user` und `GET /user/repos` antworten mit **403**; der GraphQL-Viewer meldet sich als `<app-slug>[bot]`.
+- **Owner-Prüfung schlägt fehl**: Im Überwachungsmodus „Benutzerkonto" muss der Viewer der Repository-Owner sein — ein `<app-slug>[bot]`-Viewer erfüllt das nie; jedes Ereignis würde verworfen.
+- **Folge**: Gesundheitsprüfung (`/user`), Repository-Enumeration (`/user/repos`) und die Ereignisverarbeitung im Modus „Benutzerkonto" arbeiten mit Installationstokens nicht zuverlässig.
+
+Ein Installationstoken eignet sich nur für kurzlebige, bewusst eingesetzte Szenarien — für die dauerhafte Einrichtung einen Personal Access Token verwenden.
+
 ## Separates Konto (Bot-Konto)
 
 Alternativ kann die Überwachung unter **Einstellungen → Automatisierung → Aufgaben ausführen → Überwachungsmodus** auf **„Separates Konto“** umgeschaltet werden. Dann enumeriert die Ereignisüberwachung nicht mehr repository-weit, sondern liest ausschließlich die GitHub-Notifications-Inbox eines eigenen Bot-Kontos; aus `reason = mention`-Einträgen entstehen Ereignisse. Lediglich die unabhängigen Prüfzyklen der Backmerge-Automatik und der Issue-Aufbereitung enumerieren weiter — stets unter dem Benutzerkonto, nicht über das separate Konto.

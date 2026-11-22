@@ -23,6 +23,12 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
     private const string GitHubAgentTokenCredentialKey = "Softwareschmiede.GitHub.AgentToken";
     private const string RepositoryUrlKey = "RepositoryUrl";
     private const string RepositoryNameKey = "RepositoryName";
+
+    /// <summary>Gemeinsamer Hinweis der Secret-Feld-Beschreibungen: <c>ghs_</c>-Installationstokens
+    /// werden technisch übernommen, sind aber als dauerhafte Zugangsdaten ungeeignet. Als
+    /// vollständiger eigenständiger Satz formuliert — hinter „. “ an die Description anhängen.</summary>
+    private const string InstallationTokenHint =
+        "GitHub-App-Installationstokens (Präfix „ghs_“) werden technisch übernommen, laufen aber nach etwa einer Stunde ab und liefern keine Benutzeridentität — als dauerhafte Zugangsdaten ungeeignet.";
     private static readonly Regex EmbeddedTokenPattern = new(@"oauth2:[^@\s]+@", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly string[] LegacyNetrcHosts = ["github.com", "api.github.com"];
 
@@ -69,14 +75,14 @@ public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEven
                 Label: "Personal Access Token",
                 FieldType: PluginSettingFieldType.Secret,
                 Placeholder: "ghp_...",
-                Description: "GitHub Personal Access Token mit den Berechtigungen repo, read:org und Zugriff auf Code-Scanning-Alerts. Token erstellen: https://github.com/settings/tokens/new",
+                Description: "GitHub Personal Access Token mit den Berechtigungen repo, read:org und Zugriff auf Code-Scanning-Alerts. Token erstellen: https://github.com/settings/tokens/new. " + InstallationTokenHint,
                 IsRequired: true),
             new PluginSettingField(
                 Key: "AgentToken",
                 Label: "Personal Access Token des separaten Kontos",
                 FieldType: PluginSettingFieldType.Secret,
                 Placeholder: "ghp_...",
-                Description: "GitHub Personal Access Token eines separaten Kontos für den Kontomodus „Separates Konto“ (Scopes: notifications und repo). Erforderlich, sobald der Kontomodus „Separates Konto“ gewählt ist.",
+                Description: "GitHub Personal Access Token eines separaten Kontos für den Kontomodus „Separates Konto“ (Scopes: notifications und repo). Erforderlich, sobald der Kontomodus „Separates Konto“ gewählt ist. " + InstallationTokenHint,
                 IsRequired: false)
         ]),
         new PluginSettingGroup("Pull Requests",

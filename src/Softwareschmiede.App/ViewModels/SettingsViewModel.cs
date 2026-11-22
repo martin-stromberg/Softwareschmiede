@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.App.Services;
@@ -21,6 +22,10 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private const string GitHubAgentTokenFieldKey = "AgentToken";
     private const string CommandLineParameterKey = "CommandLineParameters";
     private const string ParallelLimitGroupName = "Ausführungsbegrenzung";
+
+    /// <summary>Erkennt GitHub-App-Installationstokens im Changelog-Format
+    /// <c>ghs_[A-Za-z0-9.\-_]{36,}</c> — identisch zur Regex im Issue #453.</summary>
+    private static readonly Regex GitHubInstallationTokenPattern = new(@"ghs_[A-Za-z0-9.\-_]{36,}", RegexOptions.Compiled);
 
     /// <summary>Host-seitig deklariertes Limit-Feld für KI-Plugins; persistiert über
     /// <see cref="ScmEventExecutionLimitService.PluginLimitKey(string)"/> in <see cref="AppSettingService"/>,
@@ -717,6 +722,12 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 return;
             }
 
+            // Bestätigungs-Gate bewusst erst nach allen Validierungen und unmittelbar vor
+            // der ersten Persistenz-Operation: Eine später scheiternde Prüfung darf nicht
+            // nach einer bereits erteilten Dialog-Zusage mit Fehlermeldung abbrechen.
+            if (!ConfirmGitHubInstallationTokens())
+                return;
+
             var updateSettings = new UpdateSettings(updateMode, updatePath);
             await _settingService.SetUpdateSettingsAsync(updateSettings, ct);
             UpdateSettingsSaved?.Invoke(this, updateSettings);
@@ -1003,6 +1014,33 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 _pluginSettingsService.SetValue(plugin, entry.Field, entry.Value);
             }
         }
+    }
+
+    /// <summary>Warnt vor dem Persistieren, wenn ein Secret-Feld der gerade ausgewählten
+    /// Plugin-Einstellungen ein GitHub-App-Installationstoken enthält (<c>ghs_</c>-Präfix):
+    /// Installationstokens laufen nach ca. einer Stunde ab, liefern keine Benutzeridentität
+    /// (<c>/user</c> und <c>/user/repos</c> antworten mit 403, der GraphQL-Viewer ist
+    /// <c>&lt;app-slug&gt;[bot]</c>) und sind daher als dauerhafte Zugangsdaten ungeeignet.
+    /// Technisch werden sie unverändert übernommen — der Hinweis fordert eine explizite
+    /// Bestätigung an statt den Wert abzulehnen.</summary>
+    private bool ConfirmGitHubInstallationTokens()
+    {
+        var fieldLabels = _selectedPluginSettings
+            .SelectMany(group => group.Entries)
+            .Where(entry => entry.FieldType == PluginSettingFieldType.Secret
+                && GitHubInstallationTokenPattern.IsMatch(entry.Value.Trim()))
+            .Select(entry => entry.Field.Label)
+            .Distinct()
+            .ToList();
+        if (fieldLabels.Count == 0)
+            return true;
+
+        var message = (fieldLabels.Count == 1
+            ? $"Der Wert im Feld „{fieldLabels[0]}“ sieht aus wie ein GitHub-App-Installationstoken (Präfix „ghs_“). "
+            : $"Die Werte in den Feldern „{string.Join("“, „", fieldLabels)}“ sehen aus wie GitHub-App-Installationstokens (Präfix „ghs_“). ")
+            + "Installationstokens laufen nach etwa einer Stunde ab und liefern keine Benutzeridentität "
+            + "— als dauerhafte Zugangsdaten sind sie ungeeignet. Trotzdem speichern?";
+        return _dialogService.ConfirmDialog(message, "GitHub-Installationstoken");
     }
 
     private bool ValidateRequiredFields()

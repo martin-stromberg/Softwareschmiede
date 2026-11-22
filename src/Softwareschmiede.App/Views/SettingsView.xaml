@@ -139,6 +139,7 @@
                                                 ContentTemplateSelector="{StaticResource FieldTemplateSelector}" />
                                 <TextBlock Text="{Binding Field.Description}"
                                            FontSize="11"
+                                           TextWrapping="Wrap"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            Visibility="{Binding Field.Description, Converter={StaticResource NullOrEmptyToVisibilityConverter}}"
                                            Margin="0,2,0,0" />

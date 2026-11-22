@@ -271,6 +271,8 @@ Beispiel für GitHub:
 cmdkey /generic:Softwareschmiede.GitHub.Token /user:github /pass:<DEIN_TOKEN>
 ```
 
+Die GitHub-Token-Felder sind für Personal Access Tokens (`ghp_…`, `github_pat_…`) vorgesehen. GitHub-App-Installationstokens (`ghs_…`) werden technisch übernommen, laufen aber nach ca. einer Stunde ab und liefern keine Benutzeridentität — beim Speichern in den Plugin-Einstellungen warnt deshalb ein Bestätigungsdialog, ohne den Wert abzulehnen. Details: [Unterstützte Token-Formate](docs/help/plugins/github-ereignisse/installation.md#unterstützte-token-formate).
+
 ### App-Einstellungen
 
 Die Konfigurationsbasis liegt in `src/Softwareschmiede/appsettings*.json`. Im aktuellen Stand sind dort u. a. konfiguriert:
