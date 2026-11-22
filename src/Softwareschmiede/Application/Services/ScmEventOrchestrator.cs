@@ -629,7 +629,7 @@ public sealed class ScmEventOrchestrator(
         if (item.Status == ScmIncomingEventStatus.Verarbeitet) return;
         if (item.DeliveryAttemptId is not null)
         {
-            try { await ReconcilePreparationAttemptAsync(item, observation, responder, ct); }
+            try { await ReconcilePreparationAttemptAsync(item, observation, source, responder, ct); }
             catch (ScmActionIdCollisionException ex)
             {
                 item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
@@ -755,6 +755,21 @@ public sealed class ScmEventOrchestrator(
             var access = await adapter.CheckExchangeAccessAsync(Path.Combine(adapter.WorkingDirectory, ScmEventExchangeProtocol.DirectoryName), ct, task.Title);
             if (access.Status != ScmExchangeAccessStatus.Supported)
             { await WaitAsync(item, "Antwortkanal für diese CLI nicht verfügbar: " + access.Reason, ct); return; }
+            // Letzte Lebendprüfung unmittelbar vor der Zustellung: Plugin-Auflösung,
+            // CLI-Start und Kanalprobe können beliebig lange dauern — ein
+            // zwischenzeitlich geschlossenes Issue wird nicht mehr analysiert.
+            issue = await source.ReadIssueAsync(observation.Reference, ct);
+            if (issue is null)
+            { await WaitAsync(item, "Das Issue konnte nicht gelesen werden. Erneut prüfen.", ct); return; }
+            if (issue.IsClosed)
+            {
+                item.Status = ScmIncomingEventStatus.Verarbeitet;
+                item.Reason = null;
+                await db.SaveChangesAsync(ct);
+                await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage,
+                    $"Issue #{issue.Number} wurde vor der Zustellung geschlossen; die Aufbereitung wurde ohne Änderung abgeschlossen.", ct: ct);
+                return;
+            }
             var attemptId = Guid.NewGuid();
             // Der Analyse-Prompt wird aus persistierten Erkennungsdaten gebaut und bleibt damit
             // beim Wiederanlauf bitgleich rekonstruierbar (Prüfung gegen request.json).
@@ -830,7 +845,7 @@ public sealed class ScmEventOrchestrator(
     /// protokolliert, bei aktivem Schalter ist ein erfolgreicher Kommentar Abschlusskriterium.
     /// Kein Wartehinweis-, Fehler- oder Attachments-Kommentar am Issue.</summary>
     private async Task ReconcilePreparationAttemptAsync(ScmIncomingEvent item, ScmEventObservation observation,
-        IScmEventResponder responder, CancellationToken ct)
+        IScmEventSource source, IScmEventResponder responder, CancellationToken ct)
     {
         if (item.ExchangePath is null || !Guid.TryParse(item.CliRunId, out var runId)) return;
         var task = await db.WorkItems.Include(x => x.IssueReference)
@@ -855,6 +870,27 @@ public sealed class ScmEventOrchestrator(
             item.AcceptedUtc ??= time.GetUtcNow().ToUnixTimeMilliseconds();
             item.Status = ScmIncomingEventStatus.InBearbeitung;
             item.Reason = null;
+            // Zwischenzeitlich geschlossenes Issue: gelieferte Remote-Aktionen werden
+            // nicht mehr angewendet — je Aktion ein ehrliches Misserfolgs-Result, der
+            // Auftrag endet sauber ohne Remote-Änderung (Analyse durfte zu Ende laufen).
+            // Unlesbar = abwarten und beim nächsten Abgleich erneut prüfen.
+            if (messages.Actions.Count > 0)
+            {
+                var live = await source.ReadIssueAsync(observation.Reference, ct);
+                if (live is null) { await db.SaveChangesAsync(ct); return; }
+                if (live.IsClosed)
+                {
+                    foreach (var action in messages.Actions)
+                        await exchange.WriteResultAsync(attempt, new(1, item.Id, request.AttemptId, runId, action.ActionId,
+                            false, null, "Das Issue wurde zwischenzeitlich geschlossen; die Änderung wird nicht remote angewendet."), ct);
+                    item.Status = ScmIncomingEventStatus.Verarbeitet;
+                    item.Reason = null;
+                    await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage,
+                        $"Issue #{live.Number} wurde während der Analyse geschlossen; die Aufbereitung wurde ohne Remote-Änderung abgeschlossen.", ct: ct);
+                    await db.SaveChangesAsync(ct);
+                    return;
+                }
+            }
             var skippedComments = 0;
             var skippedActionIds = new HashSet<Guid>();
             foreach (var action in messages.Actions)
