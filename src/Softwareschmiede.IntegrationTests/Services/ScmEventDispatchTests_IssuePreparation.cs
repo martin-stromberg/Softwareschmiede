@@ -36,6 +36,16 @@ public sealed class ScmEventDispatchTests_IssuePreparation
 
         var delivered = await fixture.EventAsync(eventId);
         Assert.Equal("Zugestellt", delivered.Status);
+        // Typwechsel (#451): Nach erfolgreicher Zustellung ist die Aufgabe eine
+        // Anweisungsaufgabe; der Purpose bleibt zur Isolation „IssueAufbereitung".
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            var task = await db.WorkItems.AsNoTracking().SingleAsync(
+                x => x.Id == delivered.WorkItemId, TestContext.Current.CancellationToken);
+            Assert.Equal(WorkItemKind.Instruction, task.Kind);
+            Assert.Equal(ScmIssuePreparationService.Purpose, task.Purpose);
+        }
         Assert.Single(fixture.Sessions);
         var prompt = Assert.Single(fixture.Prompts);
         // Analyse-Prompt: Titel, Beschreibung und die Qualitätskriterien — nicht der rohe Body.

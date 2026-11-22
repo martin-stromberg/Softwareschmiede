@@ -152,6 +152,13 @@
                                          IsChecked="{Binding WorkItemListMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Ai}"
                                          AutomationProperties.Name="WorkItemsMode:AI"
                                          ToolTip="Gruppiert nach aktiver bzw. zuletzt verwendeter KI"
+                                         FontSize="11"
+                                         Margin="0,0,8,0" />
+                            <RadioButton GroupName="WorkItemMode"
+                                         Content="Art"
+                                         IsChecked="{Binding WorkItemListMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Kind}"
+                                         AutomationProperties.Name="WorkItemsMode:Kind"
+                                         ToolTip="Gruppiert nach Auftragsart (manuell, Anweisung, Issue-Aufbereitung, Pull Request, Alert)"
                                          FontSize="11" />
                         </StackPanel>
                     </StackPanel>

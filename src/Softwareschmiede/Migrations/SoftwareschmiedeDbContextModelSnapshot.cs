@@ -15,7 +15,7 @@ partial class SoftwareschmiedeDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261120194435_SchemaStabilityCheck";
+    public override string LastMigrationId => "20261122125707_AddWorkItemKind";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -265,7 +265,8 @@ partial class SoftwareschmiedeDbContextModelSnapshot : ModelSnapshot
 
                 b.Property<Guid?>("LogEntryId")
                     .HasColumnType("TEXT")
-                    .HasColumnName("ProtokollEintragId");
+                    .HasColumnName("ProtokollEintragId")
+                    .HasJsonPropertyName("ProtokollEintragId");
 
                 b.Property<int>("ModifiedLines")
                     .HasColumnType("INTEGER");
@@ -295,7 +296,8 @@ partial class SoftwareschmiedeDbContextModelSnapshot : ModelSnapshot
 
                 b.Property<Guid>("WorkItemId")
                     .HasColumnType("TEXT")
-                    .HasColumnName("AufgabeId");
+                    .HasColumnName("AufgabeId")
+                    .HasJsonPropertyName("AufgabeId");
 
                 b.HasKey("Id");
 
@@ -438,6 +440,8 @@ partial class SoftwareschmiedeDbContextModelSnapshot : ModelSnapshot
                 b.HasIndex("WorkItemId");
 
                 b.ToTable("Protokolleintraege");
+
+                b.HasAnnotation("Relational:JsonPropertyName", "ProtokollEintrag");
             });
 
         modelBuilder.Entity("Softwareschmiede.Domain.Entities.NotificationAudioFile", b =>
@@ -1255,6 +1259,13 @@ partial class SoftwareschmiedeDbContextModelSnapshot : ModelSnapshot
                 b.Property<Guid?>("GitRepositoryId")
                     .HasColumnType("TEXT");
 
+                b.Property<string>("Kind")
+                    .IsRequired()
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("TEXT")
+                    .HasDefaultValue("Unspecified")
+                    .HasColumnName("Auftragsart");
+
                 b.Property<long?>("LastCliStartUtc")
                     .HasColumnType("INTEGER")
                     .HasColumnName("LetzterCliStartUtc");
@@ -1325,6 +1336,8 @@ partial class SoftwareschmiedeDbContextModelSnapshot : ModelSnapshot
                 b.HasIndex("ProjectId");
 
                 b.ToTable("Aufgaben");
+
+                b.HasAnnotation("Relational:JsonPropertyName", "Aufgabe");
             });
 
         modelBuilder.Entity("Softwareschmiede.Domain.Entities.AlertReference", b =>

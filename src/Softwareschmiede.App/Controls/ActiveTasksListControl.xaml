@@ -16,6 +16,19 @@
                            TextTrimming="CharacterEllipsis"
                            Margin="0,2,0,0" />
                 <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <Border BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Padding="6,1"
+                            Margin="0,0,8,0"
+                            AutomationProperties.AutomationId="{Binding Title, StringFormat=ActiveWorkItemKind_{0}}"
+                            AutomationProperties.HelpText="{Binding KindLabel, StringFormat=Auftragsart: {0}}"
+                            ToolTip="{Binding KindLabel, StringFormat=Auftragsart: {0}}"
+                            Visibility="{Binding KindLabel, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
+                        <TextBlock Text="{Binding KindLabel}"
+                                   FontSize="10"
+                                   Foreground="{DynamicResource SecondaryTextBrush}" />
+                    </Border>
                     <TextBlock Text="{Binding ScmPluginSymbol}"
                                FontSize="13"
                                Foreground="{DynamicResource SecondaryTextBrush}"

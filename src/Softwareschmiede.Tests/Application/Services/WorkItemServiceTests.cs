@@ -55,6 +55,7 @@ public sealed class WorkItemServiceTests : IDisposable
         result.Status.Should().Be(WorkItemStatus.New);
         result.ExecutionStatus.Should().Be(WorkItemExecutionStatus.NotStarted);
         result.ProjectId.Should().Be(_projectId);
+        result.Kind.Should().Be(WorkItemKind.Manual);
     }
 
     /// <summary>CreateFromIssueAsync erstellt eine Aufgabe aus einem Issue mit IssueReferenz.</summary>
@@ -78,6 +79,39 @@ public sealed class WorkItemServiceTests : IDisposable
         result.IssueReference.Should().NotBeNull();
         result.IssueReference!.IssueNumber.Should().Be(42);
         result.IssueReference.Milestone.Should().Be("v1.0");
+        result.Kind.Should().Be(WorkItemKind.Manual);
+    }
+
+    /// <summary>CreateFromIssueEventAsync typisiert reguläre Ereignisaufgaben als Anweisung
+    /// und Aufbereitungsaufgaben als IssueAufbereitung.</summary>
+    [Theory]
+    [InlineData(null, WorkItemKind.Instruction)]
+    [InlineData("IssueAufbereitung", WorkItemKind.IssuePreparation)]
+    public async Task CreateFromIssueEventAsync_ShouldAssignKind_WhenCreatedFromEvent(string? purpose, WorkItemKind expectedKind)
+    {
+        // Arrange
+        var repository = new GitRepository
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = _projectId,
+            RepositoryName = "owner/repo",
+            RepositoryUrl = "https://github.com/owner/repo.git",
+            PluginType = "Softwareschmiede.GitHub",
+            Active = true
+        };
+        _db.GitRepositories.Add(repository);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var issue = new Issue(42, "Issue-Titel", "Body", [], null, "https://github.com/owner/repo/issues/42");
+
+        // Act
+        var result = await _sut.CreateFromIssueEventAsync(
+            _projectId, issue, repository.Id, $"src-{purpose ?? "default"}",
+            TestContext.Current.CancellationToken, purpose: purpose);
+
+        // Assert
+        result.Kind.Should().Be(expectedKind);
+        result.Purpose.Should().Be(purpose);
     }
 
     /// <summary>CreateFromPullRequestAsync erstellt eine Aufgabe mit ReviewSource-Referenz.</summary>
@@ -143,6 +177,7 @@ public sealed class WorkItemServiceTests : IDisposable
         reference.SourceRef.Should().Be("refs/heads/feature/external");
         reference.MonitoringPhase.Should().Be(PullRequestMonitoringPhase.Created);
         reference.NextCheckUtc.Should().NotBeNull();
+        result.Kind.Should().Be(WorkItemKind.PullRequest);
     }
 
     /// <summary>CreateFromAlertAsync erstellt Aufgabe, IssueReferenz und AlertReferenz.</summary>
@@ -188,6 +223,7 @@ public sealed class WorkItemServiceTests : IDisposable
         result.AlertReference.Should().NotBeNull();
         result.AlertReference!.SourceKey.Should().Be("github:code-scanning:owner/repo:7");
         result.AlertReference.RuleId.Should().Be("cs/sql-injection");
+        result.Kind.Should().Be(WorkItemKind.Alert);
     }
 
     /// <summary>CreateFromAlertAsync erzeugt bei gleicher SourceKey keine zweite Aufgabe.</summary>

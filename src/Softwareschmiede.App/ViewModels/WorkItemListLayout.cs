@@ -15,6 +15,22 @@ public static class WorkItemListLayout
     /// <summary>Gruppenname für Aufgaben ohne Repository-Verknüpfung im Repository-Modus.</summary>
     public const string WithoutRepository = "Ohne Repository";
 
+    /// <summary>Gruppenname für Aufgaben ohne bestimmbare Auftragsart im Auftragsart-Modus.</summary>
+    public const string WithoutKind = "Ohne Auftragsart";
+
+    /// <summary>Deutscher Anzeigename einer <see cref="Domain.Enums.WorkItemKind"/> — dient als
+    /// Gruppenname im Auftragsart-Modus und als sichtbare Typ-Markierung auf der Kachel.</summary>
+    public static string KindGroupName(Domain.Enums.WorkItemKind kind)
+        => kind switch
+        {
+            Domain.Enums.WorkItemKind.Manual => "Manuell",
+            Domain.Enums.WorkItemKind.Instruction => "Anweisung",
+            Domain.Enums.WorkItemKind.IssuePreparation => "Issue-Aufbereitung",
+            Domain.Enums.WorkItemKind.PullRequest => "Pull Request",
+            Domain.Enums.WorkItemKind.Alert => "Alert",
+            _ => WithoutKind
+        };
+
     /// <summary>
     /// Erzeugt die Sortierdeskriptoren für den gegebenen Modus. Die Gruppen-Fallback-Flags werden
     /// aufsteigend sortiert, damit die Fallback-Gruppe ("Nicht ausgeführt"/"Ohne Repository") am
@@ -42,6 +58,13 @@ public static class WorkItemListLayout
                 new SortDescription(nameof(ActiveWorkItemPanelItem.Title), ListSortDirection.Ascending),
                 new SortDescription(nameof(ActiveWorkItemPanelItem.Id), ListSortDirection.Ascending),
             ],
+            WorkItemListMode.Kind =>
+            [
+                new SortDescription(nameof(ActiveWorkItemPanelItem.KindSortOrder), ListSortDirection.Ascending),
+                new SortDescription(nameof(ActiveWorkItemPanelItem.SortTimestamp), ListSortDirection.Descending),
+                new SortDescription(nameof(ActiveWorkItemPanelItem.Title), ListSortDirection.Ascending),
+                new SortDescription(nameof(ActiveWorkItemPanelItem.Id), ListSortDirection.Ascending),
+            ],
             _ =>
             [
                 new SortDescription(nameof(ActiveWorkItemPanelItem.SortTimestamp), ListSortDirection.Descending),
@@ -61,6 +84,7 @@ public static class WorkItemListLayout
         {
             WorkItemListMode.Repository => new PropertyGroupDescription(nameof(ActiveWorkItemPanelItem.RepositoryGroupName)),
             WorkItemListMode.Ai => new PropertyGroupDescription(nameof(ActiveWorkItemPanelItem.AiGroupName)),
+            WorkItemListMode.Kind => new PropertyGroupDescription(nameof(ActiveWorkItemPanelItem.KindGroupName)),
             _ => null
         };
 

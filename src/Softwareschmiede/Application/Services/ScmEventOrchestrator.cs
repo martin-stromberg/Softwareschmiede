@@ -796,6 +796,12 @@ public sealed class ScmEventOrchestrator(
                 await adapter.WritePromptAsync(attempt.Prompt, ct);
                 if (await IsCancelledAsync(item.Id, CancellationToken.None)) return;
                 item.Status = ScmIncomingEventStatus.Zugestellt;
+                // Issue #451: Mit der erfolgreichen Zustellung des Analyse-Prompts ist die
+                // Aufbereitungs-Phase abgeschlossen — die Aufgabe wird zur Anweisungsaufgabe.
+                // Der Purpose bleibt zur Routing-Isolation unverändert „IssueAufbereitung";
+                // auch vor der Typisierung persistierte Aufbereitungsaufgaben (Unspecified)
+                // wechseln so mit ihrer ersten Zustellung.
+                task.Kind = WorkItemKind.Instruction;
             }
             catch (Exception)
             {

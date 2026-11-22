@@ -119,6 +119,12 @@ public sealed class WorkItem
     /// kanonischen SCM-Ereignisauflösung ausdrücklich ausgeschlossen.</summary>
     public string? Purpose { get; set; }
 
+    /// <summary>Auftragsart der Aufgabe — ihr fachlicher Ursprung (Issue #451). Getrennt von
+    /// <see cref="Purpose"/>: Die Aufbereitungs-Aufgabe behält ihren Purpose zur Isolation,
+    /// wechselt aber nach erfolgreicher Zustellung des Analyse-Prompts zu
+    /// <see cref="WorkItemKind.Instruction"/>.</summary>
+    public WorkItemKind Kind { get; set; } = WorkItemKind.Unspecified;
+
     /// <summary>Navigationseigenschaft zum übergeordneten Projekt.</summary>
     public Project Project { get; set; } = null!;
 
