@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Application.Services;
@@ -24,7 +25,7 @@ public sealed class ScmEventExchangeService(IServiceScopeFactory scopes, TimePro
             return;
         }
         var ids = await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmIncomingEvents.AsNoTracking()
-            .Where(x => x.DeliveryAttemptId != null && x.Status != "Verarbeitet" && x.Status != "Abgebrochen").Select(x => x.Id).ToListAsync(ct);
+            .Where(x => x.DeliveryAttemptId != null && x.Status != ScmIncomingEventStatus.Verarbeitet && x.Status != ScmIncomingEventStatus.Abgebrochen).Select(x => x.Id).ToListAsync(ct);
         foreach (var id in ids)
         {
             using var itemScope = scopes.CreateScope();

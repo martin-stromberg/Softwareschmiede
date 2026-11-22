@@ -84,6 +84,17 @@ public sealed class PullRequestReferenceService
         return entity;
     }
 
+    /// <summary>Sucht eine Referenz über ihren fachlichen Schlüssel (Provider + normalisierte
+    /// Repository-Id + Nummer). Provider-Ableitung aus dem Plugin-Prefix und Normalisierung laufen
+    /// intern über dieselbe Auflösung wie <see cref="SaveReportedAsync"/>.</summary>
+    /// <returns>Die gefundene Referenz oder <see langword="null"/>.</returns>
+    public async Task<PullRequestReference?> FindByKeyAsync(
+        string? pluginPrefix,
+        string repositoryId,
+        int pullRequestNumber,
+        CancellationToken ct = default)
+        => await FindByKeyAsync(ResolveKey(pluginPrefix, repositoryId), pullRequestNumber, ct);
+
     /// <summary>Speichert oder aktualisiert einen Pull Request, den der KI-Agent selbst angelegt und im
     /// Abschluss gemeldet hat (<c>pullRequestNumber</c> in <c>complete.json</c>). Idempotent: Eine bereits
     /// derselben Aufgabe zugeordnete Referenz wird ergänzt; eine fremd zugeordnete Referenz wird nicht
@@ -104,16 +115,9 @@ public sealed class PullRequestReferenceService
         var now = _timeProvider.GetUtcNow();
         // Ereignisquellen liefert derzeit nur das GitHub-Plugin; unbekannte Prefixe werden
         // bewusst als GitHub-Referenz gespeichert, damit die Abschlussüberwachung sie prüfen kann.
-        var provider = PullRequestProviderDescriptor.TryGetProviderForPluginPrefix(pluginPrefix)
-            ?? PullRequestProvider.GitHub;
-        var normalizedRepositoryId = PullRequestRepositoryId.Normalize(provider, repositoryId);
+        var key = ResolveKey(pluginPrefix, repositoryId);
 
-        var entity = await _db.PullRequestReferences
-            .FirstOrDefaultAsync(
-                p => p.Provider == provider
-                     && p.RepositoryId == normalizedRepositoryId
-                     && p.PullRequestNumber == pullRequestNumber,
-                ct);
+        var entity = await FindByKeyAsync(key, pullRequestNumber, ct);
 
         if (entity is null)
         {
@@ -121,13 +125,13 @@ public sealed class PullRequestReferenceService
             {
                 Id = Guid.NewGuid(),
                 WorkItemId = workItemId,
-                Provider = provider,
+                Provider = key.Provider,
                 Role = PullRequestReferenceRole.CreatedByTask,
-                RepositoryId = normalizedRepositoryId,
+                RepositoryId = key.RepositoryId,
                 PullRequestNumber = pullRequestNumber,
                 CreatedUtc = now,
-                MonitoringPhase = PullRequestMonitoringPolicy.GetInitialPhase(provider),
-                NextCheckUtc = PullRequestMonitoringPolicy.GetInitialPhase(provider) == PullRequestMonitoringPhase.NotMonitored ? null : now
+                MonitoringPhase = PullRequestMonitoringPolicy.GetInitialPhase(key.Provider),
+                NextCheckUtc = PullRequestMonitoringPolicy.GetInitialPhase(key.Provider) == PullRequestMonitoringPhase.NotMonitored ? null : now
             };
             _db.PullRequestReferences.Add(entity);
         }
@@ -135,7 +139,7 @@ public sealed class PullRequestReferenceService
         {
             _logger.LogWarning(
                 "Pull Request {RepositoryId}#{Number} wurde gemeldet, ist aber bereits Aufgabe {AufgabeId} zugeordnet; Meldung an Aufgabe {MeldendeAufgabeId} wird ignoriert.",
-                normalizedRepositoryId, pullRequestNumber, entity.WorkItemId, workItemId);
+                key.RepositoryId, pullRequestNumber, entity.WorkItemId, workItemId);
             return null;
         }
 
@@ -291,6 +295,28 @@ public sealed class PullRequestReferenceService
         entity.NextCheckUtc = now.Add(DefaultRetryDelay);
         await _db.SaveChangesAsync(ct);
     }
+
+    /// <summary>Leitet Provider und normalisierte Repository-Id aus Plugin-Prefix und Rohwert ab;
+    /// unbekannte Prefixe gelten als GitHub-Referenz.</summary>
+    private static PullRequestKey ResolveKey(string? pluginPrefix, string repositoryId)
+    {
+        var provider = PullRequestProviderDescriptor.TryGetProviderForPluginPrefix(pluginPrefix)
+            ?? PullRequestProvider.GitHub;
+        return new(provider, PullRequestRepositoryId.Normalize(provider, repositoryId));
+    }
+
+    private async Task<PullRequestReference?> FindByKeyAsync(PullRequestKey key, int pullRequestNumber, CancellationToken ct)
+        => await _db.PullRequestReferences
+            .FirstOrDefaultAsync(
+                p => p.Provider == key.Provider
+                     && p.RepositoryId == key.RepositoryId
+                     && p.PullRequestNumber == pullRequestNumber,
+                ct);
+
+    /// <summary>Fachlicher Schlüssel einer Pull-Request-Referenz (abgeleiteter Provider +
+    /// normalisierte Repository-Id); die Pull-Request-Nummer bleibt ein separater Parameter
+    /// der <c>FindByKeyAsync</c>-Überladung.</summary>
+    private sealed record PullRequestKey(PullRequestProvider Provider, string RepositoryId);
 
     private void UpsertWorkflowRuns(
         PullRequestReference entity,

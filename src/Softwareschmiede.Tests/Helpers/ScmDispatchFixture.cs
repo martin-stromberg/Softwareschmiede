@@ -291,6 +291,17 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         return await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmIncomingEvents.AsNoTracking().SingleAsync(x => x.Id == id);
     }
 
+    /// <summary>Setzt den persistierten Status eines Ereignisses direkt — Szenario-Vorgabe für
+    /// Freigabe- und Reihenfolgeprüfungen, ohne den Zustellpfad zu durchlaufen.</summary>
+    internal async Task SetEventStatusAsync(Guid eventId, string status)
+    {
+        using var scope = Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmIncomingEvents
+            .Where(x => x.Id == eventId)
+            .ExecuteUpdateAsync(x => x.SetProperty(e => e.Status, status),
+                cancellationToken: TestContext.Current.CancellationToken);
+    }
+
     /// <summary>Vollzieht die Dateitool-Kanalprobe wie ein echtes CLI-Dateitool: Challenge lesen,
     /// temporären Nachweis schreiben und beide Seiten in die Endnamen verschieben.</summary>
     internal static async Task CompleteProbeAsync(string prompt, CancellationToken ct = default)

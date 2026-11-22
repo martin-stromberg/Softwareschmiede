@@ -98,7 +98,7 @@ public sealed class ScmEventStore(SoftwareschmiedeDbContext db, ScmEventChangeNo
             {
                 // Die Zustellung ruht persistiert bis zum Zielzeitpunkt; der Empfangskommentar
                 // wird über die Outbox beim nächsten Poll versendet, ohne die Zustellung auszulösen.
-                item.Status = "Verzögert";
+                item.Status = ScmIncomingEventStatus.Verzögert;
                 item.NextAttemptUtc = delay.TargetUtc.ToUnixTimeMilliseconds();
                 item.Reason = $"Verzögerte Ausführung bis {delay.TargetUtc.ToLocalTime():g} ('{delay.Argument}').";
                 EnqueueDelayComment(item, observation,

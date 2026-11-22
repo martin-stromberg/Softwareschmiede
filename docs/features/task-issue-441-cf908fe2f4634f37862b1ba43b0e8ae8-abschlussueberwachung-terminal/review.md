@@ -1,0 +1,35 @@
+# Plan-Review
+
+## Ergebnis
+
+**Status:** Vollständig umgesetzt
+
+## Umgesetzte Planelemente
+
+- [x] `ScmIncomingEventStatus` (statische Klasse, `src/Softwareschmiede/Domain/Entities/ScmIncomingEventStatus.cs`) — angelegt: alle zehn Status-Konstanten (`Aufgenommen` … `Abgebrochen`), `NonBlocking` als `IReadOnlyCollection<string>` mit exakt den vier Freigabe-Stati, `BlocksTaskCompletion(string)` und `IsTransient(string)` — beide als `!NonBlocking.Contains(status)` implementiert; Kommentar begründet die negative Prüfrichtung, nennt beide Verwender, das EF-Verbot für die Komfortmethoden und die bewusste `Wartend`/`NextAttemptUtc = long.MaxValue`-Ausnahme.
+- [x] `ScmIncomingEventStatusTests` (Unit-Testklasse, `src/Softwareschmiede.Tests/Domain/Entities/ScmIncomingEventStatusTests.cs`) — angelegt: `NonBlocking`-Exaktheit, Konstanten aller zehn Werte, Theory über alle Stati, unbekannte Werte (`"ZukuenftigerStatus"`, `""`) blockieren; 14 Tests bestanden.
+- [x] `ScmTaskCompletionMonitoringService.CheckTaskAsync` — geändert: Gate 1 (Z. 85–87) und Gate 2 unter der `ScmTaskCoordinator.Shared.RunAsync`-Sperre (Z. 136–138) fragen `!ScmIncomingEventStatus.NonBlocking.Contains(x.Status)` ab; Kommentare auf die transient/terminal-Einteilung aktualisiert.
+- [x] `ScmEventOrchestrator.DispatchCoreAsync` — geändert: Vorgänger-`AnyAsync` (Z. 182) fragt `!ScmIncomingEventStatus.NonBlocking.Contains(x.Status)` ab; `IsTransient` wird im EF-Ausdruck nicht verwendet; Wartegrund-Text und `WaitWithCommentAsync`-Aufruf unverändert.
+- [x] `ScmEventOrchestrator.ReconcileAttemptAsync` — geändert: `LinkReportedPullRequestAsync`-Aufruf aus dem `if (messages.Accepted is not null)`-Block herausgelöst und hinter dem Block positioniert (Z. 581–582) mit `IsCancelledAsync`-Guard und erklärendem Kommentar.
+- [x] `ScmEventOrchestrator.LinkReportedPullRequestAsync` — geändert: Dedupe-Vorprüfung (Z. 989–1008) — Lookup auf `PullRequestReferences` (`Provider` + `RepositoryId` + `PullRequestNumber`); bereits verknüpft → Rückkehr ohne Aktion/Log; fremd zugeordnet → höchstens ein `GitAction`-Eintrag via `LogEntries`-Dedupe; sonst `SaveReportedAsync` + Protokolleintrag.
+- [x] `Monitor_EventWithStatus_CompletionGate` (Theory, `ScmTaskCompletionMonitoringServiceTests`, Z. 405) — MemberData über alle zehn Stati plus unbekannten Wert; bestanden.
+- [x] `Monitor_UnresolvedEvent_CompletesTaskAfterWait` (`ScmTaskCompletionMonitoringServiceTests`, Z. 442) — `VerarbeitungUngeklärt`-Ereignis + gemergte Referenz → `Completed` nach Wartezeit; bestanden.
+- [x] `SeedEventWithExchangeAsync` (Testhilfe, `ScmEventDispatchTests_Reconcile.cs`, Z. 145) — zugestelltes Ereignis mit `DeliveryAttemptId`/`CliRunId`/`ExchangePath`; Kanaldateien schreiben die Aufrufer (`WriteAcceptedAsync`/`WriteCompleteAsync`); `SetEventStatusAsync`-`ExecuteUpdate`-Muster in beiden Testklassen vorhanden.
+- [x] `ScmEventDispatchTests_Ordering` (neue Integrationstest-Datei) — angelegt mit `Dispatch_FollowUpBehindTerminalUnresolved_IsDelivered` (Theory, 4 freigegebene Stati), `Dispatch_FollowUpBehindTransientPredecessor_StaysWaiting` (Theory, 6 transiente Stati), `Dispatch_MultipleFollowUps_KeepRelativeOrder` und Hilfsmethode `AddEventToTaskAsync` (Z. 99); alle bestanden.
+- [x] `Reconcile_CompleteWithPullRequestNumberWithoutAccepted_RegistersReference` (`ScmEventDispatchTests_Reconcile`, Z. 24) — `complete.json` ohne `accepted.json` → `PullRequestReference` (`CreatedByTask`) + genau ein Protokolleintrag, Ereignis bleibt ungeklärt; bestanden.
+- [x] `Reconcile_ReportedPullRequest_RepeatedReconcile_LogsOnce` (Z. 57) — Wiederholungsabgleich ohne zweite Referenz/zweiten Eintrag; bestanden.
+- [x] `Reconcile_LateCompleteAfterUnresolved_RegistersReference` (Z. 84) — verspätetes `complete.json` wird beim Folgeabgleich nachgeholt; bestanden.
+- [x] `Reconcile_FailedCompletenessCheck_StillRegistersReference` (Z. 112) — scheiternde `Complete`-Mengenprüfung → `VerarbeitungUngeklärt`, Referenz trotzdem registriert; bestanden.
+- [x] `docs/help/plugins/github-ereignisse/business-rules.md` — angepasst: neuer Abschnitt „Ereignis-Stati und Blockwirkung" mit verbindlicher Status-Tabelle und Freigabeliste (unbekannte Stati blockieren konservativ), Fußnote zum Sonderfall `Wartend` + `NextAttemptUtc = long.MaxValue` (bewusst blockierend), „Zustellung und Abschluss" um die vom Abschlusspfad entkoppelte, deduplizierte Verknüpfung ergänzt, „Abschlussüberwachung" und „Abbruch durch den Anwender" auf die transient/terminal-Differenzierung umgestellt.
+- [x] `docs/help/plugins/github-ereignisse/ablauf-technisch.md` — angepasst: `ScmTaskCompletionMonitoringService`-Passage (Z. 61) auf `!NonBlocking.Contains`-Prüfung, `LinkReportedPullRequestAsync`-Passage (Z. 57) um Entkopplung hinter dem `accepted.json`-Block und Dedupe erweitert, Vorgängerprüfung der Warteschlange (Z. 69) auf die Freigabeliste umgestellt.
+- [x] `docs/help/plugins/github-ereignisse/datenmodell.md` — angepasst: Status-Feld verweist auf `ScmIncomingEventStatus`/`NonBlocking`; `pullRequestNumber`-Registrierung als unabhängig von `accepted.json`/Endstatus dokumentiert.
+- [x] `docs/help/plugins/github-ereignisse/beschreibung.md`, `ablauf-anwender.md` — angepasst: Beobachtungsrückstellung nur durch noch offene, sich weiterbewegende Ereignisse; terminal ungeklärte Ereignisse halten den Abschluss nicht auf.
+- [x] `docs/help/plugins/github-ereignisse/troubleshooting.md` — angepasst: Troubleshooting-Hinweis „Aufgabe wird nicht automatisch beendet" nennt die sechs blockierenden Stati und die Freigabe durch terminal ungeklärte Ereignisse.
+- [x] `docs/help/aufgaben/datenmodell.md` — angepasst: `ScmAbschlussErkanntUtc` dokumentiert die Freigabe-Einteilung mit Verweis auf „Ereignis-Stati und Blockwirkung".
+- [x] Abschluss-Verifikation — `dotnet build Softwareschmiede.slnx`: 0 Warnungen/0 Fehler; `dotnet format Softwareschmiede.slnx --verify-no-changes`: sauber; fokussierte Feature-Tests (`ScmIncomingEventStatusTests` 14, `ScmEventDispatchTests_Ordering`/`_Reconcile`/`ScmTaskCompletionMonitoringServiceTests` 42) bestanden.
+
+## Hinweise
+
+- Der Review-Lauf verifizierte Build, Format-Check und die feature-relevanten Testklassen (56 Tests, alle bestanden). Die in der Tasks-Datei dokumentierten Vollläufe (Unit 2735, Integration 403, `Category!=OsInterface`) stammen aus dem Implementierungslauf und wurden nicht vollständig wiederholt.
+- Bewusste Abweichung zum Plan-Detail ohne Zielverlust: Die Planbeschreibung der Hilfsmethode `SeedEventWithExchangeAsync` nennt als Ablage `ScmTaskCompletionMonitoringServiceTests`/`ScmDispatchFixture`; realisiert wurde sie in `ScmEventDispatchTests_Reconcile` (Z. 145), ergänzt um `SetEventStatusAsync` in beiden Testklassen — das ExecuteUpdate-Muster ist damit in beiden Kontexten vorhanden.
+- Die übrigen Literal-Vergleiche (`ScmEventQueueViewModel`, `MainWindowViewModel` u. a.) wurden — wie im Plan festgelegt — bewusst nicht auf `ScmIncomingEventStatus` migriert; die Divergenzwarnung steht im Klassenkommentar und in der Hilfe-Dokumentation.

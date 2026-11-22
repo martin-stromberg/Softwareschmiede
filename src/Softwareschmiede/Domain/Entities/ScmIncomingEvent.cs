@@ -18,8 +18,8 @@ public sealed class ScmIncomingEvent
     /// <summary>ObservationJson des Ereignisprozesses.</summary>
     public string ObservationJson { get; set; } = "";
 
-    /// <summary>Status des Ereignisprozesses.</summary>
-    public string Status { get; set; } = "Aufgenommen";
+    /// <summary>Status des Ereignisprozesses (Werte: <see cref="ScmIncomingEventStatus"/>).</summary>
+    public string Status { get; set; } = ScmIncomingEventStatus.Aufgenommen;
 
     /// <summary>Reason des Ereignisprozesses.</summary>
     public string? Reason { get; set; }
