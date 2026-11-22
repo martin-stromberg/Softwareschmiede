@@ -190,8 +190,24 @@ public sealed class ScmIssuePreparationMonitoringService(
         if (await preparation.SkipEvaluationAsync(issue, ct))
             return;
         // Die erzeugte Referenz trägt das konfigurierte Monitoring-Konto: Remote-Aktionen des
-        // Ausführungspfads wählen ihr Credential über ScmEventRepository.Account.
-        var tagged = issue with { Repository = issue.Repository with { Account = accountMode } };
+        // Ausführungspfads wählen ihr Credential über ScmEventRepository.Account. Im
+        // SeparatesKonto-Modus wird die Referenz unter dem Ausführungskonto neu aufgelöst, damit
+        // der persistierte Snapshot die Viewer-Identität dieses Kontos trägt — ein nur umgetaggter
+        // Benutzerkonto-Snapshot ließe den Umleitungsschutz der Antwortausführung fälschlich
+        // anschlagen. Der Auflösungscache ist je Konto getrennt und nach dem ersten Call
+        // transportlos; im Benutzerkonto-Modus bleibt die bisherige Referenz unverändert.
+        var repository = issue.Repository;
+        if (accountMode != ScmAccountMode.UserAccount)
+        {
+            var resolved = await source.GetEventRepositoryAsync(
+                new ScmRepositoryContext(localRepositories[0].Id, repository.ProviderPrefix,
+                    $"https://{repository.Host}/{repository.Owner}/{repository.Name}", accountMode), ct);
+            if (resolved.RepositoryId != repository.RepositoryId)
+                throw new ScmProviderException(ScmProviderFailureKind.Permanent,
+                    "Die Auflösung unter dem Ausführungskonto liefert eine andere Repository-Identität als die Entdeckung.");
+            repository = resolved;
+        }
+        var tagged = issue with { Repository = repository with { Account = accountMode } };
         var batch = await source.ReadEventsAsync(
             new ScmEventReadRequest(tagged, ScmContentKind.Description, null, _time.GetUtcNow()), ct);
         await preparation.DetectAndEnqueueAsync(source, tagged, batch, localRepositories, ct);

@@ -1208,6 +1208,30 @@ public sealed class GitHubEventSourceTests
         routed.AssertComplete();
     }
 
+    /// <summary>Ein konto-konsistenter SeparatesKonto-Snapshot (Viewer = Agent-Konto, wie ihn die
+    /// Issue-Aufbereitung nach der Neuauflösung unter dem Ausführungskonto persistiert) passiert
+    /// die Identitätsprüfung; der Abgleich erkennt den Agent-Kommentar per Marker als eigenen.</summary>
+    [Fact]
+    public async Task Response_SeparatesAccount_BotViewer_PassesIdentityAndReconciles()
+    {
+        var user = new FakeApi();
+        var agent = new FakeApi();
+        var repository = Repository with
+        { ViewerId = "BOT", ViewerLogin = "scm-bot", Account = ScmAccountMode.SeparateAccount };
+        var reference = Issue with { Repository = repository };
+        var request = new ScmResponseRequest(reference, "action-1", ScmResponseKind.Comment, "Antwort");
+        Identity(agent, viewer: "BOT");
+        agent.Add("comments?", new[] { new { id = 5, body = "alt\n" + request.Marker, user = new { node_id = "BOT", login = "scm-bot" } } });
+        var plugin = Plugin(user, StoreWithAgentToken(), agent);
+
+        var result = await plugin.ExecuteResponseAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.True(result.AlreadyExisted);
+        Assert.Equal("5", result.RemoteId);
+        Assert.Empty(user.Requests);
+        agent.AssertComplete();
+    }
+
     /// <summary>Zweite Auflösung desselben Alias kommt aus dem TTL-Cache — kein weiterer
     /// Transportaufruf, die eingeplante Antwort bleibt unberührt.</summary>
     [Fact]
