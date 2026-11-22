@@ -80,9 +80,10 @@ public sealed class ScmTaskCompletionMonitoringService(
         using var scope = scopes.CreateScope();
         var services = scope.ServiceProvider;
         var db = services.GetRequiredService<SoftwareschmiedeDbContext>();
-        // Laufende oder wartende Ereignisverarbeitung hat Vorrang; eine Referenzbeobachtung wäre verfrüht.
+        // Nur transient offene Ereignisse stellen die Referenzbeobachtung zurück; final oder
+        // terminal ungeklärte (freigegebene) Ereignisse dürfen den Abschluss nicht länger aufhalten.
         if (await db.ScmIncomingEvents.AnyAsync(
-                x => x.WorkItemId == taskId && x.Status != "Verarbeitet" && x.Status != "Abgebrochen", ct))
+                x => x.WorkItemId == taskId && !ScmIncomingEventStatus.NonBlocking.Contains(x.Status), ct))
             return;
         var task = await db.WorkItems
             .Include(a => a.GitRepository)
@@ -130,8 +131,10 @@ public sealed class ScmTaskCompletionMonitoringService(
                 || current.ScmCompletionDetectedUtc is null
                 || _time.GetUtcNow() - current.ScmCompletionDetectedUtc.Value < wait)
                 return;
+            // Erneuter Check unter der Aufgabensperre: Der Status kann sich seit Kandidatenwahl
+            // verändert haben; es gilt dieselbe Freigabe-Einteilung transient vs. terminal/final.
             if (await db.ScmIncomingEvents.AnyAsync(
-                    x => x.WorkItemId == taskId && x.Status != "Verarbeitet" && x.Status != "Abgebrochen", ct))
+                    x => x.WorkItemId == taskId && !ScmIncomingEventStatus.NonBlocking.Contains(x.Status), ct))
                 return;
             try
             {

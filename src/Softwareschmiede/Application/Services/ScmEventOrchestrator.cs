@@ -40,8 +40,8 @@ public sealed class ScmEventOrchestrator(
         {
             // Abgebrochene Ereignisse sind endgültig: auch noch ausstehende Hostaktionen werden nicht mehr gesendet.
             var batch = await db.ScmIncomingEvents.AsNoTracking().Where(x => x.Sequence > afterSequence && x.Sequence <= upperSequence).Where(x =>
-                x.Status != "Abgebrochen" &&
-                ((x.Status != "Verarbeitet" && (x.NextAttemptUtc == null || x.NextAttemptUtc <= nowMilliseconds)) ||
+                x.Status != ScmIncomingEventStatus.Abgebrochen &&
+                ((x.Status != ScmIncomingEventStatus.Verarbeitet && (x.NextAttemptUtc == null || x.NextAttemptUtc <= nowMilliseconds)) ||
                 db.ScmOutgoingActions.Any(action => action.EventId == x.Id && action.Status != "Succeeded"
                     && (action.NextAttemptUtc == null || action.NextAttemptUtc <= nowMilliseconds))))
                 .OrderBy(x => x.Sequence).Take(100)
@@ -90,7 +90,7 @@ public sealed class ScmEventOrchestrator(
             {
                 db.ChangeTracker.Clear();
                 var item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, ct);
-                if (item.Status is "Verarbeitet" or "Abgebrochen") return;
+                if (item.Status is ScmIncomingEventStatus.Verarbeitet or ScmIncomingEventStatus.Abgebrochen) return;
                 if (item.DeliveryAttemptId is not null)
                 {
                     await DispatchCoreAsync(eventId, taskId, null, ct, owner);
@@ -130,7 +130,7 @@ public sealed class ScmEventOrchestrator(
             db.ChangeTracker.Clear();
             item = await db.ScmIncomingEvents.SingleAsync(x => x.Id == eventId, ct);
             // Ein Abbruch ist endgültig: keine Hostaktionen, kein Abgleich und keine Zustellung mehr.
-            if (item.Status == "Abgebrochen") return;
+            if (item.Status == ScmIncomingEventStatus.Abgebrochen) return;
             // Interner Aufbereitungsauftrag: dedizierter Ausführungspfad; der generische
             // Zustellpfad würde den rohen Issue-Body als Prompt zustellen.
             if (item.Purpose == ScmIssuePreparationService.Purpose)
@@ -159,19 +159,19 @@ public sealed class ScmEventOrchestrator(
             foreach (var action in await db.ScmOutgoingActions.Where(x => x.EventId == item.Id
                 && !x.Purpose.StartsWith("ai:") && x.Status != "Succeeded").ToListAsync(ct))
                 await outbox.ExecuteAsync(action, responder, ct);
-            if (item.Status == "Verarbeitet") return;
+            if (item.Status == ScmIncomingEventStatus.Verarbeitet) return;
             if (item.DeliveryAttemptId is not null)
             {
                 try { await ReconcileAttemptAsync(item, observation, responder, ct); }
                 catch (ScmActionIdCollisionException ex)
                 {
-                    item.Status = "VerarbeitungUngeklärt";
+                    item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
                     item.Reason = ex.Message;
                     await db.SaveChangesAsync(ct);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
                 {
-                    item.Status = "VerarbeitungUngeklärt";
+                    item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
                     item.Reason = "Antwortkanal ist nicht mehr verfügbar oder enthält keine gültige Meldung. Status erneut prüfen; kein automatischer Neuversand.";
                     await db.SaveChangesAsync(ct);
                 }
@@ -180,7 +180,7 @@ public sealed class ScmEventOrchestrator(
             // Eine fällige Eingangs-/Warte-Antwort kann ein sonst verzögertes Ereignis auswählen. Ihr
             // eigenständiger Retry darf keinen weiteren Health-Check, Start oder Prompt autorisieren.
             if (item.NextAttemptUtc > time.GetUtcNow().ToUnixTimeMilliseconds()) return;
-            if (await db.ScmIncomingEvents.AnyAsync(x => x.WorkItemId == item.WorkItemId && x.Sequence < item.Sequence && x.Status != "Verarbeitet" && x.Status != "Abgebrochen", ct))
+            if (await db.ScmIncomingEvents.AnyAsync(x => x.WorkItemId == item.WorkItemId && x.Sequence < item.Sequence && !ScmIncomingEventStatus.NonBlocking.Contains(x.Status), ct))
             {
                 await WaitWithCommentAsync(item, observation, responder, "Ein früheres Ereignis dieser Aufgabe muss zuerst abgeschlossen oder geklärt werden.", ct);
                 return;
@@ -304,7 +304,7 @@ public sealed class ScmEventOrchestrator(
                 { await WaitAsync(item, "CLI-Sitzung hat sich geändert. Erneut prüfen.", ct); return; }
                 // Ein Abbruch zwischen Vorbereitung und Schreiben geht dem getrackten Zustellungszustand vor.
                 if (await IsCancelledAsync(item.Id, ct)) return;
-                item.Status = "ZustellungVorbereitet";
+                item.Status = ScmIncomingEventStatus.ZustellungVorbereitet;
                 item.DeliveryAttemptId = attemptId;
                 item.CliRunId = adapter.CliRunId.ToString("D");
                 item.ExchangePath = attempt.DirectoryPath;
@@ -319,12 +319,12 @@ public sealed class ScmEventOrchestrator(
                     if (await IsCancelledAsync(item.Id, ct)) return;
                     await adapter.WritePromptAsync(attempt.Prompt, ct);
                     if (await IsCancelledAsync(item.Id, CancellationToken.None)) return;
-                    item.Status = "Zugestellt";
+                    item.Status = ScmIncomingEventStatus.Zugestellt;
                 }
                 catch (Exception)
                 {
                     if (await IsCancelledAsync(item.Id, CancellationToken.None)) return;
-                    item.Status = "ZustellungUngewiss";
+                    item.Status = ScmIncomingEventStatus.ZustellungUngewiss;
                     item.Reason = "Der Schreibversuch wurde begonnen, konnte aber nicht sicher bestätigt werden. Keine automatische Wiederholung.";
                 }
                 await db.SaveChangesAsync(CancellationToken.None);
@@ -371,7 +371,7 @@ public sealed class ScmEventOrchestrator(
     public Task RetryAsync(Guid eventId, CancellationToken ct = default)
         => MutateAndDispatchAsync(eventId, async (item, token) =>
     {
-        if (item.Status == "Abgebrochen") return false;
+        if (item.Status == ScmIncomingEventStatus.Abgebrochen) return false;
         item.NextAttemptUtc = null;
         item.ErrorCode = null;
         await db.ScmOutgoingActions.Where(x => x.EventId == eventId && x.Status != "Succeeded")
@@ -384,7 +384,7 @@ public sealed class ScmEventOrchestrator(
     public Task ConfirmReadyAsync(Guid eventId, string displayedRunId, CancellationToken ct = default)
         => MutateAndDispatchAsync(eventId, (item, _) =>
     {
-        if (item.Status is "Verarbeitet" or "Abgebrochen") return Task.FromResult(false);
+        if (item.Status is ScmIncomingEventStatus.Verarbeitet or ScmIncomingEventStatus.Abgebrochen) return Task.FromResult(false);
         var session = cli.GetScmPromptSession(item.WorkItemId);
         if (session is null || !session.IsAlive || session.CliRunId.ToString("D") != displayedRunId)
             throw new InvalidOperationException("CLI-Sitzung hat sich geändert. Bitte die neue Sitzung ausdrücklich bestätigen.");
@@ -408,9 +408,9 @@ public sealed class ScmEventOrchestrator(
     public Task ResendAsync(Guid eventId, Guid displayedAttemptId, CancellationToken ct = default)
         => MutateAndDispatchAsync(eventId, (item, _) =>
     {
-        if (item.DeliveryAttemptId != displayedAttemptId || item.Status is not ("ZustellungUngewiss" or "VerarbeitungUngeklärt"))
+        if (item.DeliveryAttemptId != displayedAttemptId || item.Status is not (ScmIncomingEventStatus.ZustellungUngewiss or ScmIncomingEventStatus.VerarbeitungUngeklärt))
             return Task.FromResult(false);
-        item.Status = "Aufgenommen";
+        item.Status = ScmIncomingEventStatus.Aufgenommen;
         item.DeliveryAttemptId = null;
         item.ExchangePath = null;
         item.ExchangeRestrictedWriteSidsJson = null;
@@ -430,19 +430,19 @@ public sealed class ScmEventOrchestrator(
         var prior = await db.ScmIncomingEvents.Where(x => x.Id == eventId)
             .Select(x => new { x.Status, x.NextAttemptUtc, x.WorkItemId }).SingleOrDefaultAsync(ct);
         var changed = await db.ScmIncomingEvents
-            .Where(x => x.Id == eventId && x.Status != "Verarbeitet" && x.Status != "Abgebrochen")
+            .Where(x => x.Id == eventId && x.Status != ScmIncomingEventStatus.Verarbeitet && x.Status != ScmIncomingEventStatus.Abgebrochen)
             .ExecuteUpdateAsync(x => x
-                .SetProperty(p => p.Status, "Abgebrochen")
+                .SetProperty(p => p.Status, ScmIncomingEventStatus.Abgebrochen)
                 .SetProperty(p => p.Reason, "Vom Anwender abgebrochen. Eine eventuell laufende CLI-Verarbeitung wird dadurch nicht beendet; es folgen keine weiteren Zustell- oder Prüfversuche.")
                 .SetProperty(p => p.NextAttemptUtc, (long?)null), ct);
         // Eine von der Verzögerungsdirektive gesetzte Aufgabenpause wird auf das nächste
         // verbleibende Direktiven-Ziel zurückgestuft bzw. aufgehoben, wenn sie noch unverändert
         // auf dem Zielzeitpunkt des abgebrochenen Ereignisses steht; fremd gesetzte Pausen bleiben.
-        if (changed != 0 && prior?.Status == "Verzögert" && prior.NextAttemptUtc is long deferredUntilMs)
+        if (changed != 0 && prior?.Status == ScmIncomingEventStatus.Verzögert && prior.NextAttemptUtc is long deferredUntilMs)
         {
             var deferredUntil = DateTimeOffset.FromUnixTimeMilliseconds(deferredUntilMs);
             var nextMs = await db.ScmIncomingEvents
-                .Where(x => x.WorkItemId == prior.WorkItemId && x.Status == "Verzögert" && x.NextAttemptUtc != null)
+                .Where(x => x.WorkItemId == prior.WorkItemId && x.Status == ScmIncomingEventStatus.Verzögert && x.NextAttemptUtc != null)
                 .MaxAsync(x => x.NextAttemptUtc, ct);
             var nextUntil = nextMs is long ms ? DateTimeOffset.FromUnixTimeMilliseconds(ms) : (DateTimeOffset?)null;
             await db.WorkItems.Where(a => a.Id == prior.WorkItemId && a.PausedUntilUtc == deferredUntil)
@@ -502,13 +502,13 @@ public sealed class ScmEventOrchestrator(
         if (await IsCancelledAsync(item.Id, ct)) return;
         if (messages.Diagnostic is not null)
         {
-            item.Status = "VerarbeitungUngeklärt";
+            item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
             item.Reason = messages.Diagnostic;
         }
         if (messages.Accepted is not null)
         {
             item.AcceptedUtc ??= time.GetUtcNow().ToUnixTimeMilliseconds();
-            item.Status = "InBearbeitung";
+            item.Status = ScmIncomingEventStatus.InBearbeitung;
             item.Reason = null;
             foreach (var action in messages.Actions)
             {
@@ -519,7 +519,7 @@ public sealed class ScmEventOrchestrator(
                 var existing = await db.ScmOutgoingActions.FindAsync([action.ActionId], ct);
                 if (existing is not null && (existing.EventId != item.Id || existing.AttemptId != item.DeliveryAttemptId || existing.RequestJson != JsonSerializer.Serialize(response, ScmEventStore.JsonOptions)))
                 {
-                    item.Status = "VerarbeitungUngeklärt";
+                    item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
                     item.Reason = "Aktionskennung wurde für einen anderen Inhalt oder Versuch verwendet.";
                     break;
                 }
@@ -529,18 +529,18 @@ public sealed class ScmEventOrchestrator(
                     outgoing.Status == "Succeeded", outgoing.RemoteId, outgoing.Error), ct);
                 if (outgoing.Status != "Succeeded")
                 {
-                    item.Status = "VerarbeitungUngeklärt";
+                    item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
                     item.Reason = outgoing.Error;
                 }
             }
-            if (messages.Complete is { } complete && item.Status == "InBearbeitung")
+            if (messages.Complete is { } complete && item.Status == ScmIncomingEventStatus.InBearbeitung)
             {
                 var actions = await db.ScmOutgoingActions.Where(x => x.EventId == item.Id && x.AttemptId == item.DeliveryAttemptId).ToListAsync(ct);
                 var completeSet = complete.ActionIds.ToHashSet();
                 if ((complete.NoRemoteAction && actions.Count == 0 && messages.Actions.Count == 0)
                     || (!complete.NoRemoteAction && actions.Count == completeSet.Count && actions.All(x => completeSet.Contains(x.Id) && x.Status == "Succeeded")))
                 {
-                    item.Status = "Verarbeitet";
+                    item.Status = ScmIncomingEventStatus.Verarbeitet;
                     item.Reason = null;
                     // Nachweis-Bilder des Versuchs werden als eigener, versuchsübergreifender
                     // Outbox-Schritt (AttemptId bleibt null) eingesammelt und hochgeladen —
@@ -578,26 +578,28 @@ public sealed class ScmEventOrchestrator(
                                 + (collected.Skipped.Count > 8 ? "; …" : string.Empty), ct: ct);
                 }
             }
-            // Ein im Abschluss gemeldeter, vom Agenten selbst angelegter Pull Request wird unabhängig
-            // vom einzelnen Abschlussversuch mit der Aufgabe verknüpft: Die Abschlussüberwachung kann
-            // die Aufgabe nach seinem Merge/Schluss beenden.
-            if (messages.Complete is { PullRequestNumber: > 0 } withPullRequest)
-                await LinkReportedPullRequestAsync(item, observation, withPullRequest.PullRequestNumber.Value, ct);
         }
+        // Ein im Abschluss gemeldeter, vom Agenten selbst angelegter Pull Request wird unabhängig
+        // vom einzelnen Abschlussversuch mit der Aufgabe verknüpft: Die Abschlussüberwachung kann
+        // die Aufgabe nach seinem Merge/Schluss beenden. Die Verknüpfung hängt nicht am sauberen
+        // Abschlusspfad — sie erfolgt auch ohne Annahmemeldung und bei ungeklärtem Ereignisstatus;
+        // ein verspätet lesbares complete.json holt der laufende Kanalabgleich nach.
+        if (messages.Complete is { PullRequestNumber: > 0 } withPullRequest && !await IsCancelledAsync(item.Id, ct))
+            await LinkReportedPullRequestAsync(item, observation, withPullRequest.PullRequestNumber.Value, ct);
         var now = time.GetUtcNow().ToUnixTimeMilliseconds();
-        if (item.Status == "ZustellungVorbereitet")
+        if (item.Status == ScmIncomingEventStatus.ZustellungVorbereitet)
         {
-            item.Status = "ZustellungUngewiss";
+            item.Status = ScmIncomingEventStatus.ZustellungUngewiss;
             item.Reason = "Unterbrochener Zustellversuch; keine automatische Wiederholung.";
         }
-        if (item.Status is "Zugestellt" or "InBearbeitung")
+        if (item.Status is ScmIncomingEventStatus.Zugestellt or ScmIncomingEventStatus.InBearbeitung)
         {
             var timeout = item.AcceptedUtc is null ? options.Value.AcceptanceTimeout : options.Value.CompletionTimeout;
             var began = item.AcceptedUtc ?? item.DeliveredUtc ?? now;
             var session = cli.GetScmPromptSession(item.WorkItemId);
             if (now - began > timeout.TotalMilliseconds || session is null || !session.IsAlive || session.CliRunId != runId)
             {
-                item.Status = "VerarbeitungUngeklärt";
+                item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
                 item.Reason = item.AcceptedUtc is null ? "Annahme fehlt oder CLI-Sitzung beendet. Kein automatischer Neuversand." : "Korrelierter Abschluss fehlt oder CLI-Sitzung beendet.";
             }
         }
@@ -624,19 +626,19 @@ public sealed class ScmEventOrchestrator(
         foreach (var action in await db.ScmOutgoingActions.Where(x => x.EventId == item.Id
             && !x.Purpose.StartsWith("ai:") && x.Status != "Succeeded").ToListAsync(ct))
             await outbox.ExecuteAsync(action, responder, ct);
-        if (item.Status == "Verarbeitet") return;
+        if (item.Status == ScmIncomingEventStatus.Verarbeitet) return;
         if (item.DeliveryAttemptId is not null)
         {
             try { await ReconcilePreparationAttemptAsync(item, observation, responder, ct); }
             catch (ScmActionIdCollisionException ex)
             {
-                item.Status = "VerarbeitungUngeklärt";
+                item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
                 item.Reason = ex.Message;
                 await db.SaveChangesAsync(ct);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
             {
-                item.Status = "VerarbeitungUngeklärt";
+                item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
                 item.Reason = "Antwortkanal ist nicht mehr verfügbar oder enthält keine gültige Meldung. Status erneut prüfen; kein automatischer Neuversand.";
                 await db.SaveChangesAsync(ct);
             }
@@ -669,7 +671,7 @@ public sealed class ScmEventOrchestrator(
             {
                 // Analyse eines bereits geschlossenen Issues wäre unredlich als Erfolg gemeldet;
                 // ohne Änderung am Issue wird der Auftrag mit Begründung abgeschlossen.
-                item.Status = "Verarbeitet";
+                item.Status = ScmIncomingEventStatus.Verarbeitet;
                 item.Reason = null;
                 await db.SaveChangesAsync(ct);
                 await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage,
@@ -763,7 +765,7 @@ public sealed class ScmEventOrchestrator(
             if (!ReferenceEquals(adapter, cli.GetScmPromptSession(task.Id)) || !adapter.IsAlive)
             { await WaitAsync(item, "CLI-Sitzung hat sich geändert. Erneut prüfen.", ct); return; }
             if (await IsCancelledAsync(item.Id, ct)) return;
-            item.Status = "ZustellungVorbereitet";
+            item.Status = ScmIncomingEventStatus.ZustellungVorbereitet;
             item.DeliveryAttemptId = attemptId;
             item.CliRunId = adapter.CliRunId.ToString("D");
             item.ExchangePath = attempt.DirectoryPath;
@@ -778,12 +780,12 @@ public sealed class ScmEventOrchestrator(
                 if (await IsCancelledAsync(item.Id, ct)) return;
                 await adapter.WritePromptAsync(attempt.Prompt, ct);
                 if (await IsCancelledAsync(item.Id, CancellationToken.None)) return;
-                item.Status = "Zugestellt";
+                item.Status = ScmIncomingEventStatus.Zugestellt;
             }
             catch (Exception)
             {
                 if (await IsCancelledAsync(item.Id, CancellationToken.None)) return;
-                item.Status = "ZustellungUngewiss";
+                item.Status = ScmIncomingEventStatus.ZustellungUngewiss;
                 item.Reason = "Der Schreibversuch wurde begonnen, konnte aber nicht sicher bestätigt werden. Keine automatische Wiederholung.";
             }
             await db.SaveChangesAsync(CancellationToken.None);
@@ -844,14 +846,14 @@ public sealed class ScmEventOrchestrator(
         if (await IsCancelledAsync(item.Id, ct)) return;
         if (messages.Diagnostic is not null)
         {
-            item.Status = "VerarbeitungUngeklärt";
+            item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
             item.Reason = messages.Diagnostic;
         }
         var commentAllowed = await settings.GetScmIssuePreparationCommentEnabledAsync(ct);
         if (messages.Accepted is not null)
         {
             item.AcceptedUtc ??= time.GetUtcNow().ToUnixTimeMilliseconds();
-            item.Status = "InBearbeitung";
+            item.Status = ScmIncomingEventStatus.InBearbeitung;
             item.Reason = null;
             var skippedComments = 0;
             var skippedActionIds = new HashSet<Guid>();
@@ -880,7 +882,7 @@ public sealed class ScmEventOrchestrator(
                 }
                 else
                 {
-                    item.Status = "VerarbeitungUngeklärt";
+                    item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
                     item.Reason = $"Nicht unterstützte Analyse-Aktion '{action.Kind}'.";
                     await exchange.WriteResultAsync(attempt, new(1, item.Id, request.AttemptId, runId, action.ActionId,
                         false, null, "Aktionsart wird für die Issue-Aufbereitung nicht unterstützt."), ct);
@@ -891,7 +893,7 @@ public sealed class ScmEventOrchestrator(
                 var existing = await db.ScmOutgoingActions.FindAsync([action.ActionId], ct);
                 if (existing is not null && (existing.EventId != item.Id || existing.AttemptId != item.DeliveryAttemptId || existing.RequestJson != JsonSerializer.Serialize(response, ScmEventStore.JsonOptions)))
                 {
-                    item.Status = "VerarbeitungUngeklärt";
+                    item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
                     item.Reason = "Aktionskennung wurde für einen anderen Inhalt oder Versuch verwendet.";
                     break;
                 }
@@ -903,7 +905,7 @@ public sealed class ScmEventOrchestrator(
                 {
                     // Fehlgeschlagene Rückschreibung: ehrlich unklar, Log + Protokolleintrag;
                     // kein Fehlerkommentar am Issue.
-                    item.Status = "VerarbeitungUngeklärt";
+                    item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
                     logger.LogError("Issue-Aufbereitung {EventId}: Aktion {ActionId} fehlgeschlagen: {Error}", item.Id, action.ActionId, outgoing.Error);
                     await LogPreparationErrorAsync(item, outgoing.Error ?? "Unbekannter Fehler.", ct);
                     item.Reason = outgoing.Error;
@@ -912,13 +914,13 @@ public sealed class ScmEventOrchestrator(
             if (skippedComments > 0)
                 await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage,
                     $"{skippedComments} Analyse-Kommentar(e) verworfen: Der Dokumentations-Kommentar ist in den Einstellungen deaktiviert.", ct: ct);
-            if (messages.Complete is { } complete && item.Status == "InBearbeitung")
+            if (messages.Complete is { } complete && item.Status == ScmIncomingEventStatus.InBearbeitung)
             {
                 var actions = await db.ScmOutgoingActions.Where(x => x.EventId == item.Id && x.AttemptId == item.DeliveryAttemptId).ToListAsync(ct);
                 var completeSet = complete.ActionIds.ToHashSet();
                 if (complete.NoRemoteAction && actions.Count == 0)
                 {
-                    item.Status = "Verarbeitet";
+                    item.Status = ScmIncomingEventStatus.Verarbeitet;
                     item.Reason = null;
                     if (!string.IsNullOrWhiteSpace(complete.Report))
                         await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage,
@@ -935,7 +937,7 @@ public sealed class ScmEventOrchestrator(
                         JsonSerializer.Deserialize<ScmResponseRequest>(x.RequestJson, ScmEventStore.JsonOptions)?.Kind == ScmResponseKind.Comment);
                     if (commentOk)
                     {
-                        item.Status = "Verarbeitet";
+                        item.Status = ScmIncomingEventStatus.Verarbeitet;
                         item.Reason = null;
                         if (!string.IsNullOrWhiteSpace(complete.Report))
                             await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage,
@@ -943,32 +945,32 @@ public sealed class ScmEventOrchestrator(
                     }
                     else
                     {
-                        item.Status = "VerarbeitungUngeklärt";
+                        item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
                         await LogPreparationErrorAsync(item, "Der dokumentierende Analyse-Kommentar wurde nicht remote bestätigt.", ct);
                         item.Reason = "Der dokumentierende Analyse-Kommentar wurde nicht remote bestätigt.";
                     }
                 }
                 else if (!complete.NoRemoteAction)
                 {
-                    item.Status = "VerarbeitungUngeklärt";
+                    item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
                     item.Reason = "Die optimierte Issue-Beschreibung wurde nicht remote bestätigt. Status erneut prüfen; kein automatischer Neuversand.";
                 }
             }
         }
         var now = time.GetUtcNow().ToUnixTimeMilliseconds();
-        if (item.Status == "ZustellungVorbereitet")
+        if (item.Status == ScmIncomingEventStatus.ZustellungVorbereitet)
         {
-            item.Status = "ZustellungUngewiss";
+            item.Status = ScmIncomingEventStatus.ZustellungUngewiss;
             item.Reason = "Unterbrochener Zustellversuch; keine automatische Wiederholung.";
         }
-        if (item.Status is "Zugestellt" or "InBearbeitung")
+        if (item.Status is ScmIncomingEventStatus.Zugestellt or ScmIncomingEventStatus.InBearbeitung)
         {
             var timeout = item.AcceptedUtc is null ? options.Value.AcceptanceTimeout : options.Value.CompletionTimeout;
             var began = item.AcceptedUtc ?? item.DeliveredUtc ?? now;
             var session = cli.GetScmPromptSession(item.WorkItemId);
             if (now - began > timeout.TotalMilliseconds || session is null || !session.IsAlive || session.CliRunId != runId)
             {
-                item.Status = "VerarbeitungUngeklärt";
+                item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
                 item.Reason = item.AcceptedUtc is null ? "Annahme fehlt oder CLI-Sitzung beendet. Kein automatischer Neuversand." : "Korrelierter Abschluss fehlt oder CLI-Sitzung beendet.";
             }
         }
@@ -978,28 +980,42 @@ public sealed class ScmEventOrchestrator(
 
     /// <summary>Verknüpft einen vom Agenten im Abschluss gemeldeten Pull Request mit der Aufgabe.
     /// Repository und Provider kommen ausschließlich aus dem gespeicherten, host-validierten Ursprung;
-    /// die gemeldete Nummer ist Datenwert. Eine fremd zugeordnete Referenz wird nicht übernommen.</summary>
+    /// die gemeldete Nummer ist Datenwert. Eine fremd zugeordnete Referenz wird nicht übernommen.
+    /// Da der Kanalabgleich für jedes nicht abgeschlossene Ereignis wiederholt läuft, sind die
+    /// Verknüpfung und ihr Protokolleintrag je Aufgabe dedupliziert.</summary>
     private async Task LinkReportedPullRequestAsync(ScmIncomingEvent item, ScmEventObservation observation,
         int pullRequestNumber, CancellationToken ct)
     {
         var repository = observation.Reference.Repository;
-        var provider = PullRequestProviderDescriptor.TryGetProviderForPluginPrefix(repository.ProviderPrefix)
-            ?? PullRequestProvider.GitHub;
-        var repositoryId = PullRequestRepositoryId.Normalize(provider, $"{repository.Owner}/{repository.Name}");
+        var repositoryId = $"{repository.Owner}/{repository.Name}";
         var url = $"https://{repository.Host}/{repository.Owner}/{repository.Name}/pull/{pullRequestNumber}";
+        var foreignMessage = $"Der vom Agenten gemeldete Pull Request #{pullRequestNumber} ist bereits einer anderen Aufgabe zugeordnet und wurde nicht verknüpft ({url}).";
+        var existing = await pullRequestReferences.FindByKeyAsync(
+            repository.ProviderPrefix, repositoryId, pullRequestNumber, ct);
+        // Bereits derselben Aufgabe verknüpft: weder erneutes Speichern noch ein weiterer Protokolleintrag.
+        if (existing?.WorkItemId == item.WorkItemId)
+            return;
+        // Fremdzuordnung bleibt unangetastet; der Hinweis wird höchstens einmal protokolliert.
+        if (existing is not null)
+        {
+            if (!await db.LogEntries.AnyAsync(x => x.WorkItemId == item.WorkItemId
+                && x.Type == LogEntryType.GitAction && x.Content == foreignMessage, ct))
+                await log.AddEntryAsync(item.WorkItemId, LogEntryType.GitAction, foreignMessage, ct: ct);
+            return;
+        }
         var linked = await pullRequestReferences.SaveReportedAsync(
             item.WorkItemId, repository.ProviderPrefix, repositoryId, pullRequestNumber, url, ct);
         await log.AddEntryAsync(item.WorkItemId, LogEntryType.GitAction,
             linked is not null
                 ? $"Pull Request #{pullRequestNumber} wurde vom Agenten gemeldet und mit der Aufgabe verknüpft ({url})."
-                : $"Der vom Agenten gemeldete Pull Request #{pullRequestNumber} ist bereits einer anderen Aufgabe zugeordnet und wurde nicht verknüpft ({url}).",
+                : foreignMessage,
             ct: ct);
     }
 
     /// <summary>Liest den persistierten Status unabhängig vom verfolgten Datensatz, damit ein während eines
     /// Versuchs eintreffender Abbruch gegenüber den getrackten Änderungen gewinnt.</summary>
     private async Task<bool> IsCancelledAsync(Guid eventId, CancellationToken ct)
-        => await db.ScmIncomingEvents.Where(x => x.Id == eventId).Select(x => x.Status).SingleOrDefaultAsync(ct) == "Abgebrochen";
+        => await db.ScmIncomingEvents.Where(x => x.Id == eventId).Select(x => x.Status).SingleOrDefaultAsync(ct) == ScmIncomingEventStatus.Abgebrochen;
 
     private string? BlockReason(WorkItem task)
         => task.Status is WorkItemStatus.Completed or WorkItemStatus.Archived ? "Aufgabe beendet/archiviert; Start gesperrt."
@@ -1007,7 +1023,7 @@ public sealed class ScmEventOrchestrator(
 
     private async Task WaitAsync(ScmIncomingEvent item, string reason, CancellationToken ct)
     {
-        item.Status = "Wartend";
+        item.Status = ScmIncomingEventStatus.Wartend;
         item.Reason = reason;
         await db.SaveChangesAsync(ct);
     }
@@ -1033,7 +1049,7 @@ public sealed class ScmEventOrchestrator(
         }
         catch (ScmActionIdCollisionException ex)
         {
-            item.Status = "VerarbeitungUngeklärt";
+            item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
             item.Reason = ex.Message;
             await db.SaveChangesAsync(ct);
             return null;

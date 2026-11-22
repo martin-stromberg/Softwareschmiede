@@ -18,7 +18,7 @@ public static class ScmDispatchPriority
     /// <param name="Id">Ereignis-ID.</param>
     /// <param name="WorkItemId">Zugehörige Aufgabe.</param>
     /// <param name="Sequence">Eingangsreihenfolge.</param>
-    /// <param name="Status">Persistierter Ereignisstatus (<c>„Verzögert"</c> markiert Klasse 2).</param>
+    /// <param name="Status">Persistierter Ereignisstatus (<see cref="ScmIncomingEventStatus.Verzögert"/> markiert Klasse 2).</param>
     /// <param name="NextAttemptUtc">Zielzeitpunkt für die Klasse-2-Sortierung (Unix-ms).</param>
     public sealed record EventSelection(Guid Id, Guid WorkItemId, long Sequence, string? Status, long? NextAttemptUtc);
 
@@ -40,7 +40,7 @@ public static class ScmDispatchPriority
                 || (task.ExecutionStatus == WorkItemExecutionStatus.Completed
                     && task.Status is WorkItemStatus.New or WorkItemStatus.Started or WorkItemStatus.Waiting)))
             return 1;
-        if (item.Status == "Verzögert")
+        if (item.Status == ScmIncomingEventStatus.Verzögert)
             return 2;
         return 3;
     }

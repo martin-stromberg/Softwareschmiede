@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
 using Softwareschmiede.Domain.Interfaces;
 using Softwareschmiede.Infrastructure.Data;
@@ -12,7 +13,7 @@ namespace Softwareschmiede.Application.Services;
 /// (<see cref="IActiveWorkItemsService.GetActiveWorkItemsAsync"/>) an und zählt den Zustand
 /// <see cref="AiExecutionState.Running"/>. Laufender gehandelter Prozess und
 /// zeitgesteuerter Prompt werden dabei wie in der UI-Klassifikation berücksichtigt.
-/// Zusätzlich zählt jedes SCM-Ereignis im Status „Verzögert" als ausstehende
+/// Zusätzlich zählt jedes SCM-Ereignis im Status <see cref="ScmIncomingEventStatus.Verzögert"/> als ausstehende
 /// Automatisierung, damit der Auto-Shutdown eine geplante Zustellung nicht überholt.
 /// </summary>
 public sealed class RunningAutomationsCount : IRunningAutomationsCount
@@ -57,7 +58,7 @@ public sealed class RunningAutomationsCount : IRunningAutomationsCount
             }
         }
 
-        count += await db.ScmIncomingEvents.CountAsync(x => x.Status == "Verzögert", ct);
+        count += await db.ScmIncomingEvents.CountAsync(x => x.Status == ScmIncomingEventStatus.Verzögert, ct);
 
         return count;
     }

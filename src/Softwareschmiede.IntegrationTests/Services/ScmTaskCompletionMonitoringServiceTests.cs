@@ -18,8 +18,6 @@ namespace Softwareschmiede.IntegrationTests.Services;
 /// beobachtet werden; Aufgaben ohne gültige Issue-/Pull-Request-Referenz bleiben stets unberührt.</summary>
 public sealed class ScmTaskCompletionMonitoringServiceTests
 {
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-
     /// <summary>Ein im Abschluss gemeldeter Pull Request wird mit der Aufgabe als
     /// <see cref="PullRequestReference"/> verknüpft — Grundlage der Abschlussüberwachung.</summary>
     [Fact]
@@ -31,7 +29,7 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
 
         await ProcessEventWithReportAsync(fixture, eventId, pullRequestNumber: 7);
 
-        Assert.Equal("Verarbeitet", (await fixture.EventAsync(eventId)).Status);
+        Assert.Equal(ScmIncomingEventStatus.Verarbeitet, (await fixture.EventAsync(eventId)).Status);
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var reference = Assert.Single(await db.PullRequestReferences.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
@@ -397,6 +395,88 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         Assert.Equal(WorkItemStatus.Started, (await TaskAsync(fixture, taskId)).Status);
     }
 
+    /// <summary>Die Abschlussprüfung folgt der verbindlichen Freigabeliste: exakt die vier finalen
+    /// oder terminal klärbaren Ereignis-Stati geben die Referenzbeobachtung frei — jeder transiente
+    /// und jeder unbekannte Status stellt sie weiter zurück.</summary>
+    [Theory]
+    [MemberData(nameof(CompletionGateStatuses))]
+    public async Task Monitor_EventWithStatus_CompletionGate(string status, bool released)
+    {
+        var time = new TestTimeProvider();
+        await using var fixture = new ScmDispatchFixture(time: time);
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(WorkItemStatus.Started, configured: true);
+        await AddPullRequestReferenceAsync(fixture, taskId, 7);
+        await fixture.SetEventStatusAsync(eventId, status);
+        SetupPullRequestStatus(fixture, PullRequestStatus.Merged);
+        var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
+
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(released, (await TaskAsync(fixture, taskId)).ScmCompletionDetectedUtc is not null);
+    }
+
+    /// <summary>Alle zehn bekannten Ereignis-Stati plus ein unbekannter Wert: nur die vier
+    /// ausdrücklich freigegebenen Stati starten den Abschluss-Countdown.</summary>
+    public static IEnumerable<object[]> CompletionGateStatuses()
+    {
+        yield return [ScmIncomingEventStatus.Verarbeitet, true];
+        yield return [ScmIncomingEventStatus.Abgebrochen, true];
+        yield return [ScmIncomingEventStatus.VerarbeitungUngeklärt, true];
+        yield return [ScmIncomingEventStatus.ZustellungUngewiss, true];
+        yield return [ScmIncomingEventStatus.Aufgenommen, false];
+        yield return [ScmIncomingEventStatus.Verzögert, false];
+        yield return [ScmIncomingEventStatus.Wartend, false];
+        yield return [ScmIncomingEventStatus.ZustellungVorbereitet, false];
+        yield return [ScmIncomingEventStatus.Zugestellt, false];
+        yield return [ScmIncomingEventStatus.InBearbeitung, false];
+        yield return ["ZukuenftigerStatus", false];
+    }
+
+    /// <summary>Der Happy Path des behobenen Defekts: Ein terminal ungeklärtes Ereignis
+    /// (<see cref="ScmIncomingEventStatus.VerarbeitungUngeklärt"/>) hält den automatischen
+    /// Abschluss nicht mehr auf — die gemergte Referenz beendet die Aufgabe nach der Wartezeit.</summary>
+    [Fact]
+    public async Task Monitor_UnresolvedEvent_CompletesTaskAfterWait()
+    {
+        var time = new TestTimeProvider();
+        await using var fixture = new ScmDispatchFixture(time: time);
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(WorkItemStatus.Started, configured: true);
+        await AddPullRequestReferenceAsync(fixture, taskId, 7);
+        await fixture.SetEventStatusAsync(eventId, ScmIncomingEventStatus.VerarbeitungUngeklärt);
+        await SetWaitAsync(fixture, 5);
+        SetupPullRequestStatus(fixture, PullRequestStatus.Merged);
+        var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
+
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull((await TaskAsync(fixture, taskId)).ScmCompletionDetectedUtc);
+
+        time.Advance(TimeSpan.FromMinutes(5));
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(WorkItemStatus.Completed, (await TaskAsync(fixture, taskId)).Status);
+    }
+
+    private static async Task AddPullRequestReferenceAsync(ScmDispatchFixture fixture, Guid taskId, int number)
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        db.PullRequestReferences.Add(new PullRequestReference
+        {
+            Id = Guid.NewGuid(),
+            WorkItemId = taskId,
+            Provider = PullRequestProvider.GitHub,
+            Role = PullRequestReferenceRole.CreatedByTask,
+            RepositoryId = "owner/repo",
+            PullRequestNumber = number,
+            Url = $"https://github.com/owner/repo/pull/{number}",
+            CreatedUtc = DateTimeOffset.UtcNow,
+            MonitoringPhase = PullRequestMonitoringPhase.Created
+        });
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
     private static void SetupPullRequestStatus(ScmDispatchFixture fixture, PullRequestStatus status, int number = 7)
         => fixture.Git.Setup(x => x.GetPullRequestStatusAsync("owner/repo", number, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PullRequestStatusInfo(PullRequestProvider.GitHub, "owner/repo", number, null,
@@ -407,14 +487,14 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
     {
         await fixture.DispatchAsync(eventId);
         var delivered = await fixture.EventAsync(eventId);
-        Assert.Equal("Zugestellt", delivered.Status);
+        Assert.Equal(ScmIncomingEventStatus.Zugestellt, delivered.Status);
         var runId = Guid.Parse(delivered.CliRunId!);
         var directory = delivered.ExchangePath!;
         await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
-            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), Json));
+            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), TestJson.Options));
         await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
             JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
-                [], false, Report: "PR angelegt.", PullRequestNumber: pullRequestNumber), Json));
+                [], false, Report: "PR angelegt.", PullRequestNumber: pullRequestNumber), TestJson.Options));
         await fixture.DispatchAsync(eventId);
         await fixture.DispatchAsync(eventId);
     }
@@ -515,13 +595,5 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         using var scope = fixture.Services.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>()
             .WorkItems.AsNoTracking().SingleAsync(x => x.Id == taskId);
-    }
-
-    /// <summary>Deterministische Zeitquelle für die Abschluss-Wartezeit.</summary>
-    private sealed class TestTimeProvider : TimeProvider
-    {
-        private DateTimeOffset _now = DateTimeOffset.UtcNow;
-        public override DateTimeOffset GetUtcNow() => _now;
-        public void Advance(TimeSpan span) => _now += span;
     }
 }

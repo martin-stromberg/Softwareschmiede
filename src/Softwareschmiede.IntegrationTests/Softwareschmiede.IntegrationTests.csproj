@@ -33,6 +33,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <Compile Include="..\Softwareschmiede.Tests\Helpers\ScmDispatchFixture.cs" Link="Infrastructure\ScmDispatchFixture.cs" />
+    <Compile Include="..\Softwareschmiede.Tests\Helpers\TestTimeProvider.cs" Link="Infrastructure\TestTimeProvider.cs" />
     <Compile Include="..\Softwareschmiede.Tests\Helpers\ScmTestServices.cs" Link="Infrastructure\ScmTestServices.cs" />
     <Compile Include="..\Softwareschmiede.Tests\Helpers\TempDirectoryCleanup.cs" Link="Infrastructure\TempDirectoryCleanup.cs" />
     <Compile Include="..\Softwareschmiede.Tests\Helpers\FakeGitHubEventApi.cs" Link="Helpers\FakeGitHubEventApi.cs" />
