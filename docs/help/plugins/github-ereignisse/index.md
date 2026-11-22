@@ -8,6 +8,7 @@ Die Softwareschmiede beobachtet Texte in lokal verknüpften GitHub-Issues und Pu
 - [Ablauf für Anwender](ablauf-anwender.md)
 - [Einrichtung](installation.md)
 - [Technischer Ablauf](ablauf-technisch.md)
+- [Ereignisabläufe je Ereignisart](ereignisablaeufe.md)
 - [Architektur](architektur.md)
 - [Datenmodell](datenmodell.md)
 - [Business Rules](business-rules.md)
