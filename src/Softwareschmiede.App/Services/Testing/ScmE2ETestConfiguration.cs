@@ -52,6 +52,9 @@ internal sealed class ScmE2EScenario
     public bool CanWrite { get; set; } = true;
     public bool RejectAiResponse { get; set; }
     public bool PluginAvailable { get; set; } = true;
+    // Simuliert ein erschöpftes REST-Primärkontingent: Nicht-GraphQL-Endpunkte liefern 403 mit
+    // X-RateLimit-Remaining/Reset; der GraphQL-Transport (eigenes Kontingent) läuft weiter.
+    public bool RateLimitRest { get; set; }
     public List<ScmE2EText> Text { get; set; } = [];
     public List<ScmE2ENotification> Notifications { get; set; } = [];
 }

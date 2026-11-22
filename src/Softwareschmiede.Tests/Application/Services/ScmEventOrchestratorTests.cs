@@ -388,4 +388,37 @@ public sealed class ScmEventOrchestratorTests
             if (fixture is not null) await fixture.DisposeAsync();
         }
     }
+
+    /// <summary>Erreicht ein Ereignis im Dispatch seinen Endstatus, fordert der Lauf die
+    /// Startprüfung an — so wird der Platz einer bereits am Prompt wartenden Sitzung
+    /// ohne Poll frei.</summary>
+    [Fact]
+    public async Task DispatchCoreAsync_EventReachesEndStatus_RequestsStartCheck()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (_, eventId) = await fixture.AddAsync(configured: true);
+        await fixture.DispatchAsync(eventId);
+        var delivered = await fixture.EventAsync(eventId);
+        Assert.Equal("Zugestellt", delivered.Status);
+        var runId = Guid.Parse(delivered.CliRunId!);
+        var directory = delivered.ExchangePath!;
+        var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        await File.WriteAllTextAsync(Path.Combine(directory, "accepted.json"),
+            JsonSerializer.Serialize(new ScmExchangeAccepted(1, eventId, delivered.DeliveryAttemptId!.Value, runId), json),
+            TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(directory, "complete.json"),
+            JsonSerializer.Serialize(new ScmExchangeComplete(1, eventId, delivered.DeliveryAttemptId!.Value, runId,
+                [], false, Report: "Fertig."), json),
+            TestContext.Current.CancellationToken);
+
+        var angefordert = 0;
+        fixture.Trigger.Requested += () => angefordert++;
+        // Die Kanal-Stabilitätsprüfung übernimmt eine Nachricht erst beim zweiten identischen Lesen.
+        await fixture.DispatchAsync(eventId);
+        await fixture.DispatchAsync(eventId);
+
+        Assert.Equal("Verarbeitet", (await fixture.EventAsync(eventId)).Status);
+        Assert.True(angefordert >= 1, "Der Endstatus-Übergang des Ereignisses hat keine Startprüfung angefordert.");
+    }
 }

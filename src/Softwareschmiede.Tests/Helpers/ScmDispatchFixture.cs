@@ -2,8 +2,6 @@ using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Moq;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
@@ -148,52 +146,8 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                 return Task.FromResult(new TerminalSessionStartResult(process, session.Object, false));
             });
         var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddDbContext<SoftwareschmiedeDbContext>(options => options.UseSqlite($"Data Source={Path.Combine(Root, "events.db")};Pooling=False"));
-        services.AddSingleton(plugins.Object);
-        services.AddSingleton(Git.Object);
-        services.AddSingleton(directories.Object);
-        services.AddSingleton(factory.Object);
-        services.AddSingleton(time ?? TimeProvider.System);
-        services.AddSingleton<IOptions<TerminalSessionOptions>>(Options.Create(new TerminalSessionOptions()));
-        services.AddSingleton<IOptions<ScmEventOptions>>(Options.Create(new ScmEventOptions()));
-        services.AddSingleton<AiExecutionService>();
-        services.AddSingleton<ICliExecutionLimitSource>(sp => sp.GetRequiredService<AiExecutionService>());
-        services.AddSingleton<IRunningAutomationStatusSource>(sp => sp.GetRequiredService<AiExecutionService>());
-        services.AddSingleton<PromptScheduleDispatchService>();
-        services.AddSingleton<ScmEventStartupGate>();
-        services.AddSingleton<ScmEventChangeNotifier>();
-        services.AddSingleton<ScmEventExchangeProtocol>();
-        services.AddSingleton<ScmEventMonitoringService>();
-        services.AddSingleton<ScmBackmergeMonitoringService>();
-        services.AddSingleton<ScmIssuePreparationMonitoringService>();
-        services.AddSingleton<ScmTaskCompletionMonitoringService>();
-        services.AddSingleton<ScmStartCheckTrigger>();
-        services.AddSingleton<ScmStartCheckService>();
-        services.AddSingleton<WorkItemRunDataChangedNotifier>();
-        services.AddScoped<PullRequestReferenceService>();
-        services.AddScoped<TodoService>();
-        services.AddScoped<WorkItemService>();
-        services.AddScoped<LogService>();
-        services.AddScoped<AppSettingService>();
-        services.AddScoped<PluginDefaultSettingsService>();
-        services.AddScoped<PluginActivationService>();
-        services.AddScoped<PluginSelectionService>();
-        services.AddScoped<AiPluginLimitService>();
-        services.AddScoped<ScmEventStore>();
-        services.AddScoped<ScmEventOutbox>();
-        services.AddScoped<ScmEventOrchestrator>();
-        // Jede Fixture erhält einen eigenen Reservierungsbestand — dadurch sind die
-        // Reservierungen der Fixture vollständig von parallel laufenden Tests isoliert.
-        services.AddSingleton<ScmStartSlotReservationPool>();
-        services.AddScoped<ScmEventExecutionLimitService>();
-        services.AddScoped<ScmEventTaskResolver>();
-        services.AddScoped<ScmIssuePreparationService>();
-        services.AddScoped<ScmBackmergeService>();
-        services.AddScoped(sp => new DevelopmentProcessService(sp.GetRequiredService<WorkItemService>(), sp.GetRequiredService<LogService>(),
-            Git.Object, sp.GetRequiredService<PluginSelectionService>(), directories.Object,
-            new DevelopmentProcessServiceOptions(AiExecutionService: sp.GetRequiredService<AiExecutionService>(),
-                PromptScheduleDispatchService: sp.GetRequiredService<PromptScheduleDispatchService>()), sp.GetRequiredService<ILogger<DevelopmentProcessService>>()));
+        services.AddScmTestServices(Path.Combine(Root, "events.db"), plugins.Object, Git.Object,
+            directories.Object, factory.Object, time ?? TimeProvider.System);
         Services = services.BuildServiceProvider();
     }
 
@@ -312,6 +266,19 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
         await File.WriteAllBytesAsync(PathValue("temporaryProofPath"), content, ct);
         File.Move(PathValue("temporaryProofPath"), PathValue("proofPath"));
         File.Move(PathValue("challengePath"), PathValue("readChallengePath"));
+    }
+
+    /// <summary>Wartet bis zu 30 s in 100-ms-Intervallen auf die Bedingung und schlägt
+    /// danach mit <paramref name="because"/> fehl.</summary>
+    internal static async Task WaitForAsync(Func<Task<bool>> condition, string because)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await condition()) return;
+            await Task.Delay(100);
+        }
+        Assert.True(await condition(), because);
     }
 
     internal void SetPrompt(Guid task, string prompt)

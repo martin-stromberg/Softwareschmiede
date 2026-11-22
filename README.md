@@ -27,7 +27,7 @@ Softwareschmiede bündelt Projektverwaltung, Aufgabensteuerung, Git-Workflows un
 - **IDE-Integration** mit Visual Studio für `.sln`/`.slnx` und Visual Studio Code als Fallback
 - **Dateiexplorer und Diff-Ansicht** direkt in der Aufgabendetailansicht
 - **Pull-Request-Workflow** mit PR-Erstellung, Statusanzeige und GitHub-Ereignisüberwachung
-- **GitHub-Ereignisüberwachung** für Issues und Pull Requests aktivierter Projekt-Repositories — umschaltbar zwischen repository-weiter Überwachung mit Trigger-Keyword und der Notifications-Inbox eines separaten Bot-Kontos (@mention) — mit persistenter Queue, kontrollierter CLI-Zustellung und begrenzbarer Parallelität (global und je KI-Plugin, jeweils leer = unbegrenzt); bei vollem Limit warten Ereignisse mit Wartegrund priorisiert (Fortsetzungen → fällige Verzögerungen → Eingangsreihenfolge) auf freie Plätze, die ohne Wartezeit auf den nächsten Poll-Zyklus nachgefüllt werden; eine pausierte Aufgabe belegt trotz weiterlaufendem Prozess keinen Platz — ihr Slot gilt ab dem Setzen der Pause als frei
+- **GitHub-Ereignisüberwachung** für Issues und Pull Requests aktivierter Projekt-Repositories — umschaltbar zwischen repository-weiter Überwachung mit Trigger-Keyword und der Notifications-Inbox eines separaten Bot-Kontos (@mention) — mit persistenter Queue, kontrollierter CLI-Zustellung und begrenzbarer Parallelität (global und je KI-Plugin, jeweils leer = unbegrenzt); bei vollem Limit warten Ereignisse mit Wartegrund priorisiert (Fortsetzungen → fällige Verzögerungen → Eingangsreihenfolge) auf freie Plätze, die ohne Wartezeit auf den nächsten Poll-Zyklus nachgefüllt werden; eine pausierte Aufgabe belegt trotz weiterlaufendem Prozess keinen Platz — ihr Slot gilt ab dem Setzen der Pause als frei; ebenso belegt eine Aufgabe keinen Platz, deren CLI-Sitzung nachweislich am Eingabeprompt wartet und der kein Ereignis mehr offen ist
 - **Pausierbare Aufgaben** mit manueller Pause und automatischer Pausierung bei erkannten KI-Session-Limits
 - **Zeitgesteuerte Prompts** mit persistenter Wartestellung — Pläne überleben Ansichtswechsel, CLI-Stopp und App-Neustart und werden zum Zielzeitpunkt bzw. beim nächsten CLI-Start zugestellt
 - **Programmupdate aus der Anwendung** gegen GitHub-Releases mit konfigurierbarem Update-Modus und wählbarem Update-Pfad (ausschließlich stabile Versionen oder ausschließlich Release-Kandidaten)
@@ -186,7 +186,7 @@ Aufgaben lassen sich zeitgebunden pausieren. Zusätzlich erkennt die Anwendung S
 - Blockiert: manueller Start (`StartProcessAsync`/`StartProcessAndCliAsync`), CLI-Neustart (`RestartCliAsync`), Wiederherstellung (`WorkItemRecoveryService`) sowie das Senden und Planen von Prompts.
 - Bereits geplante zeitgesteuerte Prompts verschiebt der `PromptScheduleDispatchService` auf das Pausenende statt sie zu verwerfen.
 - Ein laufender CLI-Prozess wird niemals unterbrochen — die Pause greift nur für neu ausgelöste Aktionen.
-- In der SCM-Ausführungsbegrenzung belegt eine pausierte Aufgabe keinen Platz — weder im globalen noch im Plugin-Zähler: Der Platz gilt ab dem Setzen der Pause als frei, und das nächste wartende SCM-Ereignis startet über die ereignisgesteuerte Startprüfung sofort, ohne auf den nächsten Poll zu warten. Läuft die Pause bei weiterlaufendem Prozess ab, zählt die Aufgabe wieder als belegt (das Limit begrenzt Starts, nicht laufende Prozesse).
+- In der SCM-Ausführungsbegrenzung belegt eine pausierte Aufgabe keinen Platz — weder im globalen noch im Plugin-Zähler: Der Platz gilt ab dem Setzen der Pause als frei, und das nächste wartende SCM-Ereignis startet über die ereignisgesteuerte Startprüfung sofort, ohne auf den nächsten Poll zu warten. Läuft die Pause bei weiterlaufendem Prozess ab, zählt die Aufgabe wieder als belegt (das Limit begrenzt Starts, nicht laufende Prozesse). Dieselbe Freigabe gilt für eine Aufgabe, deren SCM-Sitzung nachweislich am Eingabeprompt wartet und deren Ereignisse alle abgeschlossen sind — auch dann rückt das nächste wartende Ereignis ereignisgesteuert nach; kehrt die Aufgabe zur Arbeit zurück, zählt sie wieder als belegt, wobei ein inzwischen gestarteter Folgelauf das Limit zeitweise überschreiten darf (toleriert — das Limit begrenzt nur Starts).
 
 ### Automatische Pause bei Session-Limit
 
@@ -283,6 +283,8 @@ Die Konfigurationsbasis liegt in `src/Softwareschmiede/appsettings*.json`. Im ak
 - `Terminal:DefaultRows`
 - `Terminal:RecordingByteBudget`
 
+Zusätzlich bindet die Sektion `ScmEvents` technische Laufzeitoptionen der SCM-Ereignisüberwachung (kein UI-Schalter): `ScmEvents:PollInterval`, `ScmEvents:AcceptanceTimeout`, `ScmEvents:CompletionTimeout` und `ScmEvents:RepositoryResolutionCacheTtl` (Lebensdauer des plugin-internen Auflösungscaches, Standard `00:15:00`). Details siehe [GitHub-Ereignisüberwachung — Technische Konfiguration](docs/help/plugins/github-ereignisse/installation.md).
+
 ### Datenbank und Logs
 
 - **Produktive Releases:** `%LocalAppData%\Softwareschmiede\softwareschmiede.db`
@@ -338,7 +340,7 @@ Die Repository-Automation ist branchbasiert aufgebaut:
 
 - **`pr-staging-ci.yml`** prüft Pull Requests nach `staging` mit Format-Check, Security Scan, Build und Tests.
 - **`staging-ci.yml`** baut auf Push nach `staging`, erzeugt bei Versionsänderungen Pre-Releases und prüft die Coverage-Schwelle.
-- **`staging-to-main-promotion.yml`** erstellt nach erfolgreichem Staging-Lauf einen Draft-PR von `staging` nach `main`.
+- **`staging-to-main-promotion.yml`** erstellt direkt nach jedem Push auf `staging` einen Draft-PR von `staging` nach `main`, sobald `main` hinter `staging` zurückliegt.
 - **`verify-pr-source.yml`** erlaubt Pull Requests nach `main` ausschließlich aus `staging`.
 - **`release.yml`** erstellt auf `main`-Pushes oder `v*.*.*`-Tags GitHub-Releases.
 - **`sync-staging-with-main.yml`** erstellt nach einem Release einen automatischen Backmerge-PR von `main` nach `staging`.

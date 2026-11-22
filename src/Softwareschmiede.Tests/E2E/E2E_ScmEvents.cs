@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FlaUI.Core.AutomationElements;
 using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.Application.Services;
@@ -647,6 +648,72 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.Equal(count + 6, fixture.Prompts().Count);
         output.WriteLine("E3-Erkennung: fehlendes Simulator-Banner meldet ehrlich ohne Bestätigen-Button; regulärer Neustart erkennt und liefert einmal.");
     }
+
+    /// <summary>Auflösungsbudget über den echten App-Pfad (Issue #442): Der Auflösungscache begrenzt
+    /// die GraphQL-Auflösung auf höchstens eine Erneuerung je TTL-Fenster (Fixture-TTL 3 s,
+    /// Poll 300 ms), kein REST-Auflösungspaar (<c>user</c>/<c>repos/…</c>) erscheint mehr im
+    /// Call-Protokoll, und ein erschöpftes REST-Kontingent sperrt Folgeaufrufe fail-fast —
+    /// während das eigene GraphQL-Budget unabhängig weiterläuft.</summary>
+    [Fact]
+    public async Task ScmEvents_RepositoryResolution_StaysWithinBudgetAndGates_OnRateLimit()
+    {
+        SkipWhenWpfE2ENotAvailable();
+        var fixture = new ScmE2EFixture();
+        await fixture.InitializeAsync();
+        output.WriteLine("SCM fixture and evidence: " + fixture.Configuration.TestRoot);
+        // AlleAufgaben-Modus: die Abschlussüberwachung erzeugt pro Zyklus reguläre REST-Lesecalls
+        // (Issue-Status je Aufgabe) als Messgröße für den Rate-Limit-Gate.
+        await fixture.SetTaskCompletionCheckMode(ScmTaskCompletionCheckMode.AllWorkItems);
+        WaitOnRealMainwindow(LaunchApp(false, fixture.EnvironmentVariables()));
+
+        // Mehrere Poll-Zyklen über ein Zeitfenster jenseits der Fixture-TTL (3 s) abwarten.
+        await fixture.WaitForCallsAsync("\"Endpoint\":\"graphql\"", 4);
+        await Task.Delay(4000, TestContext.Current.CancellationToken);
+        var calls = fixture.Calls();
+        var resolutions = calls.Count(IsResolutionCall);
+        // Auflösung höchstens je TTL-Fenster: Start + wenige Erneuerungen — ein Bruchteil des
+        // Gesamtverkehrs (früher: zwei REST-Calls je Zyklus und Repository).
+        Assert.True(resolutions <= 4, $"Auflösungen über Budget: {resolutions} von {calls.Count} Calls.");
+        Assert.True(resolutions * 15 < calls.Count,
+            $"Auflösungsanteil zu hoch: {resolutions} Auflösungen bei {calls.Count} Calls.");
+        Assert.DoesNotContain(calls, x => Endpoint(x) == "user");
+        Assert.DoesNotContain(calls, x => Endpoint(x) == "repos/scm-owner/scm-e2e" && Method(x) == "GET");
+        output.WriteLine($"Phase A: {resolutions} Auflösungen bei {calls.Count} protokollierten Calls.");
+
+        // REST-Primärkontingent erschöpft: die erste Antwort liefert 403 + X-RateLimit-Reset und
+        // armiert den Gate; Folgeaufrufe scheitern vor dem Transport und erscheinen nicht mehr im
+        // Protokoll, während die GraphQL-Enumeration und -Auflösung eigenständig weiterlaufen.
+        fixture.Scenario.RateLimitRest = true;
+        fixture.SaveScenario();
+        await fixture.WaitForCallsAsync("repos/scm-owner/scm-e2e/issues/", 1);
+        // Der Gate gilt ab der ersten 403 — erst nach weiteren GraphQL-Calls einfrieren messen.
+        await fixture.WaitForCallsAsync("\"Endpoint\":\"graphql\"", 4);
+        var frozen = fixture.Calls().Count(IsRestCall);
+        await fixture.WaitForCallsAsync("\"Endpoint\":\"graphql\"", 4);
+        var after = fixture.Calls();
+        Assert.Equal(frozen, after.Count(IsRestCall));
+        Assert.True(after.Count(x => Endpoint(x) == "graphql") > calls.Count(x => Endpoint(x) == "graphql"),
+            "GraphQL muss trotz REST-Sperre eigenständig weiterlaufen.");
+        output.WriteLine($"Phase B: REST eingefroren bei {frozen} Calls, GraphQL läuft weiter.");
+    }
+
+    private static bool IsResolutionCall(JsonElement call)
+        => Endpoint(call) == "graphql"
+            && call.TryGetProperty("JsonBody", out var body) && body.ValueKind == JsonValueKind.String
+            && body.GetString()!.Contains("viewerPermission", StringComparison.Ordinal);
+
+    private static bool IsRestCall(JsonElement call)
+        => Endpoint(call) is { } endpoint && endpoint != "graphql";
+
+    private static string? Endpoint(JsonElement call)
+        => call.TryGetProperty("Endpoint", out var endpoint) && endpoint.ValueKind == JsonValueKind.String
+            ? endpoint.GetString()
+            : null;
+
+    private static string? Method(JsonElement call)
+        => call.TryGetProperty("Method", out var method) && method.ValueKind == JsonValueKind.String
+            ? method.GetString()
+            : null;
 
     private static async Task WaitPromptCountAsync(ScmE2EFixture fixture, int minimum, Guid? attempt)
     {

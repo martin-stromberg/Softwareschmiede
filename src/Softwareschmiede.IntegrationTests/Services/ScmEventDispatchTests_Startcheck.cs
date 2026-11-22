@@ -39,7 +39,7 @@ public sealed class ScmEventDispatchTests_Startcheck
             // Wie PseudoConsoleSession: das Session-Ende wird als Exited-Ereignis gemeldet.
             fixture.Sessions[firstTask].Raise(x => x.Exited += null, new TerminalSessionExitedEventArgs(0));
 
-            await WaitForAsync(async () => fixture.Sessions.Count == 2
+            await ScmDispatchFixture.WaitForAsync(async () => fixture.Sessions.Count == 2
                     && (await fixture.EventAsync(secondId)).Status == "Zugestellt",
                 "Das wartende Ereignis wurde nach dem Freiwerden des Platzes nicht ereignisgesteuert gestartet.");
             Assert.Equal(2, fixture.Prompts.Count);
@@ -78,7 +78,7 @@ public sealed class ScmEventDispatchTests_Startcheck
                     .SetPauseAsync(firstTask, DateTimeOffset.UtcNow.AddMinutes(30), TestContext.Current.CancellationToken);
             }
 
-            await WaitForAsync(async () => fixture.Sessions.Count == 2
+            await ScmDispatchFixture.WaitForAsync(async () => fixture.Sessions.Count == 2
                     && (await fixture.EventAsync(secondId)).Status == "Zugestellt",
                 "Das wartende Ereignis wurde nach dem Setzen der Pause nicht ereignisgesteuert gestartet.");
             Assert.True(fixture.Cli.IsRunning(firstTask));
@@ -116,7 +116,7 @@ public sealed class ScmEventDispatchTests_Startcheck
                     .SetPauseAsync(taskId, null, TestContext.Current.CancellationToken);
             }
 
-            await WaitForAsync(async () => (await fixture.EventAsync(eventId)).Status == "Zugestellt",
+            await ScmDispatchFixture.WaitForAsync(async () => (await fixture.EventAsync(eventId)).Status == "Zugestellt",
                 "Das wartende Ereignis wurde nach dem Aufheben der Pause nicht ereignisgesteuert gestartet.");
             Assert.Single(fixture.Sessions);
         }
@@ -251,7 +251,7 @@ public sealed class ScmEventDispatchTests_Startcheck
         {
             await fixture.Cli.StopCliAsync(nonScmTask, TestContext.Current.CancellationToken);
             fixture.Sessions[nonScmTask].Raise(x => x.Exited += null, new TerminalSessionExitedEventArgs(0));
-            await WaitForAsync(async () => (await fixture.EventAsync(eventId)).Status == "Zugestellt",
+            await ScmDispatchFixture.WaitForAsync(async () => (await fixture.EventAsync(eventId)).Status == "Zugestellt",
                 "Das wartende Ereignis wurde nach dem Ende des Nicht-SCM-Laufs nicht ereignisgesteuert gestartet.");
         }
         finally
@@ -260,14 +260,27 @@ public sealed class ScmEventDispatchTests_Startcheck
         }
     }
 
-    private static async Task WaitForAsync(Func<Task<bool>> condition, string because)
+    /// <summary>Der Übergang der SCM-Promptsitzung in den verifizierten Eingabeprompt
+    /// (<see cref="IScmPromptSessionAdapter.ReadyStatusChanged"/> nach Ready, verdrahtet im
+    /// <see cref="AiExecutionService"/>) fordert die Startprüfung an — andere Stände nicht.</summary>
+    [Fact]
+    public async Task StartCheck_SessionReady_TriggersSignalOut()
     {
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
-        while (DateTime.UtcNow < deadline)
-        {
-            if (await condition()) return;
-            await Task.Delay(100);
-        }
-        Assert.True(await condition(), because);
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(configured: true);
+        await fixture.DispatchAsync(eventId);
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
+
+        var angefordert = 0;
+        fixture.Trigger.Requested += () => angefordert++;
+
+        // Die Sitzung meldet Busy weiter — kein Auslöser.
+        fixture.SetPrompt(taskId, "SCM_BUSY_V1");
+        Assert.Equal(0, angefordert);
+
+        // Erst der verifizierte Eingabeprompt fordert die Prüfung an.
+        fixture.SetPrompt(taskId, "SCM_READY_V1");
+        Assert.True(angefordert >= 1, "Der Übergang in den verifizierten Eingabeprompt hat keinen Auslöser gemeldet.");
     }
 }

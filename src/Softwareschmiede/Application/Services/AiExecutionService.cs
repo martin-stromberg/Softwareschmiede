@@ -33,6 +33,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
     private readonly ITerminalSessionFactory _sessionFactory;
     private readonly IOptions<TerminalSessionOptions> _terminalOptions;
     private readonly TimeProvider _timeProvider;
+    private readonly ScmStartCheckTrigger? _startCheckTrigger;
     private volatile bool _isDisposed;
 
     /// <summary>Erstellt eine neue Instanz des <see cref="AiExecutionService"/>.</summary>
@@ -42,13 +43,17 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
     /// <param name="sessionFactory">Zentrale Erzeugung der interaktiven Terminal-Session (Auflösung, Preflight, Backend-Wahl).</param>
     /// <param name="terminalOptions">Terminal-Laufzeitparameter (u. a. <see cref="TerminalSessionOptions.RecordingByteBudget"/>).</param>
     /// <param name="timeProvider">Zeitquelle für die Aufzeichnungs-Zeitstempel.</param>
+    /// <param name="startCheckTrigger">Optionaler Auslöser der SCM-Startprüfung: Erreicht eine
+    /// SCM-Promptsitzung den verifizierten Eingabeprompt, kann ihr Ausführungsplatz für ein
+    /// wartendes Ereignis frei werden — die angeforderte Prüfung füllt ihn ohne Poll-Wartezeit.</param>
     public AiExecutionService(
         ILogger<AiExecutionService> logger,
         ILoggerFactory loggerFactory,
         IServiceScopeFactory scopeFactory,
         ITerminalSessionFactory sessionFactory,
         IOptions<TerminalSessionOptions> terminalOptions,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ScmStartCheckTrigger? startCheckTrigger = null)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
@@ -56,6 +61,7 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
         _sessionFactory = sessionFactory;
         _terminalOptions = terminalOptions;
         _timeProvider = timeProvider;
+        _startCheckTrigger = startCheckTrigger;
     }
 
     /// <summary>Wird ausgelöst, wenn ein CLI-Prozess gestartet, gestoppt oder ein Fehler aufgetreten ist.</summary>
@@ -377,6 +383,17 @@ public sealed class AiExecutionService : IRunningAutomationStatusSource, ICliExe
             handle.ScmPromptSession = new ScmPromptSessionAdapter(workItemId, handle.CliRunId, aiPlugin.PluginPrefix,
                 spec, session, scmConfiguration, () => _handles.TryGetValue(workItemId, out var active) && ReferenceEquals(active, handle), _timeProvider);
             session.InputStarted = handle.ScmPromptSession.MarkInputStarted;
+            // Erreicht die Sitzung ihren verifizierten Eingabeprompt, kann die Aufgabe ihren
+            // Ausführungsplatz freigeben — die angeforderte Startprüfung füllt ihn ereignisgesteuert.
+            handle.ScmPromptSession.ReadyStatusChanged += status =>
+            {
+                if (status == ScmPromptReadyStatus.Ready)
+                    _startCheckTrigger?.RequestStartCheck();
+            };
+            // RefreshScreen im Adapter-Konstruktor kann bereits vor der Verdrahtung Ready gesetzt
+            // haben — ein solcher Zustand ohne Übergang wird einmalig nachgemeldet.
+            if (handle.ScmPromptSession.ReadyStatus == ScmPromptReadyStatus.Ready)
+                _startCheckTrigger?.RequestStartCheck();
 
             session.Exited += (_, e) => HandleSessionEndedAsync(workItemId, handle, e.ExitCode, "Terminal").SafeFireAndForget(_logger, "AiExecutionService.HandleSessionEndedAsync");
             session.Failed += (_, e) => HandleSessionFailedAsync(workItemId, handle, e).SafeFireAndForget(_logger, "AiExecutionService.HandleSessionFailedAsync");
