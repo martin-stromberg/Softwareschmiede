@@ -46,6 +46,18 @@ public sealed class WorkItemsListsViewTests
         sort[2].Should().Be(new SortDescription(nameof(ActiveWorkItemPanelItem.SortTimestamp), ListSortDirection.Descending));
     }
 
+    /// <summary>Konfiguriere im Modus Art gruppiert nach Auftragsart mit Fallback-Gruppe am Ende.</summary>
+    [Fact]
+    public void Configure_ShouldApplyGroupingAndSorting_WhenModeIsKind()
+    {
+        var sort = WorkItemListLayout.CreateSortDescriptors(WorkItemListMode.Kind);
+        var grouping = WorkItemListLayout.CreateGroupDescriptor(WorkItemListMode.Kind);
+
+        grouping.Should().NotBeNull();
+        grouping!.PropertyName.Should().Be(nameof(ActiveWorkItemPanelItem.KindGroupName));
+        sort[0].Should().Be(new SortDescription(nameof(ActiveWorkItemPanelItem.KindSortOrder), ListSortDirection.Ascending));
+    }
+
     /// <summary>Die Fallback-Gruppe erscheint im gruppierten Modus als letzte Gruppe.</summary>
     [Fact]
     public void Configure_ShouldPlaceFallbackGroupLast_WhenGrouped()

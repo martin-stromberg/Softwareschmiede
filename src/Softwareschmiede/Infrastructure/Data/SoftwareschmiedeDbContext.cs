@@ -203,6 +203,10 @@ public sealed class SoftwareschmiedeDbContext : DbContext
                 .HasMaxLength(255);
             e.Property(a => a.Purpose)
                 .HasMaxLength(100);
+            e.Property(a => a.Kind)
+                .HasColumnName("Auftragsart")
+                .HasConversion<string>()
+                .HasDefaultValue(WorkItemKind.Unspecified);
             e.Property(a => a.RecoveryVersion)
                 .HasDefaultValue(0)
                 .IsConcurrencyToken();

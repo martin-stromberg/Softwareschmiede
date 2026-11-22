@@ -492,6 +492,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             RepositoryGroupIsFallback = string.IsNullOrWhiteSpace(repositoryName),
             AiGroupName = aiPluginName ?? WorkItemListLayout.NotExecuted,
             AiGroupIsFallback = aiPluginName is null,
+            Kind = workItem.Kind,
+            KindGroupName = WorkItemListLayout.KindGroupName(workItem.Kind),
+            KindLabel = workItem.Kind == WorkItemKind.Unspecified
+                ? string.Empty
+                : WorkItemListLayout.KindGroupName(workItem.Kind),
             SortTimestamp = workItem.LastCliStartUtc ?? workItem.CreatedAt,
             Status = workItem.Status,
             ExecutionStatus = workItem.ExecutionStatus,

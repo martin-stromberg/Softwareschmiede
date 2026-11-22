@@ -10,5 +10,8 @@ public enum WorkItemListMode
     Repository,
 
     /// <summary>Gruppiert nach aktiver bzw. zuletzt verwendeter KI, innerhalb der Gruppe nach letzter Ausführung.</summary>
-    Ai
+    Ai,
+
+    /// <summary>Gruppiert nach Auftragsart (<see cref="Domain.Enums.WorkItemKind"/>), innerhalb der Gruppe nach letzter Ausführung.</summary>
+    Kind
 }
