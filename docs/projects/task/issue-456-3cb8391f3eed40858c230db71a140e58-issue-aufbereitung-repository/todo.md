@@ -15,7 +15,7 @@ Issues: #456, #452, #451, #436, #433, #457
 - [x] Planprüfung (`project-plan-check.md`)
 - [x] Planungscommit
 - [x] Entwicklungsschritte-Tracking (`steps.md`)
-- [ ] Entwicklungsschleife (je Schritt: lifecycle-Skill, Abnahme, Merge) — Schritte 1–4 abgeschlossen (df0d1cac, 2b92a3b7, 710b7c37, 8e4765a6); Schritt 5 in Arbeit
+- [x] Entwicklungsschleife (je Schritt: lifecycle-Skill, Abnahme, Merge) — alle 5 Schritte abgeschlossen (df0d1cac, 2b92a3b7, 710b7c37, 8e4765a6, 9d442bf4)
 - [ ] Aufräumen + Abschlusscommit
 - [x] Issue-Kommentare zum Bearbeitungsstatus (vom Nutzer autorisiert)
 - [ ] PR gegen `staging` mit Closing-Keywords für alle 6 Issues, Checks grün
