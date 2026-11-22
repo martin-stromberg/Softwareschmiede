@@ -24,7 +24,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
     private readonly SemaphoreSlim _refresh = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
     private ScmEventQueueItem? _selectedEvent;
-    private string _selectedFilter = "Wartend";
+    private string _selectedFilter = ScmIncomingEventStatus.Wartend;
     private string? _message;
     private string? _diagnostics;
     private bool _isBusy;
@@ -92,7 +92,7 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
     /// <summary>Gefilterte, dauerhafte Ereignisse.</summary>
     public ObservableCollection<ScmEventQueueItem> Events { get; } = new();
     /// <summary>Verfügbare Anzeigefilter.</summary>
-    public IReadOnlyList<string> Filter { get; } = ["Wartend", "Verarbeitet", "Abgebrochen", "Alle"];
+    public IReadOnlyList<string> Filter { get; } = [ScmIncomingEventStatus.Wartend, ScmIncomingEventStatus.Verarbeitet, ScmIncomingEventStatus.Abgebrochen, "Alle"];
     /// <summary>Reiner Anzeigefilter; löst keine Ereignisverarbeitung aus.</summary>
     public string SelectedFilter
     {
@@ -126,8 +126,8 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
     /// <summary>Text des zum Filter passenden Leerzustands.</summary>
     public string EmptyText => SelectedFilter switch
     {
-        "Wartend" => "Keine wartenden SCM-Ereignisse",
-        "Abgebrochen" => "Keine abgebrochenen SCM-Ereignisse",
+        ScmIncomingEventStatus.Wartend => "Keine wartenden SCM-Ereignisse",
+        ScmIncomingEventStatus.Abgebrochen => "Keine abgebrochenen SCM-Ereignisse",
         _ => "Keine SCM-Ereignisse in diesem Filter"
     };
     /// <summary>Operation/Dialog sperrt weitere verändernde Commands.</summary>
@@ -172,9 +172,9 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
             var filter = SelectedFilter;
             var query = db.ScmIncomingEvents.AsNoTracking();
-            if (filter == "Wartend") query = query.Where(x => x.Status != "Verarbeitet" && x.Status != "Abgebrochen");
-            if (filter == "Verarbeitet") query = query.Where(x => x.Status == "Verarbeitet");
-            if (filter == "Abgebrochen") query = query.Where(x => x.Status == "Abgebrochen");
+            if (filter == ScmIncomingEventStatus.Wartend) query = query.Where(x => x.Status != ScmIncomingEventStatus.Verarbeitet && x.Status != ScmIncomingEventStatus.Abgebrochen);
+            if (filter == ScmIncomingEventStatus.Verarbeitet) query = query.Where(x => x.Status == ScmIncomingEventStatus.Verarbeitet);
+            if (filter == ScmIncomingEventStatus.Abgebrochen) query = query.Where(x => x.Status == ScmIncomingEventStatus.Abgebrochen);
             var records = await query.OrderBy(x => x.Sequence).ToListAsync(ct);
             var taskIds = records.Select(x => x.WorkItemId).Distinct().ToArray();
             var tasks = await db.WorkItems.AsNoTracking().Where(x => taskIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
@@ -358,8 +358,8 @@ public sealed class ScmEventQueueViewModel : ViewModelBase, IDisposable
         ? "Ausgang ungewiss; auf GitHub prüfen, ob die Aktion bereits angekommen ist — kein automatischer Neuversand"
         : eventStatus switch
         {
-            "Abgebrochen" => "keine Wiederholung verfügbar",
-            "Verarbeitet" => "Ereignis im Filter „Verarbeitet“ oder „Alle“ öffnen und dort „Erneut prüfen“ wählen",
+            ScmIncomingEventStatus.Abgebrochen => "keine Wiederholung verfügbar",
+            ScmIncomingEventStatus.Verarbeitet => "Ereignis im Filter „Verarbeitet“ oder „Alle“ öffnen und dort „Erneut prüfen“ wählen",
             _ => "beim Ereignis „Erneut prüfen“ wählen",
         };
     private void OnChanged() => _dispatch(RefreshInBackground);
@@ -381,16 +381,16 @@ public sealed record ScmEventQueueItem(Guid Id, Guid TaskId, string TaskTitle, s
     string? CliRunId, Guid? AttemptId, bool IsBlocked, bool HasOpenActions)
 {
     /// <summary>Der aktuelle Attempt ist abgeschlossen.</summary>
-    public bool IsProcessed => Status == "Verarbeitet";
+    public bool IsProcessed => Status == ScmIncomingEventStatus.Verarbeitet;
     /// <summary>Verarbeitet und Abgebrochen sind die abschließenden Endstatus ohne weitere Verarbeitung.</summary>
-    public bool IsFinal => Status is "Verarbeitet" or "Abgebrochen";
+    public bool IsFinal => Status is ScmIncomingEventStatus.Verarbeitet or ScmIncomingEventStatus.Abgebrochen;
     /// <summary>Mindestens eine Outbox-Aktion (z. B. Screenshot-Nachweis oder Wartehinweis) ist noch
     /// nicht abgeschlossen; erst dann darf ein „Verarbeitet"-Ereignis bewusst erneut geprüft werden.</summary>
     public bool CanRetryProcessed => IsProcessed && HasOpenActions;
     /// <summary>Nur nicht abgeschlossene Ereignisse können vom Anwender endgültig abgebrochen werden.</summary>
     public bool CanCancel => !IsFinal;
     /// <summary>Unsicherheit benötigt eine ausdrückliche Warnungsbestätigung.</summary>
-    public bool CanResend => AttemptId is not null && Status is "ZustellungUngewiss" or "VerarbeitungUngeklärt";
+    public bool CanResend => AttemptId is not null && Status is ScmIncomingEventStatus.ZustellungUngewiss or ScmIncomingEventStatus.VerarbeitungUngeklärt;
     /// <summary>Nur ein als bestätigbar markierter, noch nicht zugestellter Wartegrund bietet die Bestätigung an.</summary>
     public bool CanConfirmReady => !IsBlocked && AttemptId is null && CliRunId is not null && ScmCliWaitReason.IsConfirmable(Reason);
     /// <summary>Erstellt die menschenlesbare Projektion aus dauerhaften Daten.</summary>
@@ -406,7 +406,7 @@ public sealed record ScmEventQueueItem(Guid Id, Guid TaskId, string TaskTitle, s
             item.Purpose == ScmIssuePreparationService.Purpose ? "Issue-Aufbereitung"
                 : observation.ContentKind switch { Domain.ValueObjects.ScmContentKind.Description => "Beschreibung", Domain.ValueObjects.ScmContentKind.ReviewComment => "Review-Kommentar", Domain.ValueObjects.ScmContentKind.PullRequestReview => "Review", _ => "Kommentar" },
             DateTimeOffset.FromUnixTimeMilliseconds(item.ReceivedUtc).ToLocalTime().ToString("g"), item.Status,
-            item.Status switch { "ZustellungVorbereitet" => "Zustellung vorbereitet", "InBearbeitung" => "In Bearbeitung", "ZustellungUngewiss" => "Zustellung ungewiss", "VerarbeitungUngeklärt" => "Verarbeitung ungeklärt", _ => item.Status },
+            item.Status switch { ScmIncomingEventStatus.ZustellungVorbereitet => "Zustellung vorbereitet", ScmIncomingEventStatus.InBearbeitung => "In Bearbeitung", ScmIncomingEventStatus.ZustellungUngewiss => "Zustellung ungewiss", ScmIncomingEventStatus.VerarbeitungUngeklärt => "Verarbeitung ungeklärt", _ => item.Status },
             observation.Body, observation.Url, reason, item.CliRunId, item.DeliveryAttemptId, blocked, hasOpenActions);
     }
 }

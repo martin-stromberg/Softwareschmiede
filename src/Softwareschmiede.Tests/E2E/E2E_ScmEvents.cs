@@ -31,7 +31,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         NavigateQueue(window);
         const string original = "$sOfTwArEsChMiEdE Prüfe \"Original\"\nzweite Zeile\u001b\u0000";
         fixture.AddText(1, 101, original);
-        var first = await fixture.WaitEventAsync(1, "Wartend");
+        var first = await fixture.WaitEventAsync(1, ScmIncomingEventStatus.Wartend);
         SelectEvent(window, 1);
         // Windows UI Automation schneidet einen Textwert am NUL-Zeichen ab; die Speicher- und Request-Asserts darunter behalten ihn bei.
         Assert.Equal(original.TrimEnd('\0'), Element(window, "ScmEventBody").AsTextBox().Text);
@@ -56,7 +56,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         window = RestartAppPreservingDatabase();
         NavigateQueue(window);
         SelectEvent(window, 1);
-        Assert.Equal(first.Id, (await fixture.WaitEventAsync(1, "Wartend")).Id);
+        Assert.Equal(first.Id, (await fixture.WaitEventAsync(1, ScmIncomingEventStatus.Wartend)).Id);
         await fixture.WaitForPollAsync();
         Assert.Equal(2, fixture.Responses().Count);
         output.WriteLine("E5: regular app close/restart preserves inbox and does not repeat remote receipts.");
@@ -65,24 +65,24 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         ChoosePlugin(window, confirm: false);
         await using (var db = fixture.OpenDatabase()) Assert.Equal(WorkItemStatus.Started, (await db.WorkItems.FindAsync(new object?[] { fixture.TaskIds[1] }, TestContext.Current.CancellationToken))!.Status);
         Assert.Empty(fixture.Prompts());
-        await fixture.WaitEventAsync(1, "Wartend");
+        await fixture.WaitEventAsync(1, ScmIncomingEventStatus.Wartend);
         SelectEvent(window, 1);
         Click(window, "ScmEventOpen");
         ChoosePlugin(window);
-        var delivered = await fixture.WaitEventAsync(1, "Zugestellt");
+        var delivered = await fixture.WaitEventAsync(1, ScmIncomingEventStatus.Zugestellt);
         SelectEvent(window, 1);
-        WaitText(window, "ScmEventStatus", "Zugestellt");
+        WaitText(window, "ScmEventStatus", ScmIncomingEventStatus.Zugestellt);
         Assert.False(Element(window, "ScmEventOpen").IsEnabled);
         Assert.Single(fixture.Prompts());
         var request = fixture.Prompts()[0].GetProperty("request");
         Assert.Equal(original, request.GetProperty("body").GetString());
         Assert.Equal("https://github.com/scm-owner/scm-e2e/issues/1#issuecomment-101", request.GetProperty("originUrl").GetString());
         fixture.Hold("accepted", false);
-        await fixture.WaitEventAsync(1, "InBearbeitung");
+        await fixture.WaitEventAsync(1, ScmIncomingEventStatus.InBearbeitung);
         WaitText(window, "ScmEventStatus", "In Bearbeitung");
         Assert.False(Element(window, "ScmEventOpen").IsEnabled);
         fixture.Hold("complete", false);
-        await fixture.WaitEventAsync(1, "Verarbeitet");
+        await fixture.WaitEventAsync(1, ScmIncomingEventStatus.Verarbeitet);
         await using (var db = fixture.OpenDatabase())
         {
             var task = (await db.WorkItems.FindAsync(new object?[] { fixture.TaskIds[1] }, TestContext.Current.CancellationToken))!;
@@ -90,21 +90,21 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
             Assert.NotNull(task.ActiveRunId);
         }
         fixture.AddText(1, 102, "$Softwareschmiede Folgeereignis");
-        var followUp = await fixture.WaitEventAsync(1, "Verarbeitet", 102);
+        var followUp = await fixture.WaitEventAsync(1, ScmIncomingEventStatus.Verarbeitet, 102);
         Assert.Equal(delivered.CliRunId, followUp.CliRunId);
         Assert.Equal(2, fixture.Prompts().Count);
         output.WriteLine("E2: single-plugin dialog/cancel/reopen, active task, exactly one prompt per event, delivered/accepted/completed and live-run reuse passed. Worktree was pre-seeded.");
 
         fixture.AddText(2, 201, "$Softwareschmiede Bleibt wartend");
-        await fixture.WaitEventAsync(2, "Wartend");
+        await fixture.WaitEventAsync(2, ScmIncomingEventStatus.Wartend);
         var promptCount = fixture.Prompts().Count;
         var responseCount = fixture.Responses().Count;
-        Filter(window, "Verarbeitet");
+        Filter(window, ScmIncomingEventStatus.Verarbeitet);
         SelectEvent(window, 1);
-        Assert.Equal("Verarbeitet", Element(window, "ScmEventStatus").Name);
+        Assert.Equal(ScmIncomingEventStatus.Verarbeitet, Element(window, "ScmEventStatus").Name);
         Assert.Contains("issues/1", Element(window, "ScmEventOrigin").AsTextBox().Text);
         Assert.Equal(2, Element(window, "ScmEventList").AsDataGridView().Rows.Length);
-        Filter(window, "Wartend");
+        Filter(window, ScmIncomingEventStatus.Wartend);
         SelectEvent(window, 2);
         Assert.Single(Element(window, "ScmEventList").AsDataGridView().Rows);
         Assert.Equal(promptCount, fixture.Prompts().Count);
@@ -114,7 +114,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         foreach (var number in new[] { 3, 4, 5 })
         {
             fixture.AddText(number, number * 100 + 1, "$Softwareschmiede Gesperrte Aufgabe");
-            await fixture.WaitEventAsync(number, "Wartend");
+            await fixture.WaitEventAsync(number, ScmIncomingEventStatus.Wartend);
             SelectEvent(window, number);
             Assert.Contains(number == 5 ? "pausiert" : "beendet/archiviert", Element(window, "ScmEventReason").Name);
             Assert.False(Element(window, "ScmEventOpen").IsEnabled);
@@ -126,7 +126,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         NavigateQueue(window);
         SelectEvent(window, 5);
         StartSelected(window);
-        await fixture.WaitEventAsync(5, "Verarbeitet");
+        await fixture.WaitEventAsync(5, ScmIncomingEventStatus.Verarbeitet);
         await using (var db = fixture.OpenDatabase())
         {
             Assert.Equal(WorkItemStatus.Completed, (await db.WorkItems.FindAsync(new object?[] { fixture.TaskIds[3] }, TestContext.Current.CancellationToken))!.Status);
@@ -137,7 +137,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
 
         fixture.Control("fail-start", true);
         fixture.AddText(6, 601, "$Softwareschmiede Startfehler und Retry");
-        await fixture.WaitEventAsync(6, "Wartend");
+        await fixture.WaitEventAsync(6, ScmIncomingEventStatus.Wartend);
         SelectEvent(window, 6);
         StartSelected(window);
         await WaitReasonAsync(fixture, 6, "Startfehler");
@@ -145,7 +145,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.Contains("Startfehler", Element(window, "ScmEventReason").Name);
         fixture.Control("fail-start", false);
         StartSelected(window);
-        await fixture.WaitEventAsync(6, "Verarbeitet");
+        await fixture.WaitEventAsync(6, ScmIncomingEventStatus.Verarbeitet);
         output.WriteLine("E3: active task without session, visible simulator start failure and successful retry passed.");
 
         // Same source parser and response transport for issue/PR comments/descriptions.
@@ -154,12 +154,12 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
             var body = "$Softwareschmiede Vollständiger Inhalt " + number + "\nZeile zwei mit \"Zitat\"";
             var receiptCount = fixture.Responses().Count(x => x.Content == "eyes");
             fixture.AddText(number, number * 100 + 1, body, kind);
-            await fixture.WaitEventAsync(number, "Wartend");
+            await fixture.WaitEventAsync(number, ScmIncomingEventStatus.Wartend);
             SelectEvent(window, number);
             Assert.Equal(body, Element(window, "ScmEventBody").AsTextBox().Text);
             Assert.Contains(number is 7 or 9 ? $"/pull/{number}" : $"/issues/{number}", Element(window, "ScmEventOrigin").AsTextBox().Text);
             StartSelected(window);
-            await fixture.WaitEventAsync(number, "Verarbeitet");
+            await fixture.WaitEventAsync(number, ScmIncomingEventStatus.Verarbeitet);
             Assert.Equal(body, fixture.Prompts().Last().GetProperty("request").GetProperty("body").GetString());
             Assert.Equal(receiptCount + (kind == "Description" ? 0 : 1), fixture.Responses().Count(x => x.Content == "eyes"));
             Assert.Contains(fixture.Responses(), x => x.Endpoint.EndsWith($"/issues/{number}/comments", StringComparison.Ordinal) && x.Body.Contains("KI-Simulator:", StringComparison.Ordinal));
@@ -171,14 +171,14 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.Scenario.RejectAiResponse = true;
         fixture.SaveScenario();
         fixture.AddText(1, 103, "$Softwareschmiede Antwortberechtigung wiederherstellen");
-        var failed = await fixture.WaitEventAsync(1, "VerarbeitungUngeklärt", 103);
+        var failed = await fixture.WaitEventAsync(1, ScmIncomingEventStatus.VerarbeitungUngeklärt, 103);
         SelectEvent(window, 1);
         Assert.Contains("403", Element(window, "ScmEventReason").Name);
         promptCount = fixture.Prompts().Count;
         fixture.Scenario.RejectAiResponse = false;
         fixture.SaveScenario();
         Click(window, "ScmEventRetry");
-        var recovered = await fixture.WaitEventAsync(1, "Verarbeitet", 103);
+        var recovered = await fixture.WaitEventAsync(1, ScmIncomingEventStatus.Verarbeitet, 103);
         Assert.Equal(failed.DeliveryAttemptId, recovered.DeliveryAttemptId);
         Assert.Equal(promptCount, fixture.Prompts().Count);
         output.WriteLine("E6-Wiederaufnahme (403 after acceptance): pending remote reply retried without new event prompt/attempt.");
@@ -186,17 +186,17 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         // Eine lebende, identifizierte CLI kann explizit bestätigt werden, ohne Bereitschaft aus I/O
         fixture.Control("unknown-ready", true);
         fixture.AddText(10, 1001, "$Softwareschmiede Bereitschaft ausdrücklich bestätigen");
-        await fixture.WaitEventAsync(10, "Wartend");
+        await fixture.WaitEventAsync(10, ScmIncomingEventStatus.Wartend);
         SelectEvent(window, 10);
         StartSelected(window);
         await WaitReasonAsync(fixture, 10, "Eingabebereitschaft unbekannt");
         SelectEvent(window, 10);
-        var unknown = await fixture.WaitEventAsync(10, "Wartend");
+        var unknown = await fixture.WaitEventAsync(10, ScmIncomingEventStatus.Wartend);
         Assert.NotNull(unknown.CliRunId);
         promptCount = fixture.Prompts().Count;
         fixture.Control("unknown-ready", false);
         Click(window, "ScmEventConfirmReady");
-        var ready = await fixture.WaitEventAsync(10, "Verarbeitet");
+        var ready = await fixture.WaitEventAsync(10, ScmIncomingEventStatus.Verarbeitet);
         Assert.Equal(unknown.CliRunId, ready.CliRunId);
         Assert.Equal(promptCount + 1, fixture.Prompts().Count);
         output.WriteLine("E3-Bereitschaft: identified live run with unknown readiness requires explicit confirmation and receives one prompt.");
@@ -206,7 +206,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         var foreignFile = System.IO.Path.Combine(occupiedChannel, "user.txt");
         await System.IO.File.WriteAllTextAsync(foreignFile, "user content", TestContext.Current.CancellationToken);
         fixture.AddText(11, 1101, "$Softwareschmiede Antwortkanal wiederherstellen");
-        await fixture.WaitEventAsync(11, "Wartend");
+        await fixture.WaitEventAsync(11, ScmIncomingEventStatus.Wartend);
         SelectEvent(window, 11);
         promptCount = fixture.Prompts().Count;
         StartSelected(window);
@@ -217,12 +217,12 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         System.IO.Directory.Delete(occupiedChannel);
         SelectEvent(window, 11);
         Click(window, "ScmEventRetry");
-        await fixture.WaitEventAsync(11, "Verarbeitet");
+        await fixture.WaitEventAsync(11, ScmIncomingEventStatus.Verarbeitet);
         Assert.Equal(promptCount + 1, fixture.Prompts().Count);
         output.WriteLine("E6-Kanal: unavailable channel blocks event input, retains foreign contents and resumes exactly once after repair.");
 
         fixture.AddText(12, 1201, "$Softwareschmiede Anmeldung und Berechtigung wiederherstellen");
-        await fixture.WaitEventAsync(12, "Wartend");
+        await fixture.WaitEventAsync(12, ScmIncomingEventStatus.Wartend);
         SelectEvent(window, 12);
         promptCount = fixture.Prompts().Count;
         fixture.Scenario.Authenticated = false;
@@ -240,7 +240,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Click(window, "ScmEventRetry");
         await WaitReasonAsync(fixture, 12, "Keine Standard-CLI");
         StartSelected(window);
-        await fixture.WaitEventAsync(12, "Verarbeitet");
+        await fixture.WaitEventAsync(12, ScmIncomingEventStatus.Verarbeitet);
         Assert.Equal(promptCount + 1, fixture.Prompts().Count);
         output.WriteLine("E6-Wiederaufnahme: persisted waiting request survives 401 and missing repository permission, then processes once.");
 
@@ -249,29 +249,29 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.Control("uncertain-write", true);
         fixture.Control("ignore-next-attempt", true);
         fixture.AddText(1, 104, "$Softwareschmiede Ungewisse Zustellung prüfen");
-        var uncertain = await fixture.WaitEventAsync(1, "ZustellungUngewiss", 104);
+        var uncertain = await fixture.WaitEventAsync(1, ScmIncomingEventStatus.ZustellungUngewiss, 104);
         SelectEvent(window, 1);
         await WaitPromptCountAsync(fixture, fixture.Prompts().Count == 0 ? 1 : fixture.Prompts().Count,
             uncertain.DeliveryAttemptId);
         promptCount = fixture.Prompts().Count;
         Assert.False(Element(window, "ScmEventOpen").IsEnabled);
         Click(window, "ScmEventCheckStatus");
-        Assert.Equal(uncertain.DeliveryAttemptId, (await fixture.WaitEventAsync(1, "ZustellungUngewiss", 104)).DeliveryAttemptId);
+        Assert.Equal(uncertain.DeliveryAttemptId, (await fixture.WaitEventAsync(1, ScmIncomingEventStatus.ZustellungUngewiss, 104)).DeliveryAttemptId);
         Assert.Equal(promptCount, fixture.Prompts().Count);
         Click(window, "ScmEventResend");
         ConfirmResend(window, false);
-        Assert.Equal(uncertain.DeliveryAttemptId, (await fixture.WaitEventAsync(1, "ZustellungUngewiss", 104)).DeliveryAttemptId);
+        Assert.Equal(uncertain.DeliveryAttemptId, (await fixture.WaitEventAsync(1, ScmIncomingEventStatus.ZustellungUngewiss, 104)).DeliveryAttemptId);
         fixture.Hold("accepted", true);
         Click(window, "ScmEventResend");
         ConfirmResend(window, true);
-        var redelivered = await fixture.WaitEventAsync(1, "Zugestellt", 104);
+        var redelivered = await fixture.WaitEventAsync(1, ScmIncomingEventStatus.Zugestellt, 104);
         Assert.NotEqual(uncertain.DeliveryAttemptId, redelivered.DeliveryAttemptId);
         fixture.Control("complete-attempt-" + uncertain.DeliveryAttemptId, true);
         await ScmE2EFixture.WaitFileAsync(System.IO.Path.Combine(uncertain.ExchangePath!, "complete.json"));
         await fixture.WaitForPollAsync();
-        Assert.Equal(redelivered.DeliveryAttemptId, (await fixture.WaitEventAsync(1, "Zugestellt", 104)).DeliveryAttemptId);
+        Assert.Equal(redelivered.DeliveryAttemptId, (await fixture.WaitEventAsync(1, ScmIncomingEventStatus.Zugestellt, 104)).DeliveryAttemptId);
         fixture.Hold("accepted", false);
-        var resent = await fixture.WaitEventAsync(1, "Verarbeitet", 104);
+        var resent = await fixture.WaitEventAsync(1, ScmIncomingEventStatus.Verarbeitet, 104);
         Assert.NotEqual(uncertain.DeliveryAttemptId, resent.DeliveryAttemptId);
         Assert.Equal(promptCount + 1, fixture.Prompts().Count);
         await fixture.WaitForPollAsync();
@@ -281,17 +281,17 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.Control("uncertain-write", true);
         fixture.Control("ignore-next-attempt", true);
         fixture.AddText(1, 105, "$Softwareschmiede Verspäteten aktuellen Versuch prüfen");
-        var current = await fixture.WaitEventAsync(1, "ZustellungUngewiss", 105);
+        var current = await fixture.WaitEventAsync(1, ScmIncomingEventStatus.ZustellungUngewiss, 105);
         await WaitPromptCountAsync(fixture, promptCount + 2, current.DeliveryAttemptId);
         // Beweist die explizite Status-Aktion, solange der aktuelle Versuch noch unsicher ist.
         // Sobald die Fertigstellung freigegeben ist, kann die Hintergrund-Abstimmung sie abschließen und die Aktion verbergen.
         SelectEvent(window, 1);
         Click(window, "ScmEventCheckStatus");
-        Assert.Equal(current.DeliveryAttemptId, (await fixture.WaitEventAsync(1, "ZustellungUngewiss", 105)).DeliveryAttemptId);
+        Assert.Equal(current.DeliveryAttemptId, (await fixture.WaitEventAsync(1, ScmIncomingEventStatus.ZustellungUngewiss, 105)).DeliveryAttemptId);
         Assert.Equal(promptCount + 2, fixture.Prompts().Count);
         fixture.Control("complete-attempt-" + current.DeliveryAttemptId, true);
         await ScmE2EFixture.WaitFileAsync(System.IO.Path.Combine(current.ExchangePath!, "complete.json"));
-        var late = await fixture.WaitEventAsync(1, "Verarbeitet", 105);
+        var late = await fixture.WaitEventAsync(1, ScmIncomingEventStatus.Verarbeitet, 105);
         Assert.Equal(current.DeliveryAttemptId, late.DeliveryAttemptId);
         Assert.Equal(promptCount + 2, fixture.Prompts().Count);
         output.WriteLine("E3-Ungewissheit: late valid completion of still-current attempt resolves without any resend.");
@@ -316,13 +316,13 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         output.WriteLine("E7-Anlage: qualified event on unassigned reference creates exactly one task with issue reference and inbox entry.");
 
         // Die automatisch erstellte Aufgabe hat keine Standard-CLI, ihr Ereignis wartet also mit umsetzbarem Grund.
-        var waiting = await fixture.WaitEventForTaskAsync(created.Id, "Wartend");
+        var waiting = await fixture.WaitEventForTaskAsync(created.Id, ScmIncomingEventStatus.Wartend);
         Assert.Contains("Keine Standard-CLI", waiting.Reason);
         promptCount = fixture.Prompts().Count;
         SelectEventByTitle(window, "SCM Referenz 20", "/issues/20");
         Assert.Contains("Keine Standard-CLI", Element(window, "ScmEventReason").Name);
         StartSelected(window);
-        await fixture.WaitEventForTaskAsync(created.Id, "Verarbeitet");
+        await fixture.WaitEventForTaskAsync(created.Id, ScmIncomingEventStatus.Verarbeitet);
         await using (var db = fixture.OpenDatabase())
         {
             var deliveredTask = (await db.WorkItems.FindAsync(new object?[] { created.Id }, TestContext.Current.CancellationToken))!;
@@ -350,7 +350,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.AddText(6, 602, "$Softwareschmiede Von anderer Instanz quittiert", viewerReactions: ["EYES"]);
         fixture.AddText(22, 2201, "$Softwareschmiede Reagierte unzugeordnete Referenz", viewerReactions: ["EYES"]);
         fixture.AddText(6, 603, "$Softwareschmiede Unberührter Folgekommentar");
-        await fixture.WaitEventAsync(6, "Verarbeitet", 603);
+        await fixture.WaitEventAsync(6, ScmIncomingEventStatus.Verarbeitet, 603);
         await fixture.WaitForDatabaseAsync(async db =>
             await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.EndsWith("SCM_IssueComment_602")
                     && x.Diagnostic == ScmEventValidationService.AlreadyReactedRejection)
@@ -415,11 +415,11 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
             return botTask is not null;
         }, "Aufgabe für Issue 18 nicht angelegt");
         Assert.NotNull(botTask);
-        var waiting = await fixture.WaitEventForTaskAsync(botTask!.Id, "Wartend");
+        var waiting = await fixture.WaitEventForTaskAsync(botTask!.Id, ScmIncomingEventStatus.Wartend);
         Assert.Equal(ScmAccountMode.SeparateAccount, ScmEventStore.Observation(waiting).Reference.Repository.Account);
         SelectEventByTitle(window, "SCM Referenz 18", "/issues/18");
         StartSelected(window);
-        await fixture.WaitEventForTaskAsync(botTask.Id, "Verarbeitet");
+        await fixture.WaitEventForTaskAsync(botTask.Id, ScmIncomingEventStatus.Verarbeitet);
         Assert.Equal(eyesBefore + 1, fixture.Responses().Count(x => x.Content == "eyes"));
         Assert.Contains(fixture.Responses(), x => x.Endpoint.EndsWith("/issues/18/comments", StringComparison.Ordinal)
             && x.Body.Contains("KI-Simulator:", StringComparison.Ordinal));
@@ -476,7 +476,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         // Trigger läuft wie bisher.
         await fixture.SetAccountMode(ScmAccountMode.UserAccount);
         fixture.AddText(1, 106, "$Softwareschmiede Zurück im Benutzerkonto");
-        await fixture.WaitEventAsync(1, "Verarbeitet", 106);
+        await fixture.WaitEventAsync(1, ScmIncomingEventStatus.Verarbeitet, 106);
         output.WriteLine("Bot: Rückschaltung auf Benutzerkonto — Enumeration und Keyword-Pfad laufen wieder.");
     }
 
@@ -484,11 +484,11 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
     {
         var count = fixture.Prompts().Count;
         fixture.AddText(13, 1301, "$Softwareschmiede Arbeitsbereich erst erstellen");
-        await fixture.WaitEventAsync(13, "Wartend");
+        await fixture.WaitEventAsync(13, ScmIncomingEventStatus.Wartend);
         SelectEvent(window, 13);
         await using (var db = fixture.OpenDatabase()) Assert.Null((await db.WorkItems.FindAsync(fixture.TaskIds[13]))!.LocalClonePath);
         StartSelected(window);
-        await fixture.WaitEventAsync(13, "Verarbeitet");
+        await fixture.WaitEventAsync(13, ScmIncomingEventStatus.Verarbeitet);
         await using (var db = fixture.OpenDatabase())
         {
             var task = (await db.WorkItems.FindAsync(fixture.TaskIds[13]))!;
@@ -502,7 +502,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.Scenario.PluginAvailable = false;
         fixture.SaveScenario();
         fixture.AddText(14, 1401, "$Softwareschmiede CLI aktivieren");
-        var missing = await fixture.WaitEventAsync(14, "Wartend");
+        var missing = await fixture.WaitEventAsync(14, ScmIncomingEventStatus.Wartend);
         SelectEvent(window, 14);
         Click(window, "ScmEventOpen");
         WaitContains(window, "ScmEventMessage", "Keine aktivierte CLI");
@@ -512,27 +512,27 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.SaveScenario();
         NavigateQueue(window);
         SelectEvent(window, 14);
-        Assert.Equal(missing.Id, (await fixture.WaitEventAsync(14, "Wartend")).Id);
+        Assert.Equal(missing.Id, (await fixture.WaitEventAsync(14, ScmIncomingEventStatus.Wartend)).Id);
         Click(window, "ScmEventOpen");
         _ = WaitForElement(window, cf => cf.ByName("PluginSelection"), Long);
         var concurrent = fixture.BeginRuntimeCommand(14);
         await ScmE2EFixture.WaitFileAsync(concurrent + ".received");
         ChoosePlugin(window);
-        var processed = await fixture.WaitEventAsync(14, "Verarbeitet");
+        var processed = await fixture.WaitEventAsync(14, ScmIncomingEventStatus.Verarbeitet);
         Assert.Equal(processed.CliRunId, (await ScmE2EFixture.RuntimeResultAsync(concurrent)).ToString("D"));
         Assert.Equal(count + 2, fixture.Prompts().Count);
         output.WriteLine("E3-Dialog: missing CLI/settings retains inbox; concurrent real start during modal selection reuses single run and prompt.");
 
         fixture.Control("unknown-ready", true);
         fixture.AddText(15, 1501, "$Softwareschmiede Neue Sitzung ausdrücklich bestätigen");
-        await fixture.WaitEventAsync(15, "Wartend");
+        await fixture.WaitEventAsync(15, ScmIncomingEventStatus.Wartend);
         SelectEvent(window, 15);
         // Auf einen echten Doppelklick folgt ein Monitor-Zyklus, während der Dialog offen ist.
         EventRow(window, 15).DoubleClick();
         ChoosePlugin(window);
         await WaitReasonAsync(fixture, 15, "Eingabebereitschaft unbekannt");
         SelectEvent(window, 15);
-        var runA = await fixture.WaitEventAsync(15, "Wartend");
+        var runA = await fixture.WaitEventAsync(15, ScmIncomingEventStatus.Wartend);
         var replace = fixture.BeginRuntimeCommand(15, replace: true);
         await ScmE2EFixture.WaitFileAsync(replace + ".locked");
         Click(window, "ScmEventConfirmReady");
@@ -547,14 +547,14 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         WaitContains(window, "ScmEventRun", runB.ToString("D"));
         fixture.Control("unknown-ready", false);
         Click(window, "ScmEventConfirmReady");
-        Assert.Equal(runB.ToString("D"), (await fixture.WaitEventAsync(15, "Verarbeitet")).CliRunId);
+        Assert.Equal(runB.ToString("D"), (await fixture.WaitEventAsync(15, ScmIncomingEventStatus.Verarbeitet)).CliRunId);
         await fixture.WaitForPollAsync();
         Assert.Equal(count + 3, fixture.Prompts().Count);
         output.WriteLine("E3-Bereitschaft: double click/poll dispatch once; confirmation captured for A rejects replacement B; fresh B confirmation required.");
 
         fixture.Control("unknown-ready", true);
         fixture.AddText(16, 1601, "$Softwareschmiede Bereitschaft erlaubt keinen fremden Kanal");
-        await fixture.WaitEventAsync(16, "Wartend");
+        await fixture.WaitEventAsync(16, ScmIncomingEventStatus.Wartend);
         SelectEvent(window, 16);
         StartSelected(window);
         await WaitReasonAsync(fixture, 16, "Eingabebereitschaft unbekannt");
@@ -572,17 +572,17 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         fixture.Control("unknown-ready", false);
         SelectEvent(window, 16);
         Click(window, "ScmEventRetry");
-        await fixture.WaitEventAsync(16, "Verarbeitet");
+        await fixture.WaitEventAsync(16, ScmIncomingEventStatus.Verarbeitet);
         Assert.Equal(count + 4, fixture.Prompts().Count);
         output.WriteLine("E3-Bereitschaft/Kanal: readiness confirmation cannot unblock occupied channel; repair sends exactly once.");
 
         fixture.Control("read-only", true);
         fixture.AddText(17, 1701, "$Softwareschmiede Schreibgeschützte CLI regulär neu starten");
-        await fixture.WaitEventAsync(17, "Wartend");
+        await fixture.WaitEventAsync(17, ScmIncomingEventStatus.Wartend);
         SelectEvent(window, 17);
         StartSelected(window);
         await WaitReasonAsync(fixture, 17, "schreibgeschützt");
-        var readOnly = await fixture.WaitEventAsync(17, "Wartend");
+        var readOnly = await fixture.WaitEventAsync(17, ScmIncomingEventStatus.Wartend);
         Assert.NotNull(readOnly.CliRunId);
         Assert.Equal(count + 4, fixture.Prompts().Count);
         // Hält den Dispatch an der Remote-Grenze blockiert, während der manuelle Stopp/Neustart bewiesen wird.
@@ -604,7 +604,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         await WaitReasonAsync(fixture, 17, "Schreibberechtigung");
         fixture.Scenario.CanWrite = true;
         fixture.SaveScenario();
-        var writable = await fixture.WaitEventAsync(17, "Verarbeitet");
+        var writable = await fixture.WaitEventAsync(17, ScmIncomingEventStatus.Verarbeitet);
         Assert.NotEqual(readOnly.CliRunId, writable.CliRunId);
         Assert.Equal(count + 5, fixture.Prompts().Count);
         Assert.DoesNotContain(fixture.Prompts(), p => p.GetProperty("request").GetProperty("cliRunId").GetString() == readOnly.CliRunId);
@@ -622,7 +622,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         var confirmButton = window.FindFirstDescendant(cf => cf.ByAutomationId("ScmEventConfirmReady"));
         Assert.True(confirmButton is null || confirmButton.IsOffscreen,
             "Der Bestätigen-Button darf bei nicht erkanntem Promptformat nicht angeboten werden.");
-        var unrecognized = await fixture.WaitEventAsync(2, "Wartend");
+        var unrecognized = await fixture.WaitEventAsync(2, ScmIncomingEventStatus.Wartend);
         Assert.NotNull(unrecognized.CliRunId);
         Assert.Equal(count + 5, fixture.Prompts().Count);
         // Hält den Dispatch an der Remote-Grenze blockiert, während der manuelle Stopp/Neustart bewiesen wird.
@@ -643,7 +643,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         await WaitReasonAsync(fixture, 2, "Schreibberechtigung");
         fixture.Scenario.CanWrite = true;
         fixture.SaveScenario();
-        var recognized = await fixture.WaitEventAsync(2, "Verarbeitet");
+        var recognized = await fixture.WaitEventAsync(2, ScmIncomingEventStatus.Verarbeitet);
         Assert.NotEqual(unrecognized.CliRunId, recognized.CliRunId);
         Assert.Equal(count + 6, fixture.Prompts().Count);
         output.WriteLine("E3-Erkennung: fehlendes Simulator-Banner meldet ehrlich ohne Bestätigen-Button; regulärer Neustart erkennt und liefert einmal.");
@@ -829,7 +829,7 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         var deadline = DateTime.UtcNow.AddSeconds(30);
         while (DateTime.UtcNow < deadline)
         {
-            var item = await fixture.WaitEventAsync(number, "Wartend");
+            var item = await fixture.WaitEventAsync(number, ScmIncomingEventStatus.Wartend);
             if (item.Reason?.Contains(reason, StringComparison.Ordinal) == true) return;
             await Task.Delay(100);
         }

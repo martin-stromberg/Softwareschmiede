@@ -390,7 +390,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     {
         using var scope = _serviceProvider.CreateScope();
         var count = await scope.ServiceProvider.GetRequiredService<Softwareschmiede.Infrastructure.Data.SoftwareschmiedeDbContext>()
-            .ScmIncomingEvents.CountAsync(x => x.Status != "Verarbeitet" && x.Status != "Abgebrochen");
+            .ScmIncomingEvents.CountAsync(x => x.Status != ScmIncomingEventStatus.Verarbeitet && x.Status != ScmIncomingEventStatus.Abgebrochen);
         _dispatcherInvoke(() =>
         {
             if (_disposed) return;

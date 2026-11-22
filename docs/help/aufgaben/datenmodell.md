@@ -29,7 +29,7 @@
 | `SuggestedPrompt` | `string?` | Gespeicherter Rate-Limit-Prompt-Vorschlag |
 | `SuggestedExecuteAfterUtc` | `DateTimeOffset?` | Geplanter Ausführungszeitpunkt des Vorschlags |
 | `AlertReference` | `AlertReference?` | Optionale Herkunftsreferenz, wenn die Aufgabe aus einem SCM-Alert erstellt wurde |
-| `ScmAbschlussErkanntUtc` | `DateTimeOffset?` | UTC-Zeitpunkt, ab dem die Abschlussüberwachung die verknüpfte SCM-Referenz (Pull Request oder Issue) erstmals als geschlossen/gemergt beobachtet hat; persistierter Startpunkt der einstellbaren Abschluss-Wartezeit (neustartsicher), `null` solange die Referenz offen ist oder noch nicht geprüft wurde |
+| `ScmAbschlussErkanntUtc` | `DateTimeOffset?` | UTC-Zeitpunkt, ab dem die Abschlussüberwachung die verknüpfte SCM-Referenz (Pull Request oder Issue) erstmals als geschlossen/gemergt beobachtet hat; persistierter Startpunkt der einstellbaren Abschluss-Wartezeit (neustartsicher), `null` solange die Referenz offen ist oder noch nicht geprüft wurde; die Beobachtung startet erst, wenn kein transient offenes SCM-Ereignis der Aufgabe mehr wartet — abgeschlossene, abgebrochene und terminal ungeklärte Ereignisse blockieren nicht (siehe `plugins/github-ereignisse/business-rules.md`, „Ereignis-Stati und Blockwirkung") |
 | `ScmAbschlussReferenz` | `string?` | Anzeigetext der für den Abschluss beobachteten SCM-Referenz (z. B. „Pull Request #7" oder „Issue #3") — Diagnose-/Protokollwert zu `ScmAbschlussErkanntUtc` |
 | `PullRequests` | `ICollection<PullRequestReference>` | Persistierte Pull Requests, die aus der Aufgabe heraus erstellt wurden |
 
