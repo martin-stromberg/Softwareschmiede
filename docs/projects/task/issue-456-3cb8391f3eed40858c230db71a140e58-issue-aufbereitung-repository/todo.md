@@ -1,0 +1,26 @@
+# Projekt-Todo – SCM-Ereignisverarbeitung & Abschlussüberwachung
+
+Basisbranch: `task/issue-456-3cb8391f3eed40858c230db71a140e58-issue-aufbereitung-repository`
+Issues: #456, #452, #451, #436, #433, #457
+
+## Checkliste
+
+- [x] Branchprüfung (aktueller Task-Branch = Projekt-Basisbranch, Stand = origin/staging)
+- [x] Verzeichnis/Tracking angelegt
+- [x] Einstiegspunkt: neues Projekt
+- [x] Anforderung aufbereitet (`requirement.md`)
+- [x] Bestandsaufnahme (`inventory.md`)
+- [x] Projektplan (`project-plan.md`)
+- [x] Offene Punkte geklärt (Nutzerentscheidungen)
+- [x] Planprüfung (`project-plan-check.md`)
+- [x] Planungscommit
+- [x] Entwicklungsschritte-Tracking (`steps.md`)
+- [x] Entwicklungsschleife (je Schritt: lifecycle-Skill, Abnahme, Merge) — alle 5 Schritte abgeschlossen (df0d1cac, 2b92a3b7, 710b7c37, 8e4765a6, 9d442bf4)
+- [x] Aufräumen + Abschlusscommit
+- [x] Issue-Kommentare zum Bearbeitungsstatus (vom Nutzer autorisiert)
+- [x] PR gegen `staging` mit Closing-Keywords für alle 6 Issues, Checks grün — PR #458, alle Checks bestanden
+
+## Hinweise
+
+- Abweichung zum Skill: Keine Unteragenten verfügbar (Umgebungsrestriktion) — alle delegierbaren Arbeitsaufträge (Anforderung, Bestandsaufnahme, Planung, Planprüfung, Lifecycle, Abnahme) werden von der Leitinstanz selbst als getrennte Phasen ausgeführt.
+- PR-Ziel: `staging` (Staging-Workflow; Issues schließen erst bei Promotion nach main — per Repo-Regel gewünscht).

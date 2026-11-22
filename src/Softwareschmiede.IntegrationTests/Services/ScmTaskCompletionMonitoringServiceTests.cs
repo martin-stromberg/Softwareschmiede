@@ -458,6 +458,125 @@ public sealed class ScmTaskCompletionMonitoringServiceTests
         Assert.Equal(WorkItemStatus.Completed, (await TaskAsync(fixture, taskId)).Status);
     }
 
+    /// <summary>Ein wiederholt scheiternder Referenz-Check läuft nicht mehr im Poll-Takt:
+    /// jede Wiederholung bekommt exponentielles Backoff, und nach Erschöpfung des Budgets wird
+    /// die Überwachung der Aufgabe einmal sichtbar ausgesetzt statt stumm weiterzuprüfen.</summary>
+    [Fact]
+    public async Task Monitor_FailingClosureCheck_BacksOffAndSuspendsAfterBudget()
+    {
+        var time = new TestTimeProvider();
+        await using var fixture = new ScmDispatchFixture(time: time);
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(WorkItemStatus.Started, configured: true);
+        await ProcessEventWithReportAsync(fixture, eventId, pullRequestNumber: 7);
+        await SetWaitAsync(fixture, 0);
+        fixture.Git.Setup(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("SCM-Dienst vorübergehend nicht erreichbar."));
+        var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
+
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+        fixture.Git.Verify(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()), Times.Once);
+
+        // Sofortiger Folge-Poll: das Budget-Gate überspringt die Aufgabe ohne Provider-Aufruf.
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+        fixture.Git.Verify(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()), Times.Once);
+
+        // Backoff jeweils abgewartet → Versuche 2 bis 10; danach ist das Budget erschöpft.
+        for (var attempt = 2; attempt <= 10; attempt++)
+        {
+            time.Advance(TimeSpan.FromMinutes(61));
+            await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+            fixture.Git.Verify(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()), Times.Exactly(attempt));
+        }
+
+        // Ausgesetzt: einmaliger sichtbarer Protokolleintrag, danach keine Provider-Aufrufe mehr.
+        using var scope = fixture.Services.CreateScope();
+        var contents = (await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>()
+                .LogEntries.ToListAsync(TestContext.Current.CancellationToken))
+            .Select(x => x.Content).ToList();
+        var suspended = Assert.Single(contents, x => x.Contains("ausgesetzt"));
+        Assert.Contains("IOException", suspended);
+        Assert.Equal(WorkItemStatus.Started, (await TaskAsync(fixture, taskId)).Status);
+
+        time.Advance(TimeSpan.FromMinutes(61));
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+        fixture.Git.Verify(x => x.GetPullRequestStatusAsync("owner/repo", 7, It.IsAny<CancellationToken>()), Times.Exactly(10));
+        Assert.Equal(WorkItemStatus.Started, (await TaskAsync(fixture, taskId)).Status);
+        Assert.Single(contents, x => x.Contains("ausgesetzt"));
+    }
+
+    /// <summary>Ein durch einen Prozess gesperrter lokaler Klon scheitert im Abschluss; die
+    /// Überwachung zählt das in dasselbe Budget, diagnostiziert den Sperrhalter und setzt die
+    /// Aufgabe nach Erschöpfung sichtbar aus statt minütlich weiterzulöschen.</summary>
+    [Fact]
+    public async Task Monitor_CompletionLockedClone_SuspendsAfterBudgetAndDiagnosesHolder()
+    {
+        var time = new TestTimeProvider();
+        await using var fixture = new ScmDispatchFixture(time: time);
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(WorkItemStatus.Started, configured: true);
+        await ProcessEventWithReportAsync(fixture, eventId, pullRequestNumber: 7);
+        await SetWaitAsync(fixture, 0);
+        SetupPullRequestStatus(fixture, PullRequestStatus.Merged);
+        var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
+
+        var clonePath = (await TaskAsync(fixture, taskId)).LocalClonePath!;
+        var lockFile = Path.Combine(clonePath, "locked.txt");
+        await File.WriteAllTextAsync(lockFile, "locked", TestContext.Current.CancellationToken);
+        await using var hold = new FileStream(lockFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        // Erster Durchlauf setzt nur den Countdown; ab dem zweiten scheitert der
+        // Abschlussversuch an der Sperre — Fehlschläge 1 bis 10 erschöpfen das Budget.
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(WorkItemStatus.Started, (await TaskAsync(fixture, taskId)).Status);
+
+        for (var attempt = 1; attempt <= 10; attempt++)
+        {
+            time.Advance(TimeSpan.FromMinutes(61));
+            await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+        }
+
+        using var scope = fixture.Services.CreateScope();
+        var suspended = Assert.Single(await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>()
+                .LogEntries.ToListAsync(TestContext.Current.CancellationToken),
+            x => x.Content.Contains("ausgesetzt"));
+        Assert.Contains("offen gehalten von", suspended.Content);
+        Assert.Equal(WorkItemStatus.Started, (await TaskAsync(fixture, taskId)).Status);
+    }
+
+    /// <summary>Ein behobener Abschlussfehler heilt das Budget: Sobald die Klon-Sperre weg ist,
+    /// wird die Aufgabe beim nächsten fälligen Versuch regulär beendet — ohne Neustart.</summary>
+    [Fact]
+    public async Task Monitor_CompletionRecovers_CompletesAfterBackoff()
+    {
+        var time = new TestTimeProvider();
+        await using var fixture = new ScmDispatchFixture(time: time);
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(WorkItemStatus.Started, configured: true);
+        await ProcessEventWithReportAsync(fixture, eventId, pullRequestNumber: 7);
+        await SetWaitAsync(fixture, 0);
+        SetupPullRequestStatus(fixture, PullRequestStatus.Merged);
+        var monitor = fixture.Services.GetRequiredService<ScmTaskCompletionMonitoringService>();
+
+        var clonePath = (await TaskAsync(fixture, taskId)).LocalClonePath!;
+        var lockFile = Path.Combine(clonePath, "locked.txt");
+        await File.WriteAllTextAsync(lockFile, "locked", TestContext.Current.CancellationToken);
+        var hold = new FileStream(lockFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+        // Der Abschlussversuch stoppt die CLI legitimerweise bereits vor dem scheiternden
+        // Klon-Delete — der Aufgabenstatus bleibt dennoch unverändert Started.
+        Assert.Equal(WorkItemStatus.Started, (await TaskAsync(fixture, taskId)).Status);
+
+        await hold.DisposeAsync();
+        time.Advance(TimeSpan.FromMinutes(61));
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(WorkItemStatus.Completed, (await TaskAsync(fixture, taskId)).Status);
+        Assert.True(fixture.Sessions[taskId].Object.Process.HasExited);
+    }
+
     private static async Task AddPullRequestReferenceAsync(ScmDispatchFixture fixture, Guid taskId, int number)
     {
         using var scope = fixture.Services.CreateScope();

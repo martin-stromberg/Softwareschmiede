@@ -76,6 +76,7 @@ public sealed class ScmEventMonitoringServiceTests_IssuePreparation
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
         var task = Assert.Single(await db.WorkItems.Include(x => x.IssueReference).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(ScmIssuePreparationService.Purpose, task.Purpose);
+        Assert.Equal(WorkItemKind.IssuePreparation, task.Kind);
         Assert.Equal(repositoryId, task.GitRepositoryId);
         Assert.Equal("custom.auf", task.AiPluginPrefix);
         Assert.Equal(9, task.IssueReference!.IssueNumber);
@@ -307,6 +308,8 @@ public sealed class ScmEventMonitoringServiceTests_IssuePreparation
         Assert.Equal(2, tasks.Count);
         var preparation = Assert.Single(tasks, x => x.Purpose == ScmIssuePreparationService.Purpose);
         var kanonisch = Assert.Single(tasks, x => x.Purpose == null);
+        Assert.Equal(WorkItemKind.IssuePreparation, preparation.Kind);
+        Assert.Equal(WorkItemKind.Instruction, kanonisch.Kind);
         Assert.EndsWith("/Issue/9", kanonisch.IssueReference!.SourceKey);
         Assert.Equal(9, kanonisch.IssueReference.IssueNumber);
         var events = await db.ScmIncomingEvents.OrderBy(x => x.Sequence).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);

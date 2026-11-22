@@ -41,6 +41,18 @@ public sealed class ActiveWorkItemPanelItem : ViewModelBase
     /// <summary><see langword="true"/>, wenn <see cref="AiGroupName"/> die Fallback-Gruppe ist (sortiert ans Ende).</summary>
     public bool AiGroupIsFallback { get; init; }
 
+    /// <summary>Auftragsart der Aufgabe (<see cref="Domain.Enums.WorkItemKind"/>) — Typ-Markierung auf der Kachel.</summary>
+    public WorkItemKind Kind { get; init; }
+
+    /// <summary>Gruppenname im Auftragsart-Modus (deutscher Anzeigename der <see cref="Kind"/>).</summary>
+    public string KindGroupName { get; init; } = string.Empty;
+
+    /// <summary>Sortierschlüssel der Auftragsart im Auftragsart-Modus (Enum-Wert; <c>Unspecified</c> sortiert ans Ende).</summary>
+    public int KindSortOrder => Kind == WorkItemKind.Unspecified ? int.MaxValue : (int)Kind;
+
+    /// <summary>Sichtbare Typ-Markierung der Kachel (leer bei <see cref="WorkItemKind.Unspecified"/>).</summary>
+    public string KindLabel { get; init; } = string.Empty;
+
     /// <summary>Sortierzeitpunkt der Liste (letzte Ausführung bzw. Erstellung).</summary>
     public DateTimeOffset SortTimestamp { get; init; }
 

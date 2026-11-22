@@ -215,7 +215,8 @@ public sealed class WorkItemService : IActiveWorkItemsService
             RequirementDescription = requirementDescription,
             Status = WorkItemStatus.New,
             ExecutionStatus = WorkItemExecutionStatus.NotStarted,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
+            Kind = WorkItemKind.Manual
         };
 
         _db.WorkItems.Add(workItem);
@@ -243,7 +244,8 @@ public sealed class WorkItemService : IActiveWorkItemsService
             RequirementDescription = issue.Body,
             Status = WorkItemStatus.New,
             ExecutionStatus = WorkItemExecutionStatus.NotStarted,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
+            Kind = WorkItemKind.Manual
         };
 
         var issueReference = new IssueReference
@@ -315,7 +317,10 @@ public sealed class WorkItemService : IActiveWorkItemsService
             ExecutionStatus = WorkItemExecutionStatus.NotStarted,
             CreatedAt = DateTimeOffset.UtcNow,
             Purpose = purpose,
-            AiPluginPrefix = aiPluginPrefix
+            AiPluginPrefix = aiPluginPrefix,
+            Kind = purpose == ScmIssuePreparationService.Purpose
+                ? WorkItemKind.IssuePreparation
+                : WorkItemKind.Instruction
         };
 
         var issueReference = CreateIssueReference(workItem.Id, issue);
@@ -403,7 +408,8 @@ public sealed class WorkItemService : IActiveWorkItemsService
             RequirementDescription = requirementDescription,
             Status = WorkItemStatus.New,
             ExecutionStatus = WorkItemExecutionStatus.NotStarted,
-            CreatedAt = now
+            CreatedAt = now,
+            Kind = WorkItemKind.PullRequest
         };
 
         workItem.PullRequests.Add(new PullRequestReference
@@ -532,7 +538,8 @@ public sealed class WorkItemService : IActiveWorkItemsService
                 : createdIssue.Body,
             Status = WorkItemStatus.New,
             ExecutionStatus = WorkItemExecutionStatus.NotStarted,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
+            Kind = WorkItemKind.Alert
         };
 
         workItem.IssueReference = CreateIssueReference(workItem.Id, createdIssue);

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -28,6 +29,26 @@ public sealed class ScmTaskCompletionMonitoringService(
     : PeriodicBackgroundService(options.Value.PollInterval, time, logger, "SCM-Abschlussüberwachung fehlgeschlagen.")
 {
     private readonly TimeProvider _time = time;
+
+    // Begrenztes Wiederholungsbudget je Aufgabe und Fehlersignatur (#433): Transiente Fehler
+    // bekommen exponentielles Backoff statt festem Poll-Takt; nach Erschöpfung wird die
+    // automatische Prüfung/Ausführung der Aufgabe einmalig laut ausgesetzt (Aufgabenprotokoll
+    // + Anwendungslog) statt stumm minütlich weiterzulaufen. In-memory: Ein App-Neustart
+    // ist der dokumentierte Wiederanstoß; aufgabenfremde Einträge werden je Durchlauf
+    // abgeräumt.
+    private static readonly TimeSpan RetryInitialDelay = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan RetryMaxDelay = TimeSpan.FromMinutes(60);
+    private const int RetryMaxAttempts = 10;
+    private readonly ConcurrentDictionary<Guid, CompletionRetryState> _retries = new();
+
+    private sealed class CompletionRetryState
+    {
+        public string? Signature;
+        public string? LastDetail;
+        public int Failures;
+        public DateTimeOffset NextAttemptUtc = DateTimeOffset.MinValue;
+        public bool Exhausted;
+    }
     /// <inheritdoc/>
     public override async Task RunOnceAsync(CancellationToken ct = default)
     {
@@ -73,9 +94,35 @@ public sealed class ScmTaskCompletionMonitoringService(
                 logger.LogError(ex, "SCM-Abschlussprüfung für Aufgabe {AufgabeId} fehlgeschlagen.", taskId);
             }
         }
+        // Budget-Einträge von Aufgaben abräumen, die die Kandidatenmenge verlassen haben
+        // (manuell abgeschlossen, archiviert oder durch den Prüfmodus ausgeschlossen).
+        var active = candidates.ToHashSet();
+        foreach (var key in _retries.Keys)
+            if (!active.Contains(key)) _retries.TryRemove(key, out _);
     }
 
     private async Task CheckTaskAsync(Guid taskId, TimeSpan wait, CancellationToken ct)
+    {
+        // Budget-Gate zuerst: ausgesetzte oder im Backoff ruhende Aufgaben werden ohne
+        // jeglichen Provider-/DB-Zugriff übersprungen.
+        var state = _retries.GetOrAdd(taskId, _ => new CompletionRetryState());
+        if (state.Exhausted || _time.GetUtcNow() < state.NextAttemptUtc)
+            return;
+        var failuresBefore = state.Failures;
+        try
+        {
+            await CheckTaskCoreAsync(taskId, wait, state, ct);
+            // Ein Durchlauf ohne neuen Fehlschlag heilt das Budget der Aufgabe.
+            if (state.Failures == failuresBefore) _retries.TryRemove(taskId, out _);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            await RecordFailureAsync(taskId, state, ex, null, ct);
+        }
+    }
+
+    private async Task CheckTaskCoreAsync(Guid taskId, TimeSpan wait, CompletionRetryState state, CancellationToken ct)
     {
         using var scope = scopes.CreateScope();
         var services = scope.ServiceProvider;
@@ -147,11 +194,61 @@ public sealed class ScmTaskCompletionMonitoringService(
             catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
             {
                 // Z. B. offene To-Dos oder ein nicht löschbarer Klon blockieren den Abschluss; der
-                // Erkennungszeitpunkt bleibt persistiert, der nächste Durchlauf versucht es erneut.
-                logger.LogWarning(ex,
-                    "Automatischer Abschluss der Aufgabe {AufgabeId} nach Referenz-Schluss fehlgeschlagen.", taskId);
+                // Erkennungszeitpunkt bleibt persistiert — der Versuch zählt in dasselbe
+                // Budget/Backoff wie die Referenzprüfung. Bei einer Dateisperre wird der
+                // haltende Prozess best-effort diagnostiziert und ins Fehlerprotokoll aufgenommen.
+                var detail = ex is IOException && state.LastDetail is null
+                    && current.LocalClonePath is { Length: > 0 } clone
+                    ? LockedFileProcessDiagnostics.DescribeLockingProcesses(clone)
+                    : null;
+                await RecordFailureAsync(taskId, state, ex, detail, ct);
             }
         }, ct);
+    }
+
+    /// <summary>Zählt einen Fehlschlag je (Aufgabe, Fehlersignatur), setzt den exponentiellen
+    /// Backoff-Zeitpunkt und versetzt die Aufgabe nach Erschöpfung des Budgets in den
+    /// ausgesetzten Zustand — einmal laut (Anwendungslog + Aufgabenprotokoll) statt
+    /// minütlich still. Wiederholte identische Fehlschläge landen ab dem zweiten Versuch
+    /// nur noch auf Debug-Ebene (Log-Dedupe).</summary>
+    private async Task RecordFailureAsync(Guid taskId, CompletionRetryState state, Exception ex,
+        string? detail, CancellationToken ct)
+    {
+        // Signatur bewusst ohne die Prozess-Diagnose: Deren Prozessliste kann sich von
+        // Durchlauf zu Durchlauf ändern und würde das Budget sonst endlos zurücksetzen.
+        var signature = ex.GetType().Name + ": " + (ex.Message.Length > 200 ? ex.Message[..200] : ex.Message);
+        state.LastDetail = detail ?? state.LastDetail;
+        if (!string.Equals(state.Signature, signature, StringComparison.Ordinal))
+        {
+            state.Signature = signature;
+            state.Failures = 0;
+            state.Exhausted = false;
+        }
+        state.Failures++;
+        var display = signature + (state.LastDetail is null ? "" : " | offen gehalten von: " + state.LastDetail);
+        if (state.Failures == 1)
+            logger.LogWarning(ex, "SCM-Abschlussprüfung/-abschluss der Aufgabe {AufgabeId} fehlgeschlagen (Versuch {Versuch}/{Max}).", taskId, state.Failures, RetryMaxAttempts);
+        else
+            logger.LogDebug("SCM-Abschlussprüfung/-abschluss der Aufgabe {AufgabeId} wiederholt fehlgeschlagen ({Versuch}/{Max}): {Signatur}", taskId, state.Failures, RetryMaxAttempts, display);
+        var delay = TimeSpan.FromTicks(Math.Min(
+            RetryInitialDelay.Ticks << Math.Min(state.Failures - 1, 10), RetryMaxDelay.Ticks));
+        state.NextAttemptUtc = _time.GetUtcNow() + delay;
+        if (state.Failures < RetryMaxAttempts || state.Exhausted) return;
+        state.Exhausted = true;
+        logger.LogError("SCM-Abschlussprüfung/-abschluss der Aufgabe {AufgabeId} nach {Versuch} Fehlversuchen ausgesetzt: {Signatur}", taskId, state.Failures, display);
+        try
+        {
+            using var scope = scopes.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<LogService>().AddEntryAsync(taskId,
+                LogEntryType.SystemMessage,
+                $"Automatische SCM-Abschlussüberwachung nach {state.Failures} Fehlversuchen ausgesetzt: {display} "
+                + "Ursache beheben und die Aufgabe manuell abschließen oder die Anwendung neu starten; danach wird die Überwachung fortgesetzt.",
+                ct: ct);
+        }
+        catch (Exception logEx)
+        {
+            logger.LogDebug(logEx, "Protokolleintrag zur ausgesetzten Abschlussüberwachung konnte nicht geschrieben werden.");
+        }
     }
 
     /// <summary>Ermittelt, ob die verknüpfte SCM-Referenz der Aufgabe geschlossen/gemergt ist.

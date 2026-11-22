@@ -258,6 +258,163 @@ public sealed class ScmIssuePreparationMonitoringServiceTests
         Assert.Equal(ScmAccountMode.SeparateAccount, ScmEventStore.Observation(item).Reference.Repository.Account);
     }
 
+    /// <summary>Im SeparatesKonto trägt der persistierte Snapshot die <em>vollständige</em>
+    /// Identität des Ausführungskontos: ViewerId, ViewerLogin und CanWrite stammen aus der
+    /// Neuauflösung unter <see cref="ScmAccountMode.SeparateAccount"/>, nicht aus der
+    /// Benutzerkonto-Enumeration — nur so passiert die spätere Identitätsprüfung der
+    /// Antwortausführung (<c>ExecuteResponseAsync</c>) den Umleitungsschutz.</summary>
+    [Fact]
+    public async Task PreparationMonitor_SeparatesAccount_EventCarriesExecutionViewer()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await EnableAsync(fixture);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
+        await AddRepositoryAsync(fixture, preparation: true);
+        var contexts = new List<ScmRepositoryContext>();
+        fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
+                It.IsAny<ScmRepositoryContext>(), It.IsAny<CancellationToken>()))
+            .Returns((ScmRepositoryContext context, CancellationToken _) =>
+            {
+                contexts.Add(context);
+                return Task.FromResult(context.Account == ScmAccountMode.SeparateAccount
+                    ? ScmDispatchFixture.BotRepository : fixture.Repository);
+            });
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
+        fixture.ConfigureIssue();
+
+        await PreparationMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        ConfigureEnumeration(fixture,
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8),
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
+        ConfigureDescriptions(fixture, request => request.Reference.Number == 9
+            ? DescriptionObservation(request, DateTimeOffset.UtcNow)
+            : null);
+
+        await PreparationMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var repository = ScmEventStore.Observation(item).Reference.Repository;
+        Assert.Equal(ScmDispatchFixture.BotRepository.ViewerId, repository.ViewerId);
+        Assert.Equal(ScmDispatchFixture.BotRepository.ViewerLogin, repository.ViewerLogin);
+        Assert.Equal(ScmDispatchFixture.BotRepository.CanWrite, repository.CanWrite);
+        Assert.Equal(ScmAccountMode.SeparateAccount, repository.Account);
+        // Entdeckung unter Benutzerkonto, Neuauflösung unter dem Ausführungskonto.
+        Assert.Contains(contexts, x => x.Account == ScmAccountMode.UserAccount);
+        Assert.Contains(contexts, x => x.Account == ScmAccountMode.SeparateAccount);
+    }
+
+    /// <summary>Im Benutzerkonto-Modus findet keine Neuauflösung statt: Der Ausführungskontext
+    /// wird nie angesprochen, der bisherige Snapshot bleibt unverändert.</summary>
+    [Fact]
+    public async Task PreparationMonitor_UserAccount_NoSecondResolution()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await EnableAsync(fixture);
+        await AddRepositoryAsync(fixture, preparation: true);
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
+        fixture.ConfigureIssue();
+
+        await PreparationMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        ConfigureEnumeration(fixture,
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8),
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
+        ConfigureDescriptions(fixture, request => request.Reference.Number == 9
+            ? DescriptionObservation(request, DateTimeOffset.UtcNow)
+            : null);
+
+        await PreparationMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        fixture.Git.As<IScmEventSource>().Verify(x => x.GetEventRepositoryAsync(
+            It.Is<ScmRepositoryContext>(c => c.Account != ScmAccountMode.UserAccount),
+            It.IsAny<CancellationToken>()), Times.Never);
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>Liefert die Ausführungskonto-Auflösung eine andere Repository-Identität als die
+    /// Entdeckung, wird der Fehler ehrlich am Issue-Checkpoint vermerkt — kein Auftrag.</summary>
+    [Fact]
+    public async Task PreparationMonitor_ResolutionMismatch_RecordsIssueFailure()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await EnableAsync(fixture);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
+        await AddRepositoryAsync(fixture, preparation: true);
+        fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
+                It.Is<ScmRepositoryContext>(c => c.Account == ScmAccountMode.SeparateAccount), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ScmDispatchFixture.BotRepository with { RepositoryId = "R_2" });
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
+        fixture.ConfigureIssue();
+
+        await PreparationMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        ConfigureEnumeration(fixture,
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8),
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
+        ConfigureDescriptions(fixture, request => request.Reference.Number == 9
+            ? DescriptionObservation(request, DateTimeOffset.UtcNow)
+            : null);
+
+        await PreparationMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var failed = Assert.Single(await db.ScmObservationCheckpoints
+            .Where(x => x.SourceKey == "issueaufbereitung-issue/test-scm/github.com/R_1/9")
+            .ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal("Permanent", failed.ErrorCode);
+        Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        fixture.Git.As<IScmEventSource>().Verify(x => x.ReadEventsAsync(
+            It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Scheitert die Neuauflösung unter dem Ausführungskonto (fehlender Zugriff des
+    /// separaten Kontos), landet der Fehler am Issue-Checkpoint statt als späterer
+    /// „Identität geändert"-Alarm — kein Beschreibungs-Read, kein Auftrag.</summary>
+    [Fact]
+    public async Task PreparationMonitor_ResolutionFailure_RecordsIssueFailure()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await EnableAsync(fixture);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
+        await AddRepositoryAsync(fixture, preparation: true);
+        fixture.Git.As<IScmEventSource>().Setup(x => x.GetEventRepositoryAsync(
+                It.Is<ScmRepositoryContext>(c => c.Account == ScmAccountMode.SeparateAccount), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ScmProviderException(ScmProviderFailureKind.Permission, "Kein Zugriff."));
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
+        fixture.ConfigureIssue();
+
+        await PreparationMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        ConfigureEnumeration(fixture,
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8),
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
+        ConfigureDescriptions(fixture, request => request.Reference.Number == 9
+            ? DescriptionObservation(request, DateTimeOffset.UtcNow)
+            : null);
+
+        await PreparationMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var failed = Assert.Single(await db.ScmObservationCheckpoints
+            .Where(x => x.SourceKey == "issueaufbereitung-issue/test-scm/github.com/R_1/9")
+            .ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal("Permission", failed.ErrorCode);
+        Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        fixture.Git.As<IScmEventSource>().Verify(x => x.ReadEventsAsync(
+            It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     /// <summary>Lückenschluss: Wurde die Beschreibung eines neu angelegten Issues zuvor schon
     /// gelesen (Erwähnungs-Vorgriff im SeparatesKonto schreibt einen
     /// <see cref="ScmContentSnapshot"/>), wird das Issue trotzdem aufbereitet.</summary>
