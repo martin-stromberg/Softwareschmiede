@@ -218,7 +218,7 @@ Die Implementierung liegt in `AutoShutdownOrchestrator`/`IAutoShutdownOrchestrat
 | Komponente | Requirement | Hinweis |
 |------------|-------------|---------|
 | Windows | 10 (Build 17763+) oder 11 | Pflicht für WPF, Windows Credential Store und ConPTY |
-| .NET SDK | 10.0+ | benötigt für Build und Test |
+| .NET SDK | 11.0+ | benötigt für Build und Test |
 | Git | aktuell | für Repository-Workflows |
 | GitHub CLI (`gh`) | optional | nur für die GitHub-Komfortaktionen Issue-/PR-Anlage und PR-Abschluss sowie für Agenten-Sitzungen; Überwachung und Lesepfade laufen über HTTP |
 | Copilot CLI (`copilot`) | optional | für `Softwareschmiede.Plugin.GitHubCopilot` |
