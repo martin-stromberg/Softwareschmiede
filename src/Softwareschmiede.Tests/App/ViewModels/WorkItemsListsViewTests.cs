@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using FluentAssertions;
 using Softwareschmiede.App.ViewModels;
+using Softwareschmiede.Domain.Enums;
 
 namespace Softwareschmiede.Tests.App.ViewModels;
 
@@ -93,5 +94,41 @@ public sealed class WorkItemsListsViewTests
 
         var title = view.Cast<ActiveWorkItemPanelItem>().Select(i => i.Title).ToArray();
         title.Should().Equal("Neu", "Mitte", "Alt");
+    }
+
+    /// <summary>Das Symbol-Mapping liefert je sichtbarer Auftragsart den dokumentierten Glyph.</summary>
+    [Theory]
+    [InlineData(WorkItemKind.Manual, "✋")]
+    [InlineData(WorkItemKind.Instruction, "📣")]
+    [InlineData(WorkItemKind.IssuePreparation, "🔍")]
+    [InlineData(WorkItemKind.PullRequest, "🔀")]
+    [InlineData(WorkItemKind.Alert, "⚠")]
+    public void KindSymbol_ShouldReturnExpectedGlyph_ForEachVisibleKind(WorkItemKind kind, string expected)
+    {
+        WorkItemListLayout.KindSymbol(kind).Should().Be(expected);
+    }
+
+    /// <summary>Nicht darstellbare bzw. unbekannte Werte liefern null — Grundlage der Badge-Ausblendung.</summary>
+    [Theory]
+    [InlineData(WorkItemKind.Unspecified)]
+    [InlineData((WorkItemKind)999)]
+    public void KindSymbol_ShouldReturnNull_ForUnspecifiedAndUndefined(WorkItemKind kind)
+    {
+        WorkItemListLayout.KindSymbol(kind).Should().BeNull();
+    }
+
+    /// <summary>Alle definierten Werte außer Unspecified liefern nicht-leere, paarweise verschiedene Glyphen.</summary>
+    [Fact]
+    public void KindSymbol_ShouldBeDefinedAndDistinct_ForAllVisibleKinds()
+    {
+        var symbols = Enum.GetValues<WorkItemKind>()
+            .Where(k => k != WorkItemKind.Unspecified)
+            .Select(WorkItemListLayout.KindSymbol)
+            .ToArray();
+
+        symbols.Should().OnlyContain(s => !string.IsNullOrEmpty(s),
+            "jede sichtbare Auftragsart muss ein Symbol liefern");
+        symbols.Should().OnlyHaveUniqueItems(
+            "die Symbole der Auftragsarten müssen paarweise unterscheidbar sein");
     }
 }

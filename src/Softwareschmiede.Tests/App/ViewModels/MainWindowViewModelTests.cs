@@ -564,6 +564,36 @@ public sealed class MainWindowViewModelTests : IDisposable
         item.AiPluginName.Should().BeNull();
     }
 
+    /// <summary>RefreshActiveWorkItemsAsync mappt Kind, KindSymbol, KindLabel und KindGroupName je Auftragsart;
+    /// Unspecified erhält weder Symbol noch Label — das Badge bleibt ausgeblendet (Issue 462).</summary>
+    [Theory]
+    [InlineData(WorkItemKind.Manual, "✋", "Manuell", "Manuell")]
+    [InlineData(WorkItemKind.Instruction, "📣", "Anweisung", "Anweisung")]
+    [InlineData(WorkItemKind.IssuePreparation, "🔍", "Issue-Aufbereitung", "Issue-Aufbereitung")]
+    [InlineData(WorkItemKind.PullRequest, "🔀", "Pull Request", "Pull Request")]
+    [InlineData(WorkItemKind.Alert, "⚠", "Alert", "Alert")]
+    [InlineData(WorkItemKind.Unspecified, null, "", "Ohne Auftragsart")]
+    public async Task RefreshActiveWorkItemsAsync_ShouldMapKindFieldsPerKind(
+        WorkItemKind kind, string? expectedSymbol, string expectedLabel, string expectedGroupName)
+    {
+        // Arrange
+        var workItem = await _workItemService.CreateAsync(_projectId, $"Aufgabe {kind}", null, ct: TestContext.Current.CancellationToken);
+        workItem.Kind = kind;
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        await _workItemService.StartAsync(workItem.Id, $"feature/{kind}", "/tmp/kind", ct: TestContext.Current.CancellationToken);
+        var sut = CreateSut();
+
+        // Act
+        await sut.RefreshActiveWorkItemsAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        var item = sut.ActiveWorkItemsList.Single(a => a.Id == workItem.Id);
+        item.Kind.Should().Be(kind);
+        item.KindSymbol.Should().Be(expectedSymbol);
+        item.KindLabel.Should().Be(expectedLabel);
+        item.KindGroupName.Should().Be(expectedGroupName);
+    }
+
     /// <summary>NavigateToDashboard setzt die NavigateZuAufgabeAction des DashboardViewModel, sodass dessen NavigateZuAufgabeCommand zur Aufgabendetailansicht navigiert (Delegate-Muster statt versteckter Kopplung).</summary>
     [Fact]
     public async Task NavigateToDashboard_ShouldWireNavigateToWorkItemActionOnDashboardViewModel_WhenCalled()

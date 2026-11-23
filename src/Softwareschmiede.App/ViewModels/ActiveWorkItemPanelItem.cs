@@ -50,8 +50,11 @@ public sealed class ActiveWorkItemPanelItem : ViewModelBase
     /// <summary>Sortierschlüssel der Auftragsart im Auftragsart-Modus (Enum-Wert; <c>Unspecified</c> sortiert ans Ende).</summary>
     public int KindSortOrder => Kind == WorkItemKind.Unspecified ? int.MaxValue : (int)Kind;
 
-    /// <summary>Sichtbare Typ-Markierung der Kachel (leer bei <see cref="WorkItemKind.Unspecified"/>).</summary>
+    /// <summary>Sichtbare Typ-Markierung der Kachel (leer, wenn <see cref="KindSymbol"/> <c>null</c> ist — bei <see cref="WorkItemKind.Unspecified"/> und unbekannten Werten).</summary>
     public string KindLabel { get; init; } = string.Empty;
+
+    /// <summary>Unicode-Glyph der Auftragsart für das Kachel-Badge (<c>null</c> bei <see cref="WorkItemKind.Unspecified"/>/unbekannt).</summary>
+    public string? KindSymbol { get; init; }
 
     /// <summary>Sortierzeitpunkt der Liste (letzte Ausführung bzw. Erstellung).</summary>
     public DateTimeOffset SortTimestamp { get; init; }
