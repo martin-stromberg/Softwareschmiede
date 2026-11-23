@@ -474,6 +474,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         var (scmPluginName, scmPluginSymbol) = ResolvePlugin(PluginType.SourceCodeManagement, workItem.GitRepository?.PluginType);
         var (aiPluginName, aiPluginSymbol) = ResolvePlugin(PluginType.DevelopmentAutomation, workItem.AiPluginPrefix);
         var repositoryName = workItem.GitRepository?.RepositoryName;
+        var kindSymbol = WorkItemListLayout.KindSymbol(workItem.Kind);
+        var kindGroupName = WorkItemListLayout.KindGroupName(workItem.Kind);
 
         return new ActiveWorkItemPanelItem
         {
@@ -493,10 +495,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             AiGroupName = aiPluginName ?? WorkItemListLayout.NotExecuted,
             AiGroupIsFallback = aiPluginName is null,
             Kind = workItem.Kind,
-            KindGroupName = WorkItemListLayout.KindGroupName(workItem.Kind),
-            KindLabel = workItem.Kind == WorkItemKind.Unspecified
+            KindGroupName = kindGroupName,
+            KindSymbol = kindSymbol,
+            KindLabel = kindSymbol is null
                 ? string.Empty
-                : WorkItemListLayout.KindGroupName(workItem.Kind),
+                : kindGroupName,
             SortTimestamp = workItem.LastCliStartUtc ?? workItem.CreatedAt,
             Status = workItem.Status,
             ExecutionStatus = workItem.ExecutionStatus,

@@ -10,9 +10,10 @@ namespace Softwareschmiede.Tests.E2E;
 
 /// <summary>
 /// Konsolidierter E2E-Test für die kompakte Aufgabenliste (Issue 288): dreizeilige Kachel mit
-/// Symbolen, vollflächiger Kachelklick, verschachtelter To-do-Button ohne Navigation,
-/// Moduswechsel (Datum/Repository/KI) in Seitenleiste und Dashboard inkl. Fallback-Gruppen,
-/// Persistenz beider AppEinstellung-Schlüssel und Wiederherstellung nach App-Neustart.
+/// Symbolen und Auftragsart-Badge (Symbol + Klartext), vollflächiger Kachelklick,
+/// verschachtelter To-do-Button ohne Navigation, Moduswechsel (Datum/Repository/KI/Art)
+/// in Seitenleiste und Dashboard inkl. Fallback-Gruppen, Persistenz beider
+/// AppEinstellung-Schlüssel und Wiederherstellung nach App-Neustart.
 /// </summary>
 public partial class End2EndTest
 {
@@ -69,6 +70,7 @@ public partial class End2EndTest
             var workItemWithoutRepo = await db.WorkItems.SingleAsync(a => a.Title == titleWithoutRepo);
             workItemWithoutRepo.Status = WorkItemStatus.Started;
             workItemWithoutRepo.ExecutionStatus = WorkItemExecutionStatus.Active;
+            workItemWithoutRepo.Kind = WorkItemKind.Alert;
             workItemWithoutRepoId = workItemWithoutRepo.Id;
 
             db.Todos.Add(new Todo { Id = Guid.NewGuid(), WorkItemId = workItemWithRepo.Id, Description = "Offenes Todo", CreatedAt = DateTimeOffset.UtcNow });
@@ -86,6 +88,13 @@ public partial class End2EndTest
         Assert.False(string.IsNullOrWhiteSpace(menu.GetActiveTaskScmPluginSymbol(titleWithRepo)));
         Assert.False(string.IsNullOrWhiteSpace(menu.GetActiveTaskStatusGlyph(titleWithRepo)));
         Assert.Equal("KI Simulator", menu.GetActiveTaskAiPluginName(titleWithRepo));
+
+        // Auftragsart-Badge: Symbol + Klartext je Kachel (manuell angelegt → "✋ Manuell",
+        // per DB auf Alert gesetzt → "⚠ Alert").
+        Assert.Equal("✋", menu.GetActiveTaskKindSymbol(titleWithRepo));
+        Assert.Equal("Manuell", menu.GetActiveTaskKindLabel(titleWithRepo));
+        Assert.Equal("⚠", menu.GetActiveTaskKindSymbol(titleWithoutRepo));
+        Assert.Equal("Alert", menu.GetActiveTaskKindLabel(titleWithoutRepo));
 
         // Verschachtelter To-do-Button: öffnet den Dialog, ohne die Kachel-Navigation auszulösen.
         menu.ClickOpenTodosButton(titleWithRepo);
@@ -110,6 +119,10 @@ public partial class End2EndTest
         menu.SetWorkItemsListsMode("AI");
         menu.WaitForWorkItemsGroup("KI Simulator", Medium);
         menu.WaitForWorkItemsGroup("Nicht ausgeführt", Medium);
+        // Art-Gruppierung: Klartext-Gruppenköpfe ohne Symbol.
+        menu.SetWorkItemsListsMode("Kind");
+        menu.WaitForWorkItemsGroup("Manuell", Medium);
+        menu.WaitForWorkItemsGroup("Alert", Medium);
         menu.SetWorkItemsListsMode("Date");
         var deadlineFlach = DateTime.UtcNow + Medium;
         while (DateTime.UtcNow < deadlineFlach && menu.GetWorkItemsGroupsNames().Length > 0)

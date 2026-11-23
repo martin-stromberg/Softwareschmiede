@@ -416,7 +416,7 @@ public sealed class MenuView : BaseWindowView
     /// 'WorkItemsMode:{modus}'-Umschalter). Fensterweit eindeutig, da die Dashboard-Umschalter
     /// 'DashboardWorkItemsMode:*' heißen.
     /// </summary>
-    /// <param name="mode">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
+    /// <param name="mode">Der anzuzeigende Modus ("Datum", "Repository", "KI" oder "Kind").</param>
     /// <returns>Diese Instanz.</returns>
     public MenuView SetWorkItemsListsMode(string mode)
     {
@@ -482,6 +482,24 @@ public sealed class MenuView : BaseWindowView
         => WaitForElement(
             ActiveWorkItemsListMenuElement(),
             cf => cf.ByAutomationId($"ActiveWorkItemScmPlugin_{taskTitle}"),
+            Short).Name;
+
+    /// <summary>Liest den Auftragsart-Glyph des Kachel-Badges (UIA-Name des 'ActiveWorkItemKindSymbol_{titel}'-TextBlocks; der Badge-Border selbst erzeugt keinen AutomationPeer).</summary>
+    /// <param name="taskTitle">Der Titel der Aufgabe.</param>
+    /// <returns>Der angezeigte Glyph (z. B. "✋").</returns>
+    public string GetActiveTaskKindSymbol(string taskTitle)
+        => WaitForElement(
+            ActiveWorkItemsListMenuElement(),
+            cf => cf.ByAutomationId($"ActiveWorkItemKindSymbol_{taskTitle}"),
+            Short).Name;
+
+    /// <summary>Liest den Auftragsart-Klartext des Kachel-Badges (UIA-Name des 'ActiveWorkItemKindLabel_{titel}'-TextBlocks).</summary>
+    /// <param name="taskTitle">Der Titel der Aufgabe.</param>
+    /// <returns>Der angezeigte Klartext (z. B. "Manuell").</returns>
+    public string GetActiveTaskKindLabel(string taskTitle)
+        => WaitForElement(
+            ActiveWorkItemsListMenuElement(),
+            cf => cf.ByAutomationId($"ActiveWorkItemKindLabel_{taskTitle}"),
             Short).Name;
 
     /// <summary>
