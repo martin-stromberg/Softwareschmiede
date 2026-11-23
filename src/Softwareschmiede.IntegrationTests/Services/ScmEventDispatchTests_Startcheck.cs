@@ -39,7 +39,7 @@ public sealed class ScmEventDispatchTests_Startcheck
             // Wie PseudoConsoleSession: das Session-Ende wird als Exited-Ereignis gemeldet.
             fixture.Sessions[firstTask].Raise(x => x.Exited += null, new TerminalSessionExitedEventArgs(0));
 
-            await ScmDispatchFixture.WaitForAsync(async () => fixture.Sessions.Count == 2
+            await fixture.WaitForTriggeredDeliveryAsync(async () => fixture.Sessions.Count == 2
                     && (await fixture.EventAsync(secondId)).Status == "Zugestellt",
                 "Das wartende Ereignis wurde nach dem Freiwerden des Platzes nicht ereignisgesteuert gestartet.");
             Assert.Equal(2, fixture.Prompts.Count);
@@ -78,7 +78,7 @@ public sealed class ScmEventDispatchTests_Startcheck
                     .SetPauseAsync(firstTask, DateTimeOffset.UtcNow.AddMinutes(30), TestContext.Current.CancellationToken);
             }
 
-            await ScmDispatchFixture.WaitForAsync(async () => fixture.Sessions.Count == 2
+            await fixture.WaitForTriggeredDeliveryAsync(async () => fixture.Sessions.Count == 2
                     && (await fixture.EventAsync(secondId)).Status == "Zugestellt",
                 "Das wartende Ereignis wurde nach dem Setzen der Pause nicht ereignisgesteuert gestartet.");
             Assert.True(fixture.Cli.IsRunning(firstTask));
@@ -116,7 +116,7 @@ public sealed class ScmEventDispatchTests_Startcheck
                     .SetPauseAsync(taskId, null, TestContext.Current.CancellationToken);
             }
 
-            await ScmDispatchFixture.WaitForAsync(async () => (await fixture.EventAsync(eventId)).Status == "Zugestellt",
+            await fixture.WaitForTriggeredDeliveryAsync(async () => (await fixture.EventAsync(eventId)).Status == "Zugestellt",
                 "Das wartende Ereignis wurde nach dem Aufheben der Pause nicht ereignisgesteuert gestartet.");
             Assert.Single(fixture.Sessions);
         }
@@ -232,7 +232,7 @@ public sealed class ScmEventDispatchTests_Startcheck
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await fixture.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
-        var (nonScmTask, _) = await fixture.AddAsync(WorkItemStatus.Started, configured: true);
+        var (nonScmTask, nonScmEventId) = await fixture.AddAsync(WorkItemStatus.Started, configured: true);
         var (_, eventId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
         {
@@ -240,6 +240,11 @@ public sealed class ScmEventDispatchTests_Startcheck
                 .RestartCliAsync(nonScmTask, ScmDispatchFixture.AiPrefix, null, TestContext.Current.CancellationToken, strictPluginSelection: true);
         }
         Assert.True(fixture.Cli.IsRunning(nonScmTask));
+        // Der Nicht-SCM-Lauf belegt den Platz über seine laufende, beschäftigte Ausführung —
+        // sein beiläufig mitgesätes Ereignis gehört nicht zum Szenario und würde nach dem
+        // Stopp sonst selbst einen Neustart versuchen.
+        fixture.SetPrompt(nonScmTask, "SCM_BUSY_V1");
+        await fixture.SetEventStatusAsync(nonScmEventId, "Verarbeitet");
 
         await fixture.StartCheck.RunOnceAsync(TestContext.Current.CancellationToken);
         var waiting = await fixture.EventAsync(eventId);
@@ -251,7 +256,7 @@ public sealed class ScmEventDispatchTests_Startcheck
         {
             await fixture.Cli.StopCliAsync(nonScmTask, TestContext.Current.CancellationToken);
             fixture.Sessions[nonScmTask].Raise(x => x.Exited += null, new TerminalSessionExitedEventArgs(0));
-            await ScmDispatchFixture.WaitForAsync(async () => (await fixture.EventAsync(eventId)).Status == "Zugestellt",
+            await fixture.WaitForTriggeredDeliveryAsync(async () => (await fixture.EventAsync(eventId)).Status == "Zugestellt",
                 "Das wartende Ereignis wurde nach dem Ende des Nicht-SCM-Laufs nicht ereignisgesteuert gestartet.");
         }
         finally

@@ -37,6 +37,9 @@ public interface IScmPromptSessionAdapter
     bool IsBusy { get; }
     /// <summary>Aktueller Nachweis einer KI-Eingabe.</summary>
     ScmPromptReadyStatus ReadyStatus { get; }
+    /// <summary>Zeitpunkt des letzten Übergangs in <see cref="ScmPromptReadyStatus.Ready"/>;
+    /// <see langword="null"/>, solange der Status nicht <c>Ready</c> ist.</summary>
+    DateTimeOffset? ReadySinceUtc { get; }
     /// <summary>Feuert bei jedem Wechsel des Bereitschaftsstands mit dem neuen Wert. Der Invoke
     /// liegt unter dem internen Sperrobjekt — Handler müssen non-blocking sein; geworfene
     /// Subscriber-Fehler werden isoliert und brechen den Zustandswechsel nicht ab.</summary>
@@ -91,6 +94,7 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
     private string? _sessionName;
     private TaskCompletionSource _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private ScmPromptReadyStatus _ready;
+    private DateTimeOffset? _readySinceUtc;
     private ScmCliRecognition _cliRecognition;
     private bool _formatUserConfirmed;
     private bool _manuallyConfirmed;
@@ -144,6 +148,8 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
     public event Action<ScmPromptReadyStatus>? ReadyStatusChanged;
     /// <inheritdoc/>
     public ScmPromptReadyStatus ReadyStatus { get { if (!IsAlive) return ScmPromptReadyStatus.Exited; lock (_sync) return _ready; } }
+    /// <inheritdoc/>
+    public DateTimeOffset? ReadySinceUtc { get { if (!IsAlive) return null; lock (_sync) return _readySinceUtc; } }
     /// <inheritdoc/>
     public ScmCliRecognition CliRecognition { get { lock (_sync) return _cliRecognition; } }
 
@@ -382,6 +388,7 @@ public sealed class ScmPromptSessionAdapter : IScmPromptSessionAdapter, IDisposa
     {
         if (_ready == ready) return;
         _ready = ready;
+        _readySinceUtc = ready == ScmPromptReadyStatus.Ready ? _time.GetUtcNow() : null;
         var previous = _changed;
         _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         previous.TrySetResult();

@@ -625,8 +625,180 @@ public sealed class ScmIssuePreparationMonitoringServiceTests
         Assert.Contains("custom.auf", item.Reason);
     }
 
+    /// <summary>Ausschluss 6: Eine beendete/archivierte Aufgabe derselben Issue-Nummer ist kein
+    /// Bindungsziel — die Bestandssuche überspringt sie (ihre <c>BlockReason</c> würde das
+    /// interne Ereignis endlos warten lassen) und es entsteht eine eigene zweck-markierte Aufgabe.</summary>
+    [Theory]
+    [InlineData(WorkItemStatus.Completed)]
+    [InlineData(WorkItemStatus.Archived)]
+    public async Task Preparation_ExistingCompletedTask_CreatesNewPreparationTask(WorkItemStatus status)
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await EnableAsync(fixture);
+        var repositoryId = await AddRepositoryAsync(fixture, preparation: true);
+        var endedTaskId = await AddTaskAsync(fixture, repositoryId, status, 9);
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
+        fixture.ConfigureIssue();
+        await PreparationMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        ConfigureEnumeration(fixture,
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8),
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
+        ConfigureDescriptions(fixture, request => request.Reference.Number == 9
+            ? DescriptionObservation(request, DateTimeOffset.UtcNow)
+            : null);
+
+        await PreparationMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var tasks = await db.WorkItems.Include(x => x.IssueReference).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(2, tasks.Count);
+        var created = Assert.Single(tasks, x => x.Id != endedTaskId);
+        Assert.Equal(ScmIssuePreparationService.Purpose, created.Purpose);
+        Assert.Equal(repositoryId, created.GitRepositoryId);
+        Assert.Equal(9, created.IssueReference!.IssueNumber);
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(created.Id, item.WorkItemId);
+        Assert.Equal(ScmIssuePreparationService.Purpose, item.Purpose);
+    }
+
+    /// <summary>Ausschluss 5: Eine aktive Aufgabe auf einem nicht aufbereitungs-freigeschalteten
+    /// <see cref="GitRepository"/> ist kein Bindungsziel — der Repository-Schalter in
+    /// <c>DispatchPreparationAsync</c> ließe das interne Ereignis dort endlos warten; es entsteht
+    /// eine eigene zweck-markierte Aufgabe auf dem freigeschalteten Repository.</summary>
+    [Fact]
+    public async Task Preparation_ExistingTaskOnDisabledRepository_CreatesNewPreparationTask()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await EnableAsync(fixture);
+        var unlockedId = await AddRepositoryAsync(fixture, preparation: true);
+        var lockedId = await AddRepositoryAsync(fixture, preparation: false);
+        var foreignTaskId = await AddTaskAsync(fixture, lockedId, WorkItemStatus.Started, 9);
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
+        fixture.ConfigureIssue();
+        await PreparationMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        ConfigureEnumeration(fixture,
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8),
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
+        ConfigureDescriptions(fixture, request => request.Reference.Number == 9
+            ? DescriptionObservation(request, DateTimeOffset.UtcNow)
+            : null);
+
+        await PreparationMonitor(fixture).RunOnceAsync(TestContext.Current.CancellationToken);
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var tasks = await db.WorkItems.Include(x => x.IssueReference).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(2, tasks.Count);
+        var created = Assert.Single(tasks, x => x.Id != foreignTaskId);
+        Assert.Equal(ScmIssuePreparationService.Purpose, created.Purpose);
+        Assert.Equal(unlockedId, created.GitRepositoryId);
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(created.Id, item.WorkItemId);
+        Assert.Equal(ScmIssuePreparationService.Purpose, item.Purpose);
+    }
+
+    /// <summary>Nebenläufigkeit (Akzeptanzszenario 8): Zeitgleiche Kommentar-Auflösung und
+    /// Aufbereitungs-Erkennung in getrennten Scopes erzeugen über das gemeinsame Issue-Gate
+    /// genau eine Aufgabe — der zweite Pfad sieht die committete Aufgabe und bindet sein
+    /// internes Ereignis, statt eine zweite Aufgabe anzulegen. Der Test fixiert die Invariante,
+    /// nicht das Timing.</summary>
+    [Fact]
+    public async Task Preparation_ConcurrentCommentResolution_CreatesSingleTask()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await EnableAsync(fixture);
+        var repositoryId = await AddRepositoryAsync(fixture, preparation: true);
+        fixture.ConfigureIssue(9);
+        var reference = new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9);
+        var source = fixture.Git.As<IScmEventSource>().Object;
+        var ct = TestContext.Current.CancellationToken;
+        // Baseline der Aufbereitungs-Erkennung; die Beschreibungs-Beobachtung liegt danach.
+        using (var scope = fixture.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<ScmIssuePreparationService>()
+                .CreateBaselineAsync(fixture.Repository, [], ct);
+        var repositories = await LocalRepositoriesAsync(fixture);
+        var time = DateTimeOffset.UtcNow;
+        var request = new ScmEventReadRequest(reference, ScmContentKind.IssueComment, null, time);
+        var comment = new ScmEventObservation(reference, ScmContentKind.IssueComment, "C_9", "42",
+            time, time, null, "U_1", "owner", null, null, "$Softwareschmiede test",
+            "https://github.com/owner/repo/issues/9", time);
+        var description = DescriptionObservation(
+            new ScmEventReadRequest(reference, ScmContentKind.Description, null, time), time);
+
+        // Beide Check-then-Create-Pfade parallel — je eigenem Scope/DbContext.
+        var resolutionTask = Task.Run(async () =>
+        {
+            using var scope = fixture.Services.CreateScope();
+            return await scope.ServiceProvider.GetRequiredService<ScmEventTaskResolver>()
+                .ResolveAsync(reference, source, comment, repositories, ct);
+        }, ct);
+        var detectionTask = Task.Run(async () =>
+        {
+            using var scope = fixture.Services.CreateScope();
+            var batch = new ScmEventBatch(
+                new ScmEventReadRequest(reference, ScmContentKind.Description, null, time), [description]);
+            await scope.ServiceProvider.GetRequiredService<ScmIssuePreparationService>()
+                .DetectAndEnqueueAsync(source, reference, batch, repositories, ct);
+        }, ct);
+        var resolution = await resolutionTask;
+        await detectionTask;
+        // Wie im Monitoring-Pfad: Das Kommentar-Ereignis wird auf die aufgelöste Aufgabe gebucht.
+        Assert.Equal(ScmTaskResolutionKind.Assigned, resolution.Kind);
+        using (var scope = fixture.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(
+                resolution.WorkItemId, "concurrency-test", new ScmEventBatch(request, [comment]), ct: ct);
+
+        using var verification = fixture.Services.CreateScope();
+        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var task = Assert.Single(await db.WorkItems.ToListAsync(cancellationToken: ct));
+        var events = await db.ScmIncomingEvents.OrderBy(x => x.Sequence).ToListAsync(cancellationToken: ct);
+        Assert.Equal(2, events.Count);
+        Assert.All(events, x => Assert.Equal(task.Id, x.WorkItemId));
+        Assert.Contains(events, x => x.Purpose == ScmIssuePreparationService.Purpose);
+        Assert.Contains(events, x => x.Purpose == null
+            && ScmEventStore.Observation(x).ContentKind == ScmContentKind.IssueComment);
+        Assert.Equal(repositoryId, task.GitRepositoryId);
+    }
+
     private static ScmIssuePreparationMonitoringService PreparationMonitor(ScmDispatchFixture fixture)
         => fixture.Services.GetRequiredService<ScmIssuePreparationMonitoringService>();
+
+    private static async Task<List<GitRepository>> LocalRepositoriesAsync(ScmDispatchFixture fixture)
+    {
+        using var scope = fixture.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().GitRepositories.ToListAsync();
+    }
+
+    private static async Task<Guid> AddTaskAsync(ScmDispatchFixture fixture, Guid repositoryId,
+        WorkItemStatus status, int issueNumber)
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var projectId = await db.GitRepositories.Where(x => x.Id == repositoryId).Select(x => x.ProjectId).SingleAsync();
+        var task = new WorkItem
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = projectId,
+            GitRepositoryId = repositoryId,
+            Title = "Bestandsaufgabe",
+            Status = status,
+            IssueReference = new IssueReference
+            {
+                Id = Guid.NewGuid(),
+                IssueNumber = issueNumber,
+                Title = "Issue " + issueNumber
+            }
+        };
+        db.Add(task);
+        await db.SaveChangesAsync();
+        return task.Id;
+    }
 
     private static async Task EnableAsync(ScmDispatchFixture fixture)
         => await fixture.SetSettingAsync(AppSettingService.ScmIssuePreparationEnabledKey, "true");

@@ -72,8 +72,10 @@ public sealed class ScmEventDispatchTests_AgentActions
         await fixture.DispatchAsync(eventId);
 
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
-        var context = Assert.Single(contexts);
-        Assert.Equal(ScmAccountMode.SeparateAccount, context.Account);
+        // Jeder Versuch (Zustellung und Wiederanlauf nach der Stabilisierungsfrist)
+        // revalidiert erneut unter der persistierten Konto-Identität.
+        Assert.NotEmpty(contexts);
+        Assert.All(contexts, context => Assert.Equal(ScmAccountMode.SeparateAccount, context.Account));
     }
 
     /// <summary>Ein Fehler beim Auflösen der Agenten-Anbindung blockiert den regulären CLI-Start

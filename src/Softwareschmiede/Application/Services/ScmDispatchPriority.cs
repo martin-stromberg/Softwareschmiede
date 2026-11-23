@@ -20,7 +20,9 @@ public static class ScmDispatchPriority
     /// <param name="Sequence">Eingangsreihenfolge.</param>
     /// <param name="Status">Persistierter Ereignisstatus (<see cref="ScmIncomingEventStatus.Verzögert"/> markiert Klasse 2).</param>
     /// <param name="NextAttemptUtc">Zielzeitpunkt für die Klasse-2-Sortierung (Unix-ms).</param>
-    public sealed record EventSelection(Guid Id, Guid WorkItemId, long Sequence, string? Status, long? NextAttemptUtc);
+    /// <param name="Purpose">Zweck-Markierung des Ereignisses (<see cref="ScmIssuePreparationService.Purpose"/>
+    /// erhält innerhalb derselben Prioritätsklasse den Vortritt).</param>
+    public sealed record EventSelection(Guid Id, Guid WorkItemId, long Sequence, string? Status, long? NextAttemptUtc, string? Purpose);
 
     /// <summary>Aufgabenzustand, der für die Priorisierung benötigt wird.</summary>
     /// <param name="Status">Fachlicher Lebenszyklus der Aufgabe.</param>
@@ -55,6 +57,9 @@ public static class ScmDispatchPriority
                     workItemStates.TryGetValue(x.WorkItemId, out var z) ? z : null)))
             .OrderBy(t => t.Class)
             .ThenBy(t => t.Class == 2 ? t.Item.NextAttemptUtc ?? long.MaxValue : 0)
+            // Zweck-markierte Aufbereitungsereignisse erhalten innerhalb derselben
+            // Prioritätsklasse (und gleicher Klasse-2-Zielzeit) den Vortritt am Ausführungsplatz.
+            .ThenBy(t => t.Item.Purpose == ScmIssuePreparationService.Purpose ? 0 : 1)
             .ThenBy(t => t.Item.Sequence)
             .Select(t => t.Item)
             .ToList();

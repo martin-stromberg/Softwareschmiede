@@ -53,6 +53,10 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal static readonly ScmEventRepository BotRepository = new("test-scm", "github.com", "R_1",
         "owner", "repo", "U_1", "BOT", "scm-bot", true, ScmAccountMode.SeparateAccount);
     internal ServiceProvider Services { get; }
+    /// <summary>Die Zeitquelle der Fixture: ohne explizite Vorgabe ein steuerbarer
+    /// <see cref="TestTimeProvider"/>, damit die Zustell-Stabilisierungsfrist
+    /// (<see cref="ScmEventOrchestrator.DeliveryStabilityPeriod"/>) ohne echtes Warten ablaufen kann.</summary>
+    internal TimeProvider Time { get; }
     internal Func<Task>? CloneGate { get; set; }
     internal string Prompt { get; set; }
     private readonly List<Process> _processes = [];
@@ -146,8 +150,9 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                 return Task.FromResult(new TerminalSessionStartResult(process, session.Object, false));
             });
         var services = new ServiceCollection();
+        Time = time ?? new TestTimeProvider();
         services.AddScmTestServices(Path.Combine(Root, "events.db"), plugins.Object, Git.Object,
-            directories.Object, factory.Object, time ?? TimeProvider.System);
+            directories.Object, factory.Object, Time);
         Services = services.BuildServiceProvider();
     }
 
@@ -210,6 +215,40 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     /// <summary>Der Monitoring-Dienst aus dem Service-Provider der Fixture.</summary>
     internal ScmEventMonitoringService Monitor => Services.GetRequiredService<ScmEventMonitoringService>();
 
+    /// <summary>Stellt die steuerbare Uhr über die Zustell-Stabilisierungsfrist vor; bei
+    /// Echtzeit-Quellen no-op (diese Tests handhaben die Frist selbst).</summary>
+    internal void AdvancePastStabilityPeriod()
+    {
+        if (Time is TestTimeProvider clock)
+            clock.Advance(ScmEventOrchestrator.DeliveryStabilityPeriod + TimeSpan.FromSeconds(1));
+    }
+
+    /// <summary>Führt einen vollständigen Überwachungszyklus aus und wickelt anschließend einen
+    /// durch die Stabilisierungsfrist wartend zurückgestellten Versuch ab: Bei steuerbarer Zeit
+    /// wird die Uhr über die Frist vorgestellt und ein zweiter Zyklus ausgeführt — der Poll-Zyklus
+    /// ist der reguläre Wiederanlaufweg nach <see cref="ScmIncomingEvent.NextAttemptUtc"/>.</summary>
+    internal async Task RunMonitorAsync(CancellationToken ct = default)
+    {
+        await Monitor.RunOnceAsync(ct);
+        AdvancePastStabilityPeriod();
+        await Monitor.RunOnceAsync(ct);
+    }
+
+    /// <summary>Wartet auf eine ausgelöste (ereignisgesteuerte) Startprüfung unter steuerbarer
+    /// Zeit: Pro Prüfschritt wird die Uhr über die Zustell-Stabilisierungsfrist vorgestellt und die
+    /// Prüfung erneut angefordert — ein erster, durch die Frist wartend zurückgestellter Versuch
+    /// wird so wie vom regulären Wiederanlauf (<see cref="ScmIncomingEvent.NextAttemptUtc"/>)
+    /// abgewickelt statt in einer Sackgasse zu enden.</summary>
+    internal async Task WaitForTriggeredDeliveryAsync(Func<Task<bool>> condition, string because)
+    {
+        await WaitForAsync(async () =>
+        {
+            AdvancePastStabilityPeriod();
+            Trigger.RequestStartCheck();
+            return await condition();
+        }, because);
+    }
+
     /// <summary>Der Auslöser der ereignisgesteuerten Startprüfung aus dem Service-Provider der Fixture.</summary>
     internal ScmStartCheckTrigger Trigger => Services.GetRequiredService<ScmStartCheckTrigger>();
 
@@ -236,6 +275,15 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal async Task DispatchAsync(Guid id)
     {
         using var scope = Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(id);
+        // Stabilisierungsfrist abwickeln: Blieb das Ereignis wartend, wird bei steuerbarer
+        // Zeit die Uhr über die Frist vorgestellt und der Versuch erneut angestoßen —
+        // denselben Effekt hat der nächste Poll-/Startprüfungs-Zyklus in der Laufzeit.
+        // Mit anderer Zeitquelle steuert der Test das Vorstellen und den Wiederanlauf selbst.
+        if (Time is not TestTimeProvider) return;
+        var item = await EventAsync(id);
+        if (item.Status != ScmIncomingEventStatus.Wartend) return;
+        AdvancePastStabilityPeriod();
         await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().DispatchAsync(id);
     }
 

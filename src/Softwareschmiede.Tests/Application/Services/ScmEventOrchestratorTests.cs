@@ -189,6 +189,9 @@ public sealed class ScmEventOrchestratorTests
                 .SetPluginEnabledAsync(ScmDispatchFixture.AiPrefix, true, TestContext.Current.CancellationToken);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
+        // Die im Wiederholungsversuch frisch gestartete CLI liefert den Prompt erst nach
+        // der Stabilisierungsfrist aus — der Fixture-Wiederanlauf vollzieht die Frist.
+        await fixture.DispatchAsync(eventId);
         item = await fixture.EventAsync(eventId);
         Assert.Equal("Zugestellt", item.Status);
         Assert.NotNull(item.DeliveryAttemptId);
@@ -317,6 +320,9 @@ public sealed class ScmEventOrchestratorTests
         }
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().ConfirmReadyAsync(eventId, adapter.CliRunId.ToString("D"), TestContext.Current.CancellationToken);
+        // Die Bestätigung stempelt ReadySinceUtc neu — die Stabilisierungsfrist wird
+        // durch den Fixture-Wiederanlauf vollzogen.
+        await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
         Assert.Equal("Zugestellt", item.Status);
         Assert.NotNull(item.DeliveryAttemptId);
