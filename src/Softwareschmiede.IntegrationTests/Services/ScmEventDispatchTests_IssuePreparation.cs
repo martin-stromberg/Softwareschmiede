@@ -509,6 +509,40 @@ public sealed class ScmEventDispatchTests_IssuePreparation
         Assert.Equal(2, fixture.Responses.Count);
     }
 
+    /// <summary>Stabilisierungsfrist auch auf dem Aufbereitungspfad (#463): Eine frisch bereite
+    /// CLI (&lt; 10 s) erhält den Analyse-Prompt noch nicht — das interne Ereignis bleibt wartend
+    /// mit verschobenem Zielzeitpunkt und (anders als der generische Pfad) ohne Warte-Kommentar
+    /// am Issue; nach der Frist läuft die Zustellung regulär.</summary>
+    [Fact]
+    public async Task Dispatch_Preparation_ReadySinceYoungerThanDeadline_StaysWaiting()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await EnableAsync(fixture);
+        fixture.ConfigureIssue();
+        var (_, eventId) = await AddPreparationAsync(fixture, ScmDispatchFixture.AiPrefix);
+        using var scope = fixture.Services.CreateScope();
+        var orchestrator = scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>();
+
+        await orchestrator.DispatchAsync(eventId, ct: TestContext.Current.CancellationToken);
+
+        var item = await fixture.EventAsync(eventId);
+        Assert.Equal("Wartend", item.Status);
+        Assert.Contains("Stabilisierungsphase", item.Reason);
+        Assert.Equal(
+            fixture.Time.GetUtcNow().Add(ScmEventOrchestrator.DeliveryStabilityPeriod).ToUnixTimeMilliseconds(),
+            item.NextAttemptUtc);
+        Assert.Single(fixture.Sessions); // CLI gestartet, Prompt noch zurückgehalten
+        Assert.Empty(fixture.Prompts);
+        Assert.Empty(fixture.Responses); // der interne Auftrag kommentiert das Warten nicht remote
+
+        ((TestTimeProvider)fixture.Time).Advance(ScmEventOrchestrator.DeliveryStabilityPeriod + TimeSpan.FromSeconds(1));
+        await orchestrator.DispatchAsync(eventId, ct: TestContext.Current.CancellationToken);
+
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
+        Assert.Single(fixture.Prompts);
+    }
+
     private static async Task EnableAsync(ScmDispatchFixture fixture)
         => await fixture.SetSettingAsync(AppSettingService.ScmIssuePreparationEnabledKey, "true");
 

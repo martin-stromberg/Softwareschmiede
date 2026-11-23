@@ -42,7 +42,7 @@ public sealed class DashboardView : BaseWindowView
     /// 'DashboardWorkItemsMode:{modus}'-Umschalter — ansichtsspezifischer Anker, da die
     /// Seitenleisten-Umschalter 'WorkItemsMode:*' heißen).
     /// </summary>
-    /// <param name="mode">Der anzuzeigende Modus ("Datum", "Repository" oder "KI").</param>
+    /// <param name="mode">Der anzuzeigende Modus ("Datum", "Repository", "KI" oder "Kind").</param>
     /// <returns>Diese Instanz.</returns>
     public DashboardView SetWorkItemsListsMode(string mode)
     {

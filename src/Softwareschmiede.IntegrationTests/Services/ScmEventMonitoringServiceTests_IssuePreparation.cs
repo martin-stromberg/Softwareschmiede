@@ -265,11 +265,12 @@ public sealed class ScmEventMonitoringServiceTests_IssuePreparation
         Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
-    /// <summary>Ein Trigger-Kommentar auf demselben Issue wird regulär aufgelöst: Die
-    /// Aufbereitungs-Aufgabe ist weder Treffer noch Mehrdeutigkeitsbeitrag; die kanonische
-    /// Aufgabe mit <c>…/Issue/{n}</c>-SourceKey wird parallel angelegt.</summary>
+    /// <summary>Ein Trigger-Kommentar auf dem aufbereiteten Issue läuft in dieselbe Aufgabe:
+    /// Die zweck-markierte Aufbereitungs-Aufgabe ist der Zuordnungskandidat — es entsteht genau
+    /// eine Aufgabe, beide Ereignisse tragen dieselbe <see cref="ScmIncomingEvent.WorkItemId"/>,
+    /// keine kanonische <c>…/Issue/{n}</c>-Zweitanlage, keine Mehrdeutigkeitsdiagnose.</summary>
     [Fact]
-    public async Task Monitor_TriggerOnPreparedIssue_ResolvesToCanonicalTask()
+    public async Task Monitor_TriggerOnPreparedIssue_AssignsToPreparationTask()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -304,22 +305,82 @@ public sealed class ScmEventMonitoringServiceTests_IssuePreparation
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
-        var tasks = await db.WorkItems.Include(x => x.IssueReference).OrderBy(x => x.CreatedAt).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal(2, tasks.Count);
-        var preparation = Assert.Single(tasks, x => x.Purpose == ScmIssuePreparationService.Purpose);
-        var kanonisch = Assert.Single(tasks, x => x.Purpose == null);
-        Assert.Equal(WorkItemKind.IssuePreparation, preparation.Kind);
-        Assert.Equal(WorkItemKind.Instruction, kanonisch.Kind);
-        Assert.EndsWith("/Issue/9", kanonisch.IssueReference!.SourceKey);
-        Assert.Equal(9, kanonisch.IssueReference.IssueNumber);
+        var task = Assert.Single(await db.WorkItems.Include(x => x.IssueReference).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(ScmIssuePreparationService.Purpose, task.Purpose);
+        Assert.Equal(WorkItemKind.IssuePreparation, task.Kind);
+        Assert.EndsWith("/IssueAufbereitung/9", task.IssueReference!.SourceKey);
         var events = await db.ScmIncomingEvents.OrderBy(x => x.Sequence).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(2, events.Count);
+        Assert.All(events, x => Assert.Equal(task.Id, x.WorkItemId));
         var trigger = Assert.Single(events, x => x.Purpose == null);
-        Assert.Equal(kanonisch.Id, trigger.WorkItemId);
         Assert.Equal(ScmContentKind.IssueComment, ScmEventStore.Observation(trigger).ContentKind);
         Assert.DoesNotContain(await db.ScmContentSnapshots.ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
             x => x.Diagnostic == ScmEventStore.AmbiguousAssignmentDiagnostic);
-        Assert.Equal(preparation.Id, Assert.Single(events, x => x.Purpose != null).WorkItemId);
+        Assert.Single(events, x => x.Purpose == ScmIssuePreparationService.Purpose);
+    }
+
+    /// <summary>Entgegengesetzte Eingangsreihenfolge in getrennten Zyklen: Der Trigger-Kommentar
+    /// legt zuerst die reguläre Aufgabe an; die spätere Aufbereitungs-Erkennung bindet ihr
+    /// internes Ereignis an diese bestehende Aufgabe, statt eine zweite zu erzeugen.</summary>
+    [Fact]
+    public async Task Monitor_CommentTaskPrecedesIssueDetection_InternalEventBindsToExistingTask()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await EnableAsync(fixture);
+        await AddRepositoryAsync(fixture, preparation: true);
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8));
+        ConfigureDescriptions(fixture, request => DescriptionObservation(request, DateTimeOffset.UtcNow.AddDays(-1)));
+        fixture.ConfigureIssue();
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+
+        // Zyklus 2: nur der Trigger-Kommentar von Issue 9 (die Beschreibung liefert noch nichts)
+        // — die Kommentar-Auflösung legt die reguläre Aufgabe an.
+        var createdAt = DateTimeOffset.UtcNow.AddSeconds(1);
+        ConfigureEnumeration(fixture,
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 8),
+            new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
+        ConfigureDescriptions(fixture,
+            request => request.Reference.Number == 9
+                ? null
+                : DescriptionObservation(request, DateTimeOffset.UtcNow.AddDays(-1)),
+            request => request.Reference.Number == 9
+                ? new ScmEventObservation(request.Reference, ScmContentKind.IssueComment,
+                    "C_" + request.Reference.Number, "42", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null,
+                    "U_1", "owner", null, null, "$Softwareschmiede test",
+                    "https://github.com/owner/repo/issues/" + request.Reference.Number, DateTimeOffset.UtcNow)
+                : null);
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+
+        // Zyklus 3: die Issue-Beschreibung wird erstmals beobachtet — die Bestandssuche findet
+        // die reguläre Aufgabe und bindet das interne Aufbereitungsereignis an sie.
+        ConfigureDescriptions(fixture,
+            request => request.Reference.Number == 9
+                ? DescriptionObservation(request, createdAt)
+                : DescriptionObservation(request, DateTimeOffset.UtcNow.AddDays(-1)),
+            request => request.Reference.Number == 9
+                ? new ScmEventObservation(request.Reference, ScmContentKind.IssueComment,
+                    "C_" + request.Reference.Number, "42", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null,
+                    "U_1", "owner", null, null, "$Softwareschmiede test",
+                    "https://github.com/owner/repo/issues/" + request.Reference.Number, DateTimeOffset.UtcNow)
+                : null);
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var task = Assert.Single(await db.WorkItems.Include(x => x.IssueReference).ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Null(task.Purpose);
+        Assert.Equal(WorkItemKind.Instruction, task.Kind);
+        Assert.EndsWith("/Issue/9", task.IssueReference!.SourceKey);
+        var events = await db.ScmIncomingEvents.OrderBy(x => x.Sequence).ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(2, events.Count);
+        Assert.All(events, x => Assert.Equal(task.Id, x.WorkItemId));
+        var internalEvent = Assert.Single(events, x => x.Purpose == ScmIssuePreparationService.Purpose);
+        Assert.EndsWith("/IssueAufbereitung", internalEvent.EventKey);
+        Assert.Single(events, x => x.Purpose == null
+            && ScmEventStore.Observation(x).ContentKind == ScmContentKind.IssueComment);
+        Assert.Contains(await db.LogEntries.ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
+            x => x.WorkItemId == task.Id && x.Type == LogEntryType.SystemMessage && x.Content.Contains("zugeordnet"));
     }
 
     /// <summary>Der interne Auftrag nutzt den eigenen Ausführungspfad: Ein expliziter

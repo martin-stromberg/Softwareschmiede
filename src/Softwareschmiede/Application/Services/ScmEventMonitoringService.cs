@@ -26,6 +26,16 @@ public sealed class ScmEventMonitoringService(
         internal bool HadFailure;
     }
 
+    /// <summary>Eine über eine lokale Aufgabe verknüpfte SCM-Referenz samt auflösendem
+    /// Projekt-Repository und Zweck-Markierung (<see cref="WorkItem.Purpose"/>) der Aufgabe.</summary>
+    private sealed record LinkedReference(Guid TaskId, GitRepository Repository,
+        ScmReferenceKind Kind, int Number, string RepositoryId, string? Purpose);
+
+    /// <summary>Eine für den aktuellen Provider-Durchlauf aufgelöste SCM-Referenz: entweder
+    /// über eine Aufgabe verknüpft (TaskId und Zweck-Markierung gesetzt) oder repository-weit
+    /// entdeckt bzw. aus der Inbox abgeleitet (TaskId und Purpose = <see langword="null"/>).</summary>
+    private sealed record ResolvedReference(Guid? TaskId, ScmEventReference Reference, string? Purpose);
+
     /// <inheritdoc/>
     public override async Task RunOnceAsync(CancellationToken ct = default)
     {
@@ -45,27 +55,30 @@ public sealed class ScmEventMonitoringService(
         var accountMode = await settings.GetScmAccountModeAsync(ct);
         var issuePreparationEnabled = await settings.GetScmIssuePreparationEnabledAsync(ct);
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
-        // Zweck-markierte Aufgaben (z. B. Issue-Aufbereitung) sind keine verknüpften Quellen:
-        // Sie dürfen weder Ereignisse auf ihre Issue-Nummer ziehen noch PR-Kontext liefern.
+        // Zweck-markierte Aufbereitungs-Aufgaben ziehen die Issue-Ereignisse ihrer eigenen
+        // Issue-Nummer auf sich (Folgekommentare laufen in derselben Aufgabe/Sitzung); sie
+        // liefern weiterhin keine PR-Referenzen und keinen PR-Kontext (Isolationsentscheidung).
         var tasks = await db.WorkItems.AsNoTracking().Include(x => x.GitRepository).Include(x => x.IssueReference)
-            .Include(x => x.PullRequests).Where(x => x.GitRepository != null && x.GitRepository.Active && x.Purpose == null).ToListAsync(ct);
+            .Include(x => x.PullRequests).Where(x => x.GitRepository != null && x.GitRepository.Active
+                && (x.Purpose == null || x.Purpose == ScmIssuePreparationService.Purpose)).ToListAsync(ct);
         var repositories = await db.GitRepositories.AsNoTracking().Where(x => x.Active).ToListAsync(ct);
         var plugins = scope.ServiceProvider.GetRequiredService<IPluginManager>().GetSourceCodeManagementPlugins();
         var pendingInboxCommits = new List<(string Key, DateTimeOffset Now, string Diagnostic)>();
-        var linked = new List<(Guid TaskId, GitRepository Repository, ScmReferenceKind Kind, int Number, string RepositoryId)>();
+        var linked = new List<LinkedReference>();
         foreach (var task in tasks)
         {
             var repository = task.GitRepository!;
             if (task.IssueReference?.IssueNumber is > 0)
-                linked.Add((task.Id, repository, ScmReferenceKind.Issue, task.IssueReference.IssueNumber.Value, repository.RepositoryUrl));
-            foreach (var reference in task.PullRequests)
-                linked.Add((task.Id, repository, ScmReferenceKind.PullRequest, reference.PullRequestNumber, reference.RepositoryId));
+                linked.Add(new(task.Id, repository, ScmReferenceKind.Issue, task.IssueReference.IssueNumber.Value, repository.RepositoryUrl, task.Purpose));
+            if (task.Purpose is null)
+                foreach (var reference in task.PullRequests)
+                    linked.Add(new(task.Id, repository, ScmReferenceKind.PullRequest, reference.PullRequestNumber, reference.RepositoryId, task.Purpose));
         }
         foreach (var plugin in plugins)
         {
             if (plugin is not IScmEventSource source)
                 continue;
-            var resolved = new List<(Guid? TaskId, ScmEventReference Reference)>();
+            var resolved = new List<ResolvedReference>();
             var repositoriesForEnumeration = new List<ScmEventRepository>();
             var localRepositories = new Dictionary<ScmEventRepository, List<GitRepository>>();
             var complete = true;
@@ -101,7 +114,7 @@ public sealed class ScmEventMonitoringService(
                 try
                 {
                     var repository = await source.GetEventRepositoryAsync(new ScmRepositoryContext(aliasGroup.Repositories[0].Id, plugin.PluginPrefix, alias, accountMode), ct);
-                    resolved.AddRange(aliasGroup.Linked.Select(x => ((Guid?)x.TaskId, new ScmEventReference(repository, x.Kind, x.Number))));
+                    resolved.AddRange(aliasGroup.Linked.Select(x => new ResolvedReference(x.TaskId, new ScmEventReference(repository, x.Kind, x.Number), x.Purpose)));
                     if (!localRepositories.TryGetValue(repository, out var candidates))
                         localRepositories[repository] = candidates = [];
                     foreach (var local in aliasGroup.Repositories)
@@ -157,7 +170,7 @@ public sealed class ScmEventMonitoringService(
                             "enumeration", enumerated,
                             (discovered, _) =>
                             {
-                                resolved.AddRange(discovered.Select(x => ((Guid?)null, x)));
+                                resolved.AddRange(discovered.Select(x => new ResolvedReference(null, x, null)));
                                 return Task.CompletedTask;
                             }, ct))
                         cycle.HadFailure = true;
@@ -170,7 +183,14 @@ public sealed class ScmEventMonitoringService(
                 var kinds = reference.Kind == ScmReferenceKind.Issue
                     ? new[] { ScmContentKind.Description, ScmContentKind.IssueComment }
                     : new[] { ScmContentKind.Description, ScmContentKind.IssueComment, ScmContentKind.ReviewComment, ScmContentKind.PullRequestReview };
-                var taskIds = group.Select(x => x.TaskId).OfType<Guid>().Distinct().ToArray();
+                // Verknüpfte Kandidaten der Referenzgruppe samt Zweck-Markierung; dieselbe
+                // Aufgabe kann über mehrere verknüpfte Referenzen in der Gruppe stehen.
+                var linkedCandidates = group.Where(x => x.TaskId is not null)
+                    .Select(x => (Id: x.TaskId!.Value, x.Purpose)).Distinct().ToList();
+                var regularIds = linkedCandidates.Where(x => x.Purpose is null).Select(x => x.Id).ToList();
+                // Purpose-Token-Vergleich wie im gespiegelten Resolver und in der
+                // Bestandssuche: künftige Fremdzwecke zählen nicht als Aufbereitungskandidat.
+                var purposeIds = linkedCandidates.Where(x => x.Purpose == ScmIssuePreparationService.Purpose).Select(x => x.Id).ToList();
                 foreach (var kind in kinds)
                 {
                     using var batchScope = scopes.CreateScope();
@@ -189,8 +209,15 @@ public sealed class ScmEventMonitoringService(
                                 || x.Diagnostic == ScmEventStore.UnassignedDiagnostic), ct))
                             request = request with { SinceUtc = null };
                         var batch = await source.ReadEventsAsync(request, ct);
-                        var workItemId = taskIds.Length == 1 ? taskIds[0] : (Guid?)null;
-                        var unassigned = taskIds.Length == 0;
+                        // Zweistufige Auswahl wie im Resolver: genau eine reguläre Aufgabe
+                        // gewinnt (auch gegenüber einem Altbestand-Paar aus regulärer und
+                        // zweck-markierter Aufgabe); ohne regulären Treffer tritt genau eine
+                        // zweck-markierte Aufgabe ein. Mehrfachtreffer je Stufe bleiben
+                        // mehrdeutig (AmbiguousAssignmentDiagnostic, kein Resolver-Aufruf).
+                        var workItemId = regularIds.Count == 1 ? regularIds[0]
+                            : regularIds.Count == 0 && purposeIds.Count == 1 ? purposeIds[0]
+                            : (Guid?)null;
+                        var unassigned = regularIds.Count == 0 && purposeIds.Count == 0;
                         if (unassigned && localRepositories.TryGetValue(reference.Repository, out var candidates)
                             && batch.Observations.FirstOrDefault(x => ScmEventValidationService.GetRejection(x, triggerKeyword) is null) is { } trigger)
                         {
@@ -261,15 +288,12 @@ public sealed class ScmEventMonitoringService(
     /// <param name="source">Die Ereignisquelle des Plugins (Alias-Normalisierung).</param>
     /// <param name="linked">Alle verknüpften Referenzen des Laufes.</param>
     /// <param name="repositories">Alle aktiven Projekt-Repositories.</param>
-    private Dictionary<string, (List<GitRepository> Repositories,
-        List<(Guid TaskId, GitRepository Repository, ScmReferenceKind Kind, int Number, string RepositoryId)> Linked)>
+    private Dictionary<string, (List<GitRepository> Repositories, List<LinkedReference> Linked)>
         BuildAliasGroups(IGitPlugin plugin, IScmEventSource source,
-            List<(Guid TaskId, GitRepository Repository, ScmReferenceKind Kind, int Number, string RepositoryId)> linked,
-            List<GitRepository> repositories)
+            List<LinkedReference> linked, List<GitRepository> repositories)
     {
         var aliasGroups = new Dictionary<string, (List<GitRepository> Repositories,
-            List<(Guid TaskId, GitRepository Repository, ScmReferenceKind Kind, int Number, string RepositoryId)> Linked)>(
-            StringComparer.OrdinalIgnoreCase);
+            List<LinkedReference> Linked)>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in linked.Where(x => ScmPluginMatcher.MatchesPlugin(plugin, x.Repository)))
         {
             var key = ScmRepositoryAliasKey.CanonicalOrRaw(source, entry.RepositoryId, logger);
@@ -296,7 +320,7 @@ public sealed class ScmEventMonitoringService(
     /// verworfene Fremd-Notifications werden als nicht-alarmierende Diagnose sichtbar.</summary>
     private async Task EnumerateNotificationsAsync(IScmNotificationSource source, IGitPlugin plugin, string host,
         SoftwareschmiedeDbContext db,
-        List<(Guid? TaskId, ScmEventReference Reference)> resolved, IReadOnlyList<ScmEventRepository> repositories,
+        List<ResolvedReference> resolved, IReadOnlyList<ScmEventRepository> repositories,
         List<(string Key, DateTimeOffset Now, string Diagnostic)> pendingInboxCommits,
         CycleState cycle, CancellationToken ct)
     {
@@ -327,7 +351,7 @@ public sealed class ScmEventMonitoringService(
                     continue;
                 }
                 if (seen.Add($"{notification.RepositoryNodeId}/{notification.Kind}/{notification.Number}"))
-                    resolved.Add((null, new ScmEventReference(repository, notification.Kind, notification.Number)));
+                    resolved.Add(new(null, new ScmEventReference(repository, notification.Kind, notification.Number), null));
             }
             // Der Watermark darf erst nach dem Verarbeiten aller abgeleiteten Quellen stehen;
             // das Commit erfolgt daher erst am Ende des Plugin-Durchlaufs (siehe RunOnceAsync).

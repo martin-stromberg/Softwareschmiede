@@ -837,7 +837,7 @@ Ablauf:
 6. Für jedes `ActiveWorkItemPanelItem` wird `WorkItemsTileTemplate` angewendet — ein vollflächiger `Button` (`AutomationProperties.Name="WorkItemNavigate:{Title}"`, `Cursor="Hand"`, `Command={Binding NavigateCommand}` mit `CommandParameter={Binding Id}`) mit eigenem `ControlTemplate` (bisheriger `Border` inkl. `IsActive`/`IsPaused`-Triggern, Hover-/Pressed-Feedback). Das `WorkItemsTileContentTemplate` rendert drei Zeilen:
    - `TextBlock` zeigt `Title` (mit Ellipsis bei Überlauf)
    - `TextBlock` zeigt `RepositoryName` (Repository-Name, Fallback Projektname)
-   - horizontale Symbolzeile: SCM-Glyph (`ScmPluginSymbol`, Tooltip/`HelpText` „SCM: {ScmPluginName}", `AutomationId="ActiveWorkItemScmPlugin_{Title}"`, ausgeblendet wenn leer), KI-Glyph (`AiPluginSymbol`, Tooltip „KI: {KiPluginName}", `AutomationId="ActiveWorkItemAiPlugin_{Title}"`), Status-Glyph via `AiExecutionStatusSymbolConverter` (`AutomationProperties.Name="WorkItemStatus:{Title}"`, Volltext via `AiExecutionStatusConverter` in Tooltip/`HelpText`, `StatusTransitionAnimation.Status` am Symbol-Converter) und der `OffeneTodos:{Title}`-Button (`Command` + `Click`-Handler mit `e.Handled = true`, damit der Klick nicht die Kachel-Navigation auslöst)
+   - horizontale Symbolzeile: Auftragsart-Badge (`Border` mit horizontalem `StackPanel`: Symbol-`TextBlock` `KindSymbol` mit `AutomationId="ActiveWorkItemKindSymbol_{Title}"` vor dem Klartext-`TextBlock` `KindLabel` mit `AutomationId="ActiveWorkItemKindLabel_{Title}"`; Tooltip/`HelpText` „Auftragsart: {KindLabel}", `AutomationId="ActiveWorkItemKind_{Title}"` am Border, ausgeblendet wenn `KindLabel` leer — z. B. „✋ Manuell"), SCM-Glyph (`ScmPluginSymbol`, Tooltip/`HelpText` „SCM: {ScmPluginName}", `AutomationId="ActiveWorkItemScmPlugin_{Title}"`, ausgeblendet wenn leer), KI-Glyph (`AiPluginSymbol`, Tooltip „KI: {KiPluginName}", `AutomationId="ActiveWorkItemAiPlugin_{Title}"`), Status-Glyph via `AiExecutionStatusSymbolConverter` (`AutomationProperties.Name="WorkItemStatus:{Title}"`, Volltext via `AiExecutionStatusConverter` in Tooltip/`HelpText`, `StatusTransitionAnimation.Status` am Symbol-Converter) und der `OffeneTodos:{Title}`-Button (`Command` + `Click`-Handler mit `e.Handled = true`, damit der Klick nicht die Kachel-Navigation auslöst)
 7. Sichtbarkeit gesteuert durch `IsDashboardVisible`:
    - Wenn `CurrentView is DashboardViewModel`: `Visibility=Collapsed`
    - Sonst: `Visibility=Visible`
@@ -845,10 +845,10 @@ Ablauf:
 ### Anzeigemodus und Gruppierung
 
 Beteiligte Komponenten:
-- `WorkItemListMode` — Enum `Datum` (flach), `Repository`, `Ki` (`src/Softwareschmiede.App/ViewModels/`)
+- `WorkItemListMode` — Enum `Datum` (flach), `Repository`, `Ki`, `Kind` (Auftragsart) (`src/Softwareschmiede.App/ViewModels/`)
 - `ActiveTasksListControl.ListMode` — Dependency Property, an `WorkItemListMode` des jeweiligen ViewModels gebunden
 - `WorkItemListLayout` — statische Hilfsklasse, liefert die Deskriptoren je Modus
-- `MainWindow.xaml` / `DashboardView.xaml` — je drei `RadioButton`s (`WorkItemsMode:{m}` bzw. `DashboardWorkItemsMode:{m}`), `IsChecked` via `EnumToBoolConverter` mit `ConverterParameter` an `WorkItemListMode` gebunden
+- `MainWindow.xaml` / `DashboardView.xaml` — je vier `RadioButton`s (`WorkItemsMode:{m}` bzw. `DashboardWorkItemsMode:{m}`), `IsChecked` via `EnumToBoolConverter` mit `ConverterParameter` an `WorkItemListMode` gebunden
 - `ItemsControl.GroupStyle` — `HeaderTemplate` mit Gruppenname; `AutomationProperties.Name="WorkItemsGroup:{Name}"` am `GroupItem`
 
 Ablauf bei Moduswechsel:
@@ -858,7 +858,8 @@ Ablauf bei Moduswechsel:
    - `Datum`: keine Gruppierung, Sort `[SortierZeitpunkt desc, Title asc, Id asc]`
    - `Repository`: `PropertyGroupDescription(RepositoryGruppenName)` + Sort `[RepositoryGroupIsFallback asc, RepositoryGruppenName asc, SortierZeitpunkt desc, Title asc, Id asc]`
    - `Ki`: `PropertyGroupDescription(KiGruppenName)` + Sort `[AiGroupIsFallback asc, KiGruppenName asc, SortierZeitpunkt desc, Title asc, Id asc]`
-4. Durch die Item-Sortierung erscheinen die Gruppen alphabetisch mit der Fallback-Gruppe (`WorkItemListLayout.WithoutRepository` / `NotExecuted`) am Ende; gruppenintern gilt die Sortierung nach letzter Ausführung — identisch zur Datenquelle
+   - `Art` (`Kind`): `PropertyGroupDescription(KindGroupName)` + Sort `[KindSortOrder asc, SortTimestamp desc, Title asc, Id asc]` — Gruppenköpfe bleiben Klartext (`KindGroupName` = deutscher Anzeigename der Auftragsart, Fallback „Ohne Auftragsart")
+4. Durch die Item-Sortierung erscheinen die Gruppen alphabetisch — im Modus „Art" dagegen in der festen Enum-Reihenfolge von `KindSortOrder` (`Manual`, `Instruction`, `PullRequest`, `Alert`, `IssuePreparation`) — mit der Fallback-Gruppe (`WorkItemListLayout.WithoutRepository` / `NotExecuted` / `WithoutKind`) am Ende; gruppenintern gilt die Sortierung nach letzter Ausführung — identisch zur Datenquelle
 5. Die Gruppenheader werden über das `HeaderTemplate` gerendert (`CollectionViewGroup.Name`)
 
 Die Modus-Buttons in der Seitenleiste werden an `IsNavigationExpanded` gebunden — in der eingeklappten 48-px-Leiste sind sie verborgen. Da die Template-Anker (`WorkItemsGroup:*`, `WorkItemNavigate:*` u. a.) in beiden Ansichten existieren, sobald das Dashboard sichtbar ist, tragen die Controls die ansichtsspezifischen `AutomationId`s `ActiveWorkItemsListMenu` bzw. `ActiveWorkItemsListDashboard` als E2E-Scoping-Wurzeln; die Modus-Buttons heißen `WorkItemsMode:*` (Seitenleiste) vs. `DashboardWorkItemsMode:*` (Dashboard).
@@ -897,6 +898,10 @@ Ablauf in `MapActiveWorkItemPanelItem` — zusätzlich zu den bisherigen Feldern
 - `RepositoryName` = `GitRepository?.RepositoryName`, Fallback `Project?.Name` bei Aufgaben ohne Repository-Verknüpfung
 - `RepositoryGruppenName` = Repository-Name bzw. `WorkItemListLayout.WithoutRepository` (`RepositoryGroupIsFallback = true`)
 - `KiGruppenName` = aufgelöster `PluginName`, sonst roher Prefix (eigene Gruppe), sonst `NotExecuted` (`AiGroupIsFallback = true`, nur bei leerem Prefix)
+- `Kind` = `workItem.Kind` (Auftragsart der Aufgabe)
+- `KindGroupName` = `WorkItemListLayout.KindGroupName(workItem.Kind)` — deutscher Anzeigename als Gruppenname im Modus „Art" (Fallback `WithoutKind` für `Unspecified`/unbekannte Werte)
+- `KindSymbol` = `WorkItemListLayout.KindSymbol(workItem.Kind)` — Badge-Glyph (`Manual` → `✋`, `Instruction` → `📣`, `IssuePreparation` → `🔍`, `PullRequest` → `🔀`, `Alert` → `⚠`; `null` bei `Unspecified`/unbekannt)
+- `KindLabel` = leer, wenn `KindSymbol` `null` ist, sonst `KindGroupName(workItem.Kind)` — Badge-Text und Sichtbarkeitsbedingung des Badges
 - `SortierZeitpunkt` = `LastCliStartUtc ?? CreatedAt`
 
 Trigger zur Aktualisierung:

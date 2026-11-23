@@ -21,6 +21,12 @@ public sealed class ScmEventOrchestrator(
     LogService log, ScmEventExecutionLimitService executionLimits,
     ILogger<ScmEventOrchestrator> logger, ScmStartCheckTrigger? startCheckTrigger = null)
 {
+    /// <summary>Fest verdrahtete Stabilisierungsfrist vor jeder Prompt-Zustellung: Erst wenn die
+    /// laufende CLI-Sitzung mindestens so lange ununterbrochen eingabebereit
+    /// (<see cref="ScmPromptReadyStatus.Ready"/>) ist, wird geschrieben. Vorher endet der
+    /// Zustellversuch ehrlich wartend mit verschobenem <see cref="ScmIncomingEvent.NextAttemptUtc"/>.</summary>
+    internal static readonly TimeSpan DeliveryStabilityPeriod = TimeSpan.FromSeconds(10);
+
     /// <summary>
     /// Startprüfung: Dispatcht alle fälligen, nicht abgeschlossenen Ereignisse in der priorisierten
     /// Reihenfolge aus <see cref="ScmDispatchPriority"/> (Fortsetzungsereignisse → fällige
@@ -45,7 +51,7 @@ public sealed class ScmEventOrchestrator(
                 db.ScmOutgoingActions.Any(action => action.EventId == x.Id && action.Status != "Succeeded"
                     && (action.NextAttemptUtc == null || action.NextAttemptUtc <= nowMilliseconds))))
                 .OrderBy(x => x.Sequence).Take(100)
-                .Select(x => new ScmDispatchPriority.EventSelection(x.Id, x.WorkItemId, x.Sequence, x.Status, x.NextAttemptUtc))
+                .Select(x => new ScmDispatchPriority.EventSelection(x.Id, x.WorkItemId, x.Sequence, x.Status, x.NextAttemptUtc, x.Purpose))
                 .ToListAsync(ct);
             if (batch.Count == 0) break;
             afterSequence = batch[^1].Sequence;
@@ -290,6 +296,15 @@ public sealed class ScmEventOrchestrator(
                     return;
                 }
                 if (adapter.IsBusy) { await WaitWithCommentAsync(item, observation, responder, "CLI beschäftigt; wartet auf Eingabebereitschaft.", ct); return; }
+                // Stabilisierungsfrist: Erst anhaltend eingabebereite CLIs bekommen einen Prompt;
+                // ein zwischenzeitlicher Statuswechsel hat ReadySinceUtc neu gestempelt.
+                if (TryGetPendingStabilityDeadlineUtc(adapter, out var stabilityAttemptUtc))
+                {
+                    item.NextAttemptUtc = stabilityAttemptUtc;
+                    await WaitWithCommentAsync(item, observation, responder,
+                        "Die CLI ist erst seit Kurzem eingabebereit; die Zustellung wird nach einer kurzen Stabilisierungsphase erneut versucht.", ct);
+                    return;
+                }
                 var access = await adapter.CheckExchangeAccessAsync(Path.Combine(adapter.WorkingDirectory, ScmEventExchangeProtocol.DirectoryName), ct, task.Title);
                 if (access.Status != ScmExchangeAccessStatus.Supported)
                 { await WaitWithCommentAsync(item, observation, responder, "Antwortkanal für diese CLI nicht verfügbar: " + access.Reason, ct); return; }
@@ -752,6 +767,13 @@ public sealed class ScmEventOrchestrator(
                 return;
             }
             if (adapter.IsBusy) { await WaitAsync(item, "CLI beschäftigt; wartet auf Eingabebereitschaft.", ct); return; }
+            // Stabilisierungsfrist wie im generischen Pfad — ohne Hostkommentar.
+            if (TryGetPendingStabilityDeadlineUtc(adapter, out var stabilityAttemptUtc))
+            {
+                item.NextAttemptUtc = stabilityAttemptUtc;
+                await WaitAsync(item, "Die CLI ist erst seit Kurzem eingabebereit; die Aufbereitung wird nach einer kurzen Stabilisierungsphase erneut versucht.", ct);
+                return;
+            }
             var access = await adapter.CheckExchangeAccessAsync(Path.Combine(adapter.WorkingDirectory, ScmEventExchangeProtocol.DirectoryName), ct, task.Title);
             if (access.Status != ScmExchangeAccessStatus.Supported)
             { await WaitAsync(item, "Antwortkanal für diese CLI nicht verfügbar: " + access.Reason, ct); return; }
@@ -841,6 +863,23 @@ public sealed class ScmEventOrchestrator(
         if (string.Equals(item.Reason, reason, StringComparison.Ordinal)) return;
         await log.AddEntryAsync(item.WorkItemId, LogEntryType.SystemMessage,
             "Issue-Aufbereitung fehlgeschlagen: " + reason, ct: ct);
+    }
+
+    /// <summary>Fristberechnung der Stabilisierungsphase beider Zustellpfade: Liefert
+    /// <see langword="true"/> samt nächstem Versuchszeitpunkt (<c>ReadySinceUtc +
+    /// <see cref="DeliveryStabilityPeriod"/></c>), solange die Sitzung kürzer als die Frist
+    /// ununterbrochen eingabebereit ist; der pfadspezifische Warteaufruf (mit bzw. ohne
+    /// Hostkommentar) bleibt am Ort.</summary>
+    /// <param name="adapter">Die eingabebereit gemeldete Prompt-Sitzung.</param>
+    /// <param name="nextAttemptUtc">Unix-ms des frühesten nächsten Zustellversuchs.</param>
+    private bool TryGetPendingStabilityDeadlineUtc(IScmPromptSessionAdapter adapter, out long nextAttemptUtc)
+    {
+        nextAttemptUtc = default;
+        if (adapter.ReadySinceUtc is not { } readySinceUtc
+            || time.GetUtcNow() - readySinceUtc >= DeliveryStabilityPeriod)
+            return false;
+        nextAttemptUtc = readySinceUtc.Add(DeliveryStabilityPeriod).ToUnixTimeMilliseconds();
+        return true;
     }
 
     /// <summary>Abgleich des Aufbereitungs-Versuchs: Die CLI liefert ihre Analyse als

@@ -25,9 +25,18 @@
                             AutomationProperties.HelpText="{Binding KindLabel, StringFormat=Auftragsart: {0}}"
                             ToolTip="{Binding KindLabel, StringFormat=Auftragsart: {0}}"
                             Visibility="{Binding KindLabel, Converter={StaticResource NullOrEmptyToVisibilityConverter}}">
-                        <TextBlock Text="{Binding KindLabel}"
-                                   FontSize="10"
-                                   Foreground="{DynamicResource SecondaryTextBrush}" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding KindSymbol}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       Margin="0,0,3,0"
+                                       VerticalAlignment="Center"
+                                       AutomationProperties.AutomationId="{Binding Title, StringFormat=ActiveWorkItemKindSymbol_{0}}" />
+                            <TextBlock Text="{Binding KindLabel}"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       AutomationProperties.AutomationId="{Binding Title, StringFormat=ActiveWorkItemKindLabel_{0}}" />
+                        </StackPanel>
                     </Border>
                     <TextBlock Text="{Binding ScmPluginSymbol}"
                                FontSize="13"

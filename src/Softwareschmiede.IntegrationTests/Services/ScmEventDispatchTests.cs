@@ -123,7 +123,7 @@ public sealed class ScmEventDispatchTests
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
         var (_, readyId) = await fixture.AddAsync(configured: true);
-        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
+        await fixture.RunMonitorAsync(TestContext.Current.CancellationToken);
         var item = await fixture.EventAsync(readyId);
         Assert.Equal("Zugestellt", item.Status);
         Assert.NotNull(item.DeliveryAttemptId);

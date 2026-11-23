@@ -125,6 +125,18 @@ internal sealed class ScmE2EFixture
         await settings.SetScmTaskCompletionCheckModeAsync(mode);
     }
 
+    /// <summary>Aktiviert die Issue-Aufbereitung über die echte Einstellungs-Schicht:
+    /// Funktionsschalter, Funktions-Plugin (Prefix) und das Repository-Flag — dieselben
+    /// persistierten Werte, die der Einstellungsdialog schreibt.</summary>
+    public async Task EnableIssuePreparationAsync(string pluginPrefix = "Softwareschmiede.KiSimulator")
+    {
+        await using var db = OpenDatabase();
+        var settings = new AppSettingService(db, NullLogger<AppSettingService>.Instance);
+        await settings.SetBoolSettingAsync(AppSettingService.ScmIssuePreparationEnabledKey, true);
+        await settings.SetSettingAsync(AppSettingService.ScmIssuePreparationPluginKey, pluginPrefix);
+        await db.GitRepositories.ExecuteUpdateAsync(x => x.SetProperty(r => r.IssuePreparationEnabled, true));
+    }
+
     public void SaveScenario()
     {
         var temporary = Configuration.ScenarioPath + "." + Guid.NewGuid().ToString("N") + ".tmp";

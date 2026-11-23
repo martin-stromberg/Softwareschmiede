@@ -14,6 +14,12 @@
 
 **Lösung:** Wähle den Eintrag und lies den angezeigten Wartegrund. Prüfe die CLI-Einstellungen oder den Aufgabenstatus und nutze anschließend **Erneut prüfen** beziehungsweise **Öffnen / CLI auswählen**.
 
+## Der Wartegrund meldet eine kurze Stabilisierungsphase
+
+**Ursache:** Die CLI der Aufgabe ist zwar am Eingabeprompt, steht dort aber erst seit wenigen Sekunden ununterbrochen. Vor jeder Prompt-Zustellung wartet die Anwendung eine kurze Stabilisierungsphase von etwa zehn Sekunden ab, damit die Sitzung wirklich ruht, bevor die Eingabe eintrifft. Der Eintrag zeigt in dieser Zeit den Wartegrund „Die CLI ist erst seit Kurzem eingabebereit; die Zustellung wird nach einer kurzen Stabilisierungsphase erneut versucht." (bei Aufbereitungsaufträgen „…die Aufbereitung wird nach einer kurzen Stabilisierungsphase erneut versucht."). Wechselt die Sitzung zwischendurch in einen anderen Zustand, beginnt die Frist von vorn.
+
+**Lösung:** Kein Eingriff nötig — der nächste Versuch läuft automatisch, sobald die Frist erfüllt ist; je nach Prüfzyklus kann die effektive Verzögerung etwas über zehn Sekunden liegen. Bleibt der Eintrag ungewöhnlich lange auf diesem Grund stehen, prüfe, ob die CLI-Sitzung tatsächlich lebt und am Prompt steht (Aufgabe öffnen), und wähle gegebenenfalls **Erneut prüfen**.
+
 ## Der Wartegrund meldet eine gespeicherte Standard-CLI-Zuordnung, die nicht mehr installiert oder aktiviert ist
 
 **Ursache:** Eine für Aufgabe, Projekt oder als globaler Standard gespeicherte CLI-Zuordnung zeigt auf ein KI-Plugin, das deaktiviert, deinstalliert oder nicht ladbar ist, und keine andere konfigurierte Standard-Stufe liefert ein ausführbares Plugin. Die automatische Auswahl überspringt solche Zuordnungen still in Richtung des nächsten Standards; erst wenn keine Stufe mehr ein ausführbares Plugin liefert, bleibt das Ereignis mit dieser Meldung wartend. Der Anlass steht zusätzlich als Systemmeldung im Aufgabenprotokoll. Der Eintrag ist dabei nicht dauerhaft gesperrt.
@@ -98,6 +104,12 @@
 **Ursache:** Die Kontextzuordnung greift nur bei genau einer **aktiven** Aufgabe: Ist die frühere Aufgabe bereits beendet oder archiviert, stammt der Pull Request aus einem Fork/Fremd-Repository, weicht sein Head-Branch vom `BranchName` der Aufgabe ab oder referenziert sein Text nicht das verknüpfte Issue (`Closes`/`Fixes`/`Resolves #N`), gilt die Referenz als ohne lokale Aufgabe — und die Anwendung legt bewusst eine neue Aufgabe aus dem Ereignis an. Zeigen die Kontextsignale dagegen auf mehrere unterschiedliche Aufgaben, bleibt das Ereignis mit der Diagnose „Mehrdeutige Zuordnung zu Aufgaben" stehen und es wird gar keine Aufgabe angelegt.
 
 **Lösung:** Prüfe die neue sowie die frühere Aufgabe in der Aufgabenverwaltung. War die frühere Aufgabe bereits beendet, ist die Neuanlage das vorgesehene Verhalten — die neue Aufgabe kann regulär genutzt oder gelöscht werden. Soll das Ereignis doch an eine laufende Aufgabe gehen, sicherstellen, dass der Pull Request auf deren Aufgaben-Branch liegt oder im PR-Text das Aufgaben-Issue per Closing-Direktive referenziert wird, und den Eintrag anschließend über **Erneut prüfen** erneut einlesen lassen.
+
+## Zu einem Issue existieren zwei Aufgaben
+
+**Ursache:** Ältere Versionen legten bei einer Issue-Neuanlage mit Trigger-Kommentar neben der Aufbereitungs-Aufgabe eine zweite, reguläre Aufgabe an. Solche Altbestand-Paare werden nicht nachträglich bereinigt oder zusammengeführt. Neu eintreffende Kommentare des Issues ordnen sich dabei weiterhin der regulären Aufgabe zu — sie landen nicht in der Aufbereitungs-Aufgabe, deren Auftrag davon unberührt bleibt.
+
+**Lösung:** Beide Aufgaben lassen sich regulär weiterverwenden. Soll das Durcheinander aufgeräumt werden, kann die nicht mehr benötigte Aufgabe manuell beendet oder gelöscht werden; bei neuen Issue-Neuanlagen entsteht das Paar nicht mehr — Aufbereitungsauftrag und Trigger-Kommentar laufen dann in derselben Aufgabe.
 
 ## Der Ausgang einer CLI-Zustellung ist ungewiss
 

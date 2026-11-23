@@ -60,6 +60,10 @@ public sealed class ScmEventDispatchTests_HostRetry
             clock.Now = clock.Now.AddHours(1);
             await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
         }
+        // Die in diesem Versuch frisch gestartete CLI braucht die Stabilisierungsfrist,
+        // bevor der Prompt geschrieben wird — der Folgezyklus liefert danach aus.
+        clock.Now = clock.Now.Add(ScmEventOrchestrator.DeliveryStabilityPeriod + TimeSpan.FromSeconds(1));
+        await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
@@ -79,6 +83,9 @@ public sealed class ScmEventDispatchTests_HostRetry
             It.IsAny<ScmResponseRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ScmProviderException(ScmProviderFailureKind.RateLimit, "Fixture rate limit", clock.Now.AddSeconds(10)));
         await fixture.DispatchAsync(eventId);
+        // Die frisch gestartete CLI liefert den Prompt erst nach der Stabilisierungsfrist aus.
+        clock.Now = clock.Now.Add(ScmEventOrchestrator.DeliveryStabilityPeriod + TimeSpan.FromSeconds(1));
+        await fixture.DispatchAsync(eventId);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmIncomingEvents
                 .Where(x => x.Id == eventId).ExecuteUpdateAsync(x => x.SetProperty(e => e.Status, "Verarbeitet"), cancellationToken: TestContext.Current.CancellationToken);
@@ -91,7 +98,9 @@ public sealed class ScmEventDispatchTests_HostRetry
 
         using var verification = fixture.Services.CreateScope();
         var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
-        Assert.Equal("Succeeded", (await db.ScmOutgoingActions.SingleAsync(cancellationToken: TestContext.Current.CancellationToken)).Status);
+        var actions = await db.ScmOutgoingActions.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.NotEmpty(actions);
+        Assert.All(actions, x => Assert.Equal("Succeeded", x.Status));
         Assert.Equal("Verarbeitet", (await fixture.EventAsync(eventId)).Status);
         Assert.Single(fixture.Sessions);
         Assert.Single(fixture.Prompts);

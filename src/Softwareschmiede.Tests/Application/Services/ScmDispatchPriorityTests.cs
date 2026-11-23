@@ -11,8 +11,8 @@ public sealed class ScmDispatchPriorityTests
     private static readonly Guid WorkItemB = new("22222222-2222-2222-2222-222222222222");
 
     private static ScmDispatchPriority.EventSelection Event(long sequence, Guid? workItemId = null,
-        string status = "Wartend", long? nextAttemptUtc = null)
-        => new(Guid.NewGuid(), workItemId ?? WorkItemB, sequence, status, nextAttemptUtc);
+        string status = "Wartend", long? nextAttemptUtc = null, string? purpose = null)
+        => new(Guid.NewGuid(), workItemId ?? WorkItemB, sequence, status, nextAttemptUtc, purpose);
 
     private static Dictionary<Guid, ScmDispatchPriority.WorkItemState> States(
         params (Guid Id, ScmDispatchPriority.WorkItemState State)[] entries)
@@ -143,5 +143,66 @@ public sealed class ScmDispatchPriorityTests
             new Dictionary<Guid, ScmDispatchPriority.WorkItemState>());
 
         geordnet.Should().Equal(e1, e2);
+    }
+
+    /// <summary>Purpose-Tiebreak: Das zweck-markierte Aufbereitungsereignis erhält innerhalb
+    /// derselben Prioritätsklasse den Vortritt — unabhängig von der Eingangsreihenfolge.</summary>
+    [Fact]
+    public void OrderForDispatch_PurposeEventPrecedesSameClassEvents()
+    {
+        var regulär = Event(1);
+        var preparation = Event(2, purpose: ScmIssuePreparationService.Purpose);
+
+        var geordnet = ScmDispatchPriority.OrderForDispatch([regulär, preparation],
+            new Dictionary<Guid, ScmDispatchPriority.WorkItemState>());
+
+        geordnet.Should().Equal(preparation, regulär);
+    }
+
+    /// <summary>Purpose-Tiebreak in Klasse 2: Bei gleichem Zielzeitpunkt gewinnt das
+    /// Aufbereitungsereignis.</summary>
+    [Fact]
+    public void OrderForDispatch_PurposeEvent_DelayedSameTargetTime_PurposeWins()
+    {
+        var regulär = Event(1, status: "Verzögert", nextAttemptUtc: 1000);
+        var preparation = Event(2, status: "Verzögert", nextAttemptUtc: 1000,
+            purpose: ScmIssuePreparationService.Purpose);
+
+        ScmDispatchPriority.OrderForDispatch([regulär, preparation],
+                new Dictionary<Guid, ScmDispatchPriority.WorkItemState>())
+            .Should().Equal(preparation, regulär);
+    }
+
+    /// <summary>Die Zielzeit sortiert vor dem Purpose: Ein früher fälliges reguläres
+    /// Ereignis bleibt vor dem Aufbereitungsereignis.</summary>
+    [Fact]
+    public void OrderForDispatch_PurposeEvent_DelayedEarlierTargetTime_RegularWins()
+    {
+        var preparation = Event(2, status: "Verzögert", nextAttemptUtc: 1000,
+            purpose: ScmIssuePreparationService.Purpose);
+        var regulärFrüher = Event(3, status: "Verzögert", nextAttemptUtc: 500);
+
+        ScmDispatchPriority.OrderForDispatch([preparation, regulärFrüher],
+                new Dictionary<Guid, ScmDispatchPriority.WorkItemState>())
+            .Should().Equal(regulärFrüher, preparation);
+    }
+
+    /// <summary>Das Purpose-Ereignis überspringt keine höherpriorisierte Klasse: Fortsetzungen
+    /// (Klasse 1) und früher fällige Verzögerungen (Klasse 2) behalten den Vortritt.</summary>
+    [Fact]
+    public void OrderForDispatch_PurposeEvent_DoesNotJumpEarlierClasses()
+    {
+        var continuation = Event(1, workItemId: WorkItemA);
+        var verzögert = Event(2, status: "Verzögert", nextAttemptUtc: 1000);
+        var preparation = Event(3, purpose: ScmIssuePreparationService.Purpose);
+        var states = States(
+            (WorkItemA, new ScmDispatchPriority.WorkItemState(WorkItemStatus.Started,
+                WorkItemExecutionStatus.Completed, null)),
+            (WorkItemB, new ScmDispatchPriority.WorkItemState(WorkItemStatus.New,
+                WorkItemExecutionStatus.NotStarted, null)));
+
+        var geordnet = ScmDispatchPriority.OrderForDispatch([preparation, verzögert, continuation], states);
+
+        geordnet.Should().Equal(continuation, verzögert, preparation);
     }
 }

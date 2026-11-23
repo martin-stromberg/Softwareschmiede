@@ -31,6 +31,20 @@ public static class WorkItemListLayout
             _ => WithoutKind
         };
 
+    /// <summary>Unicode-Glyph einer <see cref="Domain.Enums.WorkItemKind"/> für das Auftragsart-Badge
+    /// auf der Kachel — <c>null</c> bedeutet „kein Symbol/kein Badge" (<c>Unspecified</c> und
+    /// unbekannte Werte).</summary>
+    public static string? KindSymbol(Domain.Enums.WorkItemKind kind)
+        => kind switch
+        {
+            Domain.Enums.WorkItemKind.Manual => "✋",
+            Domain.Enums.WorkItemKind.Instruction => "📣",
+            Domain.Enums.WorkItemKind.IssuePreparation => "🔍",
+            Domain.Enums.WorkItemKind.PullRequest => "🔀",
+            Domain.Enums.WorkItemKind.Alert => "⚠",
+            _ => null
+        };
+
     /// <summary>
     /// Erzeugt die Sortierdeskriptoren für den gegebenen Modus. Die Gruppen-Fallback-Flags werden
     /// aufsteigend sortiert, damit die Fallback-Gruppe ("Nicht ausgeführt"/"Ohne Repository") am

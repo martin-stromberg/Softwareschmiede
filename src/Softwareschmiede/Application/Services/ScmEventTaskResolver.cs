@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Softwareschmiede.Domain.Entities;
@@ -60,18 +62,32 @@ public sealed class ScmEventTaskResolver(
             return ScmTaskResolution.Unassigned;
         }
         var repositoryIds = repositories.Select(x => (Guid?)x.Id).ToArray();
-        var taskIds = await db.WorkItems.AsNoTracking()
-            .Where(a => repositoryIds.Contains(a.GitRepositoryId)
-                && a.Purpose == null
-                && a.IssueReference != null && a.IssueReference.IssueNumber == reference.Number)
-            .Select(a => a.Id).Distinct().ToListAsync(ct);
-        if (taskIds.Count > 1) return ScmTaskResolution.Ambiguous;
-        if (taskIds.Count == 1) return ScmTaskResolution.Assigned(taskIds[0]);
-        var repository = ChooseRepository(repositories);
-        var composed = issue with { Body = ComposeBody(issue.Body, trigger) };
-        var task = await workItems.CreateFromIssueEventAsync(repository.ProjectId, composed,
-            repository.Id, IssueSourceKey(reference), ct);
-        return ScmTaskResolution.Assigned(task.Id);
+        // Kandidatenabfrage, Auswertung und Anlage laufen unter dem deterministischen Issue-Gate:
+        // Ein parallel committetes Ergebnis des Aufbereitungs-Erkennungspfads (und umgekehrt)
+        // wird von der nachfolgenden Abfrage gesehen, statt eine zweite Aufgabe zu erzeugen.
+        return await ScmTaskCoordinator.Shared.RunAsync(IssueGateKey(reference), async () =>
+        {
+            // Kandidaten: reguläre Aufgaben oder die zweck-markierte Aufbereitungs-Aufgabe
+            // derselben Issue-Nummer. Auswertung zweistufig — regulär vor zweck-markiert,
+            // Mehrfachtreffer je Stufe bleiben mehrdeutig.
+            var candidates = await db.WorkItems.AsNoTracking()
+                .Where(a => repositoryIds.Contains(a.GitRepositoryId)
+                    && (a.Purpose == null || a.Purpose == ScmIssuePreparationService.Purpose)
+                    && a.IssueReference != null && a.IssueReference.IssueNumber == reference.Number)
+                .Select(a => new { a.Id, a.Purpose }).ToListAsync(ct);
+            var regularIds = candidates.Where(x => x.Purpose is null).Select(x => x.Id).Distinct().ToList();
+            if (regularIds.Count > 1) return ScmTaskResolution.Ambiguous;
+            if (regularIds.Count == 1) return ScmTaskResolution.Assigned(regularIds[0]);
+            var purposeIds = candidates.Where(x => x.Purpose == ScmIssuePreparationService.Purpose)
+                .Select(x => x.Id).Distinct().ToList();
+            if (purposeIds.Count > 1) return ScmTaskResolution.Ambiguous;
+            if (purposeIds.Count == 1) return ScmTaskResolution.Assigned(purposeIds[0]);
+            var repository = ChooseRepository(repositories);
+            var composed = issue with { Body = ComposeBody(issue.Body, trigger) };
+            var task = await workItems.CreateFromIssueEventAsync(repository.ProjectId, composed,
+                repository.Id, IssueSourceKey(reference), ct);
+            return ScmTaskResolution.Assigned(task.Id);
+        }, ct);
     }
 
     private async Task<ScmTaskResolution> ResolvePullRequestAsync(ScmEventReference reference, IScmEventSource source,
@@ -171,9 +187,19 @@ public sealed class ScmEventTaskResolver(
     }
 
     /// <summary>Kanonischer Dedup-Schlüssel einer Issue-Referenz (Namensraum wie <see cref="ScmEventObservation.ContentKey"/>).</summary>
-    private static string IssueSourceKey(ScmEventReference reference)
+    internal static string IssueSourceKey(ScmEventReference reference)
         => string.Join('/', new[] { reference.Repository.ProviderPrefix.ToLowerInvariant(),
             reference.Repository.Host.ToLowerInvariant(), reference.Repository.RepositoryId,
             reference.Kind.ToString(), reference.Number.ToString(CultureInfo.InvariantCulture) }
             .Select(Uri.EscapeDataString));
+
+    /// <summary>Deterministischer Gate-Schlüssel des prozessinternen Issue-Gates
+    /// (<see cref="ScmTaskCoordinator.Shared"/>): SHA-256 über den kanonischen
+    /// <see cref="IssueSourceKey"/>, erste 16 Bytes als <see cref="Guid"/> — Muster wie
+    /// <see cref="ScmEventStore.ActionId"/>. Kommentar-Auflösung und Aufbereitungs-Erkennung
+    /// serialisieren ihre Check-then-Create-Abschnitte je Issue-Referenz über denselben Schlüssel,
+    /// unabhängig vom <see cref="ScmEventRepository.Account"/> der Referenz.</summary>
+    /// <param name="reference">Die Issue-Referenz.</param>
+    internal static Guid IssueGateKey(ScmEventReference reference)
+        => new(SHA256.HashData(Encoding.UTF8.GetBytes(IssueSourceKey(reference))).AsSpan(0, 16));
 }

@@ -30,7 +30,7 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
             await scope.ServiceProvider.GetRequiredService<PluginDefaultSettingsService>()
                 .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.AiPrefix, TestContext.Current.CancellationToken);
 
-        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+        await fixture.RunMonitorAsync(TestContext.Current.CancellationToken);
 
         using var verification = fixture.Services.CreateScope();
         var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
@@ -68,7 +68,7 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
             await scope.ServiceProvider.GetRequiredService<AppSettingService>()
                 .SetSettingAsync(AppSettingService.DefaultAiPluginKey, "Simulator", TestContext.Current.CancellationToken);
 
-        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+        await fixture.RunMonitorAsync(TestContext.Current.CancellationToken);
 
         using var verification = fixture.Services.CreateScope();
         var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
@@ -138,6 +138,9 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
                 .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.AiPrefix, TestContext.Current.CancellationToken);
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
+        // Die im Wiederholungsversuch frisch gestartete CLI liefert den Prompt erst nach
+        // der Stabilisierungsfrist aus — der Fixture-Wiederanlauf vollzieht die Frist.
+        await fixture.DispatchAsync(eventId);
 
         using var verification = fixture.Services.CreateScope();
         var verifiedDb = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
@@ -179,6 +182,9 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
                     selectedTask = task;
                     return Task.FromResult<string?>(ScmDispatchFixture.AiPrefix);
                 }, TestContext.Current.CancellationToken);
+        // Die durch die Queue-Auswahl frisch gestartete CLI liefert den Prompt erst nach
+        // der Stabilisierungsfrist aus — der Fixture-Wiederanlauf vollzieht die Frist.
+        await fixture.DispatchAsync(eventId);
 
         Assert.NotNull(selectedTask);
         using var verification = fixture.Services.CreateScope();

@@ -159,29 +159,77 @@ public sealed class ScmIssuePreparationService(
         }
         var baselineUtc = baseline.WatermarkUtc ?? 0;
         var repository = unlocked[0];
+        var unlockedIds = unlocked.Select(x => (Guid?)x.Id).ToArray();
         if (await SkipEvaluationAsync(reference, ct))
             return; // Bereits ausgewertet bzw. Fehler-Backoff noch nicht erreicht.
         foreach (var observation in batch.Observations)
         {
             if (observation.CreatedAt.ToUnixTimeMilliseconds() <= baselineUtc)
                 continue; // Altbestand: vor dem Beobachtungsbeginn angelegt.
-            var eventKey = PreparationEventKey(observation);
-            if (await db.ScmIncomingEvents.AnyAsync(x => x.EventKey == eventKey, ct))
-                continue; // Aufbereitungsauftrag bereits eingereiht.
             var issue = await source.ReadIssueAsync(reference, ct);
             if (issue is null)
             {
                 logger.LogWarning("Issue-Aufbereitung: Anlagedaten des Issues {Number} konnten nicht gelesen werden.", reference.Number);
                 continue;
             }
-            var pluginPrefix = await settings.GetScmIssuePreparationPluginPrefixAsync(ct);
-            var task = await workItems.CreateFromIssueEventAsync(repository.ProjectId, issue,
-                repository.Id, PreparationSourceKey(reference), ct, Purpose, pluginPrefix);
+            await EnqueuePreparationUnderGateAsync(observation, issue, repository, unlockedIds, reference, ct);
+        }
+        // Abgeschlossene Auswertung (Einreihung oder begründeter Skip wie Altbestand,
+        // bereits eingereihter Auftrag oder fehlende Anlagedaten): Die Referenz gilt für
+        // beide Erkennungspfade als ausgewertet (Endzustand).
+        await CompleteEvaluationAsync(reference, ct);
+    }
+
+    /// <summary>Check-then-Create des internen Aufbereitungsauftrags: EventKey-Prüfung,
+    /// Bestandssuche, Anlage/Bindung der Aufgabe, <see cref="ScmIncomingEvent"/>- und
+    /// <see cref="LogEntry"/>-Persistenz, Anlagerennen-Duldung und Benachrichtigung.
+    /// Der Abschnitt läuft unter demselben deterministischen Issue-Gate wie die
+    /// Kommentar-Auflösung (<see cref="ScmEventTaskResolver.IssueGateKey"/>): Der spätere
+    /// Erkennungspfad sieht die unter dem Gate committete Aufgabe und bindet sein internes
+    /// Ereignis, statt eine zweite Aufgabe anzulegen. Der Netzwerk-Read
+    /// (<see cref="IScmEventSource.ReadIssueAsync"/>) bleibt bewusst außerhalb des Gates.</summary>
+    /// <param name="observation">Die auslösende Beschreibungs-Beobachtung.</param>
+    /// <param name="issue">Die gelesenen Anlagedaten des Issues.</param>
+    /// <param name="repository">Das führende freigeschaltete Repository (Anlageziel).</param>
+    /// <param name="unlockedIds">IDs aller aufbereitungs-freigeschalteten Repositories
+    /// (Bestandssuche).</param>
+    /// <param name="reference">Die beobachtete Issue-Referenz.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    private Task EnqueuePreparationUnderGateAsync(ScmEventObservation observation, Issue issue,
+        GitRepository repository, Guid?[] unlockedIds, ScmEventReference reference, CancellationToken ct)
+        => ScmTaskCoordinator.Shared.RunAsync(ScmEventTaskResolver.IssueGateKey(reference), async () =>
+        {
+            var eventKey = PreparationEventKey(observation);
+            if (await db.ScmIncomingEvents.AnyAsync(x => x.EventKey == eventKey, ct))
+                return; // Aufbereitungsauftrag bereits eingereiht.
+            // Bestandssuche: geeignete Aufgaben derselben Issue-Nummer — nur auf
+            // aufbereitungs-freigeschalteten Repositories und ohne dauerhaft gesperrte
+            // Aufgaben (beendet/archiviert), damit das interne Ereignis nicht endlos wartet.
+            var existingId = await db.WorkItems.AsNoTracking()
+                .Where(a => unlockedIds.Contains(a.GitRepositoryId)
+                    && a.Status != WorkItemStatus.Completed && a.Status != WorkItemStatus.Archived
+                    && a.IssueReference != null && a.IssueReference.IssueNumber == reference.Number
+                    && (a.Purpose == null || a.Purpose == Purpose))
+                .OrderBy(a => a.Purpose == null ? 0 : 1).ThenBy(a => a.CreatedAt)
+                .Select(a => (Guid?)a.Id).FirstOrDefaultAsync(ct);
+            Guid workItemId;
+            var assigned = existingId is not null;
+            if (assigned)
+            {
+                workItemId = existingId!.Value;
+            }
+            else
+            {
+                var pluginPrefix = await settings.GetScmIssuePreparationPluginPrefixAsync(ct);
+                var task = await workItems.CreateFromIssueEventAsync(repository.ProjectId, issue,
+                    repository.Id, PreparationSourceKey(reference), ct, Purpose, pluginPrefix);
+                workItemId = task.Id;
+            }
             // Sofort fällig (NextAttemptUtc bleibt leer): Plugin-Auflösung, Kommentar-Schalter und
             // Ausführungsbegrenzung wirken erst zum Ausführungszeitpunkt im Orchestrator.
             var item = new ScmIncomingEvent
             {
-                WorkItemId = task.Id,
+                WorkItemId = workItemId,
                 EventKey = eventKey,
                 ObservationJson = JsonSerializer.Serialize(observation, ScmEventStore.JsonOptions),
                 ReceivedUtc = time.GetUtcNow().ToUnixTimeMilliseconds(),
@@ -192,9 +240,11 @@ public sealed class ScmIssuePreparationService(
             db.LogEntries.Add(new LogEntry
             {
                 Id = Guid.NewGuid(),
-                WorkItemId = task.Id,
+                WorkItemId = workItemId,
                 Type = LogEntryType.SystemMessage,
-                Content = $"Issue-Aufbereitung für Issue #{issue.Number} eingereiht (interner, trigger-freier Auftrag).",
+                Content = assigned
+                    ? $"Issue-Aufbereitung für Issue #{issue.Number} der vorhandenen Aufgabe zugeordnet (interner, trigger-freier Auftrag)."
+                    : $"Issue-Aufbereitung für Issue #{issue.Number} eingereiht (interner, trigger-freier Auftrag).",
                 Timestamp = time.GetUtcNow()
             });
             try
@@ -205,14 +255,12 @@ public sealed class ScmIssuePreparationService(
             {
                 // Anlagerennen über den EventKey-Unique-Index: Der Auftrag ist bereits eingereiht.
                 db.ChangeTracker.Clear();
-                continue;
+                return;
             }
             notifier.Notify();
-            logger.LogInformation("Issue-Aufbereitung: interner Auftrag {EventKey} auf Aufgabe {AufgabeId} eingereiht.", eventKey, task.Id);
-        }
-        // Abgeschlossene Auswertung (Einreihung oder begründeter Skip wie Altbestand,
-        // bereits eingereihter Auftrag oder fehlende Anlagedaten): Die Referenz gilt für
-        // beide Erkennungspfade als ausgewertet (Endzustand).
-        await CompleteEvaluationAsync(reference, ct);
-    }
+            logger.LogInformation(assigned
+                    ? "Issue-Aufbereitung: interner Auftrag {EventKey} der vorhandenen Aufgabe {AufgabeId} zugeordnet."
+                    : "Issue-Aufbereitung: interner Auftrag {EventKey} auf Aufgabe {AufgabeId} eingereiht.",
+                eventKey, workItemId);
+        }, ct);
 }
