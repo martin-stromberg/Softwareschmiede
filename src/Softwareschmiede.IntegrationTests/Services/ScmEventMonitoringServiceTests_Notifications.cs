@@ -67,7 +67,7 @@ public sealed class ScmEventMonitoringServiceTests_Notifications
         fixture.AddNotification(new ScmNotification("T_1", "R_1", "github.com", "owner", "repo",
             ScmReferenceKind.Issue, 7, "mention", DateTimeOffset.UtcNow));
 
-        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+        await fixture.RunMonitorAsync(TestContext.Current.CancellationToken);
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();

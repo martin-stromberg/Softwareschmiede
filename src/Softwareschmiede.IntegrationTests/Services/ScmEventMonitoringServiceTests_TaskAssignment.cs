@@ -209,11 +209,11 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
         Assert.All(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken), x => Assert.Equal(taskId, x.WorkItemId));
     }
 
-    /// <summary>Ein Issue mit bestehender Aufbereitungsaufgabe erzeugt bei einem Trigger-Kommentar
-    /// genau eine kanonische Anweisungsaufgabe — die isolierte Aufbereitungsaufgabe bleibt
-    /// unberührt (Zweck-Ausschluss), und wiederholte Polls erzeugen keine dritte Instanz (#457).</summary>
+    /// <summary>Ein Issue mit bestehender Aufbereitungsaufgabe ordnet den Trigger-Kommentar
+    /// dieser zweck-markierten Aufgabe zu — es entsteht keine zusätzliche Anweisungsaufgabe,
+    /// und wiederholte Polls bleiben dedupliziert.</summary>
     [Fact]
-    public async Task Monitor_TriggerOnIssueWithPreparationTask_CreatesOneInstructionTaskAlongside()
+    public async Task Monitor_TriggerOnIssueWithPreparationTask_AssignsToPreparationTask()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -230,14 +230,118 @@ public sealed class ScmEventMonitoringServiceTests_TaskAssignment
 
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
-        var tasks = await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal(2, tasks.Count);
-        var prep = Assert.Single(tasks, x => x.Kind == WorkItemKind.IssuePreparation);
-        Assert.Equal(prepTaskId, prep.Id);
-        var instruction = Assert.Single(tasks, x => x.Kind == WorkItemKind.Instruction);
-        Assert.Equal("Issue Titel 9", instruction.Title);
-        Assert.All(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
-            x => Assert.Equal(instruction.Id, x.WorkItemId));
+        var task = Assert.Single(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(prepTaskId, task.Id);
+        Assert.Equal(WorkItemKind.IssuePreparation, task.Kind);
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(prepTaskId, item.WorkItemId);
+    }
+
+    /// <summary>Die zweck-markierte Aufbereitungs-Aufgabe steht in der Verknüpfungsmenge: ein
+    /// Folgekommentar in einem späteren Zyklus wird direkt derselben Aufgabe zugeordnet — ohne
+    /// Resolver-Aufruf und ohne Neuanlage.</summary>
+    [Fact]
+    public async Task Monitor_FollowUpCommentOnPreparationTask_AssignsDirectly()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var repositoryId = await AddRepositoryAsync(fixture);
+        var prepTaskId = await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started,
+            issueNumber: 9, purpose: ScmIssuePreparationService.Purpose, kind: WorkItemKind.IssuePreparation);
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
+        ConfigureObservations(fixture);
+        fixture.ConfigureIssue(9);
+        var monitor = fixture.Monitor;
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+
+        // Folgekommentar im nächsten Zyklus (neuer ContentKey).
+        var time = DateTimeOffset.UtcNow;
+        fixture.Git.As<IScmEventSource>().Setup(x => x.ReadEventsAsync(It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()))
+            .Returns((ScmEventReadRequest request, CancellationToken _) => Task.FromResult(new ScmEventBatch(request,
+                request.ContentKind == ScmContentKind.IssueComment
+                    ? [Observation(request, "C2_" + request.Reference.Number, "$Softwareschmiede nochmal", time)]
+                    : Array.Empty<ScmEventObservation>())));
+        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var task = Assert.Single(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(prepTaskId, task.Id);
+        var events = await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(2, events.Count);
+        Assert.All(events, x => Assert.Equal(prepTaskId, x.WorkItemId));
+        // Die direkte Zuordnung über die Verknüpfungsmenge braucht keinen Resolver/Detailabruf.
+        fixture.Git.As<IScmEventSource>().Verify(x => x.ReadIssueAsync(
+            It.IsAny<ScmEventReference>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Altbestand-Paar (reguläre + zweck-markierte Aufgabe derselben Issue-Nummer):
+    /// Der Trigger-Kommentar wird der regulären Aufgabe zugeordnet — zweistufige Gruppen-Auswahl,
+    /// keine Mehrdeutigkeitsdiagnose, keine neue Aufgabe (Verhalten wie vor der Erweiterung).</summary>
+    [Fact]
+    public async Task Monitor_LegacyTaskPair_CommentAssignsToRegularTask()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var repositoryId = await AddRepositoryAsync(fixture);
+        var regularTaskId = await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started, issueNumber: 9);
+        await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started,
+            issueNumber: 9, purpose: ScmIssuePreparationService.Purpose, kind: WorkItemKind.IssuePreparation);
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.Issue, 9));
+        ConfigureObservations(fixture);
+        fixture.ConfigureIssue(9);
+
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        Assert.Equal(2, await db.WorkItems.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(regularTaskId, item.WorkItemId);
+        Assert.DoesNotContain(await db.ScmContentSnapshots.ToListAsync(cancellationToken: TestContext.Current.CancellationToken),
+            x => x.Diagnostic == ScmEventStore.AmbiguousAssignmentDiagnostic);
+    }
+
+    /// <summary>PR-Guard: Eine an der zweck-markierten Aufgabe gemeldete PR-Referenz landet nicht
+    /// in der Verknüpfungsmenge — das PR-Ereignis zieht nicht auf die Purpose-Aufgabe. Ist die
+    /// Referenz für den Resolver nicht lesbar, bleibt das Ereignis wie bisher unzugeordnet.</summary>
+    [Fact]
+    public async Task Monitor_PullRequestOnPreparationTask_StaysUnassigned()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var repositoryId = await AddRepositoryAsync(fixture);
+        var prepTaskId = await AddTaskAsync(fixture, repositoryId, WorkItemStatus.Started,
+            purpose: ScmIssuePreparationService.Purpose, kind: WorkItemKind.IssuePreparation);
+        // Via LinkReportedPullRequestAsync-Pfad simuliert: gemeldete PR-Referenz an der Purpose-Aufgabe.
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var seedDb = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+            seedDb.PullRequestReferences.Add(new PullRequestReference
+            {
+                Id = Guid.NewGuid(),
+                WorkItemId = prepTaskId,
+                Provider = PullRequestProvider.GitHub,
+                RepositoryId = "owner/repo",
+                PullRequestNumber = 5
+            });
+            await seedDb.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        ConfigureEnumeration(fixture, new ScmEventReference(fixture.Repository, ScmReferenceKind.PullRequest, 5));
+        ConfigureObservations(fixture);
+        // Bewusst kein ConfigurePullRequest: die Referenz bleibt für den Resolver nicht lesbar,
+        // sodass nur die verknüpfte Zuordnung dem Ereignis eine Aufgabe geben könnte.
+
+        await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+
+        using var verification = fixture.Services.CreateScope();
+        var db = verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var task = Assert.Single(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(prepTaskId, task.Id);
+        Assert.Empty(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var snapshots = await db.ScmContentSnapshots.ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.NotEmpty(snapshots);
+        Assert.All(snapshots, x => Assert.Equal(ScmEventStore.UnassignedDiagnostic, x.Diagnostic));
     }
 
     /// <summary>Ein Ereignis auf einem Pull Request, dessen Head-Branch dem Branch einer aktiven

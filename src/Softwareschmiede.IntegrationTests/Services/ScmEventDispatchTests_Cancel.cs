@@ -43,13 +43,16 @@ public sealed class ScmEventDispatchTests_Cancel
                 throw new ScmProviderException(ScmProviderFailureKind.RateLimit, "Fixture rate limit", clock.Now.AddSeconds(10));
             });
         await fixture.DispatchAsync(eventId);
-        Assert.Equal(1, calls);
+        // Der Versuch hat mindestens eine Hostaktion remote ausgelöst (Empfangsreaktion und
+        // ggf. Warte-Kommentar der Stabilisierungsfrist), die alle im Rate-Limit hängen bleiben.
+        var callsAfterDispatch = calls;
+        Assert.True(callsAfterDispatch >= 1, "Der Versuch hat keine Hostaktion remote ausgelöst.");
         using (var scope = fixture.Services.CreateScope())
             Assert.True(await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(eventId, TestContext.Current.CancellationToken));
         clock.Now = clock.Now.AddHours(1);
         await fixture.Services.GetRequiredService<ScmEventMonitoringService>().RunOnceAsync(TestContext.Current.CancellationToken);
         Assert.Equal("Abgebrochen", (await fixture.EventAsync(eventId)).Status);
-        Assert.Equal(1, calls);
+        Assert.Equal(callsAfterDispatch, calls);
     }
 
     private sealed class TestClock : TimeProvider

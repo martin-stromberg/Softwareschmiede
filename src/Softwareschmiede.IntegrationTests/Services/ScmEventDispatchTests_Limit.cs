@@ -459,7 +459,7 @@ public sealed class ScmEventDispatchTests_Limit
             // Die CLI beendet ihren Turn und zeigt erneut ihren verifizierten Eingabeprompt.
             fixture.SetPrompt(firstTask, "SCM_READY_V1");
 
-            await ScmDispatchFixture.WaitForAsync(async () => fixture.Sessions.Count == 2
+            await fixture.WaitForTriggeredDeliveryAsync(async () => fixture.Sessions.Count == 2
                     && (await fixture.EventAsync(secondId)).Status == "Zugestellt",
                 "Das wartende Ereignis wurde nach dem Prompt-Nachweis nicht ereignisgesteuert gestartet.");
             Assert.True(fixture.Cli.IsRunning(firstTask));

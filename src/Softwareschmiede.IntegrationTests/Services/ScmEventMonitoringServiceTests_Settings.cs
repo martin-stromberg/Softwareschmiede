@@ -57,7 +57,7 @@ public sealed class ScmEventMonitoringServiceTests_Settings
             await scope.ServiceProvider.GetRequiredService<AppSettingService>()
                 .SetBoolSettingAsync(AppSettingService.ScmMonitoringEnabledKey, true, TestContext.Current.CancellationToken);
 
-        await monitor.RunOnceAsync(TestContext.Current.CancellationToken);
+        await fixture.RunMonitorAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
         Assert.Single(fixture.Prompts);
@@ -140,6 +140,9 @@ public sealed class ScmEventMonitoringServiceTests_Settings
 
         using (var scope = fixture.Services.CreateScope())
             await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().RetryAsync(eventId, TestContext.Current.CancellationToken);
+        // Die im Wiederholungsversuch frisch gestartete CLI liefert den Prompt erst nach
+        // der Stabilisierungsfrist aus — der Fixture-Wiederanlauf vollzieht die Frist.
+        await fixture.DispatchAsync(eventId);
 
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
         Assert.Single(fixture.Prompts);

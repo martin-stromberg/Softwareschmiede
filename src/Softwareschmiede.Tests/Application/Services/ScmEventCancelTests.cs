@@ -115,6 +115,9 @@ public sealed class ScmEventCancelTests
         await fixture.InitializeAsync();
         var (_, eventId) = await fixture.AddAsync(configured: true);
         await fixture.DispatchAsync(eventId);
+        // Die frisch gestartete CLI liefert den Prompt erst nach der Stabilisierungsfrist aus.
+        clock.Now = clock.Now.Add(ScmEventOrchestrator.DeliveryStabilityPeriod + TimeSpan.FromSeconds(1));
+        await fixture.DispatchAsync(eventId);
         Assert.Equal("Zugestellt", (await fixture.EventAsync(eventId)).Status);
         using (var scope = fixture.Services.CreateScope())
             Assert.True(await scope.ServiceProvider.GetRequiredService<ScmEventOrchestrator>().CancelAsync(eventId, TestContext.Current.CancellationToken));

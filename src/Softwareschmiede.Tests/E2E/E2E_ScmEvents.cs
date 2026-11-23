@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FlaUI.Core.AutomationElements;
 using Microsoft.EntityFrameworkCore;
+using Softwareschmiede.App.Services.Testing;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
@@ -695,6 +696,110 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         Assert.True(after.Count(x => Endpoint(x) == "graphql") > calls.Count(x => Endpoint(x) == "graphql"),
             "GraphQL muss trotz REST-Sperre eigenständig weiterlaufen.");
         output.WriteLine($"Phase B: REST eingefroren bei {frozen} Calls, GraphQL läuft weiter.");
+    }
+
+    /// <summary>Issue #463 über die reale Pipeline: Eine Issue-Neuanlage (Beschreibung) mit
+    /// unmittelbarem Trigger-Kommentar erzeugt genau <b>eine</b> Aufgabe; das interne
+    /// Aufbereitungs-Ereignis und das Kommentar-Ereignis bleiben beide erhalten und tragen
+    /// dieselbe <c>WorkItemId</c>, der Analyse-Prompt geht — erst nach der Stabilisierungsfrist —
+    /// vor dem Kommentar-Prompt in dieselbe Simulator-Sitzung.</summary>
+    [Fact]
+    public async Task ScmEvents_NewIssueWithTriggerComment_CreatesSingleTask_E2E()
+    {
+        SkipWhenWpfE2ENotAvailable();
+        var fixture = new ScmE2EFixture();
+        await fixture.InitializeAsync();
+        output.WriteLine("SCM fixture and evidence: " + fixture.Configuration.TestRoot);
+        await fixture.EnableIssuePreparationAsync();
+        var window = WaitOnRealMainwindow(LaunchApp(false, fixture.EnvironmentVariables()));
+
+        // Ein gemeinsamer Szenario-Snapshot: Beschreibung und Trigger-Kommentar werden im
+        // selben Poll-Zyklus sichtbar. CreatedAt der Beschreibung muss hinter der
+        // Erstbeobachtungs-Baseline liegen — der Puffer hält sie sicher „neu".
+        fixture.Scenario.Text.Add(new ScmE2EText
+        {
+            Number = 30,
+            Id = 3001,
+            Kind = "Description",
+            Body = "Neue Anforderung E2E",
+            CreatedAt = DateTimeOffset.UtcNow.AddSeconds(10)
+        });
+        fixture.Scenario.Text.Add(new ScmE2EText
+        {
+            Number = 30,
+            Id = 3002,
+            Kind = "IssueComment",
+            Body = "$Softwareschmiede Aufgabe vorbereiten"
+        });
+        fixture.SaveScenario();
+
+        // Genau eine Aufgabe für Issue 30; beide Ereignisse tragen dieselbe WorkItemId.
+        WorkItem? task = null;
+        await fixture.WaitForDatabaseAsync(async db =>
+        {
+            task = await db.WorkItems.Include(x => x.IssueReference)
+                .SingleOrDefaultAsync(x => x.IssueReference != null && x.IssueReference.IssueNumber == 30);
+            return task is not null
+                && await db.ScmIncomingEvents.CountAsync(x => x.WorkItemId == task.Id) == 2;
+        }, "Issue 30: keine Aufgabe mit zwei zugeordneten Ereignissen");
+        Assert.NotNull(task);
+        await using (var db = fixture.OpenDatabase())
+        {
+            // 17 gesäte Aufgaben + genau eine neue — keine zweite Aufgabe für das Issue.
+            Assert.Equal(18, await db.WorkItems.CountAsync(cancellationToken: TestContext.Current.CancellationToken));
+            var events = await db.ScmIncomingEvents.Where(x => x.WorkItemId == task!.Id)
+                .ToListAsync(cancellationToken: TestContext.Current.CancellationToken);
+            Assert.Equal(2, events.Count);
+            Assert.Contains(events, x => x.Purpose == ScmIssuePreparationService.Purpose);
+            Assert.Contains(events, x => x.Purpose == null);
+        }
+
+        // Frist-Nachweis am realen Pfad: Der Analyse-Prompt geht erst nach der
+        // Stabilisierungsphase raus — das interne Ereignis pendelt sichtbar über
+        // „Wartend" mit Stabilisierungsgrund und verschobenem Zielzeitpunkt.
+        ScmIncomingEvent? stabilized = null;
+        await fixture.WaitForDatabaseAsync(async db =>
+        {
+            var item = await db.ScmIncomingEvents.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.WorkItemId == task!.Id && x.Purpose != null);
+            if (item?.Status == ScmIncomingEventStatus.Wartend
+                && item.Reason?.Contains("Stabilisierungsphase", StringComparison.Ordinal) == true)
+            {
+                stabilized = item;
+                return true;
+            }
+            return false;
+        }, "Aufbereitungsereignis: Stabilisierungs-Wartegrund fehlt");
+        Assert.NotNull(stabilized!.NextAttemptUtc);
+        Assert.Empty(fixture.Prompts());
+        output.WriteLine("Frist: interne Aufbereitung wartete sichtbar in der Stabilisierungsphase, kein Prompt vor Fristende.");
+
+        // Exchange-Gates öffnen: Der Simulator nimmt an und schließt ab — danach läuft das
+        // Kommentar-Ereignis (Vorgängerprüfung) in dieselbe Sitzung.
+        fixture.Hold("accepted", false);
+        fixture.Hold("complete", false);
+        var processed = await fixture.WaitEventForTaskAsync(task!.Id, ScmIncomingEventStatus.Verarbeitet, 3002);
+        Assert.Equal("SCM_IssueComment_3002", ScmEventStore.Observation(processed).RemoteNodeId);
+
+        // Reihenfolge- und Sitzungsnachweis: zuerst der Analyse-Prompt, dann der
+        // Kommentar-Prompt — beide mit derselben CliRunId in einer Sitzung.
+        Assert.Equal(2, fixture.Prompts().Count);
+        var analysis = fixture.Prompts()[0].GetProperty("request");
+        var comment = fixture.Prompts()[1].GetProperty("request");
+        Assert.Contains("Verständlichkeit", analysis.GetProperty("body").GetString());
+        Assert.Equal("$Softwareschmiede Aufgabe vorbereiten", comment.GetProperty("body").GetString());
+        Assert.Equal(analysis.GetProperty("cliRunId").GetString(), comment.GetProperty("cliRunId").GetString());
+
+        // Sichtbarer Nachweis: genau ein Aufgabeneintrag; beide Ereigniszeilen gehören
+        // zur selben Aufgabe (gleicher Aufgabentitel in der SCM-Ereignisliste).
+        var cards = WaitForElement(window, cf => cf.ByAutomationId("ActiveWorkItemKind_SCM Referenz 30"), Long);
+        Assert.NotNull(cards);
+        Assert.Single(window.FindAllDescendants(cf => cf.ByAutomationId("ActiveWorkItemKind_SCM Referenz 30")));
+        NavigateQueue(window);
+        var rows = Element(window, "ScmEventList").AsDataGridView().Rows;
+        Assert.Equal(2, rows.Length);
+        Assert.All(rows, row => Assert.Equal("SCM Referenz 30", row.Cells[0].Value));
+        output.WriteLine("#463: eine Aufgabe für Issue 30; internes Aufbereitungsereignis und Kommentar zugestellt in dieser Reihenfolge.");
     }
 
     private static bool IsResolutionCall(JsonElement call)
