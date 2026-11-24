@@ -177,28 +177,38 @@ public sealed class AiSimulatorPlugin : CliAiPluginBase, IIssueTemplateTextGener
                 $correlation = @{ protocolVersion = 1; eventId = $request.eventId; attemptId = $request.attemptId; cliRunId = $request.cliRunId }
                 Wait-ScmFixture 'accepted'
                 Publish-ScmJson (Join-Path $directory 'accepted.json') $correlation
-                $actionId = [Guid]::NewGuid().ToString('D')
-                $action = $correlation.Clone()
-                $action.actionId = $actionId
-                $action.kind = 'comment'
-                $action.body = 'KI-Simulator: SCM-Ereignis verarbeitet.'
-                Publish-ScmJson (Join-Path $directory ('actions/' + $actionId + '.json')) $action
-                $resultPath = Join-Path $directory ('results/' + $actionId + '.json')
-                $deadline = [DateTime]::UtcNow.AddMinutes(30)
-                $succeeded = $false
-                while ([DateTime]::UtcNow -lt $deadline) {
-                    if ([IO.File]::Exists((Get-ScmNativePath $resultPath))) {
-                        try {
-                            $result = [IO.File]::ReadAllText((Get-ScmNativePath $resultPath)) | ConvertFrom-Json
-                            if ($result.success -eq $true -and $result.eventId -eq $request.eventId -and $result.attemptId -eq $request.attemptId -and $result.cliRunId -eq $request.cliRunId -and $result.actionId -eq $actionId) { $succeeded = $true; break }
-                        } catch { }
+                # Die Issue-Aufbereitung verlangt eine issueBodyUpdate- plus eine comment-Aktion;
+                # alle übrigen Ereignisarten beantwortet der Simulator mit einem einzelnen Kommentar.
+                $kinds = @('comment')
+                if ($request.eventKind -eq 'IssueAufbereitung') { $kinds = @('issueBodyUpdate', 'comment') }
+                $actionIds = @()
+                $succeeded = $true
+                foreach ($kind in $kinds) {
+                    $actionId = [Guid]::NewGuid().ToString('D')
+                    $action = $correlation.Clone()
+                    $action.actionId = $actionId
+                    $action.kind = $kind
+                    $action.body = 'KI-Simulator: SCM-Ereignis verarbeitet.'
+                    Publish-ScmJson (Join-Path $directory ('actions/' + $actionId + '.json')) $action
+                    $resultPath = Join-Path $directory ('results/' + $actionId + '.json')
+                    $deadline = [DateTime]::UtcNow.AddMinutes(30)
+                    $confirmed = $false
+                    while ([DateTime]::UtcNow -lt $deadline) {
+                        if ([IO.File]::Exists((Get-ScmNativePath $resultPath))) {
+                            try {
+                                $result = [IO.File]::ReadAllText((Get-ScmNativePath $resultPath)) | ConvertFrom-Json
+                                if ($result.success -eq $true -and $result.eventId -eq $request.eventId -and $result.attemptId -eq $request.attemptId -and $result.cliRunId -eq $request.cliRunId -and $result.actionId -eq $actionId) { $confirmed = $true; break }
+                            } catch { }
+                        }
+                        [Threading.Thread]::Sleep(100)
                     }
-                    [Threading.Thread]::Sleep(100)
+                    if (-not $confirmed) { $succeeded = $false; break }
+                    $actionIds += $actionId
                 }
                 if ($succeeded) {
                     Wait-ScmFixture 'complete'
                     $complete = $correlation.Clone()
-                    $complete.actionIds = @($actionId)
+                    $complete.actionIds = $actionIds
                     $complete.noRemoteAction = $false
                     Publish-ScmJson (Join-Path $directory 'complete.json') $complete
                 }

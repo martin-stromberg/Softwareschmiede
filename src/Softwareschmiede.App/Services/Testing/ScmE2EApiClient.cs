@@ -120,7 +120,7 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
             var number = numberProperty.GetInt32();
             var pr = query.Contains("pullRequest(", StringComparison.Ordinal);
             if (query.Contains("mergeStateStatus", StringComparison.Ordinal))
-                return Json(new { data = new { repository = new { pullRequest = PullRequestStatus(number) } } });
+                return Json(new { data = new { repository = new { pullRequest = PullRequestStatus(number, HeadSha(scenario, number)) } } });
             if (query.Contains("reviews(", StringComparison.Ordinal))
                 return Json(new { data = new { repository = new { pullRequest = new { reviews = new { nodes = Array.Empty<object>(), pageInfo = new { hasNextPage = false, endCursor = (string?)null } } } } } });
             var description = scenario.Text.SingleOrDefault(x => x.Number == number && x.PullRequest == pr && x.Kind == "Description")
@@ -146,6 +146,33 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
         if (request.Method == "GET" && path.EndsWith("/reactions", StringComparison.Ordinal))
             return Json(responses.Where(x => x.Endpoint == path).Select(Remote));
         var detail = Regex.Match(path, "^" + Repository + @"/(issues|pulls)/(\d+)$");
+        if (request.Method == "PATCH" && detail.Success)
+        {
+            // IssueBodyUpdate ersetzt die Beschreibung vollständig; die Fixture schreibt sie
+            // ins Szenario zurück, damit Detail-Reads und der Reconcile-Pfad den Marker sehen.
+            var patchNumber = int.Parse(detail.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+            using var patchDocument = JsonDocument.Parse(request.JsonBody!);
+            var patchBody = patchDocument.RootElement.TryGetProperty("body", out var bodyProperty)
+                ? bodyProperty.GetString() ?? string.Empty : string.Empty;
+            // Frisch lesen, damit zwischenzeitliche Fixture-Änderungen nicht verloren gehen;
+            // Veröffentlichung wie SaveScenario per temporärer Datei plus Rename.
+            var current = configuration.ReadScenario();
+            var description = current.Text.FirstOrDefault(x => x.Number == patchNumber
+                && x.Kind == "Description" && x.PullRequest == (detail.Groups[1].Value == "pulls"));
+            if (description is not null)
+            {
+                description.Body = patchBody;
+                var temporary = configuration.ScenarioPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                File.WriteAllText(temporary, JsonSerializer.Serialize(current));
+                File.Move(temporary, configuration.ScenarioPath, true);
+            }
+            return Json(new
+            {
+                id = "ISSUE_" + patchNumber,
+                node_id = "ISSUE_" + patchNumber,
+                html_url = $"https://github.com/scm-owner/scm-e2e/issues/{patchNumber}"
+            });
+        }
         if (request.Method == "GET" && detail.Success)
         {
             var detailNumber = int.Parse(detail.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
@@ -175,11 +202,27 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
                 head = new
                 {
                     @ref = $"scm-branch-{detailNumber}",
-                    sha = "sha" + detailNumber,
+                    sha = HeadSha(scenario, detailNumber),
                     repo = new { full_name = "scm-owner/scm-e2e", clone_url = "https://github.com/scm-owner/scm-e2e.git" }
                 },
                 @base = new { @ref = "main" }
             });
+        }
+        var eventsMatch = Regex.Match(path, "^" + Repository + @"/issues/(\d+)/events$");
+        if (request.Method == "GET" && eventsMatch.Success)
+        {
+            var eventsNumber = int.Parse(eventsMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+            var index = 0;
+            return Json(scenario.Assignments.Where(x => x.Number == eventsNumber).OrderBy(x => x.CreatedAt)
+                .Select(x => (object)new
+                {
+                    id = ++index,
+                    node_id = x.EventNodeId,
+                    @event = x.EventType,
+                    actor = new { node_id = x.AssignerNodeId, login = x.AssignerLogin },
+                    assignee = new { node_id = x.AssigneeNodeId, login = x.AssigneeLogin },
+                    created_at = x.CreatedAt
+                }).ToArray());
         }
         var match = Regex.Match(path, "^" + Repository + @"/(issues|pulls)/(\d+)/comments$");
         if (request.Method == "GET" && match.Success)
@@ -214,9 +257,14 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
             reactionGroups = text.ViewerReactions.Select(reaction => (object)new { content = reaction, viewerHasReacted = true }).ToArray()
         };
 
+    // Head-SHA des Szenarios: ein vom Fixture im Origin angelegter Branch liefert seinen
+    // echten SHA (die Checkout-Prüfung gleicht ihn mit rev-parse ab), sonst der Platzhalter.
+    private static string HeadSha(ScmE2EScenario scenario, int number)
+        => scenario.PullRequestHeadShas.TryGetValue(number, out var sha) ? sha : "sha" + number;
+
     // Feldliste der PR-Status-Abfrage (ParsePullRequestStatus): offen und mergebar — die
     // Abschlussüberwachung schließt keine Aufgabe, ohne dass das Szenario es ausdrücklich vorgibt.
-    private static object PullRequestStatus(int number)
+    private static object PullRequestStatus(int number, string headSha)
         => new
         {
             id = "PR_" + number,
@@ -226,7 +274,7 @@ internal sealed class ScmE2EApiClient(ScmE2ETestConfiguration configuration,
             state = "OPEN",
             headRefName = $"scm-branch-{number}",
             baseRefName = "main",
-            headRefOid = "sha" + number,
+            headRefOid = headSha,
             mergeCommit = (object?)null,
             mergeStateStatus = "CLEAN"
         };

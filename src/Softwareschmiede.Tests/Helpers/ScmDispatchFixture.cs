@@ -61,8 +61,10 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
     internal string Prompt { get; set; }
     private readonly List<Process> _processes = [];
     private readonly bool _ownsRoot;
+    private readonly bool _hasAssignmentSource;
 
-    internal ScmDispatchFixture(string? root = null, TimeProvider? time = null, ScmAiProfile? ai = null, ScmAiProfile? ki2 = null)
+    internal ScmDispatchFixture(string? root = null, TimeProvider? time = null, ScmAiProfile? ai = null, ScmAiProfile? ki2 = null,
+        bool assignmentSource = false)
     {
         AiProfile = ai ?? ScmAiProfile.Simulator;
         Ki2Profile = ki2;
@@ -89,6 +91,13 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
             .ReturnsAsync(new Dictionary<string, string?>());
         Git.As<IScmNotificationSource>().Setup(x => x.EnumerateNotificationsAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .Returns((string _, DateTimeOffset? _, CancellationToken _) => Task.FromResult<IReadOnlyList<ScmNotification>>(Notifications.ToArray()));
+        // Die optionale Fähigkeit bleibt standardmäßig weg — ihr Fehlen muss testbar sein
+        // (source is IScmAssignmentSource == false). Tests hängen sie explizit über den
+        // Konstruktorparameter assignmentSource an; nachträgliches As<> wäre zu spät, weil
+        // Git.Object unten im Konstruktor materialisiert wird (Moq: AlreadyInitialized).
+        if (assignmentSource)
+            Git.As<IScmAssignmentSource>();
+        _hasAssignmentSource = assignmentSource;
         Git.Setup(x => x.CloneRepositoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(async (string _, string directory, CancellationToken _) =>
             {
@@ -211,6 +220,49 @@ internal sealed class ScmDispatchFixture : IAsyncDisposable
                     "C_" + request.Reference.Number, "42", time, time, null, authorId, authorLogin, null, null,
                     "@scm-bot bitte übernehmen", "https://github.com/owner/repo/issues/" + request.Reference.Number, time)] : [])));
     }
+
+    /// <summary>Lässt die optionale Plugin-Fähigkeit <see cref="IScmAssignmentSource"/> für jede
+    /// Referenz die konfigurierte Zuweisung liefern (<paramref name="assignment"/> = <c>null</c>:
+    /// kein wirksames Viewer-Ereignis, der Zuweisender gilt als nicht bestimmbar). Voraussetzung
+    /// ist eine Fixture mit <c>assignmentSource: true</c> — ohne die Fähigkeit scheitert das
+    /// <c>As&lt;&gt;</c>-Setup, weil <c>Git.Object</c> bereits materialisiert ist.</summary>
+    internal void ConfigureAssignmentSource(ScmAssignment? assignment)
+    {
+        if (!_hasAssignmentSource)
+            throw new InvalidOperationException(
+                "ConfigureAssignmentSource benötigt eine Fixture mit assignmentSource: true — die optionale Fähigkeit muss im Konstruktor angehängt werden, bevor Git.Object materialisiert ist.");
+        Git.As<IScmAssignmentSource>().Setup(x => x.GetLatestViewerAssignmentAsync(
+                It.IsAny<ScmEventReference>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(assignment);
+    }
+
+    /// <summary>Lässt <see cref="IScmEventSource.ReadEventsAsync"/> für die Description-Quelle
+    /// eine Beobachtung mit gegebenem Text liefern; alle übrigen Quellarten bleiben leer. Setzt
+    /// das <c>ReadEventsAsync</c>-Setup wie <see cref="ConfigureMentionObservations"/> komplett
+    /// neu — das jeweils zuletzt konfigurierte Setup gewinnt.</summary>
+    internal void ConfigureDescriptionObservations(string body, string? authorId = "U_1", string? authorLogin = "owner")
+    {
+        var time = DateTimeOffset.UtcNow;
+        Git.As<IScmEventSource>().Setup(x => x.ReadEventsAsync(It.IsAny<ScmEventReadRequest>(), It.IsAny<CancellationToken>()))
+            .Returns((ScmEventReadRequest request, CancellationToken _) => Task.FromResult(new ScmEventBatch(request,
+                request.ContentKind == ScmContentKind.Description ? [new ScmEventObservation(request.Reference, request.ContentKind,
+                    "D_" + request.Reference.Number, null, time, time, null, authorId, authorLogin, null, null,
+                    body, "https://github.com/owner/repo/issues/" + request.Reference.Number, time)] : [])));
+    }
+
+    /// <summary>Lässt <see cref="IScmEventSource.ReadPullRequestAsync"/> einen Standard-PR
+    /// liefern (analog <see cref="ConfigureIssue"/>); mit <paramref name="number"/> nur für
+    /// PR-Referenzen dieser Nummer, sonst für jede Referenz.</summary>
+    internal void ConfigurePullRequestRead(int? number = null, string body = "PR Beschreibung")
+        => Git.As<IScmEventSource>().Setup(x => x.ReadPullRequestAsync(
+                It.Is<ScmEventReference>(r => r.Kind == ScmReferenceKind.PullRequest
+                    && (!number.HasValue || r.Number == number.Value)),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ScmEventReference reference, CancellationToken _) => new PullRequest(reference.Number,
+                "PR Titel " + reference.Number, "https://github.com/owner/repo/pull/" + reference.Number,
+                "feature/branch", PullRequestProvider.GitHub, "owner/repo", "PR_node",
+                "main", "sha1", "owner/repo", "https://github.com/owner/repo.git", "refs/heads/feature/branch",
+                body));
 
     /// <summary>Der Monitoring-Dienst aus dem Service-Provider der Fixture.</summary>
     internal ScmEventMonitoringService Monitor => Services.GetRequiredService<ScmEventMonitoringService>();

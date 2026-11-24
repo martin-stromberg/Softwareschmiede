@@ -9,8 +9,9 @@ Abschluss (Issue #457). Sie ist normativ mit der Implementierung abgeglichen; Be
 1. **Eingang:** Der Poll (`ScmEventMonitoringService`, Standard 60 s) enumeriert Referenzen
    aktiver Repositories und liest neue Inhalte (Kommentare, Beschreibungen, Notifications).
 2. **Qualifizierung:** Trigger-Keyword (Modus „Benutzerkonto") bzw. freistehende
-   `@`-Erwähnung (Modus „Separates Konto"), Owner-/Vertrauenslisten-Prüfung,
-   Reaktions-Dedupe (`GetRejection`).
+   `@`-Erwähnung oder Assignee-Zuweisung (`reason = assign`, Modus „Separates Konto"),
+   Owner-/Vertrauenslisten-Prüfung (bei Zuweisung: Zuweisender-Kreis statt Autor),
+   Reaktions-Dedupe (`GetRejection`/`GetAssignRejection`).
 3. **Registrierung:** Das qualifizierte Ereignis wird als `ScmIncomingEvent` persistiert —
    der `EventKey`-Unique-Index dedupliziert über Polls, Neustarts und Anlagerennen hinweg.
 4. **Aufgabenzuordnung:** `ScmEventTaskResolver` ordnet das Ereignis genau einer Aufgabe zu
@@ -73,9 +74,9 @@ Es gibt zwei getrennte Erkennungspfade:
   `Purpose`-Tiebreak → `Sequence`); innerhalb derselben Aufgabe ordnet ohnehin die
   Vorgängerprüfung.
 - **Ohne Issue-Aufbereitung:** Eine neue Issue-Anlage erzeugt kein Ereignis — außer die
-  Beschreibung selbst ist qualifiziert (Trigger-Keyword bzw. Erwähnung des separaten
-  Kontos): dann durchläuft sie denselben Pfad wie Ablauf B (Anweisungsaufgabe aus der
-  Beschreibung).
+  Beschreibung selbst ist qualifiziert (Trigger-Keyword bzw. Erwähnung oder Zuweisung
+  des separaten Kontos): dann durchläuft sie denselben Pfad wie Ablauf B (Anweisungsaufgabe
+  aus der Beschreibung) bzw. Ablauf B+ (Zuweisungsauslöser).
 
 **Abweichung zur ursprünglichen Skizze:** Der Sketch sah eine Anweisungsausführung direkt
 bei Issue-Anlage vor. Umgesetzt ist die getrennte Aufbereitungsaufgabe mit eigenem,
@@ -99,6 +100,35 @@ opt-in).
    Aufgabe an; pausierte Aufgaben gelten als aktiv, ihr Ereignis wartet regulär.
 4. Zustellung über die gemeinsame Pipeline (Wartegrund statt Anlageduplikat bei
    mehrdeutiger Zuordnung).
+
+## Ablauf B+: Assignee-Zuweisung an das separate Konto (Modus „Separates Konto")
+
+1. Eine `reason = assign`-Benachrichtigung in der Inbox des separaten Kontos qualifiziert
+   die Referenz — bei gleichzeitig vorliegender Mention gewinnt die Zuweisung die
+   Deduplizierung je Referenz.
+2. Der Monitor ermittelt über `IScmAssignmentSource` das jüngste wirksame
+   `assigned`-Ereignis auf das Konto (`issues/{n}/events`, Issues und PRs); ein jüngeres
+   `unassigned` entwertet die Zuweisung — die Notification wird dennoch verarbeitet:
+   Die Zuweisung legitimiert die Aufnahme nicht mehr, und ohne anderen gültigen
+   Auslöser verwirft die Ablehnungsprüfung (Schritt 3) sie mit „Zuweisender nicht
+   bestimmbar", sichtbar als `Inbox:`-Diagnose in den Integrationshinweisen.
+3. Ablehnungsprüfung (`GetAssignRejection`): Zuweisender ∈ {Repository-Owner, separates
+   Konto, `github-actions[bot]`/`app/github-actions`} **und** Referenzbeschreibung nicht
+   leer **und** kein eigener Antwortmarker. Scheitert die Zuweisungsprüfung, fällt die
+   Prüfung auf den regulären Texttrigger zurück (`GetRejection`): Eine davon unabhängig
+   gültige frei stehende `@`-Erwähnung in derselben Beschreibung legitimiert die Aufnahme
+   trotz abgelehnter Zuweisung — die Zuweisung gewinnt nur die Deduplizierung je
+   Referenz, sie unterdrückt den Texttrigger nicht. Erst wenn auch der Texttrigger
+   fehlschlägt, bleibt die spezifischere Zuweisungsbegründung führend und es entsteht
+   keine Aufgabe.
+4. Der **Description-Text der Referenz** (Issue-Beschreibung bzw. PR-Text) wird zum
+   Auftragsinhalt — Trigger-Keyword und `@`-Erwähnung sind nicht erforderlich.
+5. Aufgabenzuordnung und Zustellung wie Ablauf B/C (Issue- bzw. PR-Zweig). Dem Prompt
+   wird der Herkunftshinweis „Dieses Ereignis wurde durch eine Assignee-Zuweisung auf
+   das überwachte Konto ausgelöst." (`AssigneePromptPrefix`) vorangestellt.
+6. **Erneute Zuweisung:** Weil die Zuweisungs-Ereignisidentität (`assign-{eventNodeId}`)
+   in den `ContentKey` einfließt, erzeugt eine Re-Assignment desselben Inhalts ein neues
+   Ereignis — es läuft als Folgeereignis auf derselben noch existierenden Aufgabe.
 
 ## Ablauf C: Trigger-Kommentar in einem Pull Request
 
