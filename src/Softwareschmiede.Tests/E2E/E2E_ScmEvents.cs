@@ -116,7 +116,9 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         foreach (var number in new[] { 3, 4, 5 })
         {
             fixture.AddText(number, number * 100 + 1, "$Softwareschmiede Gesperrte Aufgabe");
-            await fixture.WaitEventAsync(number, ScmIncomingEventStatus.Wartend);
+            // Beendete/archivierte Aufgaben sind strukturell unzustellbar (terminal klärbar);
+            // die pausierte Aufgabe wartet regulär weiter.
+            await fixture.WaitEventAsync(number, number == 5 ? ScmIncomingEventStatus.Wartend : ScmIncomingEventStatus.VerarbeitungUngeklärt);
             SelectEvent(window, number);
             Assert.Contains(number == 5 ? "pausiert" : "beendet/archiviert", Element(window, "ScmEventReason").Name);
             Assert.False(Element(window, "ScmEventOpen").IsEnabled);

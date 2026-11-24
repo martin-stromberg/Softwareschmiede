@@ -57,4 +57,21 @@ public static class ScmIncomingEventStatus
     /// </summary>
     public static IReadOnlyCollection<string> NonBlocking { get; } =
         [Verarbeitet, Abgebrochen, VerarbeitungUngeklärt, ZustellungUngewiss];
+
+    /// <summary>
+    /// Freigabeliste für die Startplatz-Belegung der Ausführungsbegrenzung
+    /// (<c>ScmEventExecutionLimitService</c>): Ein Ereignis in einem dieser Stati hält den
+    /// Startplatz einer am verifizierten Eingabeprompt wartenden Aufgabe NICHT belegt —
+    /// neben den nicht blockierenden Stati (<see cref="NonBlocking"/>) auch die noch nicht
+    /// zugestellten <see cref="Aufgenommen"/>, <see cref="Verzögert"/> und
+    /// <see cref="Wartend"/>, deren Zustellung an die lebende Sitzung keinen neuen CLI-Start
+    /// erfordert. Belegt bleibt der Platz nur bei den In-Flight-Stati laufender
+    /// Zustellung/Verarbeitung (<see cref="ZustellungVorbereitet"/>, <see cref="Zugestellt"/>,
+    /// <see cref="InBearbeitung"/>) sowie — konservativ — bei jedem unbekannten oder
+    /// zukünftigen Wert. Bewusst von <see cref="NonBlocking"/> entkoppelt: Eine künftige
+    /// Erweiterung von <see cref="NonBlocking"/> darf die Platzvergabe nicht automatisch
+    /// mitändern.
+    /// </summary>
+    public static IReadOnlyCollection<string> StartSlotFreeing { get; } =
+        [Aufgenommen, Verzögert, Wartend, ZustellungUngewiss, VerarbeitungUngeklärt, Verarbeitet, Abgebrochen];
 }
