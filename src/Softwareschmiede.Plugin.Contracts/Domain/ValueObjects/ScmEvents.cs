@@ -28,11 +28,17 @@ public sealed record ScmEventReadRequest(ScmEventReference Reference, ScmContent
 /// <summary>Vollständig gelesene Quelle, die atomar mit ihrem Checkpoint gespeichert werden kann.</summary>
 public sealed record ScmEventBatch(ScmEventReadRequest Request, IReadOnlyList<ScmEventObservation> Observations);
 
+/// <summary>Serialisierte Auslöseherkunft einer Beobachtung; <see langword="null"/> auf der
+/// Beobachtung bedeutet den regulären Texttrigger (Erwähnung/Keyword im Inhalt).</summary>
+public sealed record ScmEventTrigger(string Reason, string? ActorId, string? ActorLogin,
+    string? EventNodeId, DateTimeOffset? OccurredAt);
+
 /// <summary>Text und Identität einer gemeinsamen Remoteversion.</summary>
 public sealed record ScmEventObservation(ScmEventReference Reference, ScmContentKind ContentKind,
     string RemoteNodeId, string? RemoteCommentId, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     DateTimeOffset? LastEditedAt, string? AuthorId, string? AuthorLogin, string? EditorId, string? EditorLogin,
-    string Body, string Url, DateTimeOffset ObservedAt, IReadOnlyList<string>? ViewerReactions = null)
+    string Body, string Url, DateTimeOffset ObservedAt, IReadOnlyList<string>? ViewerReactions = null,
+    ScmEventTrigger? Trigger = null)
 {
     /// <summary>SHA-256 über den exakten UTF-8-Text.</summary>
     public string BodyHash => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Body)));
@@ -86,9 +92,19 @@ public sealed record ScmNotification(string ThreadId, string RepositoryNodeId, s
     string Owner, string Name, ScmReferenceKind Kind, int Number, string Reason, DateTimeOffset UpdatedAt)
 {
     /// <summary><see cref="Reason"/>-Wert, der eine direkte Erwähnung des Kontos kennzeichnet
-    /// (GitHub: <c>"mention"</c>); nur dieser Auslöser führt zur Beobachtung einer Referenz.</summary>
+    /// (GitHub: <c>"mention"</c>); löst die Beobachtung einer Referenz über den Texttrigger aus.</summary>
     public const string MentionReason = "mention";
+
+    /// <summary><see cref="Reason"/>-Wert, der eine Zuweisung der Referenz an das überwachte
+    /// Konto kennzeichnet (GitHub: <c>"assign"</c>); die Referenzbeschreibung wird dabei ohne
+    /// Erwähnungs-/Keyword-Pflicht zum Auftragsinhalt.</summary>
+    public const string AssignReason = "assign";
 }
+
+/// <summary>Die jüngste wirksame Zuweisung des Viewer-Kontos auf einer Referenz samt
+/// Zuweisendem und Ereignisidentität.</summary>
+public sealed record ScmAssignment(string EventNodeId, DateTimeOffset OccurredAt,
+    string? AssignerId, string? AssignerLogin, string? AssigneeId, string? AssigneeLogin);
 
 /// <summary>Fehlerklasse für gezielte Sperren und zeitgesteuerte Wiederholungen.</summary>
 public enum ScmProviderFailureKind { Authentication, Permission, RateLimit, Temporary, Permanent }

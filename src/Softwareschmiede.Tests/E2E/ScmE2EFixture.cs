@@ -96,15 +96,39 @@ internal sealed class ScmE2EFixture
         ["SOFTWARESCHMIEDE_TEST_DB_PATH"] = DatabasePath
     };
 
-    public void AddText(int number, long id, string body, string kind = "IssueComment", IEnumerable<string>? viewerReactions = null)
+    public void AddText(int number, long id, string body, string kind = "IssueComment", IEnumerable<string>? viewerReactions = null, bool pullRequest = false)
     {
-        Scenario.Text.Add(new ScmE2EText { Number = number, Id = id, Body = body, Kind = kind, PullRequest = number is 7 or 9, ViewerReactions = viewerReactions?.ToList() ?? [] });
+        Scenario.Text.Add(new ScmE2EText { Number = number, Id = id, Body = body, Kind = kind, PullRequest = pullRequest || number is 7 or 9, ViewerReactions = viewerReactions?.ToList() ?? [] });
         SaveScenario();
     }
 
     public void AddNotification(int number, string repositoryNodeId = "REPO", string reason = "mention", bool pullRequest = false)
     {
         Scenario.Notifications.Add(new ScmE2ENotification(number, pullRequest, repositoryNodeId, reason, DateTimeOffset.UtcNow, "THREAD_" + number));
+        SaveScenario();
+    }
+
+    /// <summary>Registriert ein Zuweisungsereignis des Issue-Events-Endpunkts
+    /// (<c>issues/{n}/events</c>); <paramref name="createdAt"/> steuert die Jüngst-Regel bei
+    /// mehreren Ereignissen (erneute Zuweisung, assign → unassign).</summary>
+    public void AddAssignment(int number, string assignerLogin, string assignerNodeId, string eventNodeId,
+        string eventType = "assigned", string assigneeLogin = "scm-bot", string assigneeNodeId = "BOT",
+        DateTimeOffset? createdAt = null)
+    {
+        Scenario.Assignments.Add(new ScmE2EAssignment(number, eventNodeId, eventType, assignerLogin,
+            assignerNodeId, assigneeLogin, assigneeNodeId, createdAt ?? DateTimeOffset.UtcNow));
+        SaveScenario();
+    }
+
+    /// <summary>Legt den Quellbranch eines Pull Requests im geteilten Origin an
+    /// (<c>scm-branch-{n}</c>, Konvention des <see cref="ScmE2EApiClient"/>),
+    /// damit eine per Pull Request angelegte Aufgabe den Branch beim Start abrufen kann, und
+    /// hinterlegt den echten Head-SHA im Szenario (die Checkout-Prüfung gleicht ihn ab).</summary>
+    public async Task CreatePullRequestSourceBranchAsync(int number)
+    {
+        var origin = Path.Combine(Configuration.TestRoot, "origin");
+        await GitAsync(origin, "branch", "scm-branch-" + number, "main");
+        Scenario.PullRequestHeadShas[number] = (await GitAsync(origin, "rev-parse", "scm-branch-" + number)).Trim();
         SaveScenario();
     }
 
@@ -273,7 +297,7 @@ internal sealed class ScmE2EFixture
         return text.Split('\n').SkipLast(1).Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
     }
 
-    private static async Task GitAsync(string directory, params string[] arguments)
+    private static async Task<string> GitAsync(string directory, params string[] arguments)
     {
         var start = new ProcessStartInfo("git") { WorkingDirectory = directory, UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
@@ -281,6 +305,8 @@ internal sealed class ScmE2EFixture
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
-        Assert.True(process.ExitCode == 0, await error + await output);
+        var stdout = await output;
+        Assert.True(process.ExitCode == 0, await error + stdout);
+        return stdout;
     }
 }

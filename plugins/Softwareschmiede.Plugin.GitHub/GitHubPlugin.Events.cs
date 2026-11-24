@@ -299,6 +299,43 @@ public sealed partial class GitHubPlugin
         return notifications;
     }
 
+    /// <inheritdoc />
+    /// <remarks>Der Issue-Events-Endpunkt deckt Issues und Pull Requests gleichermaßen ab und
+    /// liefert den Zuweisenden (<c>actor</c>) je Ereignis — die Notifications-API enthält ihn
+    /// nicht. Maßgeblich ist das jüngste Zuweisungsereignis mit <c>assignee</c> = Viewer; ein
+    /// jüngeres <c>unassigned</c> auf den Viewer hebt die Zuweisung auf (<see langword="null"/>).</remarks>
+    public async Task<ScmAssignment?> GetLatestViewerAssignmentAsync(ScmEventReference reference, CancellationToken ct = default)
+    {
+        ValidateReference(reference);
+        var repository = reference.Repository;
+        var events = await RestPagesAsync(ClientFor(repository.Account), repository.Host,
+            $"{RepositoryEndpoint(repository)}/issues/{reference.Number}/events?per_page=100", ct);
+        JsonElement? effective = null;
+        var effectiveAt = DateTimeOffset.MinValue;
+        long effectiveId = -1;
+        foreach (var element in events)
+        {
+            if (String(element, "event") is not ("assigned" or "unassigned")) continue;
+            var assignee = Object(element, "assignee");
+            if (!IsViewer(repository, String(assignee, "node_id"), String(assignee, "login"))) continue;
+            var at = RequiredDate(element, "created_at");
+            var id = long.TryParse(String(element, "id"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : -1;
+            if (effective is null || at > effectiveAt || (at == effectiveAt && id > effectiveId))
+            {
+                effective = element;
+                effectiveAt = at;
+                effectiveId = id;
+            }
+        }
+        if (effective is not { } latest || String(latest, "event") != "assigned") return null;
+        var actor = Object(latest, "actor").ValueKind == JsonValueKind.Object
+            ? Object(latest, "actor") : Object(latest, "assigner");
+        var effectiveAssignee = Object(latest, "assignee");
+        return new ScmAssignment(Required(latest, "node_id"), effectiveAt,
+            String(actor, "node_id"), String(actor, "login"),
+            String(effectiveAssignee, "node_id"), String(effectiveAssignee, "login"));
+    }
+
     /// <summary>Liest eine paginierte Referenzliste; jüngste Aktivität zuerst, Abbruch am <paramref name="cutoff"/>.</summary>
     private async Task CollectReferencesAsync(IGitHubEventApiClient client, ScmEventRepository repository, ScmReferenceKind kind, string field,
         string states, DateTimeOffset? cutoff, List<ScmEventReference> target, CancellationToken ct)

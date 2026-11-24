@@ -20,12 +20,12 @@
 
 ## Separates Konto (Bot-Konto)
 
-Alternativ kann die Überwachung unter **Einstellungen → Automatisierung → Aufgaben ausführen → Überwachungsmodus** auf **„Separates Konto“** umgeschaltet werden. Dann enumeriert die Ereignisüberwachung nicht mehr repository-weit, sondern liest ausschließlich die GitHub-Notifications-Inbox eines eigenen Bot-Kontos; aus `reason = mention`-Einträgen entstehen Ereignisse. Lediglich die unabhängigen Prüfzyklen der Backmerge-Automatik und der Issue-Aufbereitung enumerieren weiter — stets unter dem Benutzerkonto, nicht über das separate Konto.
+Alternativ kann die Überwachung unter **Einstellungen → Automatisierung → Aufgaben ausführen → Überwachungsmodus** auf **„Separates Konto“** umgeschaltet werden. Dann enumeriert die Ereignisüberwachung nicht mehr repository-weit, sondern liest ausschließlich die GitHub-Notifications-Inbox eines eigenen Bot-Kontos; aus `reason = mention`-Einträgen entstehen Ereignisse, aus `reason = assign`-Einträgen (Zuweisung des Issues oder Pull Requests an das Bot-Konto) ebenfalls — die Referenzbeschreibung wird dann ohne Erwähnung oder Keyword zum Auftragsinhalt. Lediglich die unabhängigen Prüfzyklen der Backmerge-Automatik und der Issue-Aufbereitung enumerieren weiter — stets unter dem Benutzerkonto, nicht über das separate Konto.
 
 1. Lege ein separates GitHub-Konto an und lade es als **Collaborator mit Schreibrecht** in die zu überwachenden Repositories ein.
 2. Erstelle für dieses Konto einen Personal Access Token mit den Scopes `notifications` und `repo` und trage ihn unter **Einstellungen → Plugins → GitHub → Authentifizierung** im Feld **„Personal Access Token des separaten Kontos“** ein.
 3. Wähle unter **Automatisierung → Aufgaben ausführen** den **Überwachungsmodus „Separates Konto“** und speichere. Ohne eingetragenes Token des separaten Kontos bricht das Speichern mit einer Fehlermeldung ab.
-4. Eine Aufgabe wird ausgelöst, wenn der Repository-Owner das separate Konto frei stehend als `@bot-name` in einer Beschreibung oder einem Kommentar erwähnt.
+4. Eine Aufgabe wird ausgelöst, wenn der Repository-Owner das separate Konto frei stehend als `@bot-name` in einer Beschreibung oder einem Kommentar erwähnt — oder wenn er dem Bot-Konto ein Issue oder einen Pull Request zuweist; dann trägt die Referenzbeschreibung den Auftrag (leere Beschreibungen erzeugen keine Aufgabe). Als Zuweisende gelten neben dem Owner auch das separate Konto selbst und das vertrauenswürdige `github-actions`-Konto; Zuweisungen anderer Konten werden mit Begründung in den Integrationshinweisen verworfen.
 
 ### Automatisierte Review-Issues aus dem Repository
 

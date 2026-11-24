@@ -27,6 +27,11 @@ public sealed class ScmEventOrchestrator(
     /// Zustellversuch ehrlich wartend mit verschobenem <see cref="ScmIncomingEvent.NextAttemptUtc"/>.</summary>
     internal static readonly TimeSpan DeliveryStabilityPeriod = TimeSpan.FromSeconds(10);
 
+    /// <summary>Fester Herkunftshinweis, der dem Auftragstext (<see cref="ScmExchangeRequest.Body"/>)
+    /// eines assign-ausgelösten Ereignisses vorangestellt wird — erkennbare Auslöseherkunft im
+    /// zugestellten Prompt, ohne den gespeicherten Ereignistext zu verändern.</summary>
+    internal const string AssigneePromptPrefix = "Dieses Ereignis wurde durch eine Assignee-Zuweisung auf das überwachte Konto ausgelöst.";
+
     /// <summary>
     /// Startprüfung: Dispatcht alle fälligen, nicht abgeschlossenen Ereignisse in der priorisierten
     /// Reihenfolge aus <see cref="ScmDispatchPriority"/> (Fortsetzungsereignisse → fällige
@@ -213,7 +218,11 @@ public sealed class ScmEventOrchestrator(
                 if (revalidation == ScmEventValidationService.AlreadyReactedRejection)
                 { await WaitAsync(item, "Auf diese Textversion wurde bereits mit dem Ereignis-Konto reagiert; die Verarbeitung erfolgt vermutlich durch eine zweite Installation.", ct); return; }
                 if (revalidation is not null && revalidation != "Kein Trigger" && revalidation != ScmEventValidationService.NoMentionRejection)
-                { await WaitAsync(item, "Angemeldeter Benutzer ist nicht mehr der bestätigte Repository-Owner.", ct); return; }
+                {
+                    await WaitAsync(item, observation.Trigger?.Reason == ScmNotification.AssignReason
+                    ? "Der Zuweisende ist nicht mehr dem berechtigten Kreis zuzuordnen."
+                    : "Angemeldeter Benutzer ist nicht mehr der bestätigte Repository-Owner.", ct); return;
+                }
                 if (task.Status == WorkItemStatus.New) await tasks.SetStatusAsync(task.Id, WorkItemStatus.Started, ct);
                 var adapter = cli.GetScmPromptSession(task.Id);
                 if (adapter?.IsAlive == true && explicitPluginPrefix is not null &&
@@ -311,9 +320,13 @@ public sealed class ScmEventOrchestrator(
                 var attemptId = Guid.NewGuid();
                 // Konfigurierte Prompt-Anhänge werden erst hier — bei der tatsächlichen Zustellung —
                 // aufgelöst und nur in den Prompt eingefügt: Der gespeicherte Ereignistext, die
-                // Trigger-Gegenprüfung, Dedup/BodyHash und request.json bleiben unverändert.
+                // Trigger-Gegenprüfung, Dedup/BodyHash und request.json bleiben davon unberührt.
+                // Anders der Assignee-Präfix: Er ist bewusster Bestandteil des unveränderlichen
+                // Auftrags in request.json und muss beim Wiederanlauf-Abgleich bitgleich
+                // rekonstruiert werden — beide Stellen leiten ihn daher über PromptBody ab.
                 var promptSuffix = ScmPromptAppendix.Resolve(observation, await settings.GetScmPromptAppendicesAsync(ct));
-                var attempt = await exchange.PrepareAsync(new(item.Id, attemptId, adapter.CliRunId, task.Id, observation.Body,
+                var body = PromptBody(observation);
+                var attempt = await exchange.PrepareAsync(new(item.Id, attemptId, adapter.CliRunId, task.Id, body,
                     observation.ContentKind.ToString(), $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}", observation.Url), adapter.WorkingDirectory, ct, access.RestrictedWriteSids, promptSuffix);
                 if (!ReferenceEquals(adapter, cli.GetScmPromptSession(task.Id)) || !adapter.IsAlive)
                 { await WaitAsync(item, "CLI-Sitzung hat sich geändert. Erneut prüfen.", ct); return; }
@@ -503,10 +516,19 @@ public sealed class ScmEventOrchestrator(
         }, ct);
     }
 
+    /// <summary>Auftragstext (<see cref="ScmExchangeRequest.Body"/>) einer Beobachtung:
+    /// assign-ausgelöste Ereignisse tragen den festen Herkunftshinweis
+    /// <see cref="AssigneePromptPrefix"/> vor dem Ereignistext. Die Ableitung hängt ausschließlich
+    /// an persistierten Beobachtungsdaten — Zustellung und Wiederanlauf-Abgleich rekonstruieren
+    /// so bitgleich denselben unveränderlichen Auftrag (Prüfung gegen request.json).</summary>
+    private static string PromptBody(ScmEventObservation observation)
+        => observation.Trigger?.Reason == ScmNotification.AssignReason
+            ? AssigneePromptPrefix + "\n\n" + observation.Body : observation.Body;
+
     private async Task ReconcileAttemptAsync(ScmIncomingEvent item, ScmEventObservation observation, IScmEventResponder responder, CancellationToken ct)
     {
         if (item.ExchangePath is null || !Guid.TryParse(item.CliRunId, out var runId)) return;
-        var request = new ScmExchangeRequest(item.Id, item.DeliveryAttemptId!.Value, runId, item.WorkItemId, observation.Body,
+        var request = new ScmExchangeRequest(item.Id, item.DeliveryAttemptId!.Value, runId, item.WorkItemId, PromptBody(observation),
             observation.ContentKind.ToString(), $"{observation.Reference.Repository.Owner}/{observation.Reference.Repository.Name}", observation.Url);
         var attempt = new ScmExchangeAttempt(request, item.ExchangePath)
         {
