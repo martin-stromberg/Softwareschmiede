@@ -17,7 +17,7 @@ namespace Softwareschmiede.Infrastructure.Plugins;
 /// Der GitHub-Token wird als GH_TOKEN Umgebungsvariable bzw. Authorization-Header übergeben,
 /// niemals als CLI-Argument oder in URLs.
 /// </summary>
-public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEventSource, IScmEventResponder, IScmAgentAccess, IScmNotificationSource, IScmRepositoryAliasNormalizer
+public sealed partial class GitHubPlugin : GitPluginBase<GitHubPlugin>, IScmEventSource, IScmEventResponder, IScmAgentAccess, IScmNotificationSource, IScmAssignmentSource, IScmRepositoryAliasNormalizer
 {
     private const string GitHubTokenCredentialKey = "Softwareschmiede.GitHub.Token";
     private const string GitHubAgentTokenCredentialKey = "Softwareschmiede.GitHub.AgentToken";

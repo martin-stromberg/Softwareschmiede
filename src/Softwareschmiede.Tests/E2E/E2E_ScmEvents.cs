@@ -5,6 +5,7 @@ using Softwareschmiede.App.Services.Testing;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Domain.Enums;
+using Softwareschmiede.Domain.ValueObjects;
 using Softwareschmiede.Tests.E2E.Views.Dialogs;
 using Softwareschmiede.Tests.E2E.Views;
 using Xunit;
@@ -379,7 +380,9 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
 
     /// <summary>Kontomodus „Separates Konto“: UI-Validierung ohne Token, Token per Tastatur,
     /// Inbox-Polling am Agent-Client (scm-bot), Mention→Aufgabe→Dispatch→Antwort, Fremd-
-    /// Verwerfungsdiagnose ohne Monitoring-Alarm und Rückschaltung auf Benutzerkonto.</summary>
+    /// Verwerfungsdiagnose ohne Monitoring-Alarm, Assignee-Auslöser (Zuweisung auf Issue und
+    /// Pull Request positiv, Fremd-Zuweisender verworfen, erneute Zuweisung auf dieselbe
+    /// Aufgabe) und Rückschaltung auf Benutzerkonto.</summary>
     private async Task BotModeAsync(Window window, ScmE2EFixture fixture)
     {
         // Fehlerfall zuerst: Separates Konto ohne AgentToken wird mit sichtbarer
@@ -449,29 +452,118 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         // Fremd- und Nicht-mention-Benachrichtigungen: verworfen bzw. ignoriert, Diagnose
         // sichtbar in den Integrationshinweisen — ohne MonitoringNotice-Alarm.
         fixture.AddNotification(19, repositoryNodeId: "FREMD_REPO");
-        fixture.AddNotification(21, reason: "assign");
+        // Assignee-Auslöser Negativfall: Zuweisung auf Issue 22 durch ein Konto außerhalb
+        // {Owner, scm-bot, Vertrauensliste} wird mit Begründung verworfen — Snapshot-Diagnose
+        // per DB-Assertion, Inbox-präfixierte Ablehnung auf dem Quellen-Checkpoint sichtbar.
+        fixture.AddText(22, 2202, "Aufgabe aus fremder Zuweisung", kind: "Description");
+        fixture.AddAssignment(22, "fremder-benutzer", "U_FREMD", "EV_22A");
+        fixture.AddNotification(22, reason: "assign");
         const string inboxKey = "notifications/softwareschmiede.github/github.com";
         string? diagnostic = null;
         await fixture.WaitForDatabaseAsync(async db =>
         {
             diagnostic = (await db.ScmObservationCheckpoints.FindAsync(inboxKey))?.Diagnostic;
-            return diagnostic?.Contains("1 verworfen", StringComparison.Ordinal) == true;
+            return diagnostic?.Contains("3 verarbeitet, 1 verworfen", StringComparison.Ordinal) == true;
         }, "Inbox-Verwerfungsdiagnose fehlt", TimeSpan.FromSeconds(30));
         Assert.NotNull(diagnostic);
         Assert.StartsWith(ScmEventStore.InboxDiscardDiagnosticPrefix, diagnostic);
         Assert.Contains("1 verworfen", diagnostic);
+        await fixture.WaitForDatabaseAsync(async db =>
+            await db.ScmContentSnapshots.AnyAsync(x => x.ContentKey.Contains("/Issue/22/Description/")
+                && x.Diagnostic == ScmEventValidationService.AssignerNotAllowedRejection),
+            "Snapshot-Diagnose für fremde Zuweisung fehlt", TimeSpan.FromSeconds(90));
         await using (var db = fixture.OpenDatabase())
         {
             Assert.False(await db.WorkItems.Include(x => x.IssueReference)
-                .AnyAsync(x => x.IssueReference != null && (x.IssueReference.IssueNumber == 19 || x.IssueReference.IssueNumber == 21)));
+                .AnyAsync(x => x.IssueReference != null && (x.IssueReference.IssueNumber == 19 || x.IssueReference.IssueNumber == 22)));
         }
         WaitForElement(window, cf => cf.ByName("Integrationshinweise"), Long)
             .Patterns.ExpandCollapse.Pattern.Expand();
         WaitContains(window, "ScmEventDiagnostics", "1 verworfen");
+        WaitContains(window, "ScmEventDiagnostics", "Zuweisung nicht durch berechtigtes Konto");
         var notice = window.FindFirstDescendant(cf => cf.ByAutomationId("ScmEventMonitoringNotice"));
         Assert.True(notice is null || notice.IsOffscreen || !notice.Name.Contains("verworfen", StringComparison.Ordinal),
             "Die Verwerfungsdiagnose darf keinen Monitoring-Alarm auslösen: " + notice?.Name);
-        output.WriteLine("Bot: Fremd-Benachrichtigung verworfen und nur als Integrationshinweis sichtbar, kein Alarm.");
+        output.WriteLine("Bot: Fremd-Benachrichtigung und Fremdzuweisung verworfen; beide nur als Integrationshinweis sichtbar, kein Alarm.");
+
+        // Assignee-Auslöser Positivfall: Owner-Zuweisung auf Issue 21 → Referenzbeschreibung
+        // als Auftragsinhalt → Aufgabe → Ereignis → Start → Zustellung mit Assignee-Hinweis.
+        fixture.AddText(21, 2101, "Aufgabe aus Assignee-Zuweisung", kind: "Description");
+        fixture.AddAssignment(21, "scm-owner", "OWNER", "EV_21A");
+        fixture.AddNotification(21, reason: "assign");
+        WorkItem? assignTask = null;
+        await fixture.WaitForDatabaseAsync(async db =>
+        {
+            assignTask = await db.WorkItems.Include(x => x.IssueReference)
+                .SingleOrDefaultAsync(x => x.IssueReference != null && x.IssueReference.IssueNumber == 21);
+            return assignTask is not null;
+        }, "Aufgabe für Issue 21 nicht angelegt");
+        Assert.NotNull(assignTask);
+        var assignWaiting = await fixture.WaitEventForTaskAsync(assignTask!.Id, ScmIncomingEventStatus.Wartend);
+        var assignTrigger = ScmEventStore.Observation(assignWaiting).Trigger;
+        Assert.Equal(ScmNotification.AssignReason, assignTrigger?.Reason);
+        Assert.Equal("scm-owner", assignTrigger?.ActorLogin);
+        Assert.Equal("EV_21A", assignTrigger?.EventNodeId);
+        SelectEventByTitle(window, "SCM Referenz 21", "/issues/21");
+        StartSelected(window);
+        await fixture.WaitEventForTaskAsync(assignTask.Id, ScmIncomingEventStatus.Verarbeitet);
+        var assignPrompt = fixture.Prompts().Last().GetProperty("request").GetProperty("body").GetString();
+        Assert.StartsWith(ScmEventOrchestrator.AssigneePromptPrefix, assignPrompt);
+        Assert.Contains("Aufgabe aus Assignee-Zuweisung", assignPrompt);
+        output.WriteLine("Bot: Owner-Zuweisung auf Issue 21 legte Aufgabe an; Prompt trägt den Assignee-Herkunftshinweis.");
+
+        // Erneute Zuweisung mit neuer Ereignisidentität: zweites Ereignis auf derselben
+        // Aufgabe — keine Doppelanlage, Zustellung in die laufende Sitzung.
+        var promptsBeforeReassign = fixture.Prompts().Count;
+        fixture.AddAssignment(21, "scm-owner", "OWNER", "EV_21B", createdAt: DateTimeOffset.UtcNow.AddMinutes(5));
+        await fixture.WaitForDatabaseAsync(async db =>
+        {
+            var events = await db.ScmIncomingEvents.Where(x => x.WorkItemId == assignTask.Id)
+                .OrderBy(x => x.Sequence).ToListAsync();
+            return events.Count == 2 && events.All(x => x.Status == ScmIncomingEventStatus.Verarbeitet);
+        }, "Zweites Ereignis der erneuten Zuweisung fehlt");
+        await using (var db = fixture.OpenDatabase())
+        {
+            Assert.Single(await db.WorkItems.Include(x => x.IssueReference)
+                .Where(x => x.IssueReference != null && x.IssueReference.IssueNumber == 21)
+                .ToListAsync());
+            Assert.Equal(2, await db.ScmIncomingEvents.CountAsync(x => x.WorkItemId == assignTask.Id));
+        }
+        Assert.Equal(promptsBeforeReassign + 1, fixture.Prompts().Count);
+        Assert.StartsWith(ScmEventOrchestrator.AssigneePromptPrefix,
+            fixture.Prompts().Last().GetProperty("request").GetProperty("body").GetString());
+        output.WriteLine("Bot: erneute Zuweisung auf Issue 21 lieferte zweites Ereignis auf derselben Aufgabe.");
+
+        // Assignee-Auslöser auf Pull Request 23: PR-Beschreibung als Auftragsinhalt über
+        // CreateFromPullRequestAsync → PR-Aufgabe → Zustellung mit Assignee-Hinweis.
+        fixture.AddText(23, 2301, "PR-Aufgabe aus Assignee-Zuweisung", kind: "Description", pullRequest: true);
+        fixture.AddAssignment(23, "scm-owner", "OWNER", "EV_23A");
+        fixture.AddNotification(23, reason: "assign", pullRequest: true);
+        await fixture.CreatePullRequestSourceBranchAsync(23);
+        WorkItem? prAssignTask = null;
+        await fixture.WaitForDatabaseAsync(async db =>
+        {
+            prAssignTask = await db.WorkItems.Include(x => x.PullRequests)
+                .SingleOrDefaultAsync(x => x.PullRequests.Any(p => p.PullRequestNumber == 23));
+            return prAssignTask is not null;
+        }, "Aufgabe für Pull Request 23 nicht angelegt");
+        Assert.NotNull(prAssignTask);
+        var prWaiting = await fixture.WaitEventForTaskAsync(prAssignTask!.Id, ScmIncomingEventStatus.Wartend);
+        Assert.Equal(ScmNotification.AssignReason, ScmEventStore.Observation(prWaiting).Trigger?.Reason);
+        Assert.Equal(ScmReferenceKind.PullRequest, ScmEventStore.Observation(prWaiting).Reference.Kind);
+        SelectEventByTitle(window, "SCM Referenz 23", "/pull/23");
+        StartSelected(window);
+        await fixture.WaitEventForTaskAsync(prAssignTask.Id, ScmIncomingEventStatus.Verarbeitet);
+        var prAssignPrompt = fixture.Prompts().Last().GetProperty("request").GetProperty("body").GetString();
+        Assert.StartsWith(ScmEventOrchestrator.AssigneePromptPrefix, prAssignPrompt);
+        Assert.Contains("PR-Aufgabe aus Assignee-Zuweisung", prAssignPrompt);
+        output.WriteLine("Bot: Owner-Zuweisung auf Pull Request 23 legte PR-Aufgabe an; Prompt trägt den Assignee-Hinweis.");
+
+        // Abschließende Zählerdiagnose: alle assign-Notifications zählen als verarbeitet.
+        await fixture.WaitForDatabaseAsync(async db =>
+            (await db.ScmObservationCheckpoints.FindAsync(inboxKey))?.Diagnostic?
+                .Contains("5 verarbeitet, 1 verworfen", StringComparison.Ordinal) == true,
+            "Abschließende Inbox-Zählerdiagnose fehlt", TimeSpan.FromSeconds(30));
 
         // Rückschaltung: der nächste Poll enumeriert wieder repository-weit, der Keyword-
         // Trigger läuft wie bisher.
@@ -713,16 +805,23 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
         await fixture.EnableIssuePreparationAsync();
         var window = WaitOnRealMainwindow(LaunchApp(false, fixture.EnvironmentVariables()));
 
+        // Erstbeobachtung abwarten: Steht die Baseline, wird ein danach veröffentlichtes Issue als
+        // neu ausgewertet; andernfalls markiert der Erstdurchlauf es ungesehen als Altbestand.
+        await fixture.WaitForDatabaseAsync(db =>
+                db.ScmObservationCheckpoints.AnyAsync(x => x.SourceKey.StartsWith("issueaufbereitung/")),
+            "Issue-Aufbereitung: Erstbeobachtungs-Baseline wurde nicht angelegt");
+
         // Ein gemeinsamer Szenario-Snapshot: Beschreibung und Trigger-Kommentar werden im
-        // selben Poll-Zyklus sichtbar. CreatedAt der Beschreibung muss hinter der
-        // Erstbeobachtungs-Baseline liegen — der Puffer hält sie sicher „neu".
+        // selben Poll-Zyklus sichtbar. CreatedAt der Beschreibung liegt hinter der
+        // Erstbeobachtungs-Baseline, aber nicht in der Zukunft — sonst verwirft der
+        // Watermark-Filter des Plugins die Beobachtung ungesehen.
         fixture.Scenario.Text.Add(new ScmE2EText
         {
             Number = 30,
             Id = 3001,
             Kind = "Description",
             Body = "Neue Anforderung E2E",
-            CreatedAt = DateTimeOffset.UtcNow.AddSeconds(10)
+            CreatedAt = DateTimeOffset.UtcNow
         });
         fixture.Scenario.Text.Add(new ScmE2EText
         {
@@ -792,11 +891,18 @@ public sealed class ScmEventsE2ETests(ITestOutputHelper output) : WpfTestBase
 
         // Sichtbarer Nachweis: genau ein Aufgabeneintrag; beide Ereigniszeilen gehören
         // zur selben Aufgabe (gleicher Aufgabentitel in der SCM-Ereignisliste).
-        var cards = WaitForElement(window, cf => cf.ByAutomationId("ActiveWorkItemKind_SCM Referenz 30"), Long);
+        var cards = WaitForElement(window, cf => cf.ByAutomationId("ActiveWorkItemKindLabel_SCM Referenz 30"), Long);
         Assert.NotNull(cards);
-        Assert.Single(window.FindAllDescendants(cf => cf.ByAutomationId("ActiveWorkItemKind_SCM Referenz 30")));
+        Assert.Single(window.FindAllDescendants(cf => cf.ByAutomationId("ActiveWorkItemKindLabel_SCM Referenz 30")));
         NavigateQueue(window);
+        Filter(window, ScmIncomingEventStatus.Verarbeitet);
+        var rowDeadline = DateTime.UtcNow.AddSeconds(30);
         var rows = Element(window, "ScmEventList").AsDataGridView().Rows;
+        while (rows.Length != 2 && DateTime.UtcNow < rowDeadline)
+        {
+            Thread.Sleep(100);
+            rows = Element(window, "ScmEventList").AsDataGridView().Rows;
+        }
         Assert.Equal(2, rows.Length);
         Assert.All(rows, row => Assert.Equal("SCM Referenz 30", row.Cells[0].Value));
         output.WriteLine("#463: eine Aufgabe für Issue 30; internes Aufbereitungsereignis und Kommentar zugestellt in dieser Reihenfolge.");

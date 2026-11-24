@@ -33,8 +33,10 @@ public sealed class ScmEventMonitoringService(
 
     /// <summary>Eine für den aktuellen Provider-Durchlauf aufgelöste SCM-Referenz: entweder
     /// über eine Aufgabe verknüpft (TaskId und Zweck-Markierung gesetzt) oder repository-weit
-    /// entdeckt bzw. aus der Inbox abgeleitet (TaskId und Purpose = <see langword="null"/>).</summary>
-    private sealed record ResolvedReference(Guid? TaskId, ScmEventReference Reference, string? Purpose);
+    /// entdeckt bzw. aus der Inbox abgeleitet (TaskId und Purpose = <see langword="null"/>;
+    /// Notification trägt den Inbox-Eintrag samt auslösendem Reason).</summary>
+    private sealed record ResolvedReference(Guid? TaskId, ScmEventReference Reference, string? Purpose,
+        ScmNotification? Notification = null);
 
     /// <inheritdoc/>
     public override async Task RunOnceAsync(CancellationToken ct = default)
@@ -180,6 +182,9 @@ public sealed class ScmEventMonitoringService(
                 Host: x.Reference.Repository.Host.ToLowerInvariant(), x.Reference.Repository.RepositoryId, x.Reference.Kind, x.Reference.Number)))
             {
                 var reference = group.First().Reference;
+                // Eine assign-abgeleitete Referenz validiert ihren Description-Batch über den
+                // Zuweisender-Kreis statt über den Texttrigger (siehe GetAssignRejection).
+                var assignNotification = group.Any(x => x.Notification?.Reason == ScmNotification.AssignReason);
                 var kinds = reference.Kind == ScmReferenceKind.Issue
                     ? new[] { ScmContentKind.Description, ScmContentKind.IssueComment }
                     : new[] { ScmContentKind.Description, ScmContentKind.IssueComment, ScmContentKind.ReviewComment, ScmContentKind.PullRequestReview };
@@ -209,6 +214,26 @@ public sealed class ScmEventMonitoringService(
                                 || x.Diagnostic == ScmEventStore.UnassignedDiagnostic), ct))
                             request = request with { SinceUtc = null };
                         var batch = await source.ReadEventsAsync(request, ct);
+                        if (assignNotification && kind == ScmContentKind.Description)
+                        {
+                            // Zuweisender und Ereignisidentität der jüngsten wirksamen
+                            // Viewer-Zuweisung; ohne Plugin-Fähigkeit bleibt die Zuweisung
+                            // unbestimmt und wird weiter unten abgelehnt. Die Dekoration trägt
+                            // die Zuweisungsidentität in den ContentKey — eine erneute
+                            // Zuweisung bei unverändertem Text erzeugt ein neues Ereignis.
+                            var assignment = source is IScmAssignmentSource assignments
+                                ? await assignments.GetLatestViewerAssignmentAsync(reference, ct)
+                                : null;
+                            batch = batch with
+                            {
+                                Observations = batch.Observations.Select(x => x with
+                                {
+                                    RemoteNodeId = x.RemoteNodeId + "/assign-" + (assignment?.EventNodeId ?? "unbestimmt"),
+                                    Trigger = new ScmEventTrigger(ScmNotification.AssignReason, assignment?.AssignerId,
+                                    assignment?.AssignerLogin, assignment?.EventNodeId, assignment?.OccurredAt)
+                                }).ToArray()
+                            };
+                        }
                         // Zweistufige Auswahl wie im Resolver: genau eine reguläre Aufgabe
                         // gewinnt (auch gegenüber einem Altbestand-Paar aus regulärer und
                         // zweck-markierter Aufgabe); ohne regulären Treffer tritt genau eine
@@ -238,7 +263,11 @@ public sealed class ScmEventMonitoringService(
                                 .DetectAndEnqueueAsync(source, reference, batch, preparationRepositories, ct);
                         }
                         await batchScope.ServiceProvider.GetRequiredService<ScmEventStore>().AcceptBatchAsync(
-                            workItemId, sourceKey, batch, unassigned, triggerKeyword, delayKeyword, ct);
+                            workItemId, sourceKey, batch, unassigned, triggerKeyword, delayKeyword,
+                            assignNotification && kind == ScmContentKind.Description
+                                ? x => ScmEventValidationService.GetRejection(x, triggerKeyword)
+                                : null,
+                            ct);
                     }
                     catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                     catch (Exception ex)
@@ -342,8 +371,12 @@ public sealed class ScmEventMonitoringService(
                 .ToDictionary(x => x.Key, x => x.First(), StringComparer.Ordinal);
             var seen = new HashSet<string>(StringComparer.Ordinal);
             var discarded = 0;
-            var mentions = notifications.Where(x => x.Reason == ScmNotification.MentionReason).ToList();
-            foreach (var notification in mentions)
+            // Erwähnung und Assignee-Zuweisung lösen die Beobachtung aus; bei gleichzeitigem
+            // Vorliegen gewinnt die Zuweisung als stärkeres Delegationssignal die Deduplizierung.
+            var relevant = notifications
+                .Where(x => x.Reason is ScmNotification.MentionReason or ScmNotification.AssignReason)
+                .OrderByDescending(x => x.Reason == ScmNotification.AssignReason).ToList();
+            foreach (var notification in relevant)
             {
                 if (!byRepository.TryGetValue(notification.RepositoryNodeId, out var repository))
                 {
@@ -351,12 +384,12 @@ public sealed class ScmEventMonitoringService(
                     continue;
                 }
                 if (seen.Add($"{notification.RepositoryNodeId}/{notification.Kind}/{notification.Number}"))
-                    resolved.Add(new(null, new ScmEventReference(repository, notification.Kind, notification.Number), null));
+                    resolved.Add(new(null, new ScmEventReference(repository, notification.Kind, notification.Number), null, notification));
             }
             // Der Watermark darf erst nach dem Verarbeiten aller abgeleiteten Quellen stehen;
             // das Commit erfolgt daher erst am Ende des Plugin-Durchlaufs (siehe RunOnceAsync).
             pendingInboxCommits.Add((inboxKey, now,
-                $"{ScmEventStore.InboxDiscardDiagnosticPrefix} {mentions.Count - discarded} verarbeitet, {discarded} verworfen (Repository nicht registriert)."));
+                $"{ScmEventStore.InboxDiscardDiagnosticPrefix} {relevant.Count - discarded} verarbeitet, {discarded} verworfen (Repository nicht registriert)."));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)

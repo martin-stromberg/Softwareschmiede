@@ -22,6 +22,13 @@ public sealed class ScmEventStore(SoftwareschmiedeDbContext db, ScmEventChangeNo
     public const string AmbiguousAssignmentDiagnostic = "Mehrdeutige Zuordnung zu Aufgaben";
     /// <summary>Diagnose für Referenzen ohne zuordenbare lokale Aufgabe.</summary>
     public const string UnassignedDiagnostic = "Keine Aufgabe zugeordnet";
+    /// <summary>Diagnose eines leeren Assign-Batches: Die Quelle lieferte keine verwertbare
+    /// Referenzbeschreibung — z. B. weil das Plugin eine eigene, marker-gekennzeichnete
+    /// Beschreibung bereits herausgefiltert hat oder die Beschreibung nicht lesbar ist.
+    /// Bewusst generischer als <see cref="ScmEventValidationService.AssignEmptyDescriptionRejection"/>:
+    /// Eine tatsächlich leere Beschreibung trifft als Beobachtung mit leerem Text ein und wird
+    /// je Beobachtung abgelehnt, ein gänzlich leerer Batch hat andere Ursachen.</summary>
+    public const string EmptyDescriptionBatchDiagnostic = "Keine verwertbare Referenzbeschreibung";
     /// <summary>Präfix der Routine-Verwerfungsdiagnose verworfener Fremd-Notifications; löst keinen
     /// Unterbrechungshinweis in der SCM-Ereignisübersicht aus.</summary>
     public const string InboxDiscardDiagnosticPrefix = "Inbox:";
@@ -46,9 +53,18 @@ public sealed class ScmEventStore(SoftwareschmiedeDbContext db, ScmEventChangeNo
     /// Ereignisvalidierung; leere Werte fallen auf den Standard zurück.</param>
     /// <param name="delayKeyword">Das aktuell konfigurierte Verzögerungs-Keyword für die
     /// Direktivenauswertung; leere Werte fallen auf den Standard zurück.</param>
+    /// <param name="unassignedRejection">Optionaler fachlicher Ablehnungsprüfer für Beobachtungen
+    /// ohne Aufgabenzuordnung (assign-ausgelöste Batches): bei <paramref name="unassigned"/>
+    /// ersetzt je Beobachtung deren eigene nicht-leere Ablehnung die pauschale
+    /// <see cref="UnassignedDiagnostic"/> am jeweiligen Snapshot; die erste nicht-leere
+    /// Ablehnung des Batches wird zusätzlich als
+    /// <see cref="InboxDiscardDiagnosticPrefix"/>-präfixierte Diagnose auf den Quellen-Checkpoint
+    /// gehoben; bei mehrdeutiger Zuordnung bleibt <see cref="AmbiguousAssignmentDiagnostic"/>
+    /// führend.</param>
     /// <param name="ct">Abbruchtoken.</param>
     public async Task AcceptBatchAsync(Guid? workItemId, string sourceKey, ScmEventBatch batch,
-        bool unassigned = false, string? triggerKeyword = null, string? delayKeyword = null, CancellationToken ct = default)
+        bool unassigned = false, string? triggerKeyword = null, string? delayKeyword = null,
+        Func<ScmEventObservation, string?>? unassignedRejection = null, CancellationToken ct = default)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var checkpoint = await db.ScmObservationCheckpoints.FindAsync([sourceKey], ct);
@@ -66,10 +82,15 @@ public sealed class ScmEventStore(SoftwareschmiedeDbContext db, ScmEventChangeNo
         var sourceSnapshots = await db.ScmContentSnapshots.Where(x => x.ContentKey.StartsWith(contentPrefix)).ToListAsync(ct);
         var unassignedDiagnostic = unassigned ? UnassignedDiagnostic : AmbiguousAssignmentDiagnostic;
         var pauseSet = false;
+        string? firstRejection = null;
         foreach (var observation in batch.Observations.OrderBy(x => x.Revision).ThenBy(x => x.EventKey, StringComparer.Ordinal))
         {
             var snapshot = await db.ScmContentSnapshots.FindAsync([observation.ContentKey], ct);
-            var rejection = workItemId is null ? unassignedDiagnostic : ScmEventValidationService.GetRejection(observation, triggerKeyword);
+            var concreteRejection = workItemId is null && unassigned ? unassignedRejection?.Invoke(observation) : null;
+            firstRejection ??= concreteRejection;
+            var rejection = workItemId is null
+                ? unassigned ? concreteRejection ?? unassignedDiagnostic : unassignedDiagnostic
+                : ScmEventValidationService.GetRejection(observation, triggerKeyword);
             var resolved = workItemId is not null && rejection != "Bearbeiter nicht bestimmbar";
             if (snapshot is not null && snapshot.BodyHash == observation.BodyHash && snapshot.IdentityResolved
                 && snapshot.Diagnostic != AmbiguousAssignmentDiagnostic && snapshot.Diagnostic != UnassignedDiagnostic)
@@ -117,7 +138,16 @@ public sealed class ScmEventStore(SoftwareschmiedeDbContext db, ScmEventChangeNo
         checkpoint.Failures = 0;
         checkpoint.NextAttemptUtc = null;
         checkpoint.ErrorCode = null;
-        checkpoint.Diagnostic = workItemId is null ? unassignedDiagnostic
+        // Assign-Ablehnungen werden zusätzlich als Inbox:-Diagnose auf den Quellen-Checkpoint
+        // gehoben: die Snapshot-Diagnose allein hätte keine Sichtbarkeit in den
+        // Integrationshinweisen. Ein leerer Batch trägt keine verwertbare Beschreibung (u. a.
+        // eigene Marker-Texte filtert das Plugin bereits vor dem Batch heraus); ohne
+        // konkrete Ablehnung bleibt die Unzugeordnet-Diagnose. Mehrdeutigkeit bleibt führend.
+        checkpoint.Diagnostic = workItemId is null
+            ? unassigned && unassignedRejection is not null
+                ? InboxDiscardDiagnosticPrefix + " " + (firstRejection ?? (batch.Observations.Count == 0
+                    ? EmptyDescriptionBatchDiagnostic : UnassignedDiagnostic))
+                : unassignedDiagnostic
             : sourceSnapshots.Any(x => x.Diagnostic == AmbiguousAssignmentDiagnostic) ? AmbiguousAssignmentDiagnostic
             : sourceSnapshots.Any(x => x.Diagnostic == UnassignedDiagnostic) ? UnassignedDiagnostic : null;
         await db.SaveChangesAsync(ct);

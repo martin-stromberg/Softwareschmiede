@@ -18,6 +18,18 @@ public sealed class ScmEventValidationService
     /// bereits remote reagiert hat (instanzübergreifende Duplikaterkennung).</summary>
     public const string AlreadyReactedRejection = "Bereits mit dem Konto reagiert";
 
+    /// <summary>Ablehnungsgrund, wenn eine durch eine Assignee-Zuweisung ausgelöste Beobachtung
+    /// keinen Auftragsinhalt trägt (leere oder nicht lesbare Referenzbeschreibung).</summary>
+    public const string AssignEmptyDescriptionRejection = "Referenzbeschreibung ist leer";
+
+    /// <summary>Ablehnungsgrund, wenn zu einer Assignee-Zuweisung kein wirksames
+    /// Zuweisungsereignis und damit kein Zuweisender ermittelt werden kann.</summary>
+    public const string AssignerUnknownRejection = "Zuweisender nicht bestimmbar";
+
+    /// <summary>Ablehnungsgrund, wenn die Zuweisung weder durch den Repository-Owner noch durch
+    /// das überwachte Konto selbst noch durch ein vertrauenswürdiges Automatisierungskonto erfolgte.</summary>
+    public const string AssignerNotAllowedRejection = "Zuweisung nicht durch berechtigtes Konto";
+
     private const string QuoteChars = "'\"`´‚‘’„“”«»";
 
     /// <summary>Vertrauenswürdige Automatisierungs-Logins, deren Textversionen dem Repository
@@ -38,6 +50,10 @@ public sealed class ScmEventValidationService
     /// <see cref="DefaultTriggerKeyword"/> zurück.</param>
     public static string? GetRejection(ScmEventObservation observation, string? triggerKeyword = null)
     {
+        // Zuweisungsauslöser: die Referenzbeschreibung trägt den Auftrag ohne Texttrigger;
+        // geprüft werden Inhalt und Zuweisender-Kreis statt Erwähnung/Keyword und Akteur.
+        if (observation.Trigger is { Reason: ScmNotification.AssignReason } assignTrigger)
+            return GetAssignRejection(observation, assignTrigger, triggerKeyword);
         var repository = observation.Reference.Repository;
         var separate = repository.Account == ScmAccountMode.SeparateAccount;
         // Trigger je Modus: Benutzerkonto = konfiguriertes Keyword, SeparatesKonto = frei stehende
@@ -65,6 +81,36 @@ public sealed class ScmEventValidationService
         if (observation.Body.Contains("<!-- softwareschmiede:", StringComparison.Ordinal))
             return "Eigene Antwort";
         return null;
+    }
+
+    /// <summary>Prüfschritt des Assignee-Auslösers: Auftragsinhalt vorhanden, Zuweisender
+    /// bestimmbar und im erlaubten Kreis (Repository-Owner, überwachtes Konto,
+    /// <see cref="TrustedAutomationLogins"/>); die eigene-Antwort-Markierung gilt weiter.
+    /// Scheitert die Zuweisungsprüfung, legitimiert ein gleichzeitig gültiger Texttrigger
+    /// (z. B. eine Erwähnung des separaten Kontos in derselben Beschreibung) die Beobachtung
+    /// dennoch: Die abgelehnte Zuweisung gewinnt zwar die Notification-Deduplizierung, darf
+    /// einen davon unabhängigen, regulären Auslöser aber nicht unterdrücken. Lehnt der
+    /// Texttrigger ebenfalls ab, bleibt die spezifischere Zuweisungsbegründung führend.</summary>
+    private static string? GetAssignRejection(ScmEventObservation observation, ScmEventTrigger trigger, string? triggerKeyword)
+    {
+        var repository = observation.Reference.Repository;
+        string? rejection;
+        if (string.IsNullOrWhiteSpace(observation.Body))
+            rejection = AssignEmptyDescriptionRejection;
+        else if (string.IsNullOrWhiteSpace(trigger.ActorId) && string.IsNullOrWhiteSpace(trigger.ActorLogin))
+            rejection = AssignerUnknownRejection;
+        else if (!SameIdentity(trigger.ActorId, trigger.ActorLogin, repository.OwnerId, repository.Owner)
+                && !SameIdentity(trigger.ActorId, trigger.ActorLogin, repository.ViewerId, repository.ViewerLogin)
+                && !IsTrustedAutomationLogin(trigger.ActorLogin))
+            rejection = AssignerNotAllowedRejection;
+        else if (observation.Body.Contains("<!-- softwareschmiede:", StringComparison.Ordinal))
+            rejection = "Eigene Antwort";
+        else
+            return null;
+        // Fallback auf den regulären Texttrigger: Ein frei stehender Auslöser in der
+        // Beschreibung (inklusive seiner Autor-/Editor- und Markerprüfung) legitimiert
+        // die Beobachtung unabhängig vom Zuweisender-Kreis.
+        return GetRejection(observation with { Trigger = null }, triggerKeyword) is null ? null : rejection;
     }
 
     /// <summary>Der Trigger zählt nur frei stehend; unmittelbar zitierte Vorkommen lösen nichts aus.</summary>

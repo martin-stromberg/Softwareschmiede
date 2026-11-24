@@ -57,6 +57,10 @@ internal sealed class ScmE2EScenario
     public bool RateLimitRest { get; set; }
     public List<ScmE2EText> Text { get; set; } = [];
     public List<ScmE2ENotification> Notifications { get; set; } = [];
+    public List<ScmE2EAssignment> Assignments { get; set; } = [];
+    // Reale Head-SHAs im Fixture-Origin angelegter PR-Quellbranches; ohne Eintrag gilt der
+    // Platzhalter "sha{n}". Die Head-SHA-Prüfung beim Checkout verlangt den echten Wert.
+    public Dictionary<int, string> PullRequestHeadShas { get; set; } = [];
 }
 
 // Inbox-Eintrag der Notifications-API; eine abweichende RepositoryNodeId steht für ein
@@ -83,5 +87,17 @@ internal sealed class ScmE2EText
     public List<string> ViewerReactions { get; set; } = [];
     public string NodeId => $"SCM_{Kind}_{Id}";
 }
+
+// Eintrag des Issue-Events-Endpunkts (issues/{n}/events); EventType ist "assigned" oder
+// "unassigned" und gilt für Issue- wie PR-Referenzen gleichermaßen.
+internal sealed record ScmE2EAssignment(
+    int Number,
+    string EventNodeId,
+    string EventType,
+    string AssignerLogin,
+    string AssignerNodeId,
+    string AssigneeLogin,
+    string AssigneeNodeId,
+    DateTimeOffset CreatedAt);
 
 internal sealed record ScmE2ERemoteResponse(string Endpoint, long Id, string Body, string? Content);
