@@ -107,7 +107,9 @@ public sealed class ScmEventOrchestrator(
                     await DispatchCoreAsync(eventId, taskId, null, ct, owner);
                     return;
                 }
-                var task = await db.WorkItems.SingleAsync(x => x.Id == taskId, ct);
+                var task = await db.WorkItems.SingleOrDefaultAsync(x => x.Id == taskId, ct);
+                if (task is null) { await MarkUndeliverableAsync(item, RemovedTaskUndeliverableReason, ct); return; }
+                if (UndeliverableReason(task) is { } undeliverable) { await MarkUndeliverableAsync(item, undeliverable, ct); return; }
                 if (BlockReason(task) is { } blocked) { await WaitAsync(item, blocked, ct); return; }
                 if (task.Status == WorkItemStatus.New) await tasks.SetStatusAsync(taskId, WorkItemStatus.Started, ct);
                 var session = cli.GetScmPromptSession(taskId);
@@ -171,6 +173,10 @@ public sealed class ScmEventOrchestrator(
                 && !x.Purpose.StartsWith("ai:") && x.Status != "Succeeded").ToListAsync(ct))
                 await outbox.ExecuteAsync(action, responder, ct);
             if (item.Status == ScmIncomingEventStatus.Verarbeitet) return;
+            // Terminal klärbare Stati ohne begonnenen Versuch (z. B. strukturell unzustellbar):
+            // kein Abgleich möglich, keine automatische Zustellung — Klärung nur manuell.
+            if (item.DeliveryAttemptId is null
+                && item.Status is ScmIncomingEventStatus.VerarbeitungUngeklärt or ScmIncomingEventStatus.ZustellungUngewiss) return;
             if (item.DeliveryAttemptId is not null)
             {
                 try { await ReconcileAttemptAsync(item, observation, responder, ct); }
@@ -197,7 +203,8 @@ public sealed class ScmEventOrchestrator(
                 return;
             }
             var task = await db.WorkItems.Include(x => x.GitRepository).SingleOrDefaultAsync(x => x.Id == item.WorkItemId, ct);
-            if (task is null) { await WaitAsync(item, "Zugehörige Aufgabe wurde entfernt.", ct); return; }
+            if (task is null) { await MarkUndeliverableAsync(item, RemovedTaskUndeliverableReason, ct); return; }
+            if (UndeliverableReason(task) is { } undeliverable) { await MarkUndeliverableAsync(item, undeliverable, ct); return; }
             var blocked = BlockReason(task);
             if (blocked is not null) { await WaitWithCommentAsync(item, observation, responder, blocked, ct); return; }
             try
@@ -283,6 +290,7 @@ public sealed class ScmEventOrchestrator(
                 { await WaitWithCommentAsync(item, observation, responder, "CLI-Sitzung ist nicht verfügbar.", ct); return; }
                 // Die lebende Sitzung hat Vorrang. Ein geänderter Dialogwert beendet oder ersetzt sie nicht.
                 await db.Entry(task).ReloadAsync(ct);
+                if (UndeliverableReason(task) is { } lateUndeliverable) { await MarkUndeliverableAsync(item, lateUndeliverable, ct); return; }
                 blocked = BlockReason(task);
                 if (blocked is not null) { await WaitWithCommentAsync(item, observation, responder, blocked, ct); return; }
                 if (task.Status == WorkItemStatus.New) await tasks.SetStatusAsync(task.Id, WorkItemStatus.Started, ct);
@@ -380,7 +388,8 @@ public sealed class ScmEventOrchestrator(
             // Randfall „Sitzung bereits am verifizierten Prompt, letztes offenes Ereignis erreicht
             // den Endstatus": Erst jetzt wird die Platzfreigabe der Ausführungsbegrenzung wirksam —
             // die angeforderte Startprüfung füllt den Platz ereignisgesteuert statt erst beim Poll.
-            if (item?.Status is "Verarbeitet" or "Abgebrochen")
+            // Die terminal klärbaren Stati geben den Platz genauso frei (StartSlotFreeing).
+            if (item?.Status is "Verarbeitet" or "Abgebrochen" or "VerarbeitungUngeklärt" or "ZustellungUngewiss")
                 startCheckTrigger?.RequestStartCheck();
             notifier.Notify();
         }
@@ -402,6 +411,11 @@ public sealed class ScmEventOrchestrator(
         if (item.Status == ScmIncomingEventStatus.Abgebrochen) return false;
         item.NextAttemptUtc = null;
         item.ErrorCode = null;
+        // Ein terminal klärbares Ereignis ohne begonnenen Versuch (z. B. strukturell
+        // unzustellbar markiert) beginnt beim expliziten Neuversuch von vorn.
+        if (item.DeliveryAttemptId is null
+            && item.Status is ScmIncomingEventStatus.VerarbeitungUngeklärt or ScmIncomingEventStatus.ZustellungUngewiss)
+            item.Status = ScmIncomingEventStatus.Aufgenommen;
         await db.ScmOutgoingActions.Where(x => x.EventId == eventId && x.Status != "Succeeded")
             .ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)null), token);
         await db.ScmObservationCheckpoints.ExecuteUpdateAsync(x => x.SetProperty(p => p.NextAttemptUtc, (long?)null), token);
@@ -684,7 +698,8 @@ public sealed class ScmEventOrchestrator(
         if (item.NextAttemptUtc > time.GetUtcNow().ToUnixTimeMilliseconds()) return;
         var task = await db.WorkItems.Include(x => x.GitRepository).Include(x => x.IssueReference)
             .SingleOrDefaultAsync(x => x.Id == item.WorkItemId, ct);
-        if (task is null) { await WaitAsync(item, "Zugehörige Aufgabe wurde entfernt.", ct); return; }
+        if (task is null) { await MarkUndeliverableAsync(item, RemovedTaskUndeliverableReason, ct); return; }
+        if (UndeliverableReason(task) is { } undeliverable) { await MarkUndeliverableAsync(item, undeliverable, ct); return; }
         var blocked = BlockReason(task);
         if (blocked is not null) { await WaitAsync(item, blocked, ct); return; }
         try
@@ -771,6 +786,7 @@ public sealed class ScmEventOrchestrator(
             if (adapter is null || !adapter.IsAlive)
             { await WaitAsync(item, "CLI-Sitzung ist nicht verfügbar.", ct); return; }
             await db.Entry(task).ReloadAsync(ct);
+            if (UndeliverableReason(task) is { } lateUndeliverable) { await MarkUndeliverableAsync(item, lateUndeliverable, ct); return; }
             blocked = BlockReason(task);
             if (blocked is not null) { await WaitAsync(item, blocked, ct); return; }
             if (task.Status == WorkItemStatus.New) await tasks.SetStatusAsync(task.Id, WorkItemStatus.Started, ct);
@@ -1123,6 +1139,33 @@ public sealed class ScmEventOrchestrator(
     private string? BlockReason(WorkItem task)
         => task.Status is WorkItemStatus.Completed or WorkItemStatus.Archived ? "Aufgabe beendet/archiviert; Start gesperrt."
             : task.PausedUntilUtc.IsCurrentlyPaused(time.GetUtcNow()) ? "Aufgabe pausiert; Start gesperrt." : null;
+
+    /// <summary>Wartegrund für Ereignisse, deren zugehörige Aufgabe nicht mehr existiert.</summary>
+    private const string RemovedTaskUndeliverableReason =
+        "Die zugehörige Aufgabe wurde entfernt; das Ereignis kann nicht mehr zugestellt werden.";
+
+    /// <summary>Strukturelle Unzustellbarkeit: Ereignisse, deren Aufgabe beendet/archiviert
+    /// oder ohne Repository-Zuordnung ist, können nie zugestellt werden und erhalten über
+    /// <see cref="MarkUndeliverableAsync"/> den manuell klärbaren Endzustand statt ewig
+    /// <see cref="ScmIncomingEventStatus.Wartend"/> zu bleiben.</summary>
+    private static string? UndeliverableReason(WorkItem task)
+        => task.Status is WorkItemStatus.Completed or WorkItemStatus.Archived
+            ? "Die Aufgabe ist beendet/archiviert; das Ereignis kann nicht mehr zugestellt werden."
+            : task.GitRepositoryId is null
+            ? "Der Aufgabe ist kein Git-Repository zugeordnet; das Ereignis kann nicht zugestellt werden. Repository zuordnen und das Ereignis erneut prüfen."
+            : null;
+
+    /// <summary>Setzt ein strukturell unzustellbares Ereignis in den terminalen, manuell klärbaren
+    /// Zustand <see cref="ScmIncomingEventStatus.VerarbeitungUngeklärt"/> — ohne Remote-Kommentar:
+    /// „wartet auf Verarbeitung" wäre für ein nie zustellbares Ereignis irreführend; die Klärung
+    /// (erneut senden oder abbrechen) erfolgt über die Ereignis-Queue.</summary>
+    private async Task MarkUndeliverableAsync(ScmIncomingEvent item, string reason, CancellationToken ct)
+    {
+        item.Status = ScmIncomingEventStatus.VerarbeitungUngeklärt;
+        item.Reason = reason;
+        item.NextAttemptUtc = long.MaxValue;
+        await db.SaveChangesAsync(ct);
+    }
 
     private async Task WaitAsync(ScmIncomingEvent item, string reason, CancellationToken ct)
     {

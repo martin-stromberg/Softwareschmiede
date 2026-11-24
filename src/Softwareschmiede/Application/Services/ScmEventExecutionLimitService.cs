@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Softwareschmiede.Domain.Entities;
 using Softwareschmiede.Infrastructure.Data;
 
 namespace Softwareschmiede.Application.Services;
@@ -7,7 +8,8 @@ namespace Softwareschmiede.Application.Services;
 /// Zwei Freigaberegeln lassen einen Platz trotz weiterlaufendem Prozess entfallen: pausierte
 /// Aufgaben (<c>Aufgabe.PausedUntilUtc</c> in der Zukunft) und Aufgaben mit lebender
 /// SCM-Promptsitzung am verifizierten Eingabeprompt (<see cref="ScmPromptReadyStatus.Ready"/>)
-/// ohne unverarbeitetes <c>ScmIncomingEvent</c> — beide fehlen in beiden Zählern.</summary>
+/// ohne platzbedürftiges <c>ScmIncomingEvent</c> (In-Flight-Status außerhalb
+/// <see cref="ScmIncomingEventStatus.StartSlotFreeing"/>) — beide fehlen in beiden Zählern.</summary>
 /// <param name="Global">Anzahl aller Aufgaben mit laufender, nicht freigegebener CLI-Ausführung
 /// (inklusive laufender Handles ohne auflösbare Aufgabenzeile).</param>
 /// <param name="ProPlugin">Anzahl laufender, nicht freigegebener Ausführungen je zugeordnetem KI-Plugin-Prefix.</param>
@@ -188,14 +190,18 @@ public sealed class ScmEventExecutionLimitService(
     /// vor der globalen Zählung und der Plugin-Attribution: Pausierte Aufgaben
     /// (<c>PausedUntilUtc</c> in der Zukunft — ihr Prozess läuft bewusst weiter) belegen keinen
     /// Platz; eine Aufgabe mit lebender SCM-Promptsitzung am verifizierten Eingabeprompt
-    /// (<see cref="ScmPromptReadyStatus.Ready"/>) ohne unverarbeitetes <c>ScmIncomingEvent</c>
-    /// (Status außerhalb <c>"Verarbeitet"</c>/<c>"Abgebrochen"</c>) ebenfalls nicht — sie wartet
-    /// ehrlich auf Eingabe und blockiert keinen Folgestart. Konservativ voll zählen dagegen
-    /// fehlende Pausenzeiten, fehlende Sitzungen, jeder andere Bereitschaftsstand, jede Aufgabe
-    /// mit offenem Ereignis und Handles ohne Aufgabenzeile. Kehrt eine freigegebene Aufgabe zur
-    /// Arbeit zurück, zählt sie erst bei der nächsten Bewertung wieder voll — die dadurch
-    /// mögliche zeitweise Überschreitung des Limits ist toleriert (nur Starts werden begrenzt,
-    /// nie laufende Prozesse).</summary>
+    /// (<see cref="ScmPromptReadyStatus.Ready"/>) ohne platzbedürftiges <c>ScmIncomingEvent</c>
+    /// ebenfalls nicht — sie wartet ehrlich auf Eingabe und blockiert keinen Folgestart.
+    /// Platzbedürftig sind ausschließlich die In-Flight-Stati laufender Zustellung/Verarbeitung;
+    /// noch nicht zugestellte Ereignisse gehen ohnehin in dieselbe Sitzung (kein neuer Start
+    /// nötig) und manuell klärbare Endstati warten auf den Anwender statt auf einen Platz —
+    /// <see cref="ScmIncomingEventStatus.StartSlotFreeing"/> fasst die freigebenden Stati.
+    /// Konservativ voll zählen dagegen fehlende Pausenzeiten, fehlende Sitzungen, jeder andere
+    /// Bereitschaftsstand, jede Aufgabe mit In-Flight- oder unbekanntem Ereignis-Status und
+    /// Handles ohne Aufgabenzeile. Kehrt eine freigegebene Aufgabe zur Arbeit zurück, zählt sie
+    /// erst bei der nächsten Bewertung wieder voll — die dadurch mögliche zeitweise
+    /// Überschreitung des Limits ist toleriert (nur Starts werden begrenzt, nie laufende
+    /// Prozesse).</summary>
     private async Task<CliExecutionOccupancy> GetOccupancyAsync(CancellationToken ct)
     {
         var runningIds = cli.GetRunningWorkItemIds();
@@ -212,13 +218,16 @@ public sealed class ScmEventExecutionLimitService(
             .Where(x => sessions[x.Id] is { IsAlive: true, ReadyStatus: ScmPromptReadyStatus.Ready })
             .Select(x => x.Id)
             .ToHashSet();
-        // Der Nachweis allein reicht nicht: Ein offenes Ereignis der Aufgabe hält den Platz
-        // belegt (Zustellfenster, Antwortabgleich). Die gebündelte Abfrage läuft nur, wenn es
-        // überhaupt einen verifizierten Kandidaten gibt.
+        // Der Nachweis allein reicht nicht: Ein Ereignis der Aufgabe hält den Platz nur dann
+        // belegt, wenn seine Zustellung/Verarbeitung tatsächlich in-Flight ist (Zustellfenster,
+        // Antwortabgleich — die Sitzung ist beschäftigt, nicht ehrlich wartend). Ereignisse in
+        // StartSlotFreeing-Stati benötigen keinen neuen Start oder keine Zustellung mehr —
+        // sie würden den Platz unbefristet sperren, ohne ihn je zu verwenden. Die gebündelte
+        // Abfrage läuft nur, wenn es überhaupt einen verifizierten Kandidaten gibt.
         var pending = readyIds.Count == 0
             ? []
             : await db.ScmIncomingEvents.AsNoTracking()
-                .Where(x => readyIds.Contains(x.WorkItemId) && x.Status != "Verarbeitet" && x.Status != "Abgebrochen")
+                .Where(x => readyIds.Contains(x.WorkItemId) && !ScmIncomingEventStatus.StartSlotFreeing.Contains(x.Status))
                 .Select(x => x.WorkItemId)
                 .ToHashSetAsync(ct);
         var occupied = active.Where(x => !readyIds.Contains(x.Id) || pending.Contains(x.Id)).ToList();
