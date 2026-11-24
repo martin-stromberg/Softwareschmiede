@@ -69,9 +69,9 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
     private void SetRunning(params Guid[] ids)
         => _cli.Setup(x => x.GetRunningWorkItemIds()).Returns(ids.ToList());
 
-    private async Task AddEventAsync(Guid workItemId, string status)
+    private async Task AddEventAsync(Guid workItemId, string status, long? nextAttemptUtc = null)
     {
-        _db.ScmIncomingEvents.Add(new ScmIncomingEvent { WorkItemId = workItemId, Status = status });
+        _db.ScmIncomingEvents.Add(new ScmIncomingEvent { WorkItemId = workItemId, Status = status, NextAttemptUtc = nextAttemptUtc });
         await _db.SaveChangesAsync();
     }
 
@@ -445,16 +445,14 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
         (await _sut.GetStartBlockReasonAsync(PrefixA, TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
-    /// <summary>Ein offenes Ereignis der Aufgabe hält den Platz trotz verifiziertem Eingabeprompt belegt.</summary>
+    /// <summary>Ein In-Flight-Ereignis der Aufgabe (Zustellung/Verarbeitung läuft) hält den Platz
+    /// trotz verifiziertem Eingabeprompt belegt — ebenso konservativ ein unbekannter Status.</summary>
     [Theory]
-    [InlineData("Aufgenommen")]
-    [InlineData("Wartend")]
-    [InlineData("Verzögert")]
+    [InlineData("ZustellungVorbereitet")]
     [InlineData("Zugestellt")]
     [InlineData("InBearbeitung")]
-    [InlineData("ZustellungUngewiss")]
-    [InlineData("VerarbeitungUngeklärt")]
-    public async Task GetStartBlockReasonAsync_ReadySessionWithPendingEvent_CountsAsOccupied(string status)
+    [InlineData("ZukuenftigerStatus")]
+    public async Task GetStartBlockReasonAsync_ReadySessionInFlightEvent_CountsAsOccupied(string status)
     {
         await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
         var workItemId = await RunningWorkItemAsync("Bereit", PrefixA, LiveSession(PrefixA, ScmPromptReadyStatus.Ready));
@@ -462,6 +460,37 @@ public sealed class ScmEventExecutionLimitServiceTests : IDisposable
         SetRunning(workItemId);
 
         (await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken)).Should().Contain("globale Limit");
+    }
+
+    /// <summary>Ein noch nicht zugestelltes oder terminal klärbares Ereignis benötigt keinen
+    /// neuen Startplatz — die Prompt-Freigabe greift trotz offenem Ereignis.</summary>
+    [Theory]
+    [InlineData("Aufgenommen")]
+    [InlineData("Verzögert")]
+    [InlineData("Wartend")]
+    [InlineData("ZustellungUngewiss")]
+    [InlineData("VerarbeitungUngeklärt")]
+    public async Task GetStartBlockReasonAsync_ReadySessionNotYetDeliveredEvent_FreesSlot(string status)
+    {
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        var workItemId = await RunningWorkItemAsync("Bereit", PrefixA, LiveSession(PrefixA, ScmPromptReadyStatus.Ready));
+        await AddEventAsync(workItemId, status);
+        SetRunning(workItemId);
+
+        (await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken)).Should().BeNull();
+    }
+
+    /// <summary>Ein dauerhaft wartendes Ereignis (manueller Neuversand nötig) hält den Platz
+    /// nicht belegt — es bewegt sich ohne Benutzereingriff ohnehin nicht weiter.</summary>
+    [Fact]
+    public async Task GetStartBlockReasonAsync_ReadySessionWaitingWithMaxAttempt_FreesSlot()
+    {
+        await _settings.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1", TestContext.Current.CancellationToken);
+        var workItemId = await RunningWorkItemAsync("Bereit", PrefixA, LiveSession(PrefixA, ScmPromptReadyStatus.Ready));
+        await AddEventAsync(workItemId, "Wartend", nextAttemptUtc: long.MaxValue);
+        SetRunning(workItemId);
+
+        (await _sut.GetStartBlockReasonAsync(PrefixB, TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     /// <summary>Ereignisse im Endstatus gelten nicht als offen — die Prompt-Freigabe greift.</summary>

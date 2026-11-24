@@ -2,15 +2,15 @@
 
 | # | Bereich | Aufgabe | Status | Testnachweis |
 |---|---------|---------|--------|--------------|
-| 1 | Logik | `ScmIncomingEventStatus.StartSlotFreeing`-Menge ergänzen (7 freigebende Stati) | Offen | — |
-| 2 | Logik | `ScmEventExecutionLimitService.GetOccupancyAsync`: Pending-Abfrage auf `!StartSlotFreeing` umstellen + XML-Doku | Offen | — |
-| 3 | Logik | `ScmEventOrchestrator`: `UndeliverableReason` + `MarkUndeliverableAsync` hinzufügen | Offen | — |
-| 4 | Logik | `ScmEventOrchestrator.DispatchCoreAsync`: Guard für manuell klärbare Stati ohne `DeliveryAttemptId`; `task is null`/`blocked`-Stellen auf `UndeliverableReason` umstellen | Offen | — |
-| 5 | Logik | `ScmEventOrchestrator.DispatchPreparationAsync`: beide `task`-/`blocked`-Stellen auf `UndeliverableReason` umstellen | Offen | — |
-| 6 | Logik | `ScmEventOrchestrator.OpenFromQueueAsync`: `Include(GitRepository)` + `UndeliverableReason` vor `BlockReason` | Offen | — |
-| 7 | Tests | `ScmEventExecutionLimitServiceTests`: Pending-Theory auf In-Flight splitten; neue Theory für freigebende Stati; `NextAttemptUtc`-Fall | Offen | — |
-| 8 | Tests | `ScmIncomingEventStatusTests`: `StartSlotFreeing`-Mengen- und Klassifikationstests | Offen | — |
-| 9 | Tests | `ScmEventDispatchTests_Limit`: `Dispatch_EndedOrArchivedTask_StaysBlocked` → `VerarbeitungUngeklärt`; neue Tests (fehlende Repository-Zuordnung, entfernte Aufgabe, Ready + nur klärbares Ereignis → Platz frei) | Offen | — |
-| 10 | Tests | `ScmEventMonitoringServiceTests_AutoStartDelivery`: `Monitor_ReusedBlockedTask_StaysWaitingWithoutStart` auf neuen Endzustand anpassen | Offen | — |
-| 11 | Dokumentation | Hilfe-Doku (`docs/help/plugins/github-ereignisse/business-rules.md` o. ä.) zur geänderten Platzbelegung aktualisieren | Offen | — |
-| 12 | Dokumentation | `docs/RELEASE_NOTES.md` ergänzen | Offen | — |
+| 1 | Logik | `ScmIncomingEventStatus.StartSlotFreeing`-Menge ergänzen (7 freigebende Stati) | Erledigt | `ScmIncomingEventStatusTests.StartSlotFreeing_ShouldContainExactlyTheNonOccupyingStatuses` |
+| 2 | Logik | `ScmEventExecutionLimitService.GetOccupancyAsync`: Pending-Abfrage auf `!StartSlotFreeing` umstellen + XML-Doku | Erledigt | `ScmEventExecutionLimitServiceTests.GetStartBlockReasonAsync_ReadySessionInFlightEvent_CountsAsOccupied` + `..._NotYetDeliveredEvent_FreesSlot` |
+| 3 | Logik | `ScmEventOrchestrator`: `UndeliverableReason` + `MarkUndeliverableAsync` hinzufügen | Erledigt | `ScmEventDispatchTests_Limit.Dispatch_EndedOrArchivedTask_MarkedUndeliverable` |
+| 4 | Logik | `ScmEventOrchestrator.DispatchCoreAsync`: Guard für manuell klärbare Stati ohne `DeliveryAttemptId`; `task is null`/`blocked`-Stellen auf `UndeliverableReason` umstellen | Erledigt | `ScmEventDispatchTests_Limit.Dispatch_RemovedTask_MarkedUndeliverable`, `Dispatch_EndedOrArchivedTask_MarkedUndeliverable` (Idempotenz-Zweitdispatch) |
+| 5 | Logik | `ScmEventOrchestrator.DispatchPreparationAsync`: beide `task`-/`blocked`-Stellen auf `UndeliverableReason` umstellen | Erledigt | `ScmEventMonitoringServiceTests_AutoStartDelivery.Monitor_ReusedBlockedTask_StaysWaitingWithoutStart` |
+| 6 | Logik | `ScmEventOrchestrator.OpenFromQueueAsync`: `UndeliverableReason` vor `BlockReason` (entfernte Aufgabe klärbar statt `SingleAsync`-Ausnahme) | Erledigt | Kein direkter Test (abgedeckt über dieselbe `UndeliverableReason`-Hilfsfunktion; `OpenFromQueue_LimitReached_WaitsWithReason` deckt den Pfad mit) |
+| 7 | Tests | `ScmEventExecutionLimitServiceTests`: Pending-Theory auf In-Flight splitten; neue Theory für freigebende Stati; `NextAttemptUtc`-Fall | Erledigt | `GetStartBlockReasonAsync_ReadySessionInFlightEvent_CountsAsOccupied`, `..._NotYetDeliveredEvent_FreesSlot`, `..._WaitingWithMaxAttempt_FreesSlot` |
+| 8 | Tests | `ScmIncomingEventStatusTests`: `StartSlotFreeing`-Mengen- und Klassifikationstests | Erledigt | `StartSlotFreeing_ShouldContainExactlyTheNonOccupyingStatuses`, `StartSlotFreeing_ShouldExcludeOccupyingStatuses`, `StartSlotFreeing_WartendIsDecoupledFromNonBlocking` |
+| 9 | Tests | `ScmEventDispatchTests_Limit`: `Dispatch_EndedOrArchivedTask_StaysBlocked` → `VerarbeitungUngeklärt`; neue Tests (fehlende Repository-Zuordnung, entfernte Aufgabe, Ready + nur klärbares Ereignis → Platz frei) | Erledigt | `Dispatch_EndedOrArchivedTask_MarkedUndeliverable`, `Dispatch_RemovedTask_MarkedUndeliverable`, `Dispatch_TaskWithoutRepository_MarkedUndeliverable`, `Dispatch_ReadySessionWaitingEvent_SlotFreedForNextStart`, `Dispatch_ReadySessionUnclarifiedEvent_SlotFreedForNextStart` |
+| 10 | Tests | `ScmEventMonitoringServiceTests_AutoStartDelivery`: `Monitor_ReusedBlockedTask_StaysWaitingWithoutStart` auf neuen Endzustand anpassen | Erledigt | `Monitor_ReusedBlockedTask_StaysWaitingWithoutStart` (grün) |
+| 11 | Dokumentation | Hilfe-Doku (`business-rules.md`, `ablauf-technisch.md`) zur geänderten Platzbelegung und zum Unzustellbar-Endzustand aktualisieren | Erledigt | Kein direkter Test (Doku) |
+| 12 | Dokumentation | `docs/RELEASE_NOTES.md` ergänzen (EN + DE) | Erledigt | Kein direkter Test (Doku) |

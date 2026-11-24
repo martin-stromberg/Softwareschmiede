@@ -200,8 +200,9 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         Assert.Single(fixture.Prompts);
     }
 
-    /// <summary>Eine wiederverwendete, blockierte Aufgabe wird auch im neuen Pfad nicht gestartet;
-    /// ihr Ereignis bleibt mit Grund wartend.</summary>
+    /// <summary>Eine wiederverwendete, blockierte Aufgabe wird auch im neuen Pfad nicht gestartet:
+    /// Ihr Ereignis bleibt bei Pause wartend, bei beendeter/archivierter Aufgabe wird es als
+    /// strukturell unzustellbar terminal klärbar markiert.</summary>
     [Theory]
     [InlineData(WorkItemStatus.Completed, false)]
     [InlineData(WorkItemStatus.Archived, false)]
@@ -224,8 +225,16 @@ public sealed class ScmEventMonitoringServiceTests_AutoStartDelivery
         Assert.Null(task.LocalClonePath);
         var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(taskId, item.WorkItemId);
-        Assert.Equal("Wartend", item.Status);
-        Assert.Contains(paused ? "pausiert" : "beendet/archiviert", item.Reason);
+        if (paused)
+        {
+            Assert.Equal("Wartend", item.Status);
+            Assert.Contains("pausiert", item.Reason);
+        }
+        else
+        {
+            Assert.Equal("VerarbeitungUngeklärt", item.Status);
+            Assert.Contains("beendet/archiviert", item.Reason);
+        }
         Assert.Empty(fixture.Sessions);
         Assert.Empty(fixture.Prompts);
     }
