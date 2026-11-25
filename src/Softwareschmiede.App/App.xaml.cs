@@ -320,6 +320,15 @@ public sealed partial class App : System.Windows.Application
         services.AddHostedService(sp => sp.GetRequiredService<PullRequestMonitoringService>());
         services.AddSingleton<ScmTaskCompletionMonitoringService>();
         services.AddHostedService(sp => sp.GetRequiredService<ScmTaskCompletionMonitoringService>());
+
+        // Remote-Übersicht: ausgehender Relay-Client + Snapshot-Pipeline + Zustandsinfo.
+        // Bleibt ohne wirksame status.remote.enabled-Einstellung im Zustand Disabled inaktiv.
+        services.AddSingleton<RemoteStatusConnectionInfo>();
+        services.AddSingleton<StatusSnapshotProjector>();
+        services.AddSingleton<RemoteStatusRelayClient>();
+        services.AddSingleton<IRemoteStatusRelayClient>(sp => sp.GetRequiredService<RemoteStatusRelayClient>());
+        services.AddSingleton<RemoteStatusRelayService>();
+        services.AddHostedService(sp => sp.GetRequiredService<RemoteStatusRelayService>());
         // Ereignisgesteuerter Auslöser der SCM-Startprüfung (freiwerdende Plätze, Pausen).
         services.AddSingleton<ScmStartCheckTrigger>();
         services.AddSingleton<ScmStartCheckService>();

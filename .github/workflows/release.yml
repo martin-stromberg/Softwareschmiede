@@ -108,6 +108,11 @@ jobs:
         run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category!=OsInterface" --logger "trx;LogFileName=test-results-regular-integration.trx" --logger "console;verbosity=normal"
         shell: pwsh
 
+      - name: Release gate - regular tests (StatusServer.Tests)
+        if: steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'create'
+        run: dotnet test server/Softwareschmiede.StatusServer.Tests/Softwareschmiede.StatusServer.Tests.csproj --no-build -c Debug --logger "trx;LogFileName=test-results-regular-statusserver.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
       - name: Release gate - OS interface tests (Softwareschmiede.Tests)
         continue-on-error: true
         if: steps.version.outputs.released == 'true' && steps.version.outputs.release_action == 'create'
@@ -128,6 +133,7 @@ jobs:
           path: |
             src/Softwareschmiede.Tests/TestResults/*.trx
             src/Softwareschmiede.IntegrationTests/TestResults/*.trx
+            server/Softwareschmiede.StatusServer.Tests/TestResults/*.trx
           retention-days: 14
 
       - name: Build and package

@@ -213,6 +213,16 @@ Die Fußzeile der Navigations-Seitenleiste zeigt mit „`{n}` laufende Automatis
 
 Die Implementierung liegt in `AutoShutdownOrchestrator`/`IAutoShutdownOrchestrator`, `RunningAutomationsCount`, `AiExecutionStatusClassification`, `SystemShutdownService`/`RecordingSystemShutdownService`, `AutoShutdownSettingsService`, `MainWindowAutoShutdownFlow`, `AppSettingService` und `MainWindow.xaml`. Abgedeckt wird das Feature u. a. durch `AutoShutdownOrchestratorTests`, `RunningAutomationsCountTests`, `AppSettingServiceTests_AutoShutdown`, `MainWindowViewModelAutoShutdownTests`, `RecordingSystemShutdownServiceTests` und den E2E-Test `General_AutoShutdown_E2E`.
 
+## Remote-Übersicht (Status-Webseite)
+
+Eine externe, rein lesende Status-Webseite macht den Gesamtzustand der Anwendung auch ohne laufende App-Sicht einsehbar (z. B. vom Mobilgerät oder Zweitrechner):
+
+- **App-Seite:** Der `RemoteStatusRelayService` hält eine ausschließlich ausgehende SignalR-Verbindung (`wss://`) zum Relay-Endpunkt `/relay` eines Status-Servers und sendet initial sowie periodisch einen Status-Snapshot (laufende Aufgaben, wartende Anwenderaktionen, letzte SCM-Ereignisse, App-Version). Konfiguriert wird das unter **Einstellungen → Automatisierung → Remote-Übersicht** (Funktionsschalter, Server-URL, Anzeigename, im Credential Store hinterlegtes Relay-Token, automatisch erzeugte Instanz-ID, ehrlicher Verbindungsstatus). Details siehe [Hilfeseite Remote-Übersicht](docs/help/einstellungen/remote-uebersicht.md).
+- **Server-Seite:** Die neue, separat zu betreibende Deploy-Einheit `server/Softwareschmiede.StatusServer` (ASP.NET Core) nimmt die Snapshots über einen token-abgesicherten SignalR-Hub entgegen, ergänzt GitHub-Daten (offene Pull Requests, Releases, offene Issues) serverseitig und rendert daraus eine schlanke, JavaScript-freie HTML-Status-Seite (`/`, maschinell `/status.json`) hinter Basic-Auth — in v1 bewusst rein lesend, ohne Kommando-Rückkanal.
+- **Verträge:** Die gemeinsamen Snapshot-/Handshake-DTOs inklusive Protokollversion liegen im Contract-Projekt `src/Softwareschmiede.StatusContracts`.
+
+Betrieb, Konfiguration und Deployment des Servers (Token-Verwaltung, systemd-Unit, nginx-Reverse-Proxy mit WebSocket-Upgrade) beschreibt [server/README.md](server/README.md).
+
 ## Voraussetzungen
 
 | Komponente | Requirement | Hinweis |
@@ -304,9 +314,11 @@ Zusätzlich bindet die Sektion `ScmEvents` technische Laufzeitoptionen der SCM-E
 │   ├── Softwareschmiede/                  # Kernlogik, EF Core, Services
 │   ├── Softwareschmiede.App/              # WPF-Desktopanwendung
 │   ├── Softwareschmiede.Plugin.Contracts/ # Plugin-Verträge
+│   ├── Softwareschmiede.StatusContracts/  # Snapshot-/Relay-Verträge der Remote-Übersicht
 │   ├── Softwareschmiede.Tests/            # Unit-/UI-/E2E-Tests
 │   └── Softwareschmiede.IntegrationTests/ # Integrationstests
 ├── plugins/                               # Plugin-Projekte
+├── server/                                # StatusServer (ASP.NET Core) — separat betriebene Remote-Übersicht
 ├── docs/                                  # Feature-, Hilfe- und CI/CD-Dokumentation
 ├── scripts/                               # Build-/Release-/Test-Hilfsskripte
 ├── site/                                  # Quellen der öffentlichen GitHub-Pages-Projektseite
