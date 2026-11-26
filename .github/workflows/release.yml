@@ -158,6 +158,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           RELEASE_ASSET_PATH: release.zip
           RELEASE_MANIFEST_PATH: update.json
+          RELEASE_EXTRA_ASSET_PATHS: statusserver-win-x64.zip,statusserver-linux-x64.zip
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: npm run release
         shell: pwsh
@@ -172,7 +173,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ steps.version.outputs.tag }}"
-          gh release create $tag release.zip update.json `
+          gh release create $tag release.zip update.json statusserver-win-x64.zip statusserver-linux-x64.zip `
             --title $tag `
             --generate-notes
         shell: pwsh
@@ -183,5 +184,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ steps.version.outputs.tag }}"
-          gh release upload $tag release.zip update.json --clobber
+          gh release upload $tag release.zip update.json statusserver-win-x64.zip statusserver-linux-x64.zip --clobber
         shell: pwsh

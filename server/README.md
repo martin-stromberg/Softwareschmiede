@@ -65,9 +65,17 @@ export GitHub__Token="github_pat_..."
 
 ## Veröffentlichen
 
+Der StatusServer wird mit jedem Release und Pre-Release als eigenständiges Asset
+ausgeliefert — self-contained, auf der Zielmaschine ist **keine** .NET-Laufzeit
+erforderlich:
+
+- `statusserver-linux-x64.zip` — der dokumentierte systemd/nginx-Pfad (siehe unten)
+- `statusserver-win-x64.zip` — optionaler Betrieb unter Windows (direkter Start,
+  Windows-Dienst oder IIS über das ASP.NET Core Hosting Bundle)
+
+Alternativ manuell paketieren:
+
 ```bash
-dotnet publish server/Softwareschmiede.StatusServer -c Release -o publish
-# z. B. linux-x64 self-contained:
 dotnet publish server/Softwareschmiede.StatusServer -c Release -r linux-x64 \
     --self-contained -o publish
 ```

@@ -356,9 +356,12 @@ section h3 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
 .src.app { background: #4f46e5; } .src.gh { background: #0d9488; }
 .count { color: #6b7280; font-weight: 500; }
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-td, th { text-align: left; padding: 7px 8px; border-top: 1px solid #f0f1f3; overflow-wrap: break-word; }
+/* anywhere statt break-word: nur anywhere fließt in die min-content-Breite der
+   Tabelle ein — sonst wird die Seite auf Mobilgeräten breiter als der Viewport. */
+td, th { text-align: left; padding: 7px 8px; border-top: 1px solid #f0f1f3; overflow-wrap: anywhere; }
 tr:first-child td { border-top: 0; }
 td.num { width: 70px; font-family: Consolas, monospace; color: #4f46e5; }
+td.num, td.right { white-space: nowrap; }
 td.right, th.right { text-align: right; }
 td.muted { color: #6b7280; font-size: 12.5px; }
 .pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; overflow-wrap: normal; }
@@ -368,7 +371,9 @@ td.muted { color: #6b7280; font-size: 12.5px; }
 .pill.err { background: #fee2e2; color: #991b1b; }
 .pill.pause { background: #e5e7eb; color: #4b5563; }
 a { color: #4f46e5; text-decoration: none; }
-.inst { font-size: 12px; color: #6b7280; font-weight: 500; min-width: 0; overflow-wrap: break-word; }
+/* Links brechen nur an Wortgrenzen — „IssueComm ent“-Zeilenumbrüche vermeiden. */
+td a { overflow-wrap: normal; }
+.inst { font-size: 12px; color: #6b7280; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
 .stale-note { display: flex; align-items: center; gap: 8px; background: #fef3c7;
   border: 1px solid #f59e0b55; color: #92400e; font-size: 12.5px;
   border-radius: 8px; padding: 8px 14px; margin-bottom: 14px; }

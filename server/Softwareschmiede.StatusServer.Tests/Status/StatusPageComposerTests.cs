@@ -257,8 +257,12 @@ public sealed class StatusPageComposerTests
         var time = new TestTimeProvider();
         var html = CreateSut(time).Render([OnlineInstance()], [], 15);
 
-        html.Should().NotContain("white-space: nowrap");
-        html.Should().NotContain("white-space:nowrap");
+        // nowrap ist ausschließlich für die kurzen Zahlen-/Link-Spalten erlaubt
+        // (einzelne Tokens wie „05:14:34“ oder „Issue ↗“, die nie umbrechen müssen).
+        var cssExcludingAllowed = html
+            .Replace("td.num, td.right { white-space: nowrap; }", string.Empty);
+        cssExcludingAllowed.Should().NotContain("white-space: nowrap");
+        cssExcludingAllowed.Should().NotContain("white-space:nowrap");
         html.Should().Contain("name=\"viewport\"");
     }
 }
