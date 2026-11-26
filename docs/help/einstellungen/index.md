@@ -13,3 +13,4 @@ Ergänzend steuert ein Block in der Fußzeile der Seitenleiste das **automatisch
 - [Business Rules](business-rules.md)
 - [Installation & Konfiguration](installation.md)
 - [Datenmodell](datenmodell.md)
+- [Remote-Übersicht](remote-uebersicht.md)

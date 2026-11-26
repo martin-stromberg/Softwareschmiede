@@ -43,6 +43,8 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private readonly ILogger<SettingsViewModel> _logger;
     private readonly IDialogService _dialogService;
     private readonly IServiceProvider _serviceProvider;
+    private readonly RemoteStatusConnectionInfo _remoteStatusInfo;
+    private readonly ICredentialStore _credentialStore;
     private readonly List<Guid> _deletedPromptTemplatesIds = [];
 
     private string? _workingDirectory;
@@ -82,6 +84,12 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private ScmTaskCompletionCheckModeOption? _selectedScmTaskCompletionCheckmode = ScmTaskCompletionCheckModeOption.ForMode(ScmTaskCompletionCheckMode.EventDriven);
     private bool _isScmBackmergeDraftActivation;
     private bool _isScmBackmergeAdminMerge;
+    private bool _isRemoteStatusEnabled;
+    private string _remoteStatusUrl = string.Empty;
+    private string _remoteStatusInstanceName = string.Empty;
+    private string _remoteStatusInstanceId = string.Empty;
+    private string _remoteStatusToken = string.Empty;
+    private string _remoteStatusConnectionText = "deaktiviert";
 
     /// <summary>Wird direkt nach erfolgreichem Speichern der Update--Einstellungen mit dem gespeicherten Snapshot ausgelöst.</summary>
     public event EventHandler<UpdateSettings>? UpdateSettingsSaved;
@@ -354,6 +362,74 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     /// <summary>Statuszeile des „Prozessabläufe“-Bereichs im Ausklapp-Header.</summary>
     public string ProcessRunsStatusText => SelectedBackmergeMode?.Mode != ScmBackmergeMode.Disabled ? "aktiviert" : "deaktiviert";
 
+    /// <summary>Gibt an, ob die Remote-Übersicht (Status-Relay) aktiviert ist (Laufzeit-Schalter, ohne Neustart wirksam).</summary>
+    public bool IsRemoteStatusEnabled
+    {
+        get => _isRemoteStatusEnabled;
+        set
+        {
+            if (!SetProperty(ref _isRemoteStatusEnabled, value)) return;
+            OnPropertyChanged(nameof(IsRemoteStatusFieldEnabled));
+            OnPropertyChanged(nameof(RemoteStatusHeaderStatusText));
+        }
+    }
+
+    /// <summary>Basis-URL des Status-Servers (z. B. <c>http://localhost:5055</c> oder <c>https://status.example.org</c>).</summary>
+    public string RemoteStatusUrl
+    {
+        get => _remoteStatusUrl;
+        set => SetProperty(ref _remoteStatusUrl, value);
+    }
+
+    /// <summary>Optionaler Anzeigename dieser Instanz auf der Status-Seite.</summary>
+    public string RemoteStatusInstanceName
+    {
+        get => _remoteStatusInstanceName;
+        set => SetProperty(ref _remoteStatusInstanceName, value);
+    }
+
+    /// <summary>Die systemseitig vergebene Instanz-ID (read-only Anzeige).</summary>
+    public string RemoteStatusInstanceId
+    {
+        get => _remoteStatusInstanceId;
+        private set => SetProperty(ref _remoteStatusInstanceId, value);
+    }
+
+    /// <summary>Das Relay-Zugangstoken; wird im CredentialStore persistiert und über die PasswordBox eingegeben.</summary>
+    public string RemoteStatusToken
+    {
+        get => _remoteStatusToken;
+        set
+        {
+            if (!SetProperty(ref _remoteStatusToken, value)) return;
+            OnPropertyChanged(nameof(HasRemoteStatusToken));
+        }
+    }
+
+    /// <summary>Ob ein Relay-Token bekannt ist (gespeichert oder frisch eingegeben);
+    /// steuert den „bereits gespeichert"-Indikator neben der PasswordBox.</summary>
+    public bool HasRemoteStatusToken => !string.IsNullOrEmpty(RemoteStatusToken);
+
+    /// <summary>Verständliche Statuszeile der Relay-Verbindung (aus <see cref="RemoteStatusConnectionInfo"/>).</summary>
+    public string RemoteStatusConnectionText
+    {
+        get => _remoteStatusConnectionText;
+        private set => SetProperty(ref _remoteStatusConnectionText, value);
+    }
+
+    /// <summary><see langword="true"/>, wenn der Verbindungsstatus einen Fehler meldet
+    /// (für die farbliche Hervorhebung der Statuszeile).</summary>
+    public bool IsRemoteStatusConnectionError
+        => _remoteStatusInfo.State is RemoteStatusConnectionState.Error
+            or RemoteStatusConnectionState.ConfigurationError;
+
+    /// <summary>URL-/Token-/Namens-Felder sind nur bei aktivierter Remote-Übersicht bedienbar
+    /// (gesperrt statt ausgeblendet — Instanz-ID und Verbindungsstatus bleiben sichtbar).</summary>
+    public bool IsRemoteStatusFieldEnabled => IsRemoteStatusEnabled;
+
+    /// <summary>Statuszeile des „Remote-Übersicht“-Bereichs im Ausklapp-Header.</summary>
+    public string RemoteStatusHeaderStatusText => IsRemoteStatusEnabled ? "aktiviert" : "deaktiviert";
+
     /// <summary>Wartezeit in Minuten zwischen dem erkannten Referenz-Schluss und dem automatischen Beenden der Aufgabe.</summary>
     public string ScmTaskCompletionWaitMinutes
     {
@@ -512,7 +588,9 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         ProjectService projectService,
         ILogger<SettingsViewModel> logger,
         IDialogService dialogService,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        RemoteStatusConnectionInfo remoteStatusInfo,
+        ICredentialStore credentialStore)
     {
         _settingService = settingService;
         _workingDirectoryService = workingDirectoryService;
@@ -525,9 +603,13 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         _logger = logger;
         _dialogService = dialogService;
         _serviceProvider = serviceProvider;
+        _remoteStatusInfo = remoteStatusInfo;
+        _credentialStore = credentialStore;
 
         _designMode = darkModeService.Current;
         _darkModeService.ModeChanged += OnDarkModeChanged;
+        _remoteStatusConnectionText = _remoteStatusInfo.BuildStatusText();
+        _remoteStatusInfo.StateChanged += OnRemoteStatusStateChanged;
 
         LoadCommand = new AsyncRelayCommand(LoadAsync);
         SaveCommand = new AsyncRelayCommand(SaveAsync);
@@ -607,6 +689,18 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
             IsScmMonitoringEnabled = await _settingService.GetScmMonitoringEnabledAsync(ct);
             IsScmTaskCompletionEnabled = await _settingService.GetScmTaskCompletionEnabledAsync(ct);
+
+            // Remote-Übersicht: Schalter, Server-URL, Anzeigename, Instanz-ID und Token;
+            // die Instanz-ID wird bei aktivierter Übersicht systemseitig erzeugt.
+            IsRemoteStatusEnabled = await _settingService.GetRemoteStatusEnabledAsync(ct);
+            RemoteStatusUrl = await _settingService.GetRemoteStatusUrlAsync(ct) ?? string.Empty;
+            RemoteStatusInstanceName = await _settingService.GetRemoteStatusInstanceNameAsync(ct) ?? string.Empty;
+            RemoteStatusInstanceId = IsRemoteStatusEnabled
+                ? await _settingService.GetOrCreateRemoteStatusInstanceIdAsync(ct)
+                : (await _settingService.GetSettingAsync(AppSettingService.RemoteStatusInstanceIdKey, ct)) ?? string.Empty;
+            RemoteStatusToken = _credentialStore.GetCredential(
+                AppSettingService.RemoteStatusRelayTokenCredentialTarget) ?? string.Empty;
+            RemoteStatusConnectionText = _remoteStatusInfo.BuildStatusText();
             ScmTaskCompletionWaitMinutes = (await _settingService.GetScmTaskCompletionWaitMinutesAsync(ct))
                 .ToString(System.Globalization.CultureInfo.InvariantCulture);
             ScmTriggerKeyword = await _settingService.GetScmTriggerKeywordAsync(ct);
@@ -799,6 +893,33 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
                 AppSettingService.ScmPromptAppendPullRequestCommentKey,
                 NullWhenEmpty(ScmPromptAppendixPullRequestComment),
                 ct);
+
+            // Remote-Übersicht: Schalter, URL und Anzeigename über die generische
+            // Einstellungstabelle; das Relay-Token getrennt im CredentialStore.
+            await _settingService.SetRemoteStatusEnabledAsync(IsRemoteStatusEnabled, ct);
+            await _settingService.SetRemoteStatusUrlAsync(NullWhenEmpty(RemoteStatusUrl?.Trim()), ct);
+            await _settingService.SetRemoteStatusInstanceNameAsync(NullWhenEmpty(RemoteStatusInstanceName?.Trim()), ct);
+            if (IsRemoteStatusEnabled)
+                RemoteStatusInstanceId = await _settingService.GetOrCreateRemoteStatusInstanceIdAsync(ct);
+            if (string.IsNullOrWhiteSpace(RemoteStatusToken))
+            {
+                _credentialStore.DeleteCredential(AppSettingService.RemoteStatusRelayTokenCredentialTarget);
+            }
+            else
+            {
+                try
+                {
+                    _credentialStore.SetCredential(
+                        AppSettingService.RemoteStatusRelayTokenCredentialTarget,
+                        RemoteStatusToken.Trim());
+                }
+                catch (InvalidOperationException ex)
+                {
+                    _logger.LogError(ex, "Das Relay-Token der Remote-Übersicht konnte nicht gespeichert werden.");
+                    ErrorMessage = $"Das Relay-Token konnte nicht gespeichert werden: {ex.Message}";
+                    return;
+                }
+            }
 
             try
             {
@@ -1250,10 +1371,17 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
 
     private void OnDarkModeChanged(string mode) => DesignMode = mode;
 
+    private void OnRemoteStatusStateChanged(object? sender, EventArgs e)
+    {
+        RemoteStatusConnectionText = _remoteStatusInfo.BuildStatusText();
+        OnPropertyChanged(nameof(IsRemoteStatusConnectionError));
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {
         _darkModeService.ModeChanged -= OnDarkModeChanged;
+        _remoteStatusInfo.StateChanged -= OnRemoteStatusStateChanged;
 
         foreach (var entry in DevelopmentEnvironmentPlugins)
             entry.PropertyChanged -= OnIdePluginEntryPropertyChanged;

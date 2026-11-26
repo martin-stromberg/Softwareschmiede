@@ -19,6 +19,7 @@ public partial class End2EndTest : WpfTestBase
             StartApp_ShowsVersionsTextInFooter_E2E(mainWindow);
             Settings_SaveCodexAsDefaultAiPluginAndExecutablePath_PersistedBoth_E2E(mainWindow);
             Settings_GeneralContainsOnlyExistingSection_E2E(mainWindow);
+            Settings_RemoteStatusSection_TogglesAndPersists_E2E(mainWindow);
             Settings_ExecutionLimitGlobalAndPerPlugin_E2E(mainWindow);
             Settings_ConfigureIssuePreparation_E2E(mainWindow);
             IdePluginSettings_ActivationValidationAndOrder_E2E(mainWindow);

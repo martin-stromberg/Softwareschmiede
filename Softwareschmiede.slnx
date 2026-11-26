@@ -10,6 +10,11 @@
     <Project Path="plugins/Softwareschmiede.Plugin.LocalDirectory/Softwareschmiede.Plugin.LocalDirectory.csproj" />
     <Project Path="src/Softwareschmiede.Plugin.Contracts/Softwareschmiede.Plugin.Contracts.csproj" />
   </Folder>
+  <Folder Name="/Server/">
+    <Project Path="server/Softwareschmiede.StatusServer/Softwareschmiede.StatusServer.csproj" />
+    <Project Path="server/Softwareschmiede.StatusServer.Tests/Softwareschmiede.StatusServer.Tests.csproj" />
+    <Project Path="src/Softwareschmiede.StatusContracts/Softwareschmiede.StatusContracts.csproj" />
+  </Folder>
   <Project Path="src/Softwareschmiede.App/Softwareschmiede.App.csproj">
     <Build Solution="Debug|*" Project="true" />
   </Project>

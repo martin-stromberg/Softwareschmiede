@@ -89,6 +89,16 @@ public sealed partial class SettingsView : UserControl
     private void OnPasswordChanged(object sender, RoutedEventArgs e)
         => PluginSettingEntryEditHelper.OnPasswordChanged(sender, e);
 
+    /// <summary>Übernimmt Token-Änderungen der Remote-Status-Box ins ViewModel.
+    /// Die Box bleibt bewusst leer: Der gespeicherte Token kann nicht angezeigt werden
+    /// (PasswordBox ist nicht bindbar und der asynchrone Load käme zu spät); die View
+    /// signalisiert den hinterlegten Token stattdessen über den „bereits gespeichert"-Hinweis.</summary>
+    private void OnRemoteStatusTokenChanged(object sender, RoutedEventArgs e)
+    {
+        if (sender is PasswordBox passwordBox && DataContext is SettingsViewModel vm)
+            vm.RemoteStatusToken = passwordBox.Password;
+    }
+
     private void OnFileSelectClick(object sender, RoutedEventArgs e)
         => PluginSettingEntryEditHelper.OnFileSelectClick(sender, e);
 

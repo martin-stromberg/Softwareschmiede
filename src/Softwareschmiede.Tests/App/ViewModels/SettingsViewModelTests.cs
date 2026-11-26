@@ -68,7 +68,9 @@ public sealed class SettingsViewModelTests : IDisposable
             new ProjectService(_db, NullLogger<ProjectService>.Instance),
             NullLogger<SettingsViewModel>.Instance,
             new Mock<IDialogService>().Object,
-            new Mock<IServiceProvider>().Object);
+            new Mock<IServiceProvider>().Object,
+            new RemoteStatusConnectionInfo(),
+            _credentialStore);
 
     private static Mock<IGitPlugin> CreateScmPluginMock(string pluginName, IReadOnlyList<PluginSettingGroup>? groups = null)
     {

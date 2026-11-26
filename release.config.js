@@ -11,7 +11,14 @@ const path = require("node:path");
 // asset name isn't platform-suffixed.
 const releaseAssetPath = process.env.RELEASE_ASSET_PATH;
 const releaseManifestPath = process.env.RELEASE_MANIFEST_PATH;
-const releaseAssets = [releaseAssetPath, releaseManifestPath]
+// Additional release assets (comma-separated, e.g. the per-RID StatusServer zips
+// shipped alongside release.zip since issue #478) - appended to the asset list
+// without affecting the updater-consumed release.zip/update.json pair.
+const releaseExtraAssetPaths = (process.env.RELEASE_EXTRA_ASSET_PATHS ?? "")
+  .split(",")
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+const releaseAssets = [releaseAssetPath, releaseManifestPath, ...releaseExtraAssetPaths]
   .filter(Boolean)
   .map((assetPath) => ({ path: assetPath, name: path.basename(assetPath) }));
 

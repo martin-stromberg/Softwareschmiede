@@ -120,6 +120,7 @@ jobs:
         run: |
           dotnet build src/Softwareschmiede.Tests/Softwareschmiede.Tests.csproj --no-restore -c Debug
           dotnet build src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-restore -c Debug
+          dotnet build server/Softwareschmiede.StatusServer.Tests/Softwareschmiede.StatusServer.Tests.csproj --no-restore -c Debug
         shell: pwsh
 
       - name: Test regular (Softwareschmiede.Tests)
@@ -130,6 +131,10 @@ jobs:
 
       - name: Test regular (IntegrationTests)
         run: dotnet test src/Softwareschmiede.IntegrationTests/Softwareschmiede.IntegrationTests.csproj --no-build -c Debug --filter "Category!=OsInterface" --collect:"XPlat Code Coverage" --logger "trx;LogFileName=test-results-regular-integration.trx" --logger "console;verbosity=normal"
+        shell: pwsh
+
+      - name: Test regular (StatusServer.Tests)
+        run: dotnet test server/Softwareschmiede.StatusServer.Tests/Softwareschmiede.StatusServer.Tests.csproj --no-build -c Debug --logger "trx;LogFileName=test-results-regular-statusserver.trx" --logger "console;verbosity=normal"
         shell: pwsh
 
       - name: Install ReportGenerator
@@ -175,6 +180,7 @@ jobs:
           path: |
             src/Softwareschmiede.Tests/TestResults/*.trx
             src/Softwareschmiede.IntegrationTests/TestResults/*.trx
+            server/Softwareschmiede.StatusServer.Tests/TestResults/*.trx
           retention-days: 14
 
   os-interface-tests:

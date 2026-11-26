@@ -71,7 +71,9 @@ public sealed class SettingsViewModelTests_ExecutionLimit : IDisposable
             new ProjectService(_db, NullLogger<ProjectService>.Instance),
             NullLogger<SettingsViewModel>.Instance,
             new Mock<IDialogService>().Object,
-            new Mock<IServiceProvider>().Object);
+            new Mock<IServiceProvider>().Object,
+            new RemoteStatusConnectionInfo(),
+            _credentialStore);
 
     private static IAiPlugin CreateAiPlugin(IReadOnlyList<PluginSettingGroup>? groups = null)
     {

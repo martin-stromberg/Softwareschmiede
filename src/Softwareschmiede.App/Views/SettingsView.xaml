@@ -715,6 +715,124 @@
                                        Margin="22,4,0,0" />
                         </StackPanel>
                     </Expander>
+
+                    <!-- Remote-Übersicht -->
+                    <Expander AutomationProperties.Name="RemoteStatusExpander"
+                              IsExpanded="False"
+                              Foreground="{DynamicResource PrimaryTextBrush}"
+                              Margin="0,0,0,16">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Remote-Übersicht"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <TextBlock Text="{Binding RemoteStatusHeaderStatusText}"
+                                           AutomationProperties.Name="RemoteStatusStatus"
+                                           AutomationProperties.HelpText="{Binding RemoteStatusHeaderStatusText}"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Expander.Header>
+                        <StackPanel Margin="0,8,0,0">
+                            <CheckBox IsChecked="{Binding IsRemoteStatusEnabled, Mode=TwoWay}"
+                                      AutomationProperties.Name="IsRemoteStatusEnabled"
+                                      Content="Status-Webseite aktivieren"
+                                      Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Die Anwendung hält eine ausgehende Verbindung zu einem Status-Server und liefert dort einen periodischen Status-Snapshot ab (laufende und wartende Aufgaben, letzte SCM-Ereignisse). Die Seite ist rein lesend; keine Steuerbefehle werden entgegengenommen. Die Änderung wirkt ohne Neustart."
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="22,4,0,0" />
+                            <StackPanel AutomationProperties.Name="RemoteStatusFieldsArea">
+                                <TextBlock Text="Server-URL, Anzeigename und Token sind nur bei aktivierter Remote-Übersicht bearbeitbar. Instanz-ID und Verbindungsstatus bleiben auch im deaktivierten Zustand sichtbar."
+                                           AutomationProperties.Name="RemoteStatusDisabledHint"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="22,8,0,0"
+                                           Visibility="{Binding IsRemoteStatusEnabled, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+                                <TextBlock Text="Server-URL"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="22,12,0,4" />
+                                <TextBox Text="{Binding RemoteStatusUrl, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="RemoteStatusUrl"
+                                         IsEnabled="{Binding IsRemoteStatusFieldEnabled}"
+                                         Margin="22,0,0,0"
+                                         Padding="8,6"
+                                         BorderBrush="{DynamicResource BorderBrush}" />
+                                <TextBlock Text="Basis-Adresse des Status-Servers, z. B. http://localhost:5055 oder https://status.example.org. Der Hub-Pfad /relay wird automatisch angehängt; ws(s):// wird zu http(s):// normalisiert."
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="22,4,0,0" />
+                                <TextBlock Text="Anzeigename der Instanz"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="22,12,0,4" />
+                                <TextBox Text="{Binding RemoteStatusInstanceName, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="RemoteStatusInstanceName"
+                                         IsEnabled="{Binding IsRemoteStatusFieldEnabled}"
+                                         Margin="22,0,0,0"
+                                         Padding="8,6"
+                                         BorderBrush="{DynamicResource BorderBrush}" />
+                                <TextBlock Text="Optionaler Name dieser Installation auf der Status-Seite (z. B. „Martin-PC“); leer = Instanz-ID wird angezeigt."
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="22,4,0,0" />
+                                <TextBlock Text="Relay-Token"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="22,12,0,4" />
+                                <PasswordBox AutomationProperties.Name="RemoteStatusToken"
+                                             IsEnabled="{Binding IsRemoteStatusFieldEnabled}"
+                                             Margin="22,0,0,0"
+                                             Padding="8,6"
+                                             PasswordChanged="OnRemoteStatusTokenChanged" />
+                                <TextBlock Text="Ein Token ist bereits hinterlegt und wird aus Sicherheitsgründen nicht angezeigt. Neueingabe ersetzt das gespeicherte Token; das hinterlegte Token bleibt ohne Eingabe erhalten."
+                                           AutomationProperties.Name="RemoteStatusTokenStoredHint"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="22,4,0,0"
+                                           Visibility="{Binding HasRemoteStatusToken, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                <TextBlock Text="Zugangstoken für den Relay-Endpunkt des Status-Servers (entspricht einem Eintrag in Relay:Tokens der Server-Konfiguration). Wird im CredentialStore abgelegt."
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="22,4,0,0" />
+                                <TextBlock Text="Instanz-ID"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="22,12,0,4" />
+                                <TextBox Text="{Binding RemoteStatusInstanceId, Mode=OneWay}"
+                                         AutomationProperties.Name="RemoteStatusInstanceId"
+                                         IsReadOnly="True"
+                                         Margin="22,0,0,0"
+                                         Padding="8,6"
+                                         BorderBrush="{DynamicResource BorderBrush}" />
+                                <TextBlock Text="Automatisch vergebene Kennung dieser Installation; dient der Zuordnung der Snapshots auf dem Server. Sie wird bei aktivierter Übersicht vergeben."
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           TextWrapping="Wrap"
+                                           Margin="22,4,0,0" />
+                                <TextBlock Text="Verbindungsstatus"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Margin="22,12,0,4" />
+                                <TextBlock Text="{Binding RemoteStatusConnectionText}"
+                                           AutomationProperties.Name="RemoteStatusConnectionText"
+                                           AutomationProperties.HelpText="{Binding RemoteStatusConnectionText}"
+                                           TextWrapping="Wrap"
+                                           Margin="22,0,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsRemoteStatusConnectionError}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
                 </StackPanel>
                 </ScrollViewer>
             </TabItem>

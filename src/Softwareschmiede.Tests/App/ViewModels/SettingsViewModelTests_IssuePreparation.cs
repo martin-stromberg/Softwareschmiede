@@ -69,7 +69,9 @@ public sealed class SettingsViewModelTests_IssuePreparation : IDisposable
             new ProjectService(_db, NullLogger<ProjectService>.Instance),
             NullLogger<SettingsViewModel>.Instance,
             new Mock<IDialogService>().Object,
-            new Mock<IServiceProvider>().Object);
+            new Mock<IServiceProvider>().Object,
+            new RemoteStatusConnectionInfo(),
+            new InMemoryCredentialStoreForSettings());
 
     private static IAiPlugin CreateAiPlugin()
     {

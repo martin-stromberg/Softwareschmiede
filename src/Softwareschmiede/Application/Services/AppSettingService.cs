@@ -126,6 +126,33 @@ public sealed class AppSettingService
     /// <summary>Maximalwert der Auto-Shutdown-Toleranzzeit in Minuten.</summary>
     public const int AutoShutdownMaxToleranceMinutes = 1440;
 
+    /// <summary>Schlüssel für den Opt-in-Schalter der Remote-Übersicht (Status-Relay).</summary>
+    public const string RemoteStatusEnabledKey = "status.remote.enabled";
+
+    /// <summary>Schlüssel für die Basis-URL des Status-Servers (Relay-Endpunkt <c>/relay</c> wird angehängt).</summary>
+    public const string RemoteStatusUrlKey = "status.remote.url";
+
+    /// <summary>Schlüssel für die persistente Instanz-ID dieser Installation (systemseitig erzeugt, GUID im <c>N</c>-Format).</summary>
+    public const string RemoteStatusInstanceIdKey = "status.remote.instanceid";
+
+    /// <summary>Schlüssel für den optionalen Anzeigenamen der Instanz auf der Status-Seite.</summary>
+    public const string RemoteStatusInstanceNameKey = "status.remote.instancename";
+
+    /// <summary>Schlüssel für das Snapshot-Push-Intervall der Remote-Übersicht in Sekunden.</summary>
+    public const string RemoteStatusSnapshotIntervalSecondsKey = "status.remote.snapshotinterval.seconds";
+
+    /// <summary>Standardwert des Snapshot-Push-Intervalls in Sekunden.</summary>
+    public const int RemoteStatusDefaultSnapshotIntervalSeconds = 60;
+
+    /// <summary>Minimalwert des Snapshot-Push-Intervalls in Sekunden.</summary>
+    public const int RemoteStatusMinSnapshotIntervalSeconds = 15;
+
+    /// <summary>Maximalwert des Snapshot-Push-Intervalls in Sekunden.</summary>
+    public const int RemoteStatusMaxSnapshotIntervalSeconds = 3600;
+
+    /// <summary>CredentialStore-Ziel des Relay-Zugangstokens für die Remote-Übersicht.</summary>
+    public const string RemoteStatusRelayTokenCredentialTarget = "Softwareschmiede:RemoteStatus:RelayToken";
+
     private readonly SoftwareschmiedeDbContext _db;
     private readonly ILogger<AppSettingService> _logger;
 
@@ -628,6 +655,87 @@ public sealed class AppSettingService
     /// <param name="ct">Abbruchtoken.</param>
     public Task SetAutoShutdownToleranceMinutesAsync(int toleranceMinutes, CancellationToken ct = default)
         => SetIntSettingAsync(AutoShutdownToleranceMinutesKey, toleranceMinutes, ct);
+
+    /// <summary>
+    /// Ermittelt, ob die Remote-Übersicht aktiviert ist (<see cref="RemoteStatusEnabledKey"/>).
+    /// Laufzeit-wirksamer Opt-in-Schalter; Standard: <see langword="false"/>.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns><see langword="true"/>, wenn die Remote-Übersicht aktiv ist.</returns>
+    public async Task<bool> GetRemoteStatusEnabledAsync(CancellationToken ct = default)
+        => await GetBoolSettingAsync(RemoteStatusEnabledKey, ct) ?? false;
+
+    /// <summary>Setzt den Opt-in-Schalter der Remote-Übersicht (<see cref="RemoteStatusEnabledKey"/>).</summary>
+    /// <param name="enabled">Der zu speichernde Schalter.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    public Task SetRemoteStatusEnabledAsync(bool enabled, CancellationToken ct = default)
+        => SetBoolSettingAsync(RemoteStatusEnabledKey, enabled, ct);
+
+    /// <summary>Liest die konfigurierte Basis-URL des Status-Servers (<see cref="RemoteStatusUrlKey"/>).</summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Die gespeicherte URL oder <see langword="null"/>.</returns>
+    public Task<string?> GetRemoteStatusUrlAsync(CancellationToken ct = default)
+        => GetSettingAsync(RemoteStatusUrlKey, ct);
+
+    /// <summary>Speichert die Basis-URL des Status-Servers (<see cref="RemoteStatusUrlKey"/>).</summary>
+    /// <param name="url">Die zu speichernde URL; <see langword="null"/> löscht den Wert.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    public Task SetRemoteStatusUrlAsync(string? url, CancellationToken ct = default)
+        => SetSettingAsync(RemoteStatusUrlKey, url, ct);
+
+    /// <summary>Liest den optionalen Anzeigenamen der Instanz (<see cref="RemoteStatusInstanceNameKey"/>).</summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Der gespeicherte Anzeigename oder <see langword="null"/>.</returns>
+    public Task<string?> GetRemoteStatusInstanceNameAsync(CancellationToken ct = default)
+        => GetSettingAsync(RemoteStatusInstanceNameKey, ct);
+
+    /// <summary>Speichert den optionalen Anzeigenamen der Instanz (<see cref="RemoteStatusInstanceNameKey"/>).</summary>
+    /// <param name="instanceName">Der zu speichernde Anzeigename; <see langword="null"/> löscht den Wert.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    public Task SetRemoteStatusInstanceNameAsync(string? instanceName, CancellationToken ct = default)
+        => SetSettingAsync(RemoteStatusInstanceNameKey, instanceName, ct);
+
+    /// <summary>
+    /// Liest das Snapshot-Push-Intervall der Remote-Übersicht in Sekunden
+    /// (<see cref="RemoteStatusSnapshotIntervalSecondsKey"/>). Fehlende oder ungültige Werte
+    /// fallen auf <see cref="RemoteStatusDefaultSnapshotIntervalSeconds"/> zurück; gespeicherte
+    /// Werte werden auf <see cref="RemoteStatusMinSnapshotIntervalSeconds"/> bis
+    /// <see cref="RemoteStatusMaxSnapshotIntervalSeconds"/> begrenzt.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Das wirksame Intervall in Sekunden.</returns>
+    public async Task<int> GetRemoteStatusSnapshotIntervalSecondsAsync(CancellationToken ct = default)
+    {
+        var value = await GetIntSettingAsync(RemoteStatusSnapshotIntervalSecondsKey, ct);
+        return value is null
+            ? RemoteStatusDefaultSnapshotIntervalSeconds
+            : Math.Clamp(value.Value, RemoteStatusMinSnapshotIntervalSeconds, RemoteStatusMaxSnapshotIntervalSeconds);
+    }
+
+    /// <summary>Speichert das Snapshot-Push-Intervall in Sekunden (<see cref="RemoteStatusSnapshotIntervalSecondsKey"/>).</summary>
+    /// <param name="seconds">Das zu speichernde Intervall in Sekunden.</param>
+    /// <param name="ct">Abbruchtoken.</param>
+    public Task SetRemoteStatusSnapshotIntervalSecondsAsync(int seconds, CancellationToken ct = default)
+        => SetIntSettingAsync(RemoteStatusSnapshotIntervalSecondsKey, seconds, ct);
+
+    /// <summary>
+    /// Liefert die persistente Instanz-ID dieser Installation (<see cref="RemoteStatusInstanceIdKey"/>);
+    /// bei fehlendem oder leerem gespeichertem Wert wird eine neue GUID (Format <c>N</c>) erzeugt,
+    /// persistiert und zurückgegeben.
+    /// </summary>
+    /// <param name="ct">Abbruchtoken.</param>
+    /// <returns>Die persistente Instanz-ID.</returns>
+    public async Task<string> GetOrCreateRemoteStatusInstanceIdAsync(CancellationToken ct = default)
+    {
+        var value = await GetSettingAsync(RemoteStatusInstanceIdKey, ct);
+        if (!string.IsNullOrWhiteSpace(value))
+            return value;
+
+        var instanceId = Guid.NewGuid().ToString("N");
+        await SetSettingAsync(RemoteStatusInstanceIdKey, instanceId, ct);
+        _logger.LogInformation("Remote-Übersicht: neue Instanz-ID {InstanceId} erzeugt.", instanceId);
+        return instanceId;
+    }
 }
 
 /// <summary>Fenstergeometrie-Einstellungen (Position und Größe des Hauptfensters).</summary>
