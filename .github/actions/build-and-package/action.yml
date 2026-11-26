@@ -91,6 +91,36 @@ runs:
         }
       shell: pwsh
 
+    - name: Publish StatusServer (win-x64 + linux-x64, self-contained)
+      # The StatusServer (server/Softwareschmiede.StatusServer) is cross-platform
+      # (net11.0, no Windows dependencies): it ships with every release/pre-release as
+      # self-contained packages for win-x64 (optional IIS/Windows-Service host) and
+      # linux-x64 (the documented systemd/nginx deployment), so the target machine
+      # needs no .NET runtime installed. Kept as separate per-RID zips instead of
+      # being folded into release.zip: that asset name/shape is consumed by the
+      # in-app updater and must stay unchanged.
+      run: |
+        dotnet publish server/Softwareschmiede.StatusServer/Softwareschmiede.StatusServer.csproj -c Release -r win-x64 --self-contained true -o publish-statusserver-win /p:ReleaseTag=${{ inputs.release-tag }}
+        dotnet publish server/Softwareschmiede.StatusServer/Softwareschmiede.StatusServer.csproj -c Release -r linux-x64 --self-contained true -o publish-statusserver-linux /p:ReleaseTag=${{ inputs.release-tag }}
+      shell: pwsh
+
+    - name: Create StatusServer ZIPs
+      run: |
+        Compress-Archive -Path publish-statusserver-win/* -DestinationPath statusserver-win-x64.zip -Force
+        Compress-Archive -Path publish-statusserver-linux/* -DestinationPath statusserver-linux-x64.zip -Force
+        foreach ($expected in 'statusserver-win-x64.zip', 'statusserver-linux-x64.zip') {
+          if (-not (Test-Path $expected)) {
+            throw "StatusServer package missing: $expected"
+          }
+        }
+        if (-not (Test-Path 'publish-statusserver-win/Softwareschmiede.StatusServer.exe')) {
+          throw "publish-statusserver-win/ is incomplete: Softwareschmiede.StatusServer.exe is missing."
+        }
+        if (-not (Test-Path 'publish-statusserver-linux/Softwareschmiede.StatusServer')) {
+          throw "publish-statusserver-linux/ is incomplete: Softwareschmiede.StatusServer is missing."
+        }
+      shell: pwsh
+
     - name: Create Release ZIP
       run: Compress-Archive -Path publish/* -DestinationPath release.zip -Force
       shell: pwsh

@@ -427,6 +427,81 @@ public sealed class SettingsView : BaseWindowView
     /// <returns>Diese Instanz.</returns>
     public SettingsView CollapseProcessflows() => CollapseExpander("ProcessRunsExpander");
 
+    /// <summary>Wechselt in den "Automatisierung"-Tab und klappt den Expander
+    /// "Remote-Übersicht" auf, damit seine Steuerelemente in der UIA-Struktur existieren.</summary>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView OpenRemoteStatus() => OpenExpander("RemoteStatusExpander");
+
+    /// <summary>Klappt den Expander "Remote-Übersicht" zu (no-op, wenn er bereits zu ist).</summary>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView CollapseRemoteStatus() => CollapseExpander("RemoteStatusExpander");
+
+    /// <summary>Liest den Schaltzustand der Titelleiste "Remote-Übersicht" — auch im
+    /// zugeklappten Zustand, da der Status-TextBlock im Expander-Header liegt.</summary>
+    /// <returns>Der Status-Text ("aktiviert"/"deaktiviert").</returns>
+    public string GetRemoteStatusStatus() => GetExpanderStatus("RemoteStatusStatus");
+
+    /// <returns>Der Zustand des Remote-Übersicht-Funktionsschalters.</returns>
+    public bool IsRemoteStatusEnabledChecked()
+        => WaitForElement(Window, cf => cf.ByName("IsRemoteStatusEnabled"), Short).AsCheckBox().IsChecked ?? false;
+
+    /// <summary>Setzt den Funktionsschalter der Remote-Übersicht.</summary>
+    /// <param name="enabled">Der neue Zustand.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetRemoteStatusEnabledChecked(bool enabled)
+    {
+        WaitForElement(Window, cf => cf.ByName("IsRemoteStatusEnabled"), Short).AsCheckBox().IsChecked = enabled;
+        return this;
+    }
+
+    /// <returns><c>true</c>, wenn die editierbaren Felder der Remote-Übersicht
+    /// (Server-URL stellvertretend) bedienbar sind — deaktiviert bleiben sie gesperrt
+    /// statt ausgeblendet (Instanz-ID und Verbindungsstatus sind immer sichtbar).</returns>
+    public bool IsRemoteStatusUrlEnabled()
+        => WaitForElement(Window, cf => cf.ByName("RemoteStatusUrl"), Short).IsEnabled;
+
+    /// <returns><c>true</c>, wenn der Hinweistext „Felder gesperrt" der deaktivierten
+    /// Remote-Übersicht sichtbar ist (ausgeblendet, sobald der Schalter an ist).</returns>
+    public bool IsRemoteStatusDisabledHintVisible() => IsAreaVisible("RemoteStatusDisabledHint");
+
+    /// <returns><c>true</c>, wenn der „Token bereits hinterlegt"-Indikator neben der
+    /// PasswordBox sichtbar ist.</returns>
+    public bool IsRemoteStatusTokenStoredHintVisible() => IsAreaVisible("RemoteStatusTokenStoredHint");
+
+    /// <returns>Der aktuelle Wert des Server-URL-Felds.</returns>
+    public string GetRemoteStatusUrl()
+        => WaitForElement(Window, cf => cf.ByName("RemoteStatusUrl"), Short).AsTextBox().Text;
+
+    /// <summary>Setzt den Wert des Server-URL-Felds.</summary>
+    /// <param name="value">Die Basis-Adresse des Status-Servers.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetRemoteStatusUrl(string value)
+    {
+        WaitForElement(Window, cf => cf.ByName("RemoteStatusUrl"), Short).AsTextBox().Text = value;
+        return this;
+    }
+
+    /// <returns>Der aktuelle Wert des Anzeigename-Felds.</returns>
+    public string GetRemoteStatusInstanceName()
+        => WaitForElement(Window, cf => cf.ByName("RemoteStatusInstanceName"), Short).AsTextBox().Text;
+
+    /// <summary>Setzt den Wert des Anzeigename-Felds.</summary>
+    /// <param name="value">Der Anzeigename der Instanz.</param>
+    /// <returns>Diese Instanz.</returns>
+    public SettingsView SetRemoteStatusInstanceName(string value)
+    {
+        WaitForElement(Window, cf => cf.ByName("RemoteStatusInstanceName"), Short).AsTextBox().Text = value;
+        return this;
+    }
+
+    /// <returns>Die angezeigte (schreibgeschützte) Instanz-ID.</returns>
+    public string GetRemoteStatusInstanceId()
+        => WaitForElement(Window, cf => cf.ByName("RemoteStatusInstanceId"), Short).AsTextBox().Text;
+
+    /// <returns>Der angezeigte Verbindungsstatus-Text.</returns>
+    public string GetRemoteStatusConnectionText()
+        => WaitForElement(Window, cf => cf.ByName("RemoteStatusConnectionText"), Short).HelpText;
+
     /// <summary>Klappt den benannten Expander im "Automatisierung"-Tab auf (no-op, wenn er
     /// bereits geöffnet ist) und wartet kurz auf den Aufbau des Inhalts.</summary>
     /// <param name="automationName">Der <c>AutomationProperties.Name</c> des Expanders.</param>
