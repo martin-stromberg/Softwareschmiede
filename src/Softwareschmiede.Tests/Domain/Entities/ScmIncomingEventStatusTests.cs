@@ -61,4 +61,40 @@ public sealed class ScmIncomingEventStatusTests
     {
         ScmIncomingEventStatus.NonBlocking.Contains(status).Should().BeFalse();
     }
+
+    /// <summary>Die Startplatz-Freigabeliste enthält exakt die Stati, die keinen neuen
+    /// CLI-Lauf benötigen: noch nicht zugestellte, wartende und terminale Ereignisse.</summary>
+    [Fact]
+    public void StartSlotFreeing_ShouldContainExactlyTheNonOccupyingStatuses()
+    {
+        ScmIncomingEventStatus.StartSlotFreeing.Should().BeEquivalentTo(
+            ScmIncomingEventStatus.Aufgenommen,
+            ScmIncomingEventStatus.Verzögert,
+            ScmIncomingEventStatus.Wartend,
+            ScmIncomingEventStatus.ZustellungUngewiss,
+            ScmIncomingEventStatus.VerarbeitungUngeklärt,
+            ScmIncomingEventStatus.Verarbeitet,
+            ScmIncomingEventStatus.Abgebrochen);
+    }
+
+    /// <summary>In-Flight-Stati halten den Startplatz belegt, solange Zustellung oder
+    /// Verarbeitung laufen kann; ein unbekannter Status bleibt konservativ belegend.</summary>
+    [Theory]
+    [InlineData(ScmIncomingEventStatus.ZustellungVorbereitet)]
+    [InlineData(ScmIncomingEventStatus.Zugestellt)]
+    [InlineData(ScmIncomingEventStatus.InBearbeitung)]
+    [InlineData("ZukuenftigerStatus")]
+    public void StartSlotFreeing_ShouldExcludeOccupyingStatuses(string status)
+    {
+        ScmIncomingEventStatus.StartSlotFreeing.Contains(status).Should().BeFalse();
+    }
+
+    /// <summary>Wartend serialisiert die Queue weiterhin (nicht NonBlocking), belegt aber
+    /// keinen Startplatz — ein wartendes Ereignis braucht keinen neuen CLI-Lauf.</summary>
+    [Fact]
+    public void StartSlotFreeing_WartendIsDecoupledFromNonBlocking()
+    {
+        ScmIncomingEventStatus.StartSlotFreeing.Should().Contain(ScmIncomingEventStatus.Wartend);
+        ScmIncomingEventStatus.NonBlocking.Should().NotContain(ScmIncomingEventStatus.Wartend);
+    }
 }

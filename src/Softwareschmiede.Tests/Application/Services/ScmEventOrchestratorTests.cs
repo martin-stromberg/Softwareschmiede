@@ -238,7 +238,8 @@ public sealed class ScmEventOrchestratorTests
         using var verification = fixture.Services.CreateScope();
         Assert.Equal(status, (await verification.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems.FindAsync(new object?[] { taskId }, TestContext.Current.CancellationToken))!.Status);
         Assert.Empty(fixture.Sessions);
-        Assert.Equal("Wartend", (await fixture.EventAsync(eventId)).Status);
+        // Pausierte Aufgaben warten regulär; beendete/archivierte sind strukturell unzustellbar.
+        Assert.Equal(paused ? "Wartend" : "VerarbeitungUngeklärt", (await fixture.EventAsync(eventId)).Status);
     }
 
     /// <summary>Eine fehlgeschlagene Kanalprüfung kann nach einer weiteren Eingabe im selben Lauf keine alte Benutzerbestätigung wiederverwenden.</summary>

@@ -140,11 +140,12 @@ public sealed class ScmEventDispatchTests_Limit
         Assert.Single(fixture.Sessions);
     }
 
-    /// <summary>Ein Ereignis an einer beendeten/archivierten Aufgabe bleibt permanent gesperrt — auch bei freiem Platz.</summary>
+    /// <summary>Ein Ereignis an einer beendeten/archivierten Aufgabe kann nie zugestellt werden:
+    /// Es erhält den terminalen Klärungsstatus statt dauerhaft zu warten — auch bei freiem Platz.</summary>
     [Theory]
     [InlineData(WorkItemStatus.Completed)]
     [InlineData(WorkItemStatus.Archived)]
-    public async Task Dispatch_EndedOrArchivedTask_StaysBlocked(WorkItemStatus status)
+    public async Task Dispatch_EndedOrArchivedTask_MarkedUndeliverable(WorkItemStatus status)
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
@@ -153,13 +154,107 @@ public sealed class ScmEventDispatchTests_Limit
 
         await fixture.DispatchAsync(eventId);
         var item = await fixture.EventAsync(eventId);
-        Assert.Equal("Wartend", item.Status);
-        Assert.Equal("Aufgabe beendet/archiviert; Start gesperrt.", item.Reason);
+        Assert.Equal("VerarbeitungUngeklärt", item.Status);
+        Assert.Equal("Die Aufgabe ist beendet/archiviert; das Ereignis kann nicht mehr zugestellt werden.", item.Reason);
 
         // Auch wiederholte Prüfung reaktiviert nichts.
         await fixture.DispatchAsync(eventId);
-        Assert.Equal("Aufgabe beendet/archiviert; Start gesperrt.", (await fixture.EventAsync(eventId)).Reason);
+        Assert.Equal("VerarbeitungUngeklärt", (await fixture.EventAsync(eventId)).Status);
         Assert.Empty(fixture.Sessions);
+    }
+
+    /// <summary>Ein Ereignis an einer entfernten Aufgabe ist strukturell unzustellbar und
+    /// erhält den terminalen Klärungsstatus statt dauerhaft zu warten.</summary>
+    [Fact]
+    public async Task Dispatch_RemovedTask_MarkedUndeliverable()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(configured: true);
+        using (var scope = fixture.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems
+                .Where(x => x.Id == taskId).ExecuteDeleteAsync(cancellationToken: TestContext.Current.CancellationToken);
+        }
+
+        await fixture.DispatchAsync(eventId);
+        var item = await fixture.EventAsync(eventId);
+        Assert.Equal("VerarbeitungUngeklärt", item.Status);
+        Assert.Contains("entfernt", item.Reason);
+        Assert.Empty(fixture.Sessions);
+    }
+
+    /// <summary>Ein Ereignis an einer Aufgabe ohne Repository-Zuordnung kann nie zugestellt
+    /// werden und erhält den terminalen Klärungsstatus mit Handlungsanweisung.</summary>
+    [Fact]
+    public async Task Dispatch_TaskWithoutRepository_MarkedUndeliverable()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        var (taskId, eventId) = await fixture.AddAsync(configured: true);
+        using (var scope = fixture.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().WorkItems
+                .Where(x => x.Id == taskId).ExecuteUpdateAsync(x => x.SetProperty(p => p.GitRepositoryId, (Guid?)null),
+                    cancellationToken: TestContext.Current.CancellationToken);
+        }
+
+        await fixture.DispatchAsync(eventId);
+        var item = await fixture.EventAsync(eventId);
+        Assert.Equal("VerarbeitungUngeklärt", item.Status);
+        Assert.Contains("kein Git-Repository", item.Reason);
+        Assert.Empty(fixture.Sessions);
+    }
+
+    /// <summary>Ein wartendes Ereignis einer Prompt-bereiten Aufgabe hält den Startplatz nicht
+    /// belegt: Die Sitzung wartet ehrlich auf Eingabe, ein zweites Ereignis darf starten.</summary>
+    [Fact]
+    public async Task Dispatch_ReadySessionWaitingEvent_SlotFreedForNextStart()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await fixture.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
+        var (firstTask, firstId) = await fixture.AddAsync(configured: true);
+        var (_, secondId) = await fixture.AddAsync(configured: true);
+        await fixture.DispatchAsync(firstId);
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(firstId)).Status);
+
+        // Ereignis in den nicht weiterbeweglichen Wartezustand versetzen (manueller Neuversand
+        // nötig); die Sitzung kehrt ans verifizierte Eingabeprompt zurück.
+        using (var scope = fixture.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>().ScmIncomingEvents
+                .Where(x => x.Id == firstId).ExecuteUpdateAsync(x => x
+                    .SetProperty(p => p.Status, "Wartend")
+                    .SetProperty(p => p.NextAttemptUtc, (long?)long.MaxValue),
+                    cancellationToken: TestContext.Current.CancellationToken);
+        }
+        fixture.SetPrompt(firstTask, fixture.Prompt);
+
+        await fixture.DispatchAsync(secondId);
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(secondId)).Status);
+        Assert.Equal(2, fixture.Sessions.Count);
+    }
+
+    /// <summary>Ein terminal klärbares Ereignis einer Prompt-bereiten Aufgabe hält den
+    /// Startplatz ebenfalls nicht belegt.</summary>
+    [Fact]
+    public async Task Dispatch_ReadySessionUnclarifiedEvent_SlotFreedForNextStart()
+    {
+        await using var fixture = new ScmDispatchFixture();
+        await fixture.InitializeAsync();
+        await fixture.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
+        var (firstTask, firstId) = await fixture.AddAsync(configured: true);
+        var (_, secondId) = await fixture.AddAsync(configured: true);
+        await fixture.DispatchAsync(firstId);
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(firstId)).Status);
+
+        await fixture.SetEventStatusAsync(firstId, "VerarbeitungUngeklärt");
+        fixture.SetPrompt(firstTask, fixture.Prompt);
+
+        await fixture.DispatchAsync(secondId);
+        Assert.Equal("Zugestellt", (await fixture.EventAsync(secondId)).Status);
+        Assert.Equal(2, fixture.Sessions.Count);
     }
 
     /// <summary>Der Polling-Lauf priorisiert Fortsetzungen vor fälligen Verzögerungen (zeitaufsteigend)
@@ -203,16 +298,18 @@ public sealed class ScmEventDispatchTests_Limit
         Assert.Equal(4, fixture.Sessions.Count);
     }
 
-    /// <summary>Bei einem einzigen freien Platz gewinnt das Fortsetzungsereignis den Platz vor dem
-    /// regulären Ereignis mit kleinerer Sequence; dieses wartet mit Limit-Grund.</summary>
+    /// <summary>Bei einem einzigen freien Platz gewinnt das Fortsetzungsereignis den ersten Start
+    /// vor dem regulären Ereignis mit kleinerer Sequence. Da die frisch gestartete Sitzung jedoch
+    /// ehrlich am Eingabeprompt wartet (Stabilisierungsfrist vor der Zustellung), ist der Platz
+    /// sofort wieder frei — das reguläre Ereignis darf ebenfalls starten.</summary>
     [Fact]
     public async Task Monitor_GlobalLimitOne_ContinuationWinsSlotOverSequence()
     {
         await using var fixture = new ScmDispatchFixture();
         await fixture.InitializeAsync();
         await fixture.SetSettingAsync(ScmEventExecutionLimitService.GlobalLimitKey, "1");
-        var (regularTask, regularId) = await fixture.AddAsync(configured: true);
-        var (continuationTask, _) = await fixture.AddAsync(configured: true);
+        var (regularTask, _) = await fixture.AddAsync(configured: true);
+        var (continuationTask, continuationId) = await fixture.AddAsync(configured: true);
         using (var scope = fixture.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
@@ -223,11 +320,13 @@ public sealed class ScmEventDispatchTests_Limit
 
         await fixture.Monitor.RunOnceAsync(TestContext.Current.CancellationToken);
 
-        Assert.Single(fixture.Sessions);
-        Assert.True(fixture.Sessions.ContainsKey(continuationTask));
-        var regular = await fixture.EventAsync(regularId);
-        Assert.Equal("Wartend", regular.Status);
-        Assert.Contains("globale Limit", regular.Reason);
+        // Priorität gewinnt den ersten Start; die prompt-bereite Sitzung mit noch wartendem
+        // Ereignis belegt den Platz jedoch nicht — das reguläre Ereignis startet ebenfalls.
+        Assert.Equal(2, fixture.Sessions.Count);
+        Assert.Equal(continuationTask.ToString("N"), Path.GetFileName(fixture.StartSpecs[0].WorkingDirectory));
+        var continuation = await fixture.EventAsync(continuationId);
+        Assert.Equal("Wartend", continuation.Status);
+        Assert.Contains("Stabilisierungsphase", continuation.Reason);
     }
 
     /// <summary>Der UI-Pfad „aus der Queue öffnen" läuft durch dieselbe Zulassungskontrolle.</summary>

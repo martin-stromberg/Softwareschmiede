@@ -1,0 +1,14 @@
+  Wiederherzustellende Projekte werden ermittelt...
+  Alle Projekte sind für die Wiederherstellung auf dem neuesten Stand.
+  Softwareschmiede.Plugin.Contracts -> D:\Repositories\softwareschmiede\53ea5989-5235-48e2-99bb-385edd110f67\src\Softwareschmiede.Plugin.Contracts\bin\Debug\net11.0\Softwareschmiede.Plugin.Contracts.dll
+  Softwareschmiede.Plugin.ClaudeCli -> D:\Repositories\softwareschmiede\53ea5989-5235-48e2-99bb-385edd110f67\plugins\Softwareschmiede.Plugin.ClaudeCli\bin\Debug\net11.0\Softwareschmiede.Plugin.ClaudeCli.dll
+  Softwareschmiede.Plugin.Devin -> D:\Repositories\softwareschmiede\53ea5989-5235-48e2-99bb-385edd110f67\plugins\Softwareschmiede.Plugin.Devin\bin\Debug\net11.0\Softwareschmiede.Plugin.Devin.dll
+  Softwareschmiede.Plugin.LocalDirectory -> D:\Repositories\softwareschmiede\53ea5989-5235-48e2-99bb-385edd110f67\plugins\Softwareschmiede.Plugin.LocalDirectory\bin\Debug\net11.0\Softwareschmiede.Plugin.LocalDirectory.dll
+  Softwareschmiede.Plugin.Codex -> D:\Repositories\softwareschmiede\53ea5989-5235-48e2-99bb-385edd110f67\plugins\Softwareschmiede.Plugin.Codex\bin\Debug\net11.0\Softwareschmiede.Plugin.Codex.dll
+  Softwareschmiede.Plugin.GitHub -> D:\Repositories\softwareschmiede\53ea5989-5235-48e2-99bb-385edd110f67\plugins\Softwareschmiede.Plugin.GitHub\bin\Debug\net11.0\Softwareschmiede.Plugin.GitHub.dll
+  Softwareschmiede -> D:\Repositories\softwareschmiede\53ea5989-5235-48e2-99bb-385edd110f67\src\Softwareschmiede\bin\Debug\net11.0\Softwareschmiede.dll
+  Softwareschmiede.IntegrationTests -> D:\Repositories\softwareschmiede\53ea5989-5235-48e2-99bb-385edd110f67\src\Softwareschmiede.IntegrationTests\bin\Debug\net11.0\Softwareschmiede.IntegrationTests.dll
+Testlauf für "D:\Repositories\softwareschmiede\53ea5989-5235-48e2-99bb-385edd110f67\src\Softwareschmiede.IntegrationTests\bin\Debug\net11.0\Softwareschmiede.IntegrationTests.dll" (.NETCoreApp,Version=v11.0)
+Insgesamt 1 Testdateien stimmten mit dem angegebenen Muster überein.
+
+Bestanden!   : Fehler:     0, erfolgreich:   434, übersprungen:     0, gesamt:   434, Dauer: 52 s - Softwareschmiede.IntegrationTests.dll (net11.0)
