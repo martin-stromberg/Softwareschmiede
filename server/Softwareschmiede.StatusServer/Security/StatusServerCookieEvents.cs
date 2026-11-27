@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Softwareschmiede.StatusServer.Data;
+using Softwareschmiede.StatusServer.Pages;
 
 namespace Softwareschmiede.StatusServer.Security;
 
@@ -117,6 +118,6 @@ public sealed class StatusServerCookieEvents : CookieAuthenticationEvents
         if (hasUsers)
             context.Response.Redirect(context.RedirectUri);
         else
-            context.Response.Redirect("/register");
+            context.Response.Redirect($"{PageShell.BasePath}/register");
     }
 }
