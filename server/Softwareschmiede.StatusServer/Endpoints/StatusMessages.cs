@@ -42,6 +42,28 @@ internal static class StatusMessages
     /// <summary>„Das Token wurde nicht gefunden." (Fehlerschlüssel)</summary>
     public const string TokenNotFound = "token-not-found";
 
+    /// <summary>„Die Update-Einstellungen wurden gespeichert."</summary>
+    public const string UpdateSettingsSaved = "update-settings-saved";
+
+    /// <summary>„Die Update-Prüfung wurde abgeschlossen."</summary>
+    public const string UpdateCheckDone = "update-check-done";
+
+    /// <summary>„Die Update-Sperre wurde zurückgesetzt."</summary>
+    public const string UpdateLockReset = "update-lock-reset";
+
+    /// <summary>„Die Update-Prüfung ist fehlgeschlagen." (Fehlerschlüssel)</summary>
+    public const string UpdateCheckFailed = "update-check-failed";
+
+    /// <summary>„Das Update konnte nicht gestartet werden." (Fehlerschlüssel)</summary>
+    public const string UpdateInstallFailed = "update-install-failed";
+
+    /// <summary>„Die Installation wurde nicht gestartet (kein bereites Update
+    /// oder übersprungen/abgebrochen)."</summary>
+    public const string UpdateInstallNotStarted = "update-install-not-started";
+
+    /// <summary>„Die Update-Sperre konnte nicht zurückgesetzt werden." (Fehlerschlüssel)</summary>
+    public const string UpdateLockResetFailed = "update-lock-reset-failed";
+
     private static readonly IReadOnlyDictionary<string, string> s_texts =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -56,6 +78,13 @@ internal static class StatusMessages
             [PasswordChanged] = "Das Passwort wurde geändert.",
             [UserNotFound] = "Der Benutzer wurde nicht gefunden.",
             [TokenNotFound] = "Das Token wurde nicht gefunden.",
+            [UpdateSettingsSaved] = "Die Update-Einstellungen wurden gespeichert.",
+            [UpdateCheckDone] = "Die Update-Prüfung wurde abgeschlossen — den aktuellen Status zeigt die Sektion „Updates“.",
+            [UpdateLockReset] = "Die Update-Sperre wurde zurückgesetzt.",
+            [UpdateCheckFailed] = "Die Update-Prüfung ist fehlgeschlagen — Details stehen in der Sektion „Updates“.",
+            [UpdateInstallFailed] = "Das Update konnte nicht gestartet werden — Details stehen in der Sektion „Updates“.",
+            [UpdateInstallNotStarted] = "Die Installation wurde nicht gestartet — es liegt kein bereites Update vor oder der Vorgang wurde übersprungen bzw. abgebrochen.",
+            [UpdateLockResetFailed] = "Die Update-Sperre konnte nicht zurückgesetzt werden (kein Lock vorhanden oder noch nicht verwaist).",
         };
 
     /// <summary>Löst einen einzelnen <c>msg</c>-/<c>err</c>-Schlüssel auf.</summary>

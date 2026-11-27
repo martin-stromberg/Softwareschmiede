@@ -31,19 +31,28 @@ public class StatusWebApplicationFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment(Environments.Production);
         builder.UseSetting("Data:DatabasePath", DatabasePath);
+
+        // Update-Subsystem (msTools.Updater) in Tests hermetisch halten: keine echten
+        // GitHub-Checks durch die Bibliotheks-Hintergrunddienste und kein Workspace
+        // im produktiven Anwendungspfad.
+        builder.UseSetting("Update:Enabled", "false");
+        builder.UseSetting("Update:HostedServicesEnabled", "false");
+        builder.UseSetting("Update:WorkingDirectory", Path.Combine(_ownedDirectory, "updates"));
     }
 
     /// <inheritdoc/>
     public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
-        if (DatabasePathOverride is not null)
-            return;
 
         // Gepoolte SQLite-Verbindungen physisch schließen, damit das Temp-Verzeichnis lösbar ist.
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         try
         {
+            // Auch bei gesetztem DatabasePathOverride aufräumen: Die Override-DB
+            // liegt dann zwar außerhalb und obliegt dem Test, das eigene
+            // Temp-Verzeichnis (Update-Workspace unter Update:WorkingDirectory)
+            // gehört weiterhin der Factory.
             Directory.Delete(_ownedDirectory, recursive: true);
         }
         catch (IOException)

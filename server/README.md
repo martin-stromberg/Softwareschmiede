@@ -19,7 +19,7 @@ Identity + SQLite).
 | `POST /logout` | Abmeldung | angemeldet |
 | `GET /profile`, `POST /profile/password` | Eigenes Profil / Passwort ändern | angemeldet |
 | `GET /access-denied` | Hinweisseite bei fehlender Berechtigung (z. B. `Ueberwacher` auf Admin-URLs) | anonym |
-| `/admin/users`, `/admin/tokens`, `/admin/settings` | Verwaltungs-UI (Benutzer, Relay-Tokens, Sitzungsdauer) | Stufe `Administration` |
+| `/admin/users`, `/admin/tokens`, `/admin/settings` | Verwaltungs-UI (Benutzer, Relay-Tokens, Sitzungsdauer, Updates) | Stufe `Administration` |
 
 ## Erststart (Setup)
 
@@ -44,6 +44,8 @@ geschlossen und weitere Benutzer legt ausschließlich die Administration über
   Ohne Tokens lehnt der Hub alle Verbindungen ab.
 - **Einstellungen** (`/admin/settings`): Sitzungsdauer der Anmeldesession in Minuten
   (5–43200, Default 480), gilt ab der nächsten Cookie-Ausstellung/-Erneuerung.
+  Darunter die Sektion **Updates** für die automatische Aktualisierung des Servers
+  (siehe [Automatische Updates](#automatische-updates)).
 
 ### Sperrung, Deaktivierung, Recovery
 
@@ -98,6 +100,101 @@ oder User-Secrets setzen, z. B. `export GitHub__Token="github_pat_..."`.
    widerrufen. App-Instanzen, die weiterhin das widerrufene Token senden, werden
    vom Hub abgelehnt und melden den Fehler in den App-Einstellungen.
 
+## Automatische Updates
+
+Der Server aktualisiert sich über die Bibliothek `msTools.Updater` selbst —
+die Update-Quelle sind die GitHub-Releases des Repositories, das Manifest ist das
+separate Release-Asset `statusserver-update.json` (nicht das Desktop-`update.json`,
+weil die Paketwahl nur über Plattform + Runtime-Identifier läuft). Gefundene Pakete
+werden per SHA-256 und ZIP-Integrität gegen das Manifest verifiziert, bevor sie zur
+Installation bereitliegen.
+
+### Steuerung in der Admin-UI
+
+Unter **Einstellungen → Updates** steuert die Administration:
+
+- **Release-Kanal**: `Stable` (nur endgültige Releases) oder `Pre-Release`
+  (zusätzlich Vorabversionen).
+- **Automatisierung**: `Aus` (nur manuelle Aktionen), `Nur prüfen` (verfügbare
+  Updates im Zeitfenster melden) oder `Prüfen und installieren` (zusätzlich
+  täglich zur angegebenen Uhrzeit installieren, Default `03:00`).
+- **Aktionen** (laufen auch bei Modus `Aus`, weil explizit angefordert):
+  „Jetzt nach Update suchen" (Prüfung + Download), „Update jetzt installieren"
+  (erfordert die Downtime-Bestätigung — der Server wird während der Installation
+  neu gestartet und liefert danach ggf. ein neues Anmelde-Cookie) und
+  „Update-Sperre zurücksetzen" (nur sichtbar, wenn ein Installations-Lock als
+  verwaist gilt).
+- Die Statustabelle zeigt installierte Version, Zustand, verfügbare Version,
+  letzte Prüfung, letzten Fehler, die Installationssperre und den Pfad des
+  Update-Protokolls.
+
+Die Einstellungen werden in der `ServerSettings`-Tabelle persistiert
+(`UpdateChannel` `stable`/`prerelease`, `UpdateAutomationMode` `off`/`check`/`install`,
+`UpdateInstallTime` `HH:mm`) und nach jedem Start auf die Laufzeitoptionen
+angewendet — persistierte Werte gewinnen gegenüber `appsettings.json`.
+
+### `Update`-Konfiguration (`appsettings.json`)
+
+| Schlüssel | Default | Bedeutung |
+|-----------|---------|-----------|
+| `Enabled` | `false` | Master-Schalter des Subsystems; der Admin-Modus überschreibt ihn persistiert (manuelle Aktionen laufen unabhängig davon) |
+| `HostedServicesEnabled` | `true` | Registriert die Hintergrunddienste (Prüf-/Installations-Scheduler) |
+| `SourceType` | `Github` | `Github` oder `LocalFolder` (Tests/Offline-Betrieb) |
+| `RepositoryOwner` / `RepositoryName` | `martin-stromberg` / `Softwareschmiede` | Das Release-Repository |
+| `ManifestAssetName` | `statusserver-update.json` | Name des Manifest-Assets im Release |
+| `LocalFolderPath` | `null` | Verzeichnis der LocalFolder-Quelle (Manifest + Paket) |
+| `SourceCheckStartTime` / `SourceCheckEndTime` | `20:00` / `06:00` | Tägliches Prüfzeitfenster (Über-Mitternacht-Fenster wird intern in zwei Ranges je Tag aufgeteilt) |
+| `WorkingDirectory` | `updates` | Workspace relativ zum ContentRoot (Pakete, Status, Lock, Logs) |
+| `ServiceName` / `ExecutablePath` | `null` | Neustart-Ziel: Windows-Dienst-Name bzw. direkter Exe-Pfad |
+| `HealthTimeoutSeconds` | `120` | Altersschwelle, ab der ein Installations-Lock als verwaist gilt |
+| `MaxAssetBytes` | `536870912` | Maximale Paketgröße |
+| `EnableAutomaticDownload` / `EnableAutomaticInstallation` | `true` / `false` | Auto-Download/-Installation — werden vom persistierten Admin-Modus überschrieben |
+| `StopHostAfterScriptStart` | `false` | Default: das Installationsskript steuert Stopp/Start des Servers selbst |
+
+Ein optionales `GitHub:Token` wird vom Update-Client mitverwendet (Rate-Limit);
+ohne Token laufen die Release-Abfragen anonym. Das Token nicht ins Repo
+einchecken (Umgebungsvariable `GitHub__Token`).
+
+### Neustart je Plattform
+
+Die Installation läuft über ein detached gestartetes Skript, das den Server stoppt,
+das Paket einspielt und wieder startet:
+
+- **Linux/systemd**: die laufende Unit wird automatisch erkannt; das Skript läuft
+  als eigene Transient-Unit (`SoftwareschmiedeStatusServerUpdate`), damit es den
+  Stopp des Elternprozesses überlebt.
+- **Windows-Dienst**: `Update:ServiceName` auf den Dienstnamen setzen; ohne Dienst
+  (direkter Exe-Start) greift `Update:ExecutablePath`.
+- **IIS**: `app_offline.htm`-Mechanik und In-/Out-of-Process-Erkennung laufen
+  automatisch; `Update:ServiceName`/`Update:ExecutablePath` werden unter IIS von
+  der Erkennung mit Warnung im Log überschrieben.
+
+Laufende `/relay`-SignalR-Verbindungen brechen beim Neustart kurz ab; die
+App-Instanzen verbinden sich selbstständig neu.
+
+### Datenerhalt, Workspace und Sperre
+
+- **Geschützte Dateien**: `appsettings*.json` und `data/*` (SQLite-Datenbank samt
+  `-wal`/`-shm`) werden beim Dateiaustausch gesichert und restauriert — Datenbestand
+  und lokale Konfiguration überstehen jedes Update. Liegt ein per
+  `Data:DatabasePath` konfigurierter SQLite-Pfad innerhalb des
+  Installationsverzeichnisses, aber außerhalb der `data/*`-Abdeckung, wird er
+  samt `-wal`/`-shm`-Seitendateien zusätzlich geschützt; ein Pfad außerhalb des
+  Installationsverzeichnisses wird vom Update ohnehin nicht berührt.
+- **Workspace**: unter `WorkingDirectory` (Default `updates/` im ContentRoot) liegen
+  `update.log` (Protokoll des Installationsskripts), `status.json` (persistierter
+  Update-Status über Neustarts), `update.lock` (Installations-Lock) sowie die
+  `staging/`-/`pending/`-Unterverzeichnisse der Paketverwaltung.
+- **Verwaiste Sperre**: bleibt `update.lock` nach einem Prozessabbruch liegen und
+  ist älter als `HealthTimeoutSeconds`, gilt der Lock als verwaist — die Admin-UI
+  blendet dann „Update-Sperre zurücksetzen" ein, das den Lock löscht und den
+  persistierten Status korrigiert.
+- **Voraussetzung `release-metadata.json`**: die installierte Version stammt aus
+  dieser Datei im Installationsverzeichnis. Pakete aus Builds vor dieser
+  Update-Funktion enthalten sie nicht — die Seite meldet dann „unbekannt" und die
+  Prüfung bleibt wirkungslos; erst Pakete aus der aktuellen Release-Pipeline sind
+  update-fähig.
+
 ## Veröffentlichen
 
 Der StatusServer wird mit jedem Release und Pre-Release als eigenständiges Asset
@@ -107,6 +204,11 @@ erforderlich:
 - `statusserver-linux-x64.zip` — der dokumentierte systemd/nginx-Pfad (siehe unten)
 - `statusserver-win-x64.zip` — optionaler Betrieb unter Windows (direkter Start,
   Windows-Dienst oder IIS über das ASP.NET Core Hosting Bundle)
+
+Jedes Paket enthält `release-metadata.json` (Versionsquelle für die
+Update-Erkennung); zusätzlich lädt die Pipeline das Server-Update-Manifest
+`statusserver-update.json` als eigenes Release-Asset hoch — beides Voraussetzung
+für die [automatischen Updates](#automatische-updates).
 
 Alternativ manuell paketieren:
 

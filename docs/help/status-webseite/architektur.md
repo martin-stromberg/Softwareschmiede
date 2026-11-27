@@ -15,9 +15,13 @@
 | `UserAdminService` | Scoped-Service (Transaction Script) | Benutzeroperationen inkl. Letzter-Admin-Schutz und `SetupCompleted`-Guard |
 | `RelayTokenService` / `RelayTokenValidator` | Scoped-Services | Token-Erzeugung (Hash-only), Widerruf; Prüfung eingehender `/relay`-Verbindungen |
 | `RelayTokenPlaintextStore` | Singleton | Single-Use-Puffer für die Einmal-Anzeige des Token-Klartexts (2 min TTL) |
-| `ServerSettingsService` | Scoped-Service | `SessionDurationMinutes` aus `ServerSettings` (Default 480) |
-| `AuthPagesComposer` / `AdminPagesComposer` / `PageShell` | statische Renderer | Serverseitig gerenderte, JS-freie HTML-Seiten |
+| `ServerSettingsService` | Scoped-Service | `SessionDurationMinutes` und die Update-Einstellungen (`UpdateChannel`, `UpdateAutomationMode`, `UpdateInstallTime`) aus `ServerSettings` |
+| `AuthPagesComposer` / `AdminPagesComposer` / `PageShell` | statische Renderer | Serverseitig gerenderte, JS-freie HTML-Seiten (inkl. Update-Sektion und Neustart-Ergebnisseite) |
 | `StatusRelayHub` | SignalR-Hub | Annahme der Snapshots; Token-Prüfung im `OnConnectedAsync` |
+| `StatusServerUpdateService` | Scoped-Service (Adapter `Update/`) | Admin-Aktionen über `IAutoUpdateOrchestrator`: Status, Einstellungen anwenden, manueller Check/Download/Install (Enabled-Override), Lock-Reset |
+| `StatusServerUpdateSourceFactory` | Singleton | Baut `AutoUpdateOptions.Source` token- und kanalbewusst (`AutoUpdateGithubSource` via `IHttpClientFactory`-Client `StatusServerUpdate`, oder `AutoUpdateLocalFolderSource`) |
+| `StatusServerAutoUpdateOptionsMapper` / `UpdateStatusMapper` / `StatusServerUpdateSettingsCodec` | statisch / Singleton / statisch | Mapping persistierter Admin-Einstellungen auf `AutoUpdateOptions`; Snapshot→UI-DTO; String↔Enum-Konvertierung |
+| `AutoUpdateCheckerService` / `AutoUpdateSchedulerService` | Bibliotheks-`IHostedService` (msTools.Updater) | Tägliche Quellprüfung/Download im Zeitfenster; tägliche Installation zur `ScheduledInstallTime` |
 
 ## Abhängigkeiten
 
@@ -32,6 +36,16 @@
   Self-Hosting geleert.
 - **GitHub-API** (unverändert) — `GitHubStatusService` für die
   Repository-Aggregation der Status-Seite.
+- **msTools.Updater** (`0.11.0-rc.8`, lokale NuGet-Quelle
+  `external/msTools.Updater/` + `NuGet.config`) — Self-Update:
+  Release-Abfrage (GitHub oder `LocalFolder`), Download, SHA-256-Verifikation
+  gegen `statusserver-update.json`, Dateiaustausch und Neustart über ein
+  detached laufendes Skript (systemd-Transient-Unit /
+  `app_offline.htm`-/Windows-Dienst-/Exe-Erkennung). Der Workspace
+  `updates/` (`status.json`, `update.log`, `update.lock`, Pakete) liegt im
+  ContentRoot; geschützte Dateien (`appsettings*.json`, `data/*`,
+  `Data:DatabasePath` innerhalb des Anwendungsverzeichnisses) werden über
+  `PreserveFile` gesichert und restauriert.
 
 ## Datenfluss
 
@@ -44,6 +58,13 @@
 3. **Snapshots:** App-Instanz → `wss://…/relay?access_token=…` →
    `RelayTokenValidator` (DB-Hash-Lookup) → `StatusRelayHub` →
    `InstanceSnapshotCache` (im Arbeitsspeicher).
+4. **Update:** Admin-POST → `StatusServerUpdateService` →
+   `IAutoUpdateOrchestrator` → `IAutoUpdateSource` (GitHub Releases bzw.
+   LocalFolder) → Download+Verifikation in `updates/` → detached
+   Installationsskript (Stopp → Austausch mit `PreserveFile`-Backup/Restore →
+   Start). Einstellungen fließen über `ServerSettingsService` ↔
+   `ServerSettings` und `StatusServerAutoUpdateOptionsMapper` →
+   `AutoUpdateOptions` (Singleton).
 
 ## Diagramm
 
@@ -61,6 +82,14 @@ graph TD
     RTV --> DB
     Hub --> Cache[InstanceSnapshotCache]
     CE[StatusServerCookieEvents] --> DB
+    EP --> SUS[StatusServerUpdateService]
+    SUS --> ORCH[IAutoUpdateOrchestrator]
+    ORCH --> SRC[IAutoUpdateSource]
+    SRC --> GH[(GitHub Releases)]
+    ORCH --> WS[(Workspace updates/)]
+    ORCH --> SK[Detached Install-Skript]
+    SUS --> OPT[AutoUpdateOptions]
+    SSS --> OPT
 ```
 
 ## Skalierung und Zuverlässigkeit

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using msTools.Updater;
 using Softwareschmiede.StatusServer.Data;
 using Softwareschmiede.StatusServer.Endpoints;
 using Softwareschmiede.StatusServer.GitHub;
@@ -11,6 +12,7 @@ using Softwareschmiede.StatusServer.Pages;
 using Softwareschmiede.StatusServer.Relay;
 using Softwareschmiede.StatusServer.Security;
 using Softwareschmiede.StatusServer.Status;
+using Softwareschmiede.StatusServer.Update;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,8 +39,33 @@ builder.Services.AddHttpClient<GitHubStatusService>((sp, client) =>
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", options.GitHub.Token);
 });
 
+// Self-Update über msTools.Updater: Quelle, Orchestrierung und die beiden
+// Bibliotheks-Hintergrunddienste (periodische Prüfung/Download im Zeitfenster,
+// tägliche Installation zur ScheduledInstallTime). Der Datenbankpfad wird vorab
+// aufgelöst, damit ein konfiguriertes Ziel innerhalb des Anwendungsverzeichnisses
+// beim Update-Dateiaustausch geschützt werden kann.
 var databasePath = builder.Configuration["Data:DatabasePath"]
     ?? Path.Combine(builder.Environment.ContentRootPath, "data", "statusserver.db");
+var updateOptions = builder.Configuration
+    .GetSection(StatusServerUpdateOptions.SectionName)
+    .Get<StatusServerUpdateOptions>() ?? new StatusServerUpdateOptions();
+builder.UseAutoUpdate(cfg => cfg.SetInitialConfiguration(
+    updateOptions, databasePath, builder.Environment.ContentRootPath));
+builder.Services.AddSingleton(updateOptions);
+builder.Services.AddHttpClient(StatusServerUpdateSourceFactory.HttpClientName, (sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<StatusServerOptions>>().Value;
+    client.BaseAddress = new Uri("https://api.github.com/");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("softwareschmiede-status-server/1.0");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+    if (!string.IsNullOrEmpty(options.GitHub.Token))
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", options.GitHub.Token);
+});
+builder.Services.AddSingleton<StatusServerUpdateSourceFactory>();
+builder.Services.AddSingleton<UpdateStatusMapper>();
+builder.Services.AddScoped<StatusServerUpdateService>();
+
 var databaseDirectory = Path.GetDirectoryName(databasePath);
 if (!string.IsNullOrEmpty(databaseDirectory))
     Directory.CreateDirectory(databaseDirectory);
@@ -96,6 +123,10 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
     await StatusServerDatabaseInitializer.InitializeAsync(scope.ServiceProvider).ConfigureAwait(false);
+
+// Persistierte Admin-Einstellungen (Kanal/Modus/Installationszeit) auf die
+// Bibliotheksoptionen anwenden, bevor app.Run() die Hintergrunddienste startet.
+await app.ApplyPersistedUpdateSettingsAsync().ConfigureAwait(false);
 
 app.UseForwardedHeaders();
 app.UseAuthentication();

@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Identity;
+using msTools.Updater;
 using Softwareschmiede.StatusServer.Data;
 using Softwareschmiede.StatusServer.Pages;
 using Softwareschmiede.StatusServer.Security;
+using Softwareschmiede.StatusServer.Update;
 
 namespace Softwareschmiede.StatusServer.Endpoints;
 
@@ -47,6 +49,10 @@ public static class AdminEndpoints
 
         app.MapGet("/admin/settings", GetSettings).RequireAuthorization(StatusRoles.AdminOnlyPolicy);
         app.MapPost("/admin/settings/session-duration", PostSessionDuration).RequireAuthorization(StatusRoles.AdminOnlyPolicy).RequireAntiforgery();
+        app.MapPost("/admin/settings/update", PostUpdateSettings).RequireAuthorization(StatusRoles.AdminOnlyPolicy).RequireAntiforgery();
+        app.MapPost("/admin/settings/update/check", PostUpdateCheck).RequireAuthorization(StatusRoles.AdminOnlyPolicy).RequireAntiforgery();
+        app.MapPost("/admin/settings/update/install", PostUpdateInstall).RequireAuthorization(StatusRoles.AdminOnlyPolicy).RequireAntiforgery();
+        app.MapPost("/admin/settings/update/lock-reset", PostUpdateLockReset).RequireAuthorization(StatusRoles.AdminOnlyPolicy).RequireAntiforgery();
 
         return app;
     }
@@ -259,15 +265,21 @@ public static class AdminEndpoints
         HttpContext httpContext,
         UserManager<ApplicationUser> userManager,
         ServerSettingsService settings,
+        StatusServerUpdateService updateService,
         IAntiforgery antiforgery,
-        string? msg)
-        => await RenderSettingsAsync(httpContext, userManager, settings, antiforgery,
-            StatusMessages.Resolve(msg)).ConfigureAwait(false);
+        string? msg,
+        string? err)
+    {
+        var (message, isError) = StatusMessages.Resolve(msg, err);
+        return await RenderSettingsAsync(httpContext, userManager, settings, updateService, antiforgery,
+            message, isError).ConfigureAwait(false);
+    }
 
     private static async Task<IResult> PostSessionDuration(
         HttpContext httpContext,
         UserManager<ApplicationUser> userManager,
         ServerSettingsService settings,
+        StatusServerUpdateService updateService,
         IAntiforgery antiforgery)
     {
         var form = await httpContext.Request.ReadFormAsync(httpContext.RequestAborted).ConfigureAwait(false);
@@ -275,7 +287,7 @@ public static class AdminEndpoints
             || minutes is < ServerSettingsService.MinSessionDurationMinutes
                 or > ServerSettingsService.MaxSessionDurationMinutes)
         {
-            return await RenderSettingsAsync(httpContext, userManager, settings, antiforgery,
+            return await RenderSettingsAsync(httpContext, userManager, settings, updateService, antiforgery,
                 $"Die Sitzungsdauer muss eine ganze Zahl zwischen {ServerSettingsService.MinSessionDurationMinutes} " +
                 $"und {ServerSettingsService.MaxSessionDurationMinutes} Minuten sein.", isError: true).ConfigureAwait(false);
         }
@@ -283,6 +295,121 @@ public static class AdminEndpoints
         await settings.SetSessionDurationAsync(minutes, httpContext.RequestAborted).ConfigureAwait(false);
         return RedirectWithMessage("/admin/settings", StatusMessages.SettingsSaved);
     }
+
+    private static async Task<IResult> PostUpdateSettings(
+        HttpContext httpContext,
+        UserManager<ApplicationUser> userManager,
+        ServerSettingsService settings,
+        StatusServerUpdateService updateService,
+        IAntiforgery antiforgery)
+    {
+        var form = await httpContext.Request.ReadFormAsync(httpContext.RequestAborted).ConfigureAwait(false);
+
+        var channel = StatusServerUpdateSettingsCodec.TryParseChannel(form["channel"].ToString());
+        if (channel is null)
+        {
+            return await RenderUpdateSettingsErrorAsync(httpContext, userManager, settings, updateService,
+                antiforgery, "Unbekannter Release-Kanal.").ConfigureAwait(false);
+        }
+
+        var mode = StatusServerUpdateSettingsCodec.TryParseMode(form["mode"].ToString());
+        if (mode is null)
+        {
+            return await RenderUpdateSettingsErrorAsync(httpContext, userManager, settings, updateService,
+                antiforgery, "Unbekannter Automatisierungsmodus.").ConfigureAwait(false);
+        }
+
+        TimeOnly? installTime = null;
+        var installTimeValue = form["installTime"].ToString();
+        if (mode == StatusServerAutomationMode.CheckAndInstall)
+        {
+            if (!StatusServerUpdateSettingsCodec.TryParseInstallTime(installTimeValue, out var parsedTime))
+            {
+                return await RenderUpdateSettingsErrorAsync(httpContext, userManager, settings, updateService,
+                    antiforgery, "Die Installationsuhrzeit muss im Format HH:mm angegeben werden.").ConfigureAwait(false);
+            }
+
+            installTime = parsedTime;
+        }
+        else if (StatusServerUpdateSettingsCodec.TryParseInstallTime(installTimeValue, out var parsedTime))
+        {
+            installTime = parsedTime;
+        }
+
+        var updateSettings = new StatusServerUpdateSettings(channel.Value, mode.Value, installTime);
+        await settings.SetUpdateSettingsAsync(updateSettings, httpContext.RequestAborted).ConfigureAwait(false);
+        await updateService.ApplySettingsAsync(updateSettings).ConfigureAwait(false);
+        return RedirectWithMessage("/admin/settings", StatusMessages.UpdateSettingsSaved);
+    }
+
+    private static async Task<IResult> PostUpdateCheck(
+        HttpContext httpContext,
+        StatusServerUpdateService updateService)
+    {
+        var result = await updateService.CheckAndDownloadAsync(httpContext.RequestAborted).ConfigureAwait(false);
+        return result.Outcome == AutoUpdateOutcome.Failed
+            ? RedirectWithError("/admin/settings", StatusMessages.UpdateCheckFailed)
+            : RedirectWithMessage("/admin/settings", StatusMessages.UpdateCheckDone);
+    }
+
+    private static async Task<IResult> PostUpdateInstall(
+        HttpContext httpContext,
+        UserManager<ApplicationUser> userManager,
+        ServerSettingsService settings,
+        StatusServerUpdateService updateService,
+        IAutoUpdatePackageStore packageStore,
+        IAntiforgery antiforgery)
+    {
+        var form = await httpContext.Request.ReadFormAsync(httpContext.RequestAborted).ConfigureAwait(false);
+        if (form["confirmDowntime"].Count == 0)
+        {
+            return await RenderUpdateSettingsErrorAsync(httpContext, userManager, settings, updateService,
+                antiforgery,
+                "Bitte bestätigen Sie die Downtime — der Server wird während der Installation neu gestartet.")
+                .ConfigureAwait(false);
+        }
+
+        var result = await updateService.StartInstallAsync(confirmDowntime: true, httpContext.RequestAborted)
+            .ConfigureAwait(false);
+        if (result.Outcome == AutoUpdateOutcome.Failed)
+            return RedirectWithError("/admin/settings", StatusMessages.UpdateInstallFailed);
+        if (result.Code != AutoUpdateResultCode.InstallationStarted)
+        {
+            // Kein Installationsanlauf (kein bereites Paket, übersprungen oder
+            // abgebrochen) — der Server läuft weiter, also greift das
+            // Post/Redirect/Get-Muster statt der statischen Neustart-Seite.
+            return RedirectWithMessage("/admin/settings", StatusMessages.UpdateInstallNotStarted);
+        }
+
+        // Kein Redirect: Das Installationsskript stoppt den Prozess — ein
+        // Redirect-Ziel könnte danach nicht mehr ausgeliefert werden.
+        var user = await EndpointSecurityExtensions
+            .BuildUserContextAsync(httpContext, userManager, antiforgery)
+            .ConfigureAwait(false);
+        return Results.Content(
+            AdminPagesComposer.RenderUpdateInstallStarted(user, packageStore.LogPath),
+            PageShell.HtmlContentType);
+    }
+
+    private static async Task<IResult> PostUpdateLockReset(
+        HttpContext httpContext,
+        StatusServerUpdateService updateService)
+    {
+        var reset = await updateService.ResetLockAsync(httpContext.RequestAborted).ConfigureAwait(false);
+        return reset
+            ? RedirectWithMessage("/admin/settings", StatusMessages.UpdateLockReset)
+            : RedirectWithError("/admin/settings", StatusMessages.UpdateLockResetFailed);
+    }
+
+    private static async Task<IResult> RenderUpdateSettingsErrorAsync(
+        HttpContext httpContext,
+        UserManager<ApplicationUser> userManager,
+        ServerSettingsService settings,
+        StatusServerUpdateService updateService,
+        IAntiforgery antiforgery,
+        string errorMessage)
+        => await RenderSettingsAsync(httpContext, userManager, settings, updateService, antiforgery,
+            errorMessage, isError: true).ConfigureAwait(false);
 
     /// <summary>Baut die Post/Redirect/Get-Umleitung auf eine GET-Seite mit der
     /// Statusmeldung als festem <c>msg</c>-Schlüssel (die Zielseite löst ihn über
@@ -349,6 +476,7 @@ public static class AdminEndpoints
         HttpContext httpContext,
         UserManager<ApplicationUser> userManager,
         ServerSettingsService settings,
+        StatusServerUpdateService updateService,
         IAntiforgery antiforgery,
         string? message = null,
         bool isError = false)
@@ -357,6 +485,10 @@ public static class AdminEndpoints
             .BuildUserContextAsync(httpContext, userManager, antiforgery)
             .ConfigureAwait(false);
         var minutes = await settings.GetSessionDurationAsync(httpContext.RequestAborted).ConfigureAwait(false);
-        return Results.Content(AdminPagesComposer.RenderSettings(user, minutes, message, isError), PageShell.HtmlContentType);
+        var updateSettings = await settings.GetUpdateSettingsAsync(httpContext.RequestAborted).ConfigureAwait(false);
+        var updateStatus = await updateService.GetStatusAsync(httpContext.RequestAborted).ConfigureAwait(false);
+        return Results.Content(
+            AdminPagesComposer.RenderSettings(user, minutes, updateSettings, updateStatus, message, isError),
+            PageShell.HtmlContentType);
     }
 }

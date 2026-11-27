@@ -1,7 +1,9 @@
 using FluentAssertions;
+using msTools.Updater;
 using Softwareschmiede.StatusServer.Data;
 using Softwareschmiede.StatusServer.Pages;
 using Softwareschmiede.StatusServer.Security;
+using Softwareschmiede.StatusServer.Update;
 
 namespace Softwareschmiede.StatusServer.Tests.Pages;
 
@@ -101,13 +103,89 @@ public sealed class AdminPagesComposerTests
     [Fact]
     public void RenderSettings_ShowsCurrentValueAndRange()
     {
-        var html = AdminPagesComposer.RenderSettings(Admin(), 120);
+        var html = AdminPagesComposer.RenderSettings(Admin(), 120, DefaultUpdateSettings(), DefaultUpdateStatus());
 
         html.Should().Contain("action=\"/admin/settings/session-duration\"");
         html.Should().Contain("value=\"120\"");
         html.Should().Contain("5");
         html.Should().Contain("43200");
     }
+
+    /// <summary>Die Update-Sektion zeigt Status, Kanal-/Modus-Auswahl,
+    /// Installationsuhrzeit und die manuellen Update-Aktionen.</summary>
+    [Fact]
+    public void RenderSettings_ShowsUpdateSection()
+    {
+        var settings = new StatusServerUpdateSettings(
+            StatusServerUpdateChannel.ReleaseCandidate,
+            StatusServerAutomationMode.CheckAndInstall,
+            new TimeOnly(3, 30));
+        var status = new StatusServerUpdateStatus(
+            "1.2.3", "9.9.9", AutoUpdateState.ReadyToInstall,
+            new DateTimeOffset(2026, 2, 1, 4, 0, 0, TimeSpan.Zero),
+            null, IsLocked: false, IsLockStale: false, "updates/update.log");
+
+        var html = AdminPagesComposer.RenderSettings(Admin(), 120, settings, status);
+
+        html.Should().Contain("<h2>Updates</h2>");
+        html.Should().Contain("Installierte Version");
+        html.Should().Contain("1.2.3");
+        html.Should().Contain("9.9.9");
+        html.Should().Contain("Bereit zur Installation");
+        // Der Zeitpunkt wird als LocalDateTime gerendert — erwartet in lokaler Zeitzone.
+        html.Should().Contain(status.LastCheckedAt!.Value.LocalDateTime.ToString("dd.MM.yyyy HH:mm"));
+        html.Should().Contain("action=\"/admin/settings/update\"");
+        html.Should().Contain("<option value=\"prerelease\" selected>");
+        html.Should().Contain("<option value=\"install\" selected>");
+        html.Should().Contain("value=\"03:30\"");
+        html.Should().Contain("action=\"/admin/settings/update/check\"");
+        html.Should().Contain("action=\"/admin/settings/update/install\"");
+        html.Should().Contain("Downtime bestätigen");
+        // Das Skript-Protokoll wird als Pfad in der Statustabelle angezeigt.
+        html.Should().Contain("Update-Protokoll");
+        html.Should().Contain("updates/update.log");
+        // Ohne verwaisten Lock gibt es kein Reset-Formular.
+        html.Should().NotContain("/admin/settings/update/lock-reset");
+    }
+
+    /// <summary>Ein verwaister Lock blendet das Reset-Formular ein; ein Fehler wird
+    /// in der Fehler-Pill der Statustabelle angezeigt.</summary>
+    [Fact]
+    public void RenderSettings_StaleLockAndError_ShowsResetFormAndErrorPill()
+    {
+        var status = new StatusServerUpdateStatus(
+            "1.2.3", null, AutoUpdateState.Failed, null,
+            "Quelle nicht erreichbar", IsLocked: true, IsLockStale: true, null);
+
+        var html = AdminPagesComposer.RenderSettings(Admin(), 120, DefaultUpdateSettings(), status);
+
+        html.Should().Contain("action=\"/admin/settings/update/lock-reset\"");
+        html.Should().Contain("Update-Sperre zurücksetzen");
+        html.Should().Contain("verwaist");
+        html.Should().Contain("Quelle nicht erreichbar");
+        html.Should().Contain("Fehlgeschlagen");
+    }
+
+    /// <summary>Die Ergebnisseite nach dem Installationsanlauf erklärt den Neustart
+    /// und verweist auf das Update-Protokoll — der Pfad kommt als Parameter
+    /// (konfigurierbares <c>Update:WorkingDirectory</c>), nicht als Literal.</summary>
+    [Fact]
+    public void RenderUpdateInstallStarted_ExplainsRestart()
+    {
+        var html = AdminPagesComposer.RenderUpdateInstallStarted(Admin(), "custom-workdir/update.log");
+
+        html.Should().Contain("startet neu");
+        html.Should().Contain("custom-workdir/update.log");
+        html.Should().NotContain("updates/update.log");
+    }
+
+    private static StatusServerUpdateSettings DefaultUpdateSettings()
+        => new(StatusServerUpdateChannel.Stable, StatusServerAutomationMode.Off,
+            ServerSettingsService.DefaultUpdateInstallTime);
+
+    private static StatusServerUpdateStatus DefaultUpdateStatus()
+        => new("1.2.3", null, AutoUpdateState.Idle, null, null,
+            IsLocked: false, IsLockStale: false, null);
 
     /// <summary>Meldungen werden escaped; Admin-Navigation ist für Admins sichtbar.</summary>
     [Fact]
