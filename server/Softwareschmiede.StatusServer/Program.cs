@@ -97,6 +97,19 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
     await StatusServerDatabaseInitializer.InitializeAsync(scope.ServiceProvider).ConfigureAwait(false);
 
+// Optionaler PathBase-Betrieb hinter einem Reverse Proxy unter einem URL-Unterpfad
+// (z.B. https://example.com/softwareschmiede/) statt auf dem Domain-Root. Gesteuert
+// ueber den Konfigurationsschluessel "PathBase"; leer = unveraendertes Verhalten.
+// PageShell.BasePath wird zusaetzlich gesetzt, weil die server-gerenderten Seiten
+// ihre Links/Formular-Aktionen/Redirects als literale, root-absolute Pfade bauen
+// (kein Blazor-Router), die von UsePathBase selbst nicht erfasst werden.
+var pathBase = app.Configuration["PathBase"];
+if (!string.IsNullOrWhiteSpace(pathBase))
+{
+    app.UsePathBase(pathBase);
+    PageShell.BasePath = pathBase.TrimEnd('/');
+}
+
 app.UseForwardedHeaders();
 app.UseAuthentication();
 app.UseAuthorization();

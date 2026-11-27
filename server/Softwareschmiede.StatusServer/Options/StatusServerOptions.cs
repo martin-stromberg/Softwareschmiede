@@ -3,6 +3,11 @@ namespace Softwareschmiede.StatusServer.Options;
 /// <summary>Gesamtkonfiguration des Status-Servers (Sektionen <c>App</c>, <c>GitHub</c>, <c>Page</c>).</summary>
 public sealed class StatusServerOptions
 {
+    /// <summary>Optionaler URL-Unterpfad-Praefix fuer den Reverse-Proxy-Betrieb
+    /// (z.B. <c>/softwareschmiede</c>), top-level Konfigurationsschluessel <c>PathBase</c>.
+    /// Default leer = Betrieb auf dem Domain-Root (unveraendertes Verhalten).</summary>
+    public string? PathBase { get; set; }
+
     /// <summary>Veraltungsschwellen der App-Sektionen (Sektion <c>App</c>).</summary>
     public AppSectionOptions App { get; set; } = new();
 

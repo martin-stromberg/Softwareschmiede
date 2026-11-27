@@ -49,7 +49,8 @@ public sealed class StatusPageComposer
             .Append(FmtTime(now, now))
             .Append(" UTC · Aktualisierung alle ")
             .Append(refreshSeconds)
-            .Append(" s · <a href=\"/status.json\">/status.json</a></div>");
+            .Append(" s · <a href=\"").Append(PageShell.BasePath).Append("/status.json\">")
+            .Append(PageShell.BasePath).Append("/status.json</a></div>");
 
         if (instances.Count == 0)
         {
