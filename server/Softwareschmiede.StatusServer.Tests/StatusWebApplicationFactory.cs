@@ -5,32 +5,51 @@ using Microsoft.Extensions.Hosting;
 namespace Softwareschmiede.StatusServer.Tests;
 
 /// <summary><see cref="WebApplicationFactory{TEntryPoint}"/> für den Status-Server mit
-/// überschreibbarer Konfiguration (Tokens, Basic-Auth, GitHub-Repos).</summary>
+/// isolierter SQLite-Datenbank je Factory-Instanz (Temp-Pfad, wird beim Dispose aufgeräumt).</summary>
 public class StatusWebApplicationFactory : WebApplicationFactory<Program>
 {
-    /// <summary>Die zu verwendenden Relay-Tokens (Standard: <c>test-token</c>).</summary>
-    public IReadOnlyList<string> RelayTokens { get; init; } = ["test-token"];
+    private readonly string _ownedDirectory =
+        Path.Combine(Path.GetTempPath(), $"statusserver-tests-{Guid.NewGuid():N}");
 
-    /// <summary>Optionaler Basic-Auth-Benutzername für die Seiten-Endpunkte.</summary>
-    public string? PageUsername { get; init; }
+    /// <summary>Erstellt eine Factory mit eigener, isolierter Datenbank-Datei.</summary>
+    public StatusWebApplicationFactory()
+    {
+    }
 
-    /// <summary>Optionales Basic-Auth-Passwort für die Seiten-Endpunkte.</summary>
-    public string? PagePassword { get; init; }
+    /// <summary>Optionaler, fester SQLite-Pfad (für Neustart-Persistenz-Tests, die
+    /// denselben Pfad mit zwei Factory-Instanzen nutzen — Aufräumen obliegt dann
+    /// dem Test, die Factory löscht nur ihr eigenes Temp-Verzeichnis).</summary>
+    public string? DatabasePathOverride { get; init; }
 
-    /// <summary>Optionaler Relay-Token-Dev-Wert (nur Development).</summary>
-    public string? DevToken { get; init; }
+    /// <summary>Der SQLite-Pfad, den diese Factory-Instanz dem Server per
+    /// <c>Data:DatabasePath</c> vorgibt.</summary>
+    public string DatabasePath
+        => DatabasePathOverride ?? Path.Combine(_ownedDirectory, "statusserver.db");
 
     /// <inheritdoc/>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(Environments.Production);
-        foreach (var (index, token) in RelayTokens.Index())
-            builder.UseSetting($"Relay:Tokens:{index}", token);
-        if (DevToken is not null)
-            builder.UseSetting("Relay:DevToken", DevToken);
-        if (PageUsername is not null)
-            builder.UseSetting("Page:Username", PageUsername);
-        if (PagePassword is not null)
-            builder.UseSetting("Page:Password", PagePassword);
+        builder.UseSetting("Data:DatabasePath", DatabasePath);
+    }
+
+    /// <inheritdoc/>
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        if (DatabasePathOverride is not null)
+            return;
+
+        // Gepoolte SQLite-Verbindungen physisch schließen, damit das Temp-Verzeichnis lösbar ist.
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        try
+        {
+            Directory.Delete(_ownedDirectory, recursive: true);
+        }
+        catch (IOException)
+        {
+            // SQLite-Handles können kurz nach dem Dispose noch offen sein — Temp-Rest
+            // ist unkritisch und wird vom OS aufgeräumt.
+        }
     }
 }

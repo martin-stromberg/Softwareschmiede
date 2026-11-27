@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Softwareschmiede.StatusContracts;
 using Softwareschmiede.StatusServer.GitHub;
+using Softwareschmiede.StatusServer.Pages;
 
 namespace Softwareschmiede.StatusServer.Status;
 
@@ -25,11 +26,13 @@ public sealed class StatusPageComposer
     /// <param name="instances">Die bekannten App-Instanzen aus dem Snapshot-Cache.</param>
     /// <param name="gitHub">Die aggregierten GitHub-Repository-Stati.</param>
     /// <param name="refreshSeconds">Das Meta-Refresh-Intervall der Seite.</param>
+    /// <param name="user">Der Benutzerkontext für die Navigationszeile (Abmelden, Admin-Links).</param>
     /// <returns>Das vollständige HTML-Dokument.</returns>
     public string Render(
         IReadOnlyList<InstanceSnapshotView> instances,
         IReadOnlyList<GitHubRepositoryStatus> gitHub,
-        int refreshSeconds)
+        int refreshSeconds,
+        PageUserContext user)
     {
         var now = _timeProvider.GetUtcNow();
         var sb = new StringBuilder(16_000);
@@ -37,10 +40,11 @@ public sealed class StatusPageComposer
         sb.Append("<meta http-equiv=\"refresh\" content=\"").Append(refreshSeconds).Append("\">");
         sb.Append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">");
         sb.Append("<title>Softwareschmiede-Status</title><style>");
-        sb.Append(Css);
+        sb.Append(Css).Append(PageShell.NavCss);
         sb.Append("</style></head><body><div class=\"page\">");
 
         RenderHeader(sb, instances, now);
+        PageShell.AppendNav(sb, user);
         sb.Append("<div class=\"meta-line\">Stand ")
             .Append(FmtTime(now, now))
             .Append(" UTC · Aktualisierung alle ")
