@@ -36,7 +36,7 @@ public static class AdminPagesComposer
         sb.Append("</table></section>");
 
         sb.Append("<section><h2>Benutzer anlegen</h2>");
-        sb.Append("<form method=\"post\" action=\"/admin/users\">");
+        sb.Append("<form method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/users\">");
         PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
         sb.Append("<label>Benutzername<input type=\"text\" name=\"username\" required autocomplete=\"off\" pattern=\"")
             .Append(UserNamePolicy.AllowedCharactersPattern).Append("\" title=\"")
@@ -110,7 +110,7 @@ public static class AdminPagesComposer
                 if (token.RevokedUtc is null)
                 {
                     // Der Widerruf läuft über eine JS-freie Zwischenseite (GET → Bestätigungs-POST).
-                    sb.Append("<a class=\"action-link danger\" href=\"/admin/tokens/")
+                    sb.Append("<a class=\"action-link danger\" href=\"").Append(PageShell.BasePath).Append("/admin/tokens/")
                         .Append(token.Id).Append("/revoke\">Widerrufen</a>");
                 }
                 else
@@ -125,7 +125,7 @@ public static class AdminPagesComposer
 
         sb.Append("</section>");
         sb.Append("<section><h2>Token anlegen</h2>");
-        sb.Append("<form method=\"post\" action=\"/admin/tokens\">");
+        sb.Append("<form method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/tokens\">");
         PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
         sb.Append("<label>Bezeichnung<input type=\"text\" name=\"label\" required maxlength=\"")
             .Append(RelayTokenService.MaxLabelLength).Append("\"></label>");
@@ -151,11 +151,11 @@ public static class AdminPagesComposer
         sb.Append("<p class=\"muted\">Das Konto wird <strong>unwiderruflich</strong> gelöscht — ")
             .Append("die betroffene Person kann sich danach nicht mehr anmelden. ")
             .Append("Diese Aktion kann nicht rückgängig gemacht werden.</p>");
-        sb.Append("<form method=\"post\" action=\"/admin/users/")
+        sb.Append("<form method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/users/")
             .Append(PageShell.E(targetUserId)).Append("/delete\">");
         PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
         sb.Append("<button type=\"submit\" class=\"danger\">Endgültig löschen</button> ")
-            .Append("<a href=\"/admin/users\">Abbrechen</a>");
+            .Append("<a href=\"").Append(PageShell.BasePath).Append("/admin/users\">Abbrechen</a>");
         sb.Append("</form></section>");
         PageShell.EndPage(sb);
         return sb.ToString();
@@ -176,11 +176,11 @@ public static class AdminPagesComposer
         sb.Append("<p class=\"muted\">Das Token wird <strong>unwiderruflich</strong> ungültig — ")
             .Append("die damit verbundenen App-Instanzen können sich danach nicht mehr am Relay ")
             .Append("anmelden; für eine erneute Anbindung muss ein neues Token hinterlegt werden.</p>");
-        sb.Append("<form method=\"post\" action=\"/admin/tokens/")
+        sb.Append("<form method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/tokens/")
             .Append(token.Id).Append("/revoke\">");
         PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
         sb.Append("<button type=\"submit\" class=\"danger\">Token endgültig widerrufen</button> ")
-            .Append("<a href=\"/admin/tokens\">Abbrechen</a>");
+            .Append("<a href=\"").Append(PageShell.BasePath).Append("/admin/tokens\">Abbrechen</a>");
         sb.Append("</form></section>");
         PageShell.EndPage(sb);
         return sb.ToString();
@@ -215,7 +215,7 @@ public static class AdminPagesComposer
             .Append(ServerSettingsService.MinSessionDurationMinutes).Append("–")
             .Append(ServerSettingsService.MaxSessionDurationMinutes)
             .Append("). Gilt ab der nächsten Ausstellung bzw. Erneuerung der Anmelde-Cookies.</p>");
-        sb.Append("<form method=\"post\" action=\"/admin/settings/session-duration\">");
+        sb.Append("<form method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/settings/session-duration\">");
         PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
         sb.Append("<label>Sitzungsdauer in Minuten<input type=\"number\" name=\"minutes\" required min=\"")
             .Append(ServerSettingsService.MinSessionDurationMinutes).Append("\" max=\"")
@@ -297,13 +297,13 @@ public static class AdminPagesComposer
 
         if (updateStatus.IsLockStale)
         {
-            sb.Append("<form class=\"inline\" method=\"post\" action=\"/admin/settings/update/lock-reset\">");
+            sb.Append("<form class=\"inline\" method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/settings/update/lock-reset\">");
             PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
             sb.Append("<button type=\"submit\">Update-Sperre zurücksetzen</button></form>");
         }
 
         sb.Append("<h3>Kanal und Automatisierung</h3>");
-        sb.Append("<form method=\"post\" action=\"/admin/settings/update\">");
+        sb.Append("<form method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/settings/update\">");
         PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
         sb.Append("<label>Release-Kanal<select name=\"channel\">");
         AppendOption(sb, StatusServerUpdateSettingsCodec.FormatChannel(StatusServerUpdateChannel.Stable),
@@ -333,10 +333,10 @@ public static class AdminPagesComposer
         sb.Append("</form>");
 
         sb.Append("<h3>Aktionen</h3>");
-        sb.Append("<form class=\"inline\" method=\"post\" action=\"/admin/settings/update/check\">");
+        sb.Append("<form class=\"inline\" method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/settings/update/check\">");
         PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
         sb.Append("<button type=\"submit\">Jetzt nach Update suchen</button></form>");
-        sb.Append("<form class=\"inline\" method=\"post\" action=\"/admin/settings/update/install\">");
+        sb.Append("<form class=\"inline\" method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/settings/update/install\">");
         PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
         sb.Append("<label><input type=\"checkbox\" name=\"confirmDowntime\" value=\"true\"> ")
             .Append("Downtime bestätigen — der Server wird während der Installation neu gestartet</label>");
@@ -396,7 +396,7 @@ public static class AdminPagesComposer
             var title = item.IsLastActiveAdmin
                 ? " title=\"Der letzte aktive Administrator kann nicht herabgestuft werden.\""
                 : string.Empty;
-            sb.Append("<form class=\"inline\" method=\"post\" action=\"/admin/users/")
+            sb.Append("<form class=\"inline\" method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/users/")
                 .Append(PageShell.E(item.Id)).Append("/role\">");
             PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
             sb.Append("<input type=\"hidden\" name=\"role\" value=\"").Append(StatusRoles.Ueberwacher).Append("\">");
@@ -404,7 +404,7 @@ public static class AdminPagesComposer
         }
         else if (item.Role == StatusRoles.Ueberwacher)
         {
-            sb.Append("<form class=\"inline\" method=\"post\" action=\"/admin/users/")
+            sb.Append("<form class=\"inline\" method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/users/")
                 .Append(PageShell.E(item.Id)).Append("/role\">");
             PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
             sb.Append("<input type=\"hidden\" name=\"role\" value=\"").Append(StatusRoles.Administration).Append("\">");
@@ -417,7 +417,7 @@ public static class AdminPagesComposer
     {
         if (item.IsDeactivated)
         {
-            sb.Append("<form class=\"inline\" method=\"post\" action=\"/admin/users/")
+            sb.Append("<form class=\"inline\" method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/users/")
                 .Append(PageShell.E(item.Id)).Append("/activate\">");
             PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
             sb.Append("<button type=\"submit\">Aktivieren</button></form>");
@@ -428,7 +428,7 @@ public static class AdminPagesComposer
             var title = item.IsLastActiveAdmin
                 ? " title=\"Der letzte aktive Administrator kann nicht deaktiviert werden.\""
                 : string.Empty;
-            sb.Append("<form class=\"inline\" method=\"post\" action=\"/admin/users/")
+            sb.Append("<form class=\"inline\" method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/users/")
                 .Append(PageShell.E(item.Id)).Append("/deactivate\">");
             PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
             sb.Append("<button type=\"submit\"").Append(disabled).Append(title).Append(">Deaktivieren</button></form>");
@@ -438,7 +438,7 @@ public static class AdminPagesComposer
     /// <summary>Sperrung zurücksetzen (nur aktiv, wenn gesperrt).</summary>
     private static void AppendUnlockAction(StringBuilder sb, PageUserContext user, UserAdminListItem item)
     {
-        sb.Append("<form class=\"inline\" method=\"post\" action=\"/admin/users/")
+        sb.Append("<form class=\"inline\" method=\"post\" action=\"").Append(PageShell.BasePath).Append("/admin/users/")
             .Append(PageShell.E(item.Id)).Append("/unlock\">");
         PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
         sb.Append("<button type=\"submit\"").Append(item.IsLockedOut ? string.Empty : " disabled")
@@ -457,7 +457,7 @@ public static class AdminPagesComposer
             return;
         }
 
-        sb.Append("<a class=\"action-link danger\" href=\"/admin/users/")
+        sb.Append("<a class=\"action-link danger\" href=\"").Append(PageShell.BasePath).Append("/admin/users/")
             .Append(PageShell.E(item.Id)).Append("/delete\">Löschen</a>");
     }
 }

@@ -80,6 +80,7 @@ erzeugt (kein Dev-Fallback mehr).
 | `GitHub` | `CacheTtlSeconds` | Mindestabstand zwischen GitHub-Abrufen; ETag/304 wird zusätzlich genutzt |
 | `Page` | `RefreshSeconds` | Meta-Refresh-Intervall der HTML-Seite |
 | `Data` | `DatabasePath` | Interner Override für den SQLite-Pfad (Default `<ContentRoot>/data/statusserver.db`); primär für Tests gedacht |
+| (top-level) | `PathBase` | Optionaler URL-Unterpfad-Präfix für den Betrieb hinter einem pfadbasierten Reverse Proxy (z. B. `/status` statt eigener Subdomain/Domain-Root); Default leer = unverändertes Verhalten. Siehe Abschnitt „PathBase-Betrieb" unten. |
 
 Die früheren Einträge `Relay:Tokens`, `Relay:DevToken`, `Page:Username` und
 `Page:Password` sind **entfallen** — Relay-Tokens kommen aus der Datenbank,
@@ -274,6 +275,30 @@ server {
 `X-Forwarded-Proto` ist wichtig: Der Server nutzt Forwarded-Headers, damit das
 Anmelde-Cookie hinter dem HTTPS-Proxy als Secure markiert wird — ohne den Header
 setzt der Server den Cookie für `http` und der Browser lehnt ihn beim Login ggf. ab.
+
+## PathBase-Betrieb (Reverse Proxy unter einem URL-Unterpfad)
+
+Für den Betrieb ohne eigene Subdomain — z. B. hinter einem Caddy/nginx, der
+mehrere Anwendungen pfadbasiert auf derselben Domain verteilt
+(`https://example.org/status/...` statt `https://status.example.org/...`) —
+den Konfigurationsschlüssel `PathBase` auf den Unterpfad setzen, z. B. per
+Umgebungsvariable `PathBase=/status`. Der Server berücksichtigt den Präfix
+dann für Routing, Cookie-Pfad, alle server-gerenderten Links/Formular-Aktionen
+und Redirects (inkl. `/relay`). Caddy-Beispiel (anstelle des nginx-Blocks oben):
+
+```caddyfile
+example.org {
+    handle_path /status/* {
+        reverse_proxy 127.0.0.1:5055
+    }
+}
+```
+
+`handle_path` entfernt den `/status`-Präfix, bevor die Anfrage an Kestrel
+weitergereicht wird — der Server selbst erfährt über `PathBase` trotzdem,
+unter welchem Präfix er extern erreichbar ist, und baut seine Links
+entsprechend. Ohne gesetztes `PathBase` bleibt der Domain-Root-Betrieb aus dem
+nginx-Beispiel oben unverändert.
 
 ## Vor dem Livegang
 

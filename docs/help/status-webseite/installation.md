@@ -35,6 +35,7 @@
 | `GitHub:Token` | string? | `null` | Optionales PAT für höhere Rate-Limits |
 | `GitHub:CacheTtlSeconds` | int | 60 | Mindestabstand zwischen GitHub-Abrufen |
 | `Data:DatabasePath` | string? | `<ContentRoot>/data/statusserver.db` | Interner Override des SQLite-Pfads (primär Test-Isolation) |
+| `PathBase` | string? | `null` | Optionaler URL-Unterpfad-Präfix für den Betrieb hinter einem pfadbasierten Reverse Proxy (z. B. `/softwareschmiede` statt eigener Subdomain/Domain-Root) |
 | `Update:Enabled` | bool | `false` | Master-Schalter des Update-Subsystems; der persistierte Admin-Modus überschreibt ihn (manuelle Aktionen laufen unabhängig davon) |
 | `Update:HostedServicesEnabled` | bool | `true` | Registriert die Bibliotheks-Hintergrunddienste (Prüf-/Installations-Scheduler) |
 | `Update:SourceType` | string | `Github` | `Github` oder `LocalFolder` (Tests/Offline-Betrieb) |
