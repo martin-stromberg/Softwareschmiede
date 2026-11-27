@@ -194,6 +194,9 @@ PublishScripts/
 
 # NuGet Packages
 *.nupkg
+# Lokale Paketquelle für msTools.Updater (Pre-Release, nicht auf nuget.org) —
+# das nupkg wird bewusst eingecheckt.
+!external/msTools.Updater/*.nupkg
 # NuGet Symbol Packages
 *.snupkg
 # The packages folder can be ignored because of Package Restore

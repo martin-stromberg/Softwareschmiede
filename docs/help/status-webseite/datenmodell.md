@@ -46,8 +46,12 @@ Zuordnung über `AspNetUserRoles` (genau eine Rolle je Benutzer).
 | `Value` | string (max 500) | Einstellungs-Wert |
 
 Bekannte Schlüssel: `SessionDurationMinutes` (Sitzungsdauer, Default 480 wenn
-Zeile fehlt) und `SetupCompleted` (atomare Setup-Markierung der
-Erst-Registrierung).
+Zeile fehlt), `SetupCompleted` (atomare Setup-Markierung der
+Erst-Registrierung) sowie die Update-Einstellungen `UpdateChannel`
+(`stable`/`prerelease`, Default `stable`), `UpdateAutomationMode`
+(`off`/`check`/`install`, Default `off`) und `UpdateInstallTime` (`HH:mm`,
+Default `03:00`) — fehlende oder korrupte Werte fallen beim Lesen auf die
+jeweiligen Defaults zurück.
 
 Übrige Tabellen (`AspNetUserClaims`, `AspNetUserLogins`, `AspNetUserTokens`,
 `AspNetRoleClaims`) gehören zum Identity-Schema und tragen keine

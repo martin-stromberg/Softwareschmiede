@@ -1,0 +1,56 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Einstellungen – Softwareschmiede-Status</title><style>* { box-sizing: border-box; margin: 0; }
+body { font-family: "Segoe UI", system-ui, sans-serif; background: #f4f5f7; color: #1f2430; }
+.page { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
+header.top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: #1f2937; color: #f8fafc; padding: 16px 24px; border-radius: 10px; }
+header.top h1 { font-size: 20px; font-weight: 600; flex: 1; }
+section { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 16px 20px; margin-bottom: 16px; margin-top: 16px; }
+section h1, section h2 { font-size: 17px; font-weight: 600; margin-bottom: 10px; }
+section h3 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.muted { color: #6b7280; font-size: 13px; margin-bottom: 12px; }
+.msg { background: #d1fae5; border: 1px solid #34d39955; color: #065f46;
+  font-size: 13px; border-radius: 8px; padding: 8px 14px; margin-bottom: 14px; }
+.msg.err { background: #fee2e2; border-color: #f8717155; color: #991b1b; }
+form label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 10px; }
+form input[type="text"], form input[type="password"], form input[type="number"], form select {
+  display: block; width: 100%; max-width: 380px; margin-top: 4px; padding: 7px 10px;
+  font-size: 14px; border: 1px solid #d1d5db; border-radius: 6px; }
+form button { background: #4f46e5; border: 0; border-radius: 6px; color: #fff;
+  font-size: 13.5px; font-weight: 600; padding: 8px 16px; cursor: pointer; }
+form button:hover { background: #4338ca; }
+form button[disabled] { background: #9ca3af; cursor: not-allowed; }
+form.inline { display: inline; }
+form.inline button { font-size: 12px; padding: 4px 10px; margin: 2px 4px 2px 0; }
+a.action-link { display: inline-block; font-size: 12px; font-weight: 600;
+  padding: 4px 10px; margin: 2px 4px 2px 0; background: #fff;
+  border: 1px solid #d1d5db; border-radius: 6px; color: #374151; }
+a.action-link:hover { background: #f3f4f6; }
+a.action-link.danger { color: #991b1b; border-color: #f87171; }
+a.action-link.danger:hover { background: #fee2e2; }
+form button.danger { background: #b91c1c; }
+form button.danger:hover { background: #991b1b; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+td, th { text-align: left; padding: 7px 8px; border-top: 1px solid #f0f1f3; overflow-wrap: anywhere; }
+tr:first-child th { border-top: 0; }
+.pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
+.pill.done { background: #d1fae5; color: #065f46; }
+.pill.err { background: #fee2e2; color: #991b1b; }
+.pill.pause { background: #e5e7eb; color: #4b5563; }
+.pill.wait { background: #fef3c7; color: #92400e; }
+a { color: #4f46e5; text-decoration: none; }
+.token-once { background: #fef3c7; border: 1px solid #f59e0b55; color: #92400e;
+  border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
+.token-once code { display: block; background: #fff; border: 1px dashed #f59e0b;
+  border-radius: 6px; padding: 8px 10px; margin-top: 8px; font-size: 14px;
+  color: #1f2430; overflow-wrap: anywhere; }
+.empty { color: #6b7280; font-size: 13px; padding: 10px 4px; }
+footer { margin-top: 26px; font-size: 11.5px; color: #9ca3af; text-align: center; }nav.topnav { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 8px 16px; margin-top: 12px; font-size: 13px; }
+nav.topnav a.nav-link { color: #4f46e5; font-weight: 600; }
+nav.topnav .nav-user { margin-left: auto; color: #6b7280; font-size: 12.5px; }
+nav.topnav form.nav-logout { display: inline; }
+nav.topnav form.nav-logout button { background: none; border: 1px solid #d1d5db;
+  border-radius: 6px; color: #374151; font-size: 12.5px; padding: 3px 10px; cursor: pointer; }
+nav.topnav form.nav-logout button:hover { background: #f3f4f6; }</style></head><body><div class="page"><header class="top"><h1>Einstellungen</h1></header><nav class="topnav"><a class="nav-link" href="/">Status</a><a class="nav-link" href="/profile">Profil</a><a class="nav-link" href="/admin/users">Benutzer</a><a class="nav-link" href="/admin/tokens">Tokens</a><a class="nav-link" href="/admin/settings">Einstellungen</a><span class="nav-user">admin · Administration</span><form class="nav-logout" method="post" action="/logout"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8A01FDFIdqJEllLlLrlmLWVnWo6kyKXQJaOS-4NSvWuylqwK_MqCn4ew1CXqgybGy8q1IKpq26pjZzKGj1yrKaqla_kHlTNUnvxIYPIYe6RvNfqoAq_oWXtHSXhJFjoWP9ewCQ1wugcW2_9LFx4lIEywODVXGiGwpSWf2T3cnkss8ZBK93DcSvuA_Um66gx_6Q"><button type="submit">Abmelden</button></form></nav><section><div class="msg err">Die Update-Pr&#252;fung ist fehlgeschlagen — Details stehen in der Sektion „Updates“.</div><h2>Sitzungsdauer</h2><p class="muted">Dauer der Anmeldesession in Minuten (5–43200). Gilt ab der nächsten Ausstellung bzw. Erneuerung der Anmelde-Cookies.</p><form method="post" action="/admin/settings/session-duration"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8A01FDFIdqJEllLlLrlmLWVnWo6kyKXQJaOS-4NSvWuylqwK_MqCn4ew1CXqgybGy8q1IKpq26pjZzKGj1yrKaqla_kHlTNUnvxIYPIYe6RvNfqoAq_oWXtHSXhJFjoWP9ewCQ1wugcW2_9LFx4lIEywODVXGiGwpSWf2T3cnkss8ZBK93DcSvuA_Um66gx_6Q"><label>Sitzungsdauer in Minuten<input type="number" name="minutes" required min="5" max="43200" value="480"></label><button type="submit">Speichern</button></form></section><section><h2>Updates</h2><table><tr><th>Feld</th><th>Wert</th></tr><tr><td>Installierte Version</td><td>1.0.0</td></tr><tr><td>Zustand</td><td>Fehlgeschlagen</td></tr><tr><td>Verfügbare Version</td><td>9.9.9</td></tr><tr><td>Letzte Prüfung</td><td>27.11.2026 20:02</td></tr><tr><td>Letzter Fehler</td><td><span class="pill err">Update package hash does not match the release manifest.</span></td></tr><tr><td>Installationssperre</td><td><span class="pill done">keine</span></td></tr></table><h3>Kanal und Automatisierung</h3><form method="post" action="/admin/settings/update"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8A01FDFIdqJEllLlLrlmLWVnWo6kyKXQJaOS-4NSvWuylqwK_MqCn4ew1CXqgybGy8q1IKpq26pjZzKGj1yrKaqla_kHlTNUnvxIYPIYe6RvNfqoAq_oWXtHSXhJFjoWP9ewCQ1wugcW2_9LFx4lIEywODVXGiGwpSWf2T3cnkss8ZBK93DcSvuA_Um66gx_6Q"><label>Release-Kanal<select name="channel"><option value="stable">Stable (nur endgültige Releases)</option><option value="prerelease" selected>Pre-Release (inkl. Vorabversionen)</option></select></label><label>Automatisierung<select name="mode"><option value="off">Aus — nur manuelle Aktionen</option><option value="check" selected>Nur prüfen — verfügbare Updates melden</option><option value="install">Prüfen und installieren — täglich zur angegebenen Uhrzeit</option></select></label><label>Installationsuhrzeit (bei „Prüfen und installieren“)<input type="time" name="installTime" value="03:00"></label><button type="submit">Update-Einstellungen speichern</button></form><h3>Aktionen</h3><form class="inline" method="post" action="/admin/settings/update/check"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8A01FDFIdqJEllLlLrlmLWVnWo6kyKXQJaOS-4NSvWuylqwK_MqCn4ew1CXqgybGy8q1IKpq26pjZzKGj1yrKaqla_kHlTNUnvxIYPIYe6RvNfqoAq_oWXtHSXhJFjoWP9ewCQ1wugcW2_9LFx4lIEywODVXGiGwpSWf2T3cnkss8ZBK93DcSvuA_Um66gx_6Q"><button type="submit">Jetzt nach Update suchen</button></form><form class="inline" method="post" action="/admin/settings/update/install"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8A01FDFIdqJEllLlLrlmLWVnWo6kyKXQJaOS-4NSvWuylqwK_MqCn4ew1CXqgybGy8q1IKpq26pjZzKGj1yrKaqla_kHlTNUnvxIYPIYe6RvNfqoAq_oWXtHSXhJFjoWP9ewCQ1wugcW2_9LFx4lIEywODVXGiGwpSWf2T3cnkss8ZBK93DcSvuA_Um66gx_6Q"><label><input type="checkbox" name="confirmDowntime" value="true"> Downtime bestätigen — der Server wird während der Installation neu gestartet</label><button type="submit" class="danger">Update jetzt installieren</button></form></section><footer>softwareschmiede-status · server-gerendert</footer></div></body></html>

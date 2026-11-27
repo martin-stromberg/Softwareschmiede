@@ -1,0 +1,33 @@
+{
+  "state": 7,
+  "installedVersion": "1.0.0",
+  "availableVersion": "9.9.9",
+  "lastCheckedAt": "2026-11-27T19:02:36.9029034+00:00",
+  "lastCheckResult": {
+    "availableVersion": "9.9.9",
+    "package": {
+      "version": "9.9.9",
+      "platform": "windows",
+      "runtimeIdentifier": "win-x64",
+      "fileName": "statusserver-win-x64.zip",
+      "uri": "file:///C:/Users/Martin/AppData/Local/Temp/statusserver-e2e/src/statusserver-win-x64.zip",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "sizeBytes": 454
+    },
+    "releaseNotes": "E2E-Test-Release 9.9.9",
+    "publishedAt": "2026-11-27T19:00:25.409259+00:00",
+    "isPrerelease": false
+  },
+  "lastDownloadResult": {
+    "localPath": "C:\\Users\\Martin\\AppData\\Local\\Temp\\statusserver-e2e\\app\\updates\\pending\\statusserver-win-x64.zip",
+    "sizeBytes": 454,
+    "checksumValid": true
+  },
+  "lastInstallResult": null,
+  "lastError": "Update package hash does not match the release manifest.",
+  "lastErrorCode": 7,
+  "isLocked": false,
+  "lockCreatedAt": null,
+  "updateLogPath": null,
+  "readyToInstallAt": "2026-11-27T19:01:09.376965+00:00"
+}

@@ -9,7 +9,7 @@
 
 ## Remote-Übersicht
 
-- [Status-Webseite](status-webseite/index.md) — Die separat betriebene Status-Webseite zeigt den Gesamtzustand aller angebundenen Softwareschmiede-Instanzen im Browser, geschützt durch eine Anmeldung mit Benutzerkonten in den Stufen Administration und Überwacher; die Verwaltung von Benutzern, Relay-Tokens und Sitzungsdauer erfolgt direkt auf der Seite.
+- [Status-Webseite](status-webseite/index.md) — Die separat betriebene Status-Webseite zeigt den Gesamtzustand aller angebundenen Softwareschmiede-Instanzen im Browser, geschützt durch eine Anmeldung mit Benutzerkonten in den Stufen Administration und Überwacher; die Verwaltung von Benutzern, Relay-Tokens, Sitzungsdauer und der automatischen Server-Aktualisierung aus den GitHub-Releases (Kanal, Automatisierungsmodus, manuelle Aktionen) erfolgt direkt auf der Seite.
 
 ## Anwendung
 

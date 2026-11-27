@@ -112,9 +112,16 @@ angemeldetem Benutzer die Navigation).
 | `/admin/tokens` | GET | Token-Liste (`?created={guid}` liefert einmalig den Klartext) |
 | `/admin/tokens` | POST | Token anlegen (`label`, 1–200 Zeichen) → Redirect `?created={guid}` |
 | `/admin/tokens/{id}/revoke` | GET/POST | Bestätigungsseite / Widerruf |
-| `/admin/settings` | GET | Einstellungsseite (Sitzungsdauer) |
+| `/admin/settings` | GET | Einstellungsseite (Sitzungsdauer, Update-Status/-Formular) |
 | `/admin/settings/session-duration` | POST | Sitzungsdauer setzen (`minutes`, 5–43200) |
+| `/admin/settings/update` | POST | Update-Einstellungen speichern (`channel` ∈ `stable`/`prerelease`, `mode` ∈ `off`/`check`/`install`, `installTime` `HH:mm` — Pflicht bei `mode=install`) |
+| `/admin/settings/update/check` | POST | Update-Prüfung auslösen (Prüfung + Download eines gefundenen Pakets) |
+| `/admin/settings/update/install` | POST | Installation starten — erfordert die gesetzte Checkbox `confirmDowntime`; bei Erfolg statische Seite „Der Server startet neu" statt Redirect |
+| `/admin/settings/update/lock-reset` | POST | Verwaiste Installations-Sperre zurücksetzen (nur wenn Lock existiert und `IsLockStale` gilt) |
 
 **Erfolgsantworten:** Redirect auf die jeweilige GET-Seite mit
-`?msg=<meldung>` (Post/Redirect/Get). Fachliche Fehlschläge rendern die Seite
-direkt mit `?err`-bzw. Inline-Fehlermeldung.
+`?msg=<meldung>` (Post/Redirect/Get) — Ausnahme: Ein erfolgreich gestarteter
+Update-Installationslauf antwortet mit der statischen Seite „Der Server
+startet neu", weil das Installationsskript den Prozess anhält und ein
+Redirect-Ziel nicht mehr ausgeliefert werden könnte. Fachliche Fehlschläge
+rendern die Seite direkt mit `?err`-bzw. Inline-Fehlermeldung.

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Softwareschmiede.StatusServer.Data;
 using Softwareschmiede.StatusServer.Security;
+using Softwareschmiede.StatusServer.Update;
 
 namespace Softwareschmiede.StatusServer.Tests.TestSupport;
 
@@ -183,6 +184,11 @@ public sealed class StatusServerDbSeeder
     /// <returns>Die Sitzungsdauer in Minuten.</returns>
     public Task<int> GetSessionDurationAsync()
         => WithScopeAsync(sp => sp.GetRequiredService<ServerSettingsService>().GetSessionDurationAsync());
+
+    /// <summary>Liest die aktuell persistierten Update-Einstellungen.</summary>
+    /// <returns>Die Update-Einstellungen.</returns>
+    public Task<StatusServerUpdateSettings> GetUpdateSettingsAsync()
+        => WithScopeAsync(sp => sp.GetRequiredService<ServerSettingsService>().GetUpdateSettingsAsync());
 
     /// <summary>Zählt die Benutzerkonten.</summary>
     /// <returns>Die Anzahl der Benutzer.</returns>

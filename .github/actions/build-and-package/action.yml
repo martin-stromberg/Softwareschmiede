@@ -104,6 +104,42 @@ runs:
         dotnet publish server/Softwareschmiede.StatusServer/Softwareschmiede.StatusServer.csproj -c Release -r linux-x64 --self-contained true -o publish-statusserver-linux /p:ReleaseTag=${{ inputs.release-tag }}
       shell: pwsh
 
+    - name: Write StatusServer release metadata
+      # msTools.Updater determines the installed version from release-metadata.json in
+      # the application root (ReleaseMetadataInstalledVersionProvider) — without this
+      # file the StatusServer update check is inert. One file per RID, same schema as
+      # the FinanceManager deployment (version/publishedAt/commitSha/repository/rid).
+      env:
+        RELEASE_VERSION: ${{ inputs.release-version }}
+        RELEASE_TAG: ${{ inputs.release-tag }}
+      run: |
+        $version = $env:RELEASE_VERSION
+        $tag = $env:RELEASE_TAG
+        if (-not $tag) {
+          $tag = "v0.0.0"
+        }
+        if (-not $version) {
+          $version = $tag -replace '^v', ''
+        }
+        $version = $version -replace '^v', ''
+
+        foreach ($target in @(
+            @{ dir = 'publish-statusserver-win'; rid = 'win-x64' },
+            @{ dir = 'publish-statusserver-linux'; rid = 'linux-x64' })) {
+          $metadata = [ordered]@{
+            version           = $version
+            publishedAt       = (Get-Date).ToUniversalTime().ToString('o')
+            commitSha         = $env:GITHUB_SHA
+            repository        = $env:GITHUB_REPOSITORY
+            runtimeIdentifier = $target.rid
+          }
+          $metadata | ConvertTo-Json -Depth 3 | Set-Content -Path (Join-Path $target.dir 'release-metadata.json') -Encoding UTF8
+          if (-not (Test-Path (Join-Path $target.dir 'release-metadata.json'))) {
+            throw "release-metadata.json missing in $($target.dir)."
+          }
+        }
+      shell: pwsh
+
     - name: Create StatusServer ZIPs
       run: |
         Compress-Archive -Path publish-statusserver-win/* -DestinationPath statusserver-win-x64.zip -Force
@@ -168,4 +204,49 @@ runs:
           )
         }
         $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path 'update.json' -Encoding UTF8
+      shell: pwsh
+
+    - name: Create StatusServer update manifest
+      # Separate server manifest (same Rezepte format as update.json) consumed by the
+      # StatusServer's msTools.Updater integration. A dedicated manifest is required
+      # because the library selects a package solely by platform + runtimeIdentifier —
+      # putting statusserver-win-x64.zip into update.json would collide with the
+      # desktop release.zip entry for the same pair. The desktop manifest stays
+      # untouched; this file is uploaded as an additional release asset.
+      env:
+        RELEASE_VERSION: ${{ inputs.release-version }}
+        RELEASE_TAG: ${{ inputs.release-tag }}
+      run: |
+        $version = $env:RELEASE_VERSION
+        $tag = $env:RELEASE_TAG
+        if (-not $tag) {
+          $tag = "v0.0.0"
+        }
+        if (-not $version) {
+          $version = $tag -replace '^v', ''
+        }
+        $version = $version -replace '^v', ''
+
+        $assets = foreach ($entry in @(
+            @{ file = 'statusserver-win-x64.zip'; platform = 'windows'; rid = 'win-x64' },
+            @{ file = 'statusserver-linux-x64.zip'; platform = 'linux'; rid = 'linux-x64' })) {
+          $hash = (Get-FileHash -Path $entry.file -Algorithm SHA256).Hash.ToLowerInvariant()
+          $size = (Get-Item $entry.file).Length
+          [ordered]@{
+            platform          = $entry.platform
+            runtimeIdentifier = $entry.rid
+            assetName         = $entry.file
+            assetUrl          = "https://github.com/${{ github.repository }}/releases/download/$tag/$($entry.file)"
+            sha256            = $hash
+            sizeBytes         = $size
+          }
+        }
+
+        $manifest = [ordered]@{
+          version      = $version
+          releaseNotes = "Softwareschmiede release $tag"
+          publishedAt  = (Get-Date).ToUniversalTime().ToString('o')
+          assets       = @($assets)
+        }
+        $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path 'statusserver-update.json' -Encoding UTF8
       shell: pwsh
