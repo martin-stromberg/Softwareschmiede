@@ -792,7 +792,7 @@
                                            TextWrapping="Wrap"
                                            Margin="22,4,0,0"
                                            Visibility="{Binding HasRemoteStatusToken, Converter={StaticResource BoolToVisibilityConverter}}" />
-                                <TextBlock Text="Zugangstoken für den Relay-Endpunkt des Status-Servers (entspricht einem Eintrag in Relay:Tokens der Server-Konfiguration). Wird im CredentialStore abgelegt."
+                                <TextBlock Text="Zugangstoken für den Relay-Endpunkt des Status-Servers (wird in der Admin-UI des Status-Servers unter „Tokens“ erzeugt). Wird im CredentialStore abgelegt."
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            TextWrapping="Wrap"
                                            Margin="22,4,0,0" />

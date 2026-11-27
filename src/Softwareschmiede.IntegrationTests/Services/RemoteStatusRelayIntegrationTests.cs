@@ -1,11 +1,14 @@
+using System.Text.RegularExpressions;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Softwareschmiede.Application.Services;
 using Softwareschmiede.StatusContracts;
+using Softwareschmiede.StatusServer.Security;
 
 namespace Softwareschmiede.IntegrationTests.Services;
 
@@ -18,6 +21,10 @@ namespace Softwareschmiede.IntegrationTests.Services;
 public sealed class RemoteStatusRelayIntegrationTests
     : IClassFixture<RemoteStatusRelayIntegrationTests.StatusServerFixture>, IAsyncDisposable
 {
+    private static readonly Regex TokenFieldRegex = new(
+        "name=\"(?<field>[^\"]*VerificationToken[^\"]*)\"\\s+value=\"(?<value>[^\"]+)\"",
+        RegexOptions.Compiled);
+
     private readonly StatusServerFixture _factory;
     private RemoteStatusRelayClient? _client;
 
@@ -34,14 +41,33 @@ public sealed class RemoteStatusRelayIntegrationTests
     }
 
     /// <summary><see cref="WebApplicationFactory{TEntryPoint}"/> für den Status-Server
-    /// mit festem Relay-Testtoken und deaktivierter Seiten-Auth.</summary>
+    /// mit isolierter SQLite-Datenbank (Temp-Pfad, wird beim Dispose aufgeräumt).</summary>
     public sealed class StatusServerFixture : WebApplicationFactory<Program>
     {
+        private readonly string _ownedDirectory =
+            Path.Combine(Path.GetTempPath(), $"statusserver-relay-it-{Guid.NewGuid():N}");
+
         /// <inheritdoc/>
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment(Environments.Production);
-            builder.UseSetting("Relay:Tokens:0", "it-token");
+            builder.UseSetting("Data:DatabasePath", Path.Combine(_ownedDirectory, "statusserver.db"));
+        }
+
+        /// <inheritdoc/>
+        public override async ValueTask DisposeAsync()
+        {
+            await base.DisposeAsync();
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            try
+            {
+                Directory.Delete(_ownedDirectory, recursive: true);
+            }
+            catch (IOException)
+            {
+                // SQLite-Handles können kurz nach dem Dispose noch offen sein —
+                // Temp-Rest ist unkritisch und wird vom OS aufgeräumt.
+            }
         }
     }
 
@@ -50,16 +76,17 @@ public sealed class RemoteStatusRelayIntegrationTests
     [Fact]
     public async Task ConnectRegisterAndPush_SnapshotIsVisibleOnStatusJson()
     {
+        var ct = TestContext.Current.CancellationToken;
         var client = CreateClient();
         await client.ConnectAsync(
             new Uri(_factory.Server.BaseAddress, "relay"),
-            "it-token",
-            TestContext.Current.CancellationToken);
+            await SeedRelayTokenAsync(ct),
+            ct);
         client.IsConnected.Should().BeTrue();
 
         var registerResult = await client.RegisterInstanceAsync(
             new RegisterInstanceRequest("it-inst-1", "Integrations-PC", RelayProtocolVersion.Current),
-            TestContext.Current.CancellationToken);
+            ct);
         registerResult.Accepted.Should().BeTrue();
 
         await client.PushSnapshotAsync(new StatusSnapshot
@@ -79,16 +106,16 @@ public sealed class RemoteStatusRelayIntegrationTests
                     RepositoryName = "it-repo",
                 },
             ],
-        }, TestContext.Current.CancellationToken);
+        }, ct);
 
-        using var http = _factory.CreateClient();
-        var json = await http.GetStringAsync("/status.json", TestContext.Current.CancellationToken);
+        using var http = await CreateAuthenticatedClientAsync(ct);
+        var json = await http.GetStringAsync("/status.json", ct);
         json.Should().Contain("it-inst-1");
         json.Should().Contain("Integrations-PC");
         json.Should().Contain("Integrationsaufgabe");
         json.Should().Contain("\"connected\":true");
 
-        await client.DisconnectAsync(TestContext.Current.CancellationToken);
+        await client.DisconnectAsync(ct);
     }
 
     /// <summary>Mit einem unbekannten Token schlägt der Verbindungsaufbau oder die Registrierung fehl.</summary>
@@ -112,6 +139,44 @@ public sealed class RemoteStatusRelayIntegrationTests
             new RegisterInstanceRequest("it-inst-2", null, RelayProtocolVersion.Current),
             TestContext.Current.CancellationToken);
         await act.Should().ThrowAsync<Exception>();
+    }
+
+    private async Task<string> SeedRelayTokenAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var created = await scope.ServiceProvider
+            .GetRequiredService<RelayTokenService>()
+            .CreateAsync("it-token", cancellationToken)
+            .ConfigureAwait(false);
+        return created.Plaintext;
+    }
+
+    private async Task<HttpClient> CreateAuthenticatedClientAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var result = await scope.ServiceProvider
+            .GetRequiredService<UserAdminService>()
+            .CreateUserAsync("it-admin", "Geheim-123", StatusRoles.Administration, cancellationToken)
+            .ConfigureAwait(false);
+        result.Succeeded.Should().BeTrue(result.Error);
+
+        var http = _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            HandleCookies = true,
+            AllowAutoRedirect = false,
+        });
+        var loginHtml = await http.GetStringAsync("/login", cancellationToken);
+        var match = TokenFieldRegex.Match(loginHtml);
+        match.Success.Should().BeTrue("die Login-Seite muss ein Antiforgery-Feld rendern");
+
+        var response = await http.PostAsync("/login", new FormUrlEncodedContent(
+        [
+            new KeyValuePair<string, string>("username", "it-admin"),
+            new KeyValuePair<string, string>("password", "Geheim-123"),
+            new KeyValuePair<string, string>(match.Groups["field"].Value, match.Groups["value"].Value),
+        ]), cancellationToken);
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.Redirect);
+        return http;
     }
 
     private RemoteStatusRelayClient CreateClient()
