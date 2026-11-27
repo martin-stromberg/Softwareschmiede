@@ -221,6 +221,9 @@ public sealed class ScmEventMonitoringService(
                             // unbestimmt und wird weiter unten abgelehnt. Die Dekoration trägt
                             // die Zuweisungsidentität in den ContentKey — eine erneute
                             // Zuweisung bei unverändertem Text erzeugt ein neues Ereignis.
+                            // Der Plugin-Vorfilter entfernt Beschreibungen nicht mehr — eine
+                            // eigene, marker-tragende Beschreibung kommt hier als Beobachtung
+                            // an und wird ausschließlich über den Zuweisender-Kreis geprüft.
                             var assignment = source is IScmAssignmentSource assignments
                                 ? await assignments.GetLatestViewerAssignmentAsync(reference, ct)
                                 : null;

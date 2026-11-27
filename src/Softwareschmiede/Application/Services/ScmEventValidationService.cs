@@ -19,7 +19,7 @@ public sealed class ScmEventValidationService
     public const string AlreadyReactedRejection = "Bereits mit dem Konto reagiert";
 
     /// <summary>Ablehnungsgrund, wenn eine durch eine Assignee-Zuweisung ausgelöste Beobachtung
-    /// keinen Auftragsinhalt trägt (leere oder nicht lesbare Referenzbeschreibung).</summary>
+    /// keinen Auftragsinhalt trägt (leere Referenzbeschreibung).</summary>
     public const string AssignEmptyDescriptionRejection = "Referenzbeschreibung ist leer";
 
     /// <summary>Ablehnungsgrund, wenn zu einer Assignee-Zuweisung kein wirksames
@@ -65,8 +65,7 @@ public sealed class ScmEventValidationService
         // Eine Kontoreaktion am Kommentar bedeutet: eine andere Instanz (oder dieser Kommentar
         // zuvor) hat die Verarbeitung bereits quittiert — keine erneute Aufnahme. Beschränkt auf
         // Kommentar-Arten, weil nur diese remote eine Empfangsreaktion tragen können.
-        if (observation.ContentKind is (ScmContentKind.IssueComment or ScmContentKind.ReviewComment
-                or ScmContentKind.PullRequestReview) && observation.ViewerHasReacted)
+        if (observation.ContentKind.IsCommentKind() && observation.ViewerHasReacted)
             return AlreadyReactedRejection;
         if (!separate && !SameIdentity(repository.OwnerId, repository.Owner, repository.ViewerId, repository.ViewerLogin))
             return "Angemeldeter Benutzer ist nicht Repository-Owner";
@@ -85,7 +84,11 @@ public sealed class ScmEventValidationService
 
     /// <summary>Prüfschritt des Assignee-Auslösers: Auftragsinhalt vorhanden, Zuweisender
     /// bestimmbar und im erlaubten Kreis (Repository-Owner, überwachtes Konto,
-    /// <see cref="TrustedAutomationLogins"/>); die eigene-Antwort-Markierung gilt weiter.
+    /// <see cref="TrustedAutomationLogins"/>). Der Zuweisender-Kreis trägt im Assign-Pfad
+    /// die Legitimation — die eigene-Antwort-Markierung ist hier kein Ablehnungsgrund;
+    /// die Marker-Abwehr wirkt nur noch über den Texttrigger-Fallback bzw. den regulären
+    /// Texttrigger-Pfad, sodass eine Marker-Beschreibung keinen fremden Zuweisender
+    /// legitimieren kann.
     /// Scheitert die Zuweisungsprüfung, legitimiert ein gleichzeitig gültiger Texttrigger
     /// (z. B. eine Erwähnung des separaten Kontos in derselben Beschreibung) die Beobachtung
     /// dennoch: Die abgelehnte Zuweisung gewinnt zwar die Notification-Deduplizierung, darf
@@ -103,8 +106,6 @@ public sealed class ScmEventValidationService
                 && !SameIdentity(trigger.ActorId, trigger.ActorLogin, repository.ViewerId, repository.ViewerLogin)
                 && !IsTrustedAutomationLogin(trigger.ActorLogin))
             rejection = AssignerNotAllowedRejection;
-        else if (observation.Body.Contains("<!-- softwareschmiede:", StringComparison.Ordinal))
-            rejection = "Eigene Antwort";
         else
             return null;
         // Fallback auf den regulären Texttrigger: Ein frei stehender Auslöser in der

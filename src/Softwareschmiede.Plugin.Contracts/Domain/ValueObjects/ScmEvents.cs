@@ -12,6 +12,17 @@ public enum ScmReferenceKind { Issue, PullRequest }
 /// <summary>Getrennte ID-Namensräume der beobachteten Texte.</summary>
 public enum ScmContentKind { Description, IssueComment, ReviewComment, PullRequestReview }
 
+/// <summary>Einordnung der beobachteten Textarten.</summary>
+public static class ScmContentKindExtensions
+{
+    /// <summary>Die Kommentar-Arten — alle beobachteten Texte außer der Referenzbeschreibung.
+    /// Nur für diese wertet der Host eine Kontoreaktion als Quittierung aus und filtert das
+    /// Plugin eigene Antwortmarker — marker-tragende Kommentare sind in keinem Pfad
+    /// legitimierbar, während Beschreibungen über den Assign-Auslöser legitimiert werden können.</summary>
+    public static bool IsCommentKind(this ScmContentKind kind)
+        => kind is ScmContentKind.IssueComment or ScmContentKind.ReviewComment or ScmContentKind.PullRequestReview;
+}
+
 /// <summary>Vom Provider geladene Repository- und Authentifizierungsdaten, ohne Credentials.</summary>
 public sealed record ScmEventRepository(string ProviderPrefix, string Host, string RepositoryId,
     string Owner, string Name, string? OwnerId, string ViewerId, string ViewerLogin, bool CanWrite,
