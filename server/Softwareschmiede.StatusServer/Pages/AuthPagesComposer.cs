@@ -21,7 +21,7 @@ public static class AuthPagesComposer
         sb.Append("<p class=\"muted\">Es existiert noch kein Benutzerkonto. Lege jetzt das ")
             .Append("Administratorkonto an — die Registrierung schließt sich danach dauerhaft.</p>");
         PageShell.AppendMessage(sb, error, isError: true);
-        sb.Append("<form method=\"post\" action=\"/register\">");
+        sb.Append("<form method=\"post\" action=\"").Append(PageShell.BasePath).Append("/register\">");
         PageShell.AppendHiddenToken(sb, antiforgeryFieldName, antiforgeryToken);
         sb.Append("<label>Benutzername<input type=\"text\" name=\"username\" required autocomplete=\"username\" pattern=\"")
             .Append(UserNamePolicy.AllowedCharactersPattern).Append("\" title=\"")
@@ -49,7 +49,7 @@ public static class AuthPagesComposer
         PageShell.AppendHeader(sb, "Softwareschmiede-Status");
         sb.Append("<section><h1>Anmeldung</h1>");
         PageShell.AppendMessage(sb, error, isError: true);
-        sb.Append("<form method=\"post\" action=\"/login\">");
+        sb.Append("<form method=\"post\" action=\"").Append(PageShell.BasePath).Append("/login\">");
         PageShell.AppendHiddenToken(sb, antiforgeryFieldName, antiforgeryToken);
         sb.Append("<label>Benutzername<input type=\"text\" name=\"username\" required autocomplete=\"username\"></label>");
         sb.Append("<label>Passwort<input type=\"password\" name=\"password\" required autocomplete=\"current-password\"></label>");
@@ -77,7 +77,7 @@ public static class AuthPagesComposer
             .Append("</p>");
         PageShell.AppendMessage(sb, message, isError);
         sb.Append("<h2>Passwort ändern</h2>");
-        sb.Append("<form method=\"post\" action=\"/profile/password\">");
+        sb.Append("<form method=\"post\" action=\"").Append(PageShell.BasePath).Append("/profile/password\">");
         PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
         sb.Append("<label>Aktuelles Passwort<input type=\"password\" name=\"currentPassword\" required autocomplete=\"current-password\"></label>");
         sb.Append("<label>Neues Passwort (mindestens ").Append(PasswordPolicy.MinLength)
@@ -103,7 +103,7 @@ public static class AuthPagesComposer
             .Append("wenn die Seite lange geöffnet war oder aus einem veralteten Browser-Tab ")
             .Append("abgesendet wurde. Deine Eingaben wurden nicht übernommen.</p>");
         sb.Append("<p class=\"muted\">Lade die Seite neu und sende das Formular erneut ab.</p>");
-        sb.Append("<p><a href=\"/\">Zur Status-Übersicht</a></p>");
+        sb.Append("<p><a href=\"").Append(PageShell.BasePath).Append("/\">Zur Status-Übersicht</a></p>");
         sb.Append("</section>");
         PageShell.EndPage(sb);
         return sb.ToString();
@@ -122,7 +122,7 @@ public static class AuthPagesComposer
         sb.Append("<section><h1>Zugriff verweigert</h1>");
         sb.Append("<p class=\"muted\">Deine Berechtigungsstufe reicht für diesen Bereich nicht aus. ")
             .Append("Die Status-Übersicht bleibt dir weiterhin zugänglich.</p>");
-        sb.Append("<p><a href=\"/\">Zur Status-Übersicht</a></p>");
+        sb.Append("<p><a href=\"").Append(PageShell.BasePath).Append("/\">Zur Status-Übersicht</a></p>");
         sb.Append("</section>");
         PageShell.EndPage(sb);
         return sb.ToString();

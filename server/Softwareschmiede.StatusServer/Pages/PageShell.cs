@@ -11,6 +11,14 @@ internal static class PageShell
     /// <summary>Content-Type aller server-gerenderten HTML-Antworten.</summary>
     internal const string HtmlContentType = "text/html; charset=utf-8";
 
+    /// <summary>Konfigurierter <c>PathBase</c>-Praefix (z.B. <c>/softwareschmiede</c>) fuer den
+    /// Reverse-Proxy-Betrieb unter einem URL-Unterpfad; leer bei Betrieb auf dem Domain-Root.
+    /// Einmalig beim Start aus der Konfiguration gesetzt (<see cref="Program"/>) und von allen
+    /// server-gerenderten Links, Formular-Aktionen und Redirects als Praefix verwendet, da diese
+    /// als literale, root-absolute Pfade gebaut werden und nicht automatisch von
+    /// <see cref="Microsoft.AspNetCore.Builder.UsePathBaseExtensions.UsePathBase"/> erfasst werden.</summary>
+    internal static string BasePath { get; set; } = string.Empty;
+
     /// <summary>Navigations-CSS — separat gehalten, damit auch <c>StatusPageComposer</c> es einbetten kann.</summary>
     internal const string NavCss = """
 nav.topnav { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
@@ -94,20 +102,20 @@ footer { margin-top: 26px; font-size: 11.5px; color: #9ca3af; text-align: center
     public static void AppendNav(StringBuilder sb, PageUserContext user)
     {
         sb.Append("<nav class=\"topnav\">");
-        sb.Append("<a class=\"nav-link\" href=\"/\">Status</a>");
-        sb.Append("<a class=\"nav-link\" href=\"/profile\">Profil</a>");
+        sb.Append("<a class=\"nav-link\" href=\"").Append(BasePath).Append("/\">Status</a>");
+        sb.Append("<a class=\"nav-link\" href=\"").Append(BasePath).Append("/profile\">Profil</a>");
         if (user.IsAdmin)
         {
-            sb.Append("<a class=\"nav-link\" href=\"/admin/users\">Benutzer</a>");
-            sb.Append("<a class=\"nav-link\" href=\"/admin/tokens\">Tokens</a>");
-            sb.Append("<a class=\"nav-link\" href=\"/admin/settings\">Einstellungen</a>");
+            sb.Append("<a class=\"nav-link\" href=\"").Append(BasePath).Append("/admin/users\">Benutzer</a>");
+            sb.Append("<a class=\"nav-link\" href=\"").Append(BasePath).Append("/admin/tokens\">Tokens</a>");
+            sb.Append("<a class=\"nav-link\" href=\"").Append(BasePath).Append("/admin/settings\">Einstellungen</a>");
         }
 
         sb.Append("<span class=\"nav-user\">").Append(E(user.UserName));
         if (user.IsAdmin)
             sb.Append(" · ").Append(E(StatusRoles.DisplayName(StatusRoles.Administration)));
         sb.Append("</span>");
-        sb.Append("<form class=\"nav-logout\" method=\"post\" action=\"/logout\">");
+        sb.Append("<form class=\"nav-logout\" method=\"post\" action=\"").Append(BasePath).Append("/logout\">");
         AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
         sb.Append("<button type=\"submit\">Abmelden</button></form>");
         sb.Append("</nav>");

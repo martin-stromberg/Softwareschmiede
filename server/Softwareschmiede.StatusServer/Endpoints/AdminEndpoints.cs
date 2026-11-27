@@ -216,7 +216,7 @@ public static class AdminEndpoints
 
         var created = await tokenService.CreateAsync(label, httpContext.RequestAborted).ConfigureAwait(false);
         var key = plaintextStore.Store(created.Plaintext);
-        return Results.Redirect($"/admin/tokens?created={key}");
+        return Results.Redirect($"{PageShell.BasePath}/admin/tokens?created={key}");
     }
 
     private static async Task<IResult> GetTokenRevokeConfirm(
@@ -288,12 +288,12 @@ public static class AdminEndpoints
     /// Statusmeldung als festem <c>msg</c>-Schlüssel (die Zielseite löst ihn über
     /// <see cref="StatusMessages"/> auf und rendert den Text HTML-escaped).</summary>
     private static IResult RedirectWithMessage(string path, string messageKey)
-        => Results.Redirect($"{path}?msg={messageKey}");
+        => Results.Redirect($"{PageShell.BasePath}{path}?msg={messageKey}");
 
     /// <summary>Baut die Post/Redirect/Get-Umleitung auf eine GET-Seite mit der
     /// Fehlermeldung als festem <c>err</c>-Schlüssel.</summary>
     private static IResult RedirectWithError(string path, string errorKey)
-        => Results.Redirect($"{path}?err={errorKey}");
+        => Results.Redirect($"{PageShell.BasePath}{path}?err={errorKey}");
 
     private static async Task<IResult> RunUserActionAsync(
         HttpContext httpContext,

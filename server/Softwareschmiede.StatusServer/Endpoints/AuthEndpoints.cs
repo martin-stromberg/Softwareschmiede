@@ -41,7 +41,7 @@ public static class AuthEndpoints
         IAntiforgery antiforgery)
     {
         if (await userManager.Users.AnyAsync(httpContext.RequestAborted).ConfigureAwait(false))
-            return Results.Redirect("/");
+            return Results.Redirect($"{PageShell.BasePath}/");
 
         var tokens = antiforgery.GetAndStoreTokens(httpContext);
         return Results.Content(
@@ -57,7 +57,7 @@ public static class AuthEndpoints
         IAntiforgery antiforgery)
     {
         if (await userManager.Users.AnyAsync(httpContext.RequestAborted).ConfigureAwait(false))
-            return Results.Redirect("/");
+            return Results.Redirect($"{PageShell.BasePath}/");
 
         var form = await httpContext.Request.ReadFormAsync(httpContext.RequestAborted).ConfigureAwait(false);
         var userName = form["username"].ToString().Trim();
@@ -79,7 +79,7 @@ public static class AuthEndpoints
             if (result.Succeeded && result.User is not null)
             {
                 await signInManager.SignInAsync(result.User, isPersistent: true).ConfigureAwait(false);
-                return Results.Redirect("/");
+                return Results.Redirect($"{PageShell.BasePath}/");
             }
 
             error = result.Error;
@@ -94,7 +94,7 @@ public static class AuthEndpoints
     private static Task<IResult> GetLogin(HttpContext httpContext, IAntiforgery antiforgery)
     {
         if (httpContext.User.Identity?.IsAuthenticated == true)
-            return Task.FromResult<IResult>(Results.Redirect("/"));
+            return Task.FromResult<IResult>(Results.Redirect($"{PageShell.BasePath}/"));
 
         var tokens = antiforgery.GetAndStoreTokens(httpContext);
         return Task.FromResult<IResult>(Results.Content(
@@ -127,7 +127,7 @@ public static class AuthEndpoints
             }
             else
             {
-                return Results.Redirect("/");
+                return Results.Redirect($"{PageShell.BasePath}/");
             }
         }
         else if (signIn.IsLockedOut)
@@ -150,7 +150,7 @@ public static class AuthEndpoints
     private static async Task<IResult> PostLogout(SignInManager<ApplicationUser> signInManager)
     {
         await signInManager.SignOutAsync().ConfigureAwait(false);
-        return Results.Redirect("/login");
+        return Results.Redirect($"{PageShell.BasePath}/login");
     }
 
     private static async Task<IResult> GetProfile(
@@ -175,7 +175,7 @@ public static class AuthEndpoints
     {
         var user = await userManager.GetUserAsync(httpContext.User).ConfigureAwait(false);
         if (user is null)
-            return Results.Redirect("/login");
+            return Results.Redirect($"{PageShell.BasePath}/login");
 
         var form = await httpContext.Request.ReadFormAsync(httpContext.RequestAborted).ConfigureAwait(false);
         var currentPassword = form["currentPassword"].ToString();
@@ -203,7 +203,7 @@ public static class AuthEndpoints
             {
                 await signInManager.RefreshSignInAsync(user).ConfigureAwait(false);
                 // Post/Redirect/Get — F5 sendet die Passwortänderung nicht erneut.
-                return Results.Redirect($"/profile?msg={StatusMessages.PasswordChanged}");
+                return Results.Redirect($"{PageShell.BasePath}/profile?msg={StatusMessages.PasswordChanged}");
             }
             else
             {
