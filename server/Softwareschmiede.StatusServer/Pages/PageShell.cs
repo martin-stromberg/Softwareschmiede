@@ -1,0 +1,139 @@
+using System.Net;
+using System.Text;
+using Softwareschmiede.StatusServer.Security;
+
+namespace Softwareschmiede.StatusServer.Pages;
+
+/// <summary>Gemeinsamer HTML-Rahmen aller server-gerenderten Seiten
+/// (Doctype/Head/CSS/Footer) samt Navigationszeile mit Abmelden-Formular.</summary>
+internal static class PageShell
+{
+    /// <summary>Content-Type aller server-gerenderten HTML-Antworten.</summary>
+    internal const string HtmlContentType = "text/html; charset=utf-8";
+
+    /// <summary>Navigations-CSS — separat gehalten, damit auch <c>StatusPageComposer</c> es einbetten kann.</summary>
+    internal const string NavCss = """
+nav.topnav { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 8px 16px; margin-top: 12px; font-size: 13px; }
+nav.topnav a.nav-link { color: #4f46e5; font-weight: 600; }
+nav.topnav .nav-user { margin-left: auto; color: #6b7280; font-size: 12.5px; }
+nav.topnav form.nav-logout { display: inline; }
+nav.topnav form.nav-logout button { background: none; border: 1px solid #d1d5db;
+  border-radius: 6px; color: #374151; font-size: 12.5px; padding: 3px 10px; cursor: pointer; }
+nav.topnav form.nav-logout button:hover { background: #f3f4f6; }
+""";
+
+    private const string Css = """
+* { box-sizing: border-box; margin: 0; }
+body { font-family: "Segoe UI", system-ui, sans-serif; background: #f4f5f7; color: #1f2430; }
+.page { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
+header.top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: #1f2937; color: #f8fafc; padding: 16px 24px; border-radius: 10px; }
+header.top h1 { font-size: 20px; font-weight: 600; flex: 1; }
+section { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 16px 20px; margin-bottom: 16px; margin-top: 16px; }
+section h1, section h2 { font-size: 17px; font-weight: 600; margin-bottom: 10px; }
+section h3 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.muted { color: #6b7280; font-size: 13px; margin-bottom: 12px; }
+.msg { background: #d1fae5; border: 1px solid #34d39955; color: #065f46;
+  font-size: 13px; border-radius: 8px; padding: 8px 14px; margin-bottom: 14px; }
+.msg.err { background: #fee2e2; border-color: #f8717155; color: #991b1b; }
+form label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 10px; }
+form input[type="text"], form input[type="password"], form input[type="number"], form select {
+  display: block; width: 100%; max-width: 380px; margin-top: 4px; padding: 7px 10px;
+  font-size: 14px; border: 1px solid #d1d5db; border-radius: 6px; }
+form button { background: #4f46e5; border: 0; border-radius: 6px; color: #fff;
+  font-size: 13.5px; font-weight: 600; padding: 8px 16px; cursor: pointer; }
+form button:hover { background: #4338ca; }
+form button[disabled] { background: #9ca3af; cursor: not-allowed; }
+form.inline { display: inline; }
+form.inline button { font-size: 12px; padding: 4px 10px; margin: 2px 4px 2px 0; }
+a.action-link { display: inline-block; font-size: 12px; font-weight: 600;
+  padding: 4px 10px; margin: 2px 4px 2px 0; background: #fff;
+  border: 1px solid #d1d5db; border-radius: 6px; color: #374151; }
+a.action-link:hover { background: #f3f4f6; }
+a.action-link.danger { color: #991b1b; border-color: #f87171; }
+a.action-link.danger:hover { background: #fee2e2; }
+form button.danger { background: #b91c1c; }
+form button.danger:hover { background: #991b1b; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+td, th { text-align: left; padding: 7px 8px; border-top: 1px solid #f0f1f3; overflow-wrap: anywhere; }
+tr:first-child th { border-top: 0; }
+.pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
+.pill.done { background: #d1fae5; color: #065f46; }
+.pill.err { background: #fee2e2; color: #991b1b; }
+.pill.pause { background: #e5e7eb; color: #4b5563; }
+.pill.wait { background: #fef3c7; color: #92400e; }
+a { color: #4f46e5; text-decoration: none; }
+.token-once { background: #fef3c7; border: 1px solid #f59e0b55; color: #92400e;
+  border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
+.token-once code { display: block; background: #fff; border: 1px dashed #f59e0b;
+  border-radius: 6px; padding: 8px 10px; margin-top: 8px; font-size: 14px;
+  color: #1f2430; overflow-wrap: anywhere; }
+.empty { color: #6b7280; font-size: 13px; padding: 10px 4px; }
+footer { margin-top: 26px; font-size: 11.5px; color: #9ca3af; text-align: center; }
+""";
+
+    /// <summary>Beginnt ein HTML-Dokument (Doctype, Head, CSS, öffnender Seiten-Container).</summary>
+    public static void BeginPage(StringBuilder sb, string title)
+    {
+        sb.Append("<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\">");
+        sb.Append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">");
+        sb.Append("<title>").Append(E(title)).Append("</title><style>");
+        sb.Append(Css).Append(NavCss);
+        sb.Append("</style></head><body><div class=\"page\">");
+    }
+
+    /// <summary>Rendert den dunklen Titel-Header der Seite.</summary>
+    public static void AppendHeader(StringBuilder sb, string title)
+        => sb.Append("<header class=\"top\"><h1>").Append(E(title)).Append("</h1></header>");
+
+    /// <summary>Rendert die Navigationszeile für angemeldete Benutzer
+    /// (Status, Profil, Admin-Links nur für <c>Administration</c>, Abmelden-Formular).</summary>
+    public static void AppendNav(StringBuilder sb, PageUserContext user)
+    {
+        sb.Append("<nav class=\"topnav\">");
+        sb.Append("<a class=\"nav-link\" href=\"/\">Status</a>");
+        sb.Append("<a class=\"nav-link\" href=\"/profile\">Profil</a>");
+        if (user.IsAdmin)
+        {
+            sb.Append("<a class=\"nav-link\" href=\"/admin/users\">Benutzer</a>");
+            sb.Append("<a class=\"nav-link\" href=\"/admin/tokens\">Tokens</a>");
+            sb.Append("<a class=\"nav-link\" href=\"/admin/settings\">Einstellungen</a>");
+        }
+
+        sb.Append("<span class=\"nav-user\">").Append(E(user.UserName));
+        if (user.IsAdmin)
+            sb.Append(" · ").Append(E(StatusRoles.DisplayName(StatusRoles.Administration)));
+        sb.Append("</span>");
+        sb.Append("<form class=\"nav-logout\" method=\"post\" action=\"/logout\">");
+        AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
+        sb.Append("<button type=\"submit\">Abmelden</button></form>");
+        sb.Append("</nav>");
+    }
+
+    /// <summary>Rendert eine Status-/Fehlermeldung, falls vorhanden.</summary>
+    public static void AppendMessage(StringBuilder sb, string? message, bool isError = false)
+    {
+        if (!string.IsNullOrEmpty(message))
+        {
+            sb.Append("<div class=\"msg").Append(isError ? " err" : string.Empty)
+                .Append("\">").Append(E(message)).Append("</div>");
+        }
+    }
+
+    /// <summary>Rendert das Antiforgery-Hidden-Feld für ein Formular.</summary>
+    public static void AppendHiddenToken(StringBuilder sb, string fieldName, string token)
+        => sb.Append("<input type=\"hidden\" name=\"").Append(E(fieldName))
+            .Append("\" value=\"").Append(E(token)).Append("\">");
+
+    /// <summary>Schließt den Seiten-Container inkl. Footer und Dokument.</summary>
+    public static void EndPage(StringBuilder sb)
+        => sb.Append("<footer>softwareschmiede-status · server-gerendert</footer>")
+            .Append("</div></body></html>");
+
+    /// <summary>HTML-encodiert einen Text.</summary>
+    public static string E(string? value)
+        => WebUtility.HtmlEncode(value ?? string.Empty);
+}

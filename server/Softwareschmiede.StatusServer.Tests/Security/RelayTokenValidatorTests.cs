@@ -1,73 +1,78 @@
 using FluentAssertions;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
-using Moq;
-using Softwareschmiede.StatusServer.Options;
+using Softwareschmiede.StatusServer.Data;
 using Softwareschmiede.StatusServer.Security;
+using Softwareschmiede.StatusServer.Tests.TestSupport;
 
 namespace Softwareschmiede.StatusServer.Tests.Security;
 
-/// <summary>Tests für <see cref="RelayTokenValidator"/>.</summary>
+/// <summary>Tests für <see cref="RelayTokenValidator"/> (datenbankbasierte Token-Prüfung).</summary>
 public sealed class RelayTokenValidatorTests
 {
-    private static RelayTokenValidator CreateSut(
-        IEnumerable<string>? tokens = null,
-        string? devToken = null,
-        string environment = "Production")
-    {
-        var options = Microsoft.Extensions.Options.Options.Create(new StatusServerOptions
-        {
-            Relay = new RelayOptions
-            {
-                Tokens = tokens?.ToList() ?? ["token-a", "token-b"],
-                DevToken = devToken,
-            },
-        });
-        var env = new Mock<IHostEnvironment>();
-        env.SetupGet(e => e.EnvironmentName).Returns(environment);
-        return new RelayTokenValidator(options, env.Object);
-    }
-
-    /// <summary>Konfigurierte Tokens werden akzeptiert.</summary>
+    /// <summary>Ein bekanntes, nicht widerrufenes Token wird akzeptiert.</summary>
     [Fact]
-    public void IsValid_KnownToken_ReturnsTrue()
+    public async Task IsValid_KnownToken_ReturnsTrue()
     {
-        var sut = CreateSut();
-        sut.IsValid("token-a").Should().BeTrue();
-        sut.IsValid("token-b").Should().BeTrue();
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new StatusServerTestDb();
+        db.Context.RelayTokens.Add(new RelayToken
+        {
+            Label = "Instanz",
+            TokenHash = RelayTokenService.HashToken("token-a"),
+            CreatedUtc = DateTimeOffset.UtcNow,
+        });
+        await db.Context.SaveChangesAsync(ct);
+
+        var sut = new RelayTokenValidator(db.Context);
+        (await sut.IsValidAsync("token-a", ct)).Should().BeTrue();
     }
 
-    /// <summary>Fremde, leere und fehlende Tokens werden abgelehnt.</summary>
-    /// <param name="token">Der zu prüfende Tokenwert.</param>
+    /// <summary>Unbekannte, leere oder <see langword="null"/>-Tokens werden abgelehnt.</summary>
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    [InlineData("token-c")]
-    public void IsValid_UnknownOrEmptyToken_ReturnsFalse(string? token)
+    [InlineData("unbekannt")]
+    public async Task IsValid_UnknownOrEmptyToken_ReturnsFalse(string? token)
     {
-        var sut = CreateSut();
-        sut.IsValid(token).Should().BeFalse();
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new StatusServerTestDb();
+        db.Context.RelayTokens.Add(new RelayToken
+        {
+            Label = "Instanz",
+            TokenHash = RelayTokenService.HashToken("token-a"),
+            CreatedUtc = DateTimeOffset.UtcNow,
+        });
+        await db.Context.SaveChangesAsync(ct);
+
+        var sut = new RelayTokenValidator(db.Context);
+        (await sut.IsValidAsync(token, ct)).Should().BeFalse();
     }
 
-    /// <summary>Ohne konfigurierte Tokens wird jeder Zugriff abgelehnt.</summary>
+    /// <summary>Ohne Token-Datensätze wird jeder Token abgelehnt.</summary>
     [Fact]
-    public void IsValid_EmptyTokenList_RejectsAll()
+    public async Task IsValid_EmptyTokenList_RejectsAll()
     {
-        var sut = CreateSut(tokens: []);
-        sut.IsValid("irgendwas").Should().BeFalse();
+        using var db = new StatusServerTestDb();
+        var sut = new RelayTokenValidator(db.Context);
+        (await sut.IsValidAsync("irgendwas", TestContext.Current.CancellationToken)).Should().BeFalse();
     }
 
-    /// <summary>Das Dev-Token gilt nur in der Development-Umgebung.</summary>
-    /// <param name="environment">Die Hosting-Umgebung.</param>
-    /// <param name="expected">Das erwartete Ergebnis.</param>
-    [Theory]
-    [InlineData("Development", true)]
-    [InlineData("Production", false)]
-    [InlineData("Staging", false)]
-    public void IsValid_DevToken_OnlyInDevelopment(string environment, bool expected)
+    /// <summary>Ein widerrufenes Token wird trotz korrektem Klartext abgelehnt.</summary>
+    [Fact]
+    public async Task IsValid_RevokedToken_ReturnsFalse()
     {
-        var sut = CreateSut(tokens: [], devToken: "dev-secret", environment: environment);
-        sut.IsValid("dev-secret").Should().Be(expected);
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new StatusServerTestDb();
+        db.Context.RelayTokens.Add(new RelayToken
+        {
+            Label = "Instanz",
+            TokenHash = RelayTokenService.HashToken("token-a"),
+            CreatedUtc = DateTimeOffset.UtcNow,
+            RevokedUtc = DateTimeOffset.UtcNow,
+        });
+        await db.Context.SaveChangesAsync(ct);
+
+        var sut = new RelayTokenValidator(db.Context);
+        (await sut.IsValidAsync("token-a", ct)).Should().BeFalse();
     }
 }

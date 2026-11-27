@@ -34,7 +34,7 @@ public sealed class StatusRelayHub : Hub
     }
 
     /// <inheritdoc/>
-    public override Task OnConnectedAsync()
+    public override async Task OnConnectedAsync()
     {
         var httpContext = Context.GetHttpContext();
         var token = httpContext?.Request.Query["access_token"].ToString();
@@ -45,14 +45,14 @@ public sealed class StatusRelayHub : Hub
             if (authorization?.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) == true)
                 token = authorization[7..].Trim();
         }
-        if (!_tokenValidator.IsValid(token))
+        if (!await _tokenValidator.IsValidAsync(token, Context.ConnectionAborted).ConfigureAwait(false))
         {
             _logger.LogWarning("Relay-Verbindung {ConnectionId} abgelehnt: ungültiges Token.", Context.ConnectionId);
             Context.Abort();
-            return Task.CompletedTask;
+            return;
         }
 
-        return base.OnConnectedAsync();
+        await base.OnConnectedAsync().ConfigureAwait(false);
     }
 
     /// <summary>Registriert die Instanz der aktuellen Verbindung.</summary>
