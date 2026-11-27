@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Softwareschmiede.StatusContracts;
 using Softwareschmiede.StatusServer.GitHub;
+using Softwareschmiede.StatusServer.Pages;
 using Softwareschmiede.StatusServer.Status;
 using Softwareschmiede.StatusServer.Tests.TestSupport;
 
@@ -10,6 +11,9 @@ namespace Softwareschmiede.StatusServer.Tests.Status;
 public sealed class StatusPageComposerTests
 {
     private static StatusPageComposer CreateSut(TestTimeProvider time) => new(time);
+
+    private static PageUserContext UserContext(bool isAdmin = true)
+        => new("tester", isAdmin, "token-value", "__RequestVerificationToken");
 
     private static InstanceSnapshotView OnlineInstance()
         => new(
@@ -77,12 +81,13 @@ public sealed class StatusPageComposerTests
                 null),
         ];
 
-    /// <summary>Die Seite enthält alle Kernsektionen, Meta-Refresh und keine Aktionsbuttons (read-only).</summary>
+    /// <summary>Die Seite enthält alle Kernsektionen, Meta-Refresh und außer dem
+    /// Abmelde-Button der Navigation keine Aktionsbuttons (read-only).</summary>
     [Fact]
     public void Render_OnlineInstance_ContainsAllSectionsAndNoButtons()
     {
         var time = new TestTimeProvider();
-        var html = CreateSut(time).Render([OnlineInstance()], GitHubRepos(), 15);
+        var html = CreateSut(time).Render([OnlineInstance()], GitHubRepos(), 15, UserContext());
 
         html.Should().Contain("meta http-equiv=\"refresh\" content=\"15\"");
         html.Should().Contain("name=\"viewport\"");
@@ -93,7 +98,39 @@ public sealed class StatusPageComposerTests
         html.Should().Contain("Letzte Releases");
         html.Should().Contain("badge online");
         html.Should().Contain("Martin-PC");
-        html.Should().NotContain("<button");
+        var withoutLogoutButton = html.Replace("<button type=\"submit\">Abmelden</button>", string.Empty);
+        withoutLogoutButton.Should().NotContain("<button");
+    }
+
+    /// <summary>Die Navigation enthält das Abmelde-Formular mit Antiforgery-Feld,
+    /// den Benutzernamen und für Admins die Admin-Links.</summary>
+    [Fact]
+    public void Render_Navigation_AdminShowsAdminLinksAndLogoutForm()
+    {
+        var time = new TestTimeProvider();
+        var html = CreateSut(time).Render([OnlineInstance()], [], 15, UserContext(isAdmin: true));
+
+        html.Should().Contain("action=\"/logout\"");
+        html.Should().Contain("name=\"__RequestVerificationToken\" value=\"token-value\"");
+        html.Should().Contain("href=\"/profile\"");
+        html.Should().Contain("href=\"/admin/users\"");
+        html.Should().Contain("href=\"/admin/tokens\"");
+        html.Should().Contain("href=\"/admin/settings\"");
+        html.Should().Contain("tester");
+    }
+
+    /// <summary>Ein Überwacher sieht in der Navigation keine Admin-Links.</summary>
+    [Fact]
+    public void Render_Navigation_WatcherHidesAdminLinks()
+    {
+        var time = new TestTimeProvider();
+        var html = CreateSut(time).Render([OnlineInstance()], [], 15, UserContext(isAdmin: false));
+
+        html.Should().Contain("action=\"/logout\"");
+        html.Should().NotContain("/admin/users");
+        html.Should().NotContain("/admin/tokens");
+        html.Should().NotContain("/admin/settings");
+        html.Should().NotContain("Administration");
     }
 
     /// <summary>Referenzierte Objekte werden als klickbare GitHub-Links gerendert.</summary>
@@ -101,7 +138,7 @@ public sealed class StatusPageComposerTests
     public void Render_References_RenderedAsGitHubLinks()
     {
         var time = new TestTimeProvider();
-        var html = CreateSut(time).Render([OnlineInstance()], GitHubRepos(), 15);
+        var html = CreateSut(time).Render([OnlineInstance()], GitHubRepos(), 15, UserContext());
 
         html.Should().Contain("href=\"https://github.com/o/r/issues/479\"");
         html.Should().Contain("href=\"https://github.com/o/r/pull/12\"");
@@ -116,7 +153,7 @@ public sealed class StatusPageComposerTests
     {
         var time = new TestTimeProvider();
         var offline = OnlineInstance() with { Connected = false, IsStale = true };
-        var html = CreateSut(time).Render([offline], GitHubRepos(), 15);
+        var html = CreateSut(time).Render([offline], GitHubRepos(), 15, UserContext());
 
         html.Should().Contain("offline seit");
         html.Should().Contain("badge offline");
@@ -128,7 +165,7 @@ public sealed class StatusPageComposerTests
     public void Render_NoInstances_ShowsEmptyState()
     {
         var time = new TestTimeProvider();
-        var html = CreateSut(time).Render([], [], 15);
+        var html = CreateSut(time).Render([], [], 15, UserContext());
 
         html.Should().Contain("Keine App-Instanz hat bisher Daten geliefert");
         html.Should().Contain("badge offline");
@@ -144,7 +181,7 @@ public sealed class StatusPageComposerTests
             new("owner/repo", "https://github.com/owner/repo", [], [], null, null,
                 "403 rate limit", new DateTimeOffset(2026, 1, 1, 11, 59, 0, TimeSpan.Zero)),
         };
-        var html = CreateSut(time).Render([OnlineInstance()], repos, 15);
+        var html = CreateSut(time).Render([OnlineInstance()], repos, 15, UserContext());
 
         html.Should().Contain("GitHub-Abruf f");
         html.Should().Contain("403 rate limit");
@@ -167,7 +204,7 @@ public sealed class StatusPageComposerTests
                 },
             ],
         };
-        var html = CreateSut(time).Render([instance with { Snapshot = snapshot }], [], 15);
+        var html = CreateSut(time).Render([instance with { Snapshot = snapshot }], [], 15, UserContext());
 
         html.Should().NotContain("<script>alert(1)</script>");
         html.Should().Contain("&lt;script&gt;");
@@ -186,7 +223,7 @@ public sealed class StatusPageComposerTests
             WorkItems = null!,
             ScmEvents = null!,
         };
-        var html = CreateSut(time).Render([instance with { Snapshot = snapshot }], [], 15);
+        var html = CreateSut(time).Render([instance with { Snapshot = snapshot }], [], 15, UserContext());
 
         html.Should().Contain("Laufende Aufgaben");
         html.Should().Contain("Wartet auf Anwender");
@@ -225,7 +262,7 @@ public sealed class StatusPageComposerTests
                 },
             ],
         };
-        var html = CreateSut(time).Render([instance with { Snapshot = snapshot }], [], 15);
+        var html = CreateSut(time).Render([instance with { Snapshot = snapshot }], [], 15, UserContext());
 
         html.Should().NotContain("href=\"javascript:");
         html.Should().NotContain("href=\"file:");
@@ -239,7 +276,7 @@ public sealed class StatusPageComposerTests
     public void Render_AppSections_CarryInstanceTag()
     {
         var time = new TestTimeProvider();
-        var html = CreateSut(time).Render([OnlineInstance()], [], 15);
+        var html = CreateSut(time).Render([OnlineInstance()], [], 15, UserContext());
 
         html.Should().Contain("Laufende Aufgaben ");
         html.Should().Contain("Wartet auf Anwender ");
@@ -255,7 +292,7 @@ public sealed class StatusPageComposerTests
     public void Render_Css_AllowsWrappingForMobile()
     {
         var time = new TestTimeProvider();
-        var html = CreateSut(time).Render([OnlineInstance()], [], 15);
+        var html = CreateSut(time).Render([OnlineInstance()], [], 15, UserContext());
 
         // nowrap ist ausschließlich für die kurzen Zahlen-/Link-Spalten erlaubt
         // (einzelne Tokens wie „05:14:34“ oder „Issue ↗“, die nie umbrechen müssen).

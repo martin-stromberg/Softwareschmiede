@@ -1,40 +1,38 @@
-using Microsoft.Extensions.Options;
-using Softwareschmiede.StatusServer.Options;
+using Microsoft.EntityFrameworkCore;
+using Softwareschmiede.StatusServer.Data;
 
 namespace Softwareschmiede.StatusServer.Security;
 
-/// <summary>Validiert das Relay-Zugangstoken einer eingehenden Hub-Verbindung.</summary>
+/// <summary>Validiert das Relay-Zugangstoken einer eingehenden Hub-Verbindung
+/// gegen die gehasht in der Datenbank gespeicherten, nicht widerrufenen Tokens.</summary>
 public sealed class RelayTokenValidator
 {
-    private readonly StatusServerOptions _options;
-    private readonly bool _isDevelopment;
+    private readonly StatusServerDbContext _db;
 
     /// <summary>Erstellt den Validator.</summary>
-    /// <param name="options">Die Server-Konfiguration.</param>
-    /// <param name="environment">Die aktuelle Hosting-Umgebung.</param>
-    public RelayTokenValidator(
-        IOptions<StatusServerOptions> options,
-        IHostEnvironment environment)
+    /// <param name="db">Der Datenbankkontext.</param>
+    public RelayTokenValidator(StatusServerDbContext db)
     {
-        ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(environment);
-
-        _options = options.Value;
-        _isDevelopment = environment.IsDevelopment();
+        ArgumentNullException.ThrowIfNull(db);
+        _db = db;
     }
 
     /// <summary>Prüft, ob das übergebene Token für den Relay-Zugriff berechtigt ist.</summary>
-    /// <param name="token">Das vom Client übergebene Token (Query-Parameter <c>access_token</c>).</param>
+    /// <param name="token">Das vom Client übergebene Token (Query-Parameter <c>access_token</c>
+    /// oder Bearer-Header).</param>
+    /// <param name="cancellationToken">Abbruchtoken.</param>
     /// <returns><see langword="true"/>, wenn der Zugriff erlaubt ist.</returns>
-    public bool IsValid(string? token)
+    public async Task<bool> IsValidAsync(string? token, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(token))
             return false;
 
-        if (_isDevelopment && !string.IsNullOrEmpty(_options.Relay.DevToken)
-            && SecretComparer.FixedTimeEquals(token, _options.Relay.DevToken))
-            return true;
-
-        return _options.Relay.Tokens.Any(allowed => SecretComparer.FixedTimeEquals(token, allowed));
+        var hash = RelayTokenService.HashToken(token);
+        var entity = await _db.RelayTokens
+            .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken)
+            .ConfigureAwait(false);
+        return entity is not null
+            && entity.RevokedUtc is null
+            && SecretComparer.FixedTimeEquals(entity.TokenHash, hash);
     }
 }
