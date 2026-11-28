@@ -10,8 +10,8 @@ namespace Softwareschmiede.StatusServer.Tests.Pages;
 /// <summary>Tests für <see cref="AdminPagesComposer"/> (Benutzer-, Token- und Einstellungslisten).</summary>
 public sealed class AdminPagesComposerTests
 {
-    private static PageUserContext Admin()
-        => new("admin", IsAdmin: true, "token-value", "__RequestVerificationToken");
+    private static PageUserContext Admin(ThemePreference theme = ThemePreference.Auto)
+        => new("admin", IsAdmin: true, "token-value", "__RequestVerificationToken", theme);
 
     /// <summary>Die Benutzerliste zeigt Namen, Stufe, Status-Pill und Aktionsformulare;
     /// der letzte aktive Admin erhält deaktivierte Buttons.</summary>
@@ -52,6 +52,16 @@ public sealed class AdminPagesComposerTests
         // Geschützte Buttons des letzten Admins sind disabled.
         html.Should().MatchRegex("disabled[^>]*>Zu Überwacher herabstufen");
         html.Should().MatchRegex("disabled[^>]*>Löschen");
+    }
+
+    /// <summary>Admin-Seiten übernehmen die Theme-Einstellung des Benutzerkontexts
+    /// ins <c>data-theme</c>-Attribut des <c>&lt;html&gt;</c>-Tags.</summary>
+    [Fact]
+    public void RenderUserList_AdminTheme_SetsDataTheme()
+    {
+        var html = AdminPagesComposer.RenderUserList(Admin(ThemePreference.Dark), []);
+
+        html.Should().Contain("<html lang=\"de\" data-theme=\"dark\">");
     }
 
     /// <summary>Die Token-Liste zeigt gültige und widerrufene Einträge; ein frisch

@@ -154,6 +154,15 @@ public sealed class StatusServerDbSeeder
                 .FindByNameAsync(userName)
                 .ConfigureAwait(false))?.LockoutEnd);
 
+    /// <summary>Liefert die persistierte Theme-Einstellung eines Benutzers.</summary>
+    /// <param name="userName">Der Benutzername.</param>
+    /// <returns>Die Theme-Einstellung oder <see langword="null"/> bei unbekanntem Benutzer.</returns>
+    public Task<ThemePreference?> GetUserThemeAsync(string userName)
+        => WithScopeAsync(async sp =>
+            (await sp.GetRequiredService<UserManager<ApplicationUser>>()
+                .FindByNameAsync(userName)
+                .ConfigureAwait(false))?.Theme);
+
     /// <summary>Liefert die Id eines Benutzers (für die Admin-Route-Parameter).</summary>
     /// <param name="userName">Der Benutzername.</param>
     /// <returns>Die Benutzer-Id oder <see langword="null"/>.</returns>

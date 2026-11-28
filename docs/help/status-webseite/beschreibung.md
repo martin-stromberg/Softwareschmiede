@@ -31,6 +31,23 @@ legt die Administration an.
   verlängert sich bei Nutzung automatisch. Wer sich abmeldet oder dessen Konto
   deaktiviert wird, verliert den Zugriff sofort.
 
+### Anzeige (Farbschema)
+
+- Die gesamte Webseite ist in einem hellen (**Light**) oder dunklen (**Dark**)
+  Farbschema darstellbar. Jeder angemeldete Benutzer wählt im Profil unter
+  **Anzeige → Farbschema** eine von drei Einstellungen:
+  - **Automatisch (System)**: Die Seite folgt der Hell-/Dunkel-Einstellung
+    des eigenen Betriebssystems bzw. Browsers — voreingestellt für alle
+    Konten.
+  - **Light** / **Dark**: Erzwingt das gewählte Schema unabhängig von der
+    Systemeinstellung.
+- Die Auswahl wird dauerhaft zum eigenen Konto gespeichert, bleibt über
+  Abmeldungen und Server-Neustarts erhalten und gilt auf allen Seiten der
+  Web-Oberfläche ab dem nächsten Seitenaufruf.
+- Ohne Anmeldung (Anmeldung, Ersteinrichtung, Hinweisseiten) folgt die
+  Darstellung immer der Systemeinstellung — eine manuelle Auswahl gibt es
+  nur mit Konto.
+
 ### Sperrung und Deaktivierung
 
 - Nach **drei fehlgeschlagenen Anmeldeversuchen** ist ein Konto für **eine
@@ -114,6 +131,10 @@ werden vorher gesichert und danach restauriert.
   herabgestuft werden.
 - Der Klartext eines Relay-Tokens wird nur einmal angezeigt — geht er verloren,
   muss ein neues Token angelegt und das alte widerrufen werden.
+- Das Farbschema lässt sich nur mit Benutzerkonto wählen; nicht angemeldete
+  Besucher sehen die Seiten im Schema ihrer Systemeinstellung. Ein Wechsel
+  wirkt erst beim nächsten Seitenaufruf — die Seite schaltet nicht im
+  laufenden Bild um.
 - Sind alle Administratoren ausgesperrt, gibt es keinen Wiederherstellungsweg in
   der Anwendung; der Server-Betreiber muss die gespeicherten Daten verwerfen und
   die Ersteinrichtung neu durchlaufen (siehe

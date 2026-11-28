@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Softwareschmiede.StatusContracts;
+using Softwareschmiede.StatusServer.Data;
 using Softwareschmiede.StatusServer.GitHub;
 using Softwareschmiede.StatusServer.Pages;
 using Softwareschmiede.StatusServer.Status;
@@ -12,8 +13,8 @@ public sealed class StatusPageComposerTests
 {
     private static StatusPageComposer CreateSut(TestTimeProvider time) => new(time);
 
-    private static PageUserContext UserContext(bool isAdmin = true)
-        => new("tester", isAdmin, "token-value", "__RequestVerificationToken");
+    private static PageUserContext UserContext(bool isAdmin = true, ThemePreference theme = ThemePreference.Auto)
+        => new("tester", isAdmin, "token-value", "__RequestVerificationToken", theme);
 
     private static InstanceSnapshotView OnlineInstance()
         => new(
@@ -301,5 +302,52 @@ public sealed class StatusPageComposerTests
         cssExcludingAllowed.Should().NotContain("white-space: nowrap");
         cssExcludingAllowed.Should().NotContain("white-space:nowrap");
         html.Should().Contain("name=\"viewport\"");
+    }
+
+    /// <summary>Ein Benutzer mit Dark-Einstellung erhält <c>data-theme="dark"</c>
+    /// am selbst gebauten <c>&lt;html&gt;</c>-Tag der Status-Seite.</summary>
+    [Fact]
+    public void Render_DarkTheme_SetsDataThemeOnHtmlTag()
+    {
+        var time = new TestTimeProvider();
+        var html = CreateSut(time).Render([OnlineInstance()], [], 15, UserContext(theme: ThemePreference.Dark));
+
+        html.Should().Contain("<html lang=\"de\" data-theme=\"dark\">");
+    }
+
+    /// <summary>Das eingebettete CSS definiert die Theme-Variablen beider Schemata:
+    /// Custom Properties auf <c>:root</c>, <c>data-theme="dark"</c>-Override und die
+    /// <c>prefers-color-scheme</c>-Media-Query mit dem
+    /// <c>:not([data-theme="light"])</c>-Selektor (explizites Light gewinnt gegen
+    /// dunkle Systemeinstellung) samt <c>color-scheme</c> für native Controls.</summary>
+    [Fact]
+    public void Render_Css_DefinesThemeVariablesAndMediaQuery()
+    {
+        var time = new TestTimeProvider();
+        var html = CreateSut(time).Render([OnlineInstance()], [], 15, UserContext());
+
+        html.Should().Contain("--bg:");
+        html.Should().Contain(":root[data-theme=\"dark\"]");
+        html.Should().Contain("@media (prefers-color-scheme: dark)");
+        html.Should().Contain(":root:not([data-theme=\"light\"])");
+        html.Should().Contain("color-scheme: dark");
+        html.Should().Contain("color-scheme: light");
+        // Keine fest verdrahteten Hex-Farben in den Seiten-CSS-Blöcken außerhalb
+        // der Variablendefinitionen — alle Regeln referenzieren var(--…).
+        html.Should().NotContain("background: #f4f5f7");
+    }
+
+    /// <summary>Das gerenderte Markup enthält keine <c>style=</c>-Attribute mehr —
+    /// Regressionsschutz für die durch Klassen ersetzten Inline-Styles
+    /// (Instanz-Tag im Header, „Letzte Releases"-Überschrift).</summary>
+    [Fact]
+    public void Render_NoInlineStyles()
+    {
+        var time = new TestTimeProvider();
+        var html = CreateSut(time).Render([OnlineInstance()], GitHubRepos(), 15, UserContext());
+
+        html.Should().NotContain("style=");
+        html.Should().Contain("class=\"inst on-dark\"");
+        html.Should().Contain("class=\"count gap-top\"");
     }
 }

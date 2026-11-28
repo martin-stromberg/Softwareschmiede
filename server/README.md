@@ -17,7 +17,7 @@ Identity + SQLite).
 | `GET`/`POST /register` | Erst-Registrierung (nur solange kein Benutzer existiert) | anonym |
 | `GET`/`POST /login` | Anmeldung (3 Fehlversuche → Sperrung für 1 Stunde) | anonym |
 | `POST /logout` | Abmeldung | angemeldet |
-| `GET /profile`, `POST /profile/password` | Eigenes Profil / Passwort ändern | angemeldet |
+| `GET /profile`, `POST /profile/password`, `POST /profile/theme` | Eigenes Profil / Passwort ändern / Anzeige-Theme wählen | angemeldet |
 | `GET /access-denied` | Hinweisseite bei fehlender Berechtigung (z. B. `Ueberwacher` auf Admin-URLs) | anonym |
 | `/admin/users`, `/admin/tokens`, `/admin/settings` | Verwaltungs-UI (Benutzer, Relay-Tokens, Sitzungsdauer, Updates) | Stufe `Administration` |
 
@@ -57,6 +57,23 @@ geschlossen und weitere Benutzer legt ausschließlich die Administration über
   das `data`-Verzeichnis löschen und den Server neu starten — der Setup-Lauf
   (`/register`) beginnt von vorn. Snapshots im Arbeitsspeicher-Cache gehen dabei
   ohnehin verloren.
+
+## Anzeige-Theme (Light/Dark)
+
+Die gesamte Web-UI unterstützt ein Light- und ein Dark-Schema ohne JavaScript —
+das wirksame Schema steht als `data-theme`-Attribut am `<html>`-Tag, die
+Umschaltung läuft über CSS Custom Properties:
+
+- Jeder angemeldete Benutzer wählt auf der Profilseite (`/profile`) zwischen
+  **„Automatisch (System)"**, **„Light"** und **„Dark"**; die Auswahl wird pro
+  Benutzer in der Datenbank persistiert (`AspNetUsers`-Spalte `Theme`, Default
+  `Automatisch` für Bestandskonten) und gilt ab dem nächsten Seitenaufruf —
+  es gibt kein Live-Umschalten.
+- **„Automatisch"** folgt der `prefers-color-scheme`-Media-Query des Browsers
+  (Fallback Light); explizit gewähltes `Light`/`Dark` gewinnt gegen die
+  Systemeinstellung.
+- Anonyme Seiten (Login, Registrierung, Fehlerseiten) rendern immer im
+  Automatisch-Modus — ohne Konto gibt es keine manuelle Auswahl.
 
 ## Lokal starten
 

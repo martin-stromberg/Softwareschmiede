@@ -1,4 +1,5 @@
 using System.Text;
+using Softwareschmiede.StatusServer.Data;
 using Softwareschmiede.StatusServer.Security;
 
 namespace Softwareschmiede.StatusServer.Pages;
@@ -59,7 +60,8 @@ public static class AuthPagesComposer
         return sb.ToString();
     }
 
-    /// <summary>Rendert das Profil des angemeldeten Benutzers (Passwort ändern).</summary>
+    /// <summary>Rendert das Profil des angemeldeten Benutzers
+    /// (Anzeige-Einstellung, Passwort ändern).</summary>
     /// <param name="user">Der Benutzerkontext (Name, Stufe, Antiforgery-Token).</param>
     /// <param name="message">Optionale Status-/Fehlermeldung.</param>
     /// <param name="isError">Ob <paramref name="message"/> ein Fehler ist.</param>
@@ -67,7 +69,7 @@ public static class AuthPagesComposer
     public static string RenderProfile(PageUserContext user, string? message = null, bool isError = false)
     {
         var sb = new StringBuilder(4_000);
-        PageShell.BeginPage(sb, "Profil – Softwareschmiede-Status");
+        PageShell.BeginPage(sb, "Profil – Softwareschmiede-Status", user.Theme);
         PageShell.AppendHeader(sb, "Profil");
         PageShell.AppendNav(sb, user);
         sb.Append("<section><h2>Konto</h2>");
@@ -76,6 +78,16 @@ public static class AuthPagesComposer
             .Append(PageShell.E(StatusRoles.DisplayName(user.IsAdmin ? StatusRoles.Administration : StatusRoles.Ueberwacher)))
             .Append("</p>");
         PageShell.AppendMessage(sb, message, isError);
+        sb.Append("<h2>Anzeige</h2>");
+        sb.Append("<form method=\"post\" action=\"").Append(PageShell.BasePath).Append("/profile/theme\">");
+        PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
+        sb.Append("<label>Farbschema<select name=\"theme\">");
+        AppendOption(sb, "auto", "Automatisch (System)", user.Theme == ThemePreference.Auto);
+        AppendOption(sb, "light", "Light", user.Theme == ThemePreference.Light);
+        AppendOption(sb, "dark", "Dark", user.Theme == ThemePreference.Dark);
+        sb.Append("</select></label>");
+        sb.Append("<button type=\"submit\">Anzeige speichern</button>");
+        sb.Append("</form>");
         sb.Append("<h2>Passwort ändern</h2>");
         sb.Append("<form method=\"post\" action=\"").Append(PageShell.BasePath).Append("/profile/password\">");
         PageShell.AppendHiddenToken(sb, user.AntiforgeryFieldName, user.AntiforgeryToken);
@@ -115,7 +127,7 @@ public static class AuthPagesComposer
     public static string RenderAccessDenied(PageUserContext? user = null)
     {
         var sb = new StringBuilder(2_000);
-        PageShell.BeginPage(sb, "Zugriff verweigert – Softwareschmiede-Status");
+        PageShell.BeginPage(sb, "Zugriff verweigert – Softwareschmiede-Status", user?.Theme ?? ThemePreference.Auto);
         PageShell.AppendHeader(sb, "Softwareschmiede-Status");
         if (user is not null)
             PageShell.AppendNav(sb, user);
@@ -127,4 +139,9 @@ public static class AuthPagesComposer
         PageShell.EndPage(sb);
         return sb.ToString();
     }
+
+    private static void AppendOption(StringBuilder sb, string value, string label, bool selected)
+        => sb.Append("<option value=\"").Append(value).Append('"')
+            .Append(selected ? " selected" : string.Empty).Append('>')
+            .Append(label).Append("</option>");
 }
