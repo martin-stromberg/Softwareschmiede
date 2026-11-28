@@ -354,3 +354,40 @@ jobs:
             --prerelease `
             --generate-notes
         shell: pwsh
+
+  release-gate:
+    name: release gate
+    # Single aggregate status for branch protection on main. The automated staging -> main
+    # promotion PR (staging-to-main-promotion.yml) has "staging" itself as its head ref, so a
+    # status posted here for this push's SHA is the same SHA the promotion PR carries - this
+    # is how "required on main" reaches a check that only ever runs on a push to staging.
+    # version/prerelease are skipped (if:) for back-merge pushes and for pushes with no
+    # release-worthy commits (changed != 'true'), so a required check pointed directly at
+    # prerelease would never report in those cases and block the promotion PR (incl.
+    # auto-merge) forever. This job runs unconditionally (if: always()) and distinguishes the
+    # three cases itself: back-merge or no version change both pass trivially (nothing to
+    # release does not mean the promotion is unsafe to merge); a static-checks/build-and-test
+    # failure or a failed prerelease both fail the gate.
+    needs: [detect-backmerge, static-checks, build-and-test, version, prerelease]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate result
+        run: |
+          if [[ "${{ needs.detect-backmerge.outputs.is_backmerge }}" == "true" ]]; then
+            echo "Back-merge - nothing to gate on."
+            exit 0
+          fi
+          if [[ "${{ needs.static-checks.result }}" != "success" || "${{ needs.build-and-test.result }}" != "success" ]]; then
+            echo "::error::static checks or build & test did not succeed."
+            exit 1
+          fi
+          if [[ "${{ needs.version.outputs.changed }}" != "true" ]]; then
+            echo "No release-worthy changes in this push - nothing to gate on."
+            exit 0
+          fi
+          if [[ "${{ needs.prerelease.result }}" != "success" ]]; then
+            echo "::error::prerelease did not succeed."
+            exit 1
+          fi
+          echo "Pre-release succeeded."

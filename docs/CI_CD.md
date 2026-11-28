@@ -36,12 +36,14 @@ Pull Requests von `main` nach `staging` werden weiterhin ueber `detect-backmerge
 
 ### Required Status Checks und Auto-Merge
 
-![Ablaufdiagramm der drei PR-Phasen (PR → staging, PR → main, PR Backmerge) mit ihren Checks; nur verify-source und ci-gate sind required](images/pr-pipeline-checks.svg)
+![Ablaufdiagramm der drei PR-Phasen (PR → staging, PR → main, PR Backmerge) mit ihren Checks; required sind verify-source, release gate und ci gate](images/pr-pipeline-checks.svg)
 
-Nur zwei Status-Checks sind in der Branch Protection als *required* hinterlegt — alle anderen Checks laufen zwar, blockieren aber keinen Merge:
+Drei Status-Checks sind in der Branch Protection als *required* hinterlegt — alle anderen Checks laufen zwar, blockieren aber keinen Merge:
 
-- **`main`:** nur `verify-source` (`.github/workflows/verify-pr-source.yml`) — prueft, dass der Kopf-Branch des PR `staging` ist.
+- **`main`:** `verify-source` (`.github/workflows/verify-pr-source.yml`) — prueft, dass der Kopf-Branch des PR `staging` ist — sowie `release gate` (Job `release-gate` in `staging-ci.yml`).
 - **`staging`:** nur `ci gate` (Job `ci-gate` in `pr-staging-ci.yml`).
+
+`release gate` lauft nicht im PR gegen `main` selbst — die automatisch erzeugte Promotion-PR (`staging-to-main-promotion.yml`) hat `staging` als Kopf-Branch, also denselben Commit-SHA, fuer den `staging-ci.yml` beim vorausgegangenen Push auf `staging` bereits gelaufen ist. GitHub ordnet Status-Checks dem SHA zu, nicht dem auslösenden Workflow-Lauf, daher erscheint `release gate` trotzdem auf der Promotion-PR.
 
 `static checks` und `build & test` sind bewusst **nicht** einzeln required: beide Jobs haengen an `detect-backmerge` und werden fuer einen Backmerge-PR (`main` → `staging`) per `if:` uebersprungen. Ein direkt auf einen dieser Jobs gerichteter required Check wuerde fuer einen Backmerge-PR nie einen Status melden und den Merge (inklusive Auto-Merge) dauerhaft blockieren.
 
@@ -54,6 +56,15 @@ Nur zwei Status-Checks sind in der Branch Protection als *required* hinterlegt �
 | Backmerge-PR | `skipped` | laeuft | erkennt `is_backmerge == true` → **passt trivial** |
 
 `os-interface tests` ist bewusst **nicht** Teil der `needs:` von `ci-gate` — der Job ist best-effort (`continue-on-error: true`) und darf Auto-Merge nicht zusaetzlich auf seine bis zu ~30-minuetige Laufzeit warten lassen.
+
+`release-gate` (in `staging-ci.yml`) folgt demselben Prinzip wie `ci-gate`, muss aber zusaetzlich einen Fall unterscheiden, den `ci-gate` nicht kennt: `version`/`prerelease` werden nicht nur fuer Backmerge-Pushes uebersprungen, sondern auch dann, wenn Semantic Release fuer die neuen Commits keine Versionserhoehung ermittelt (`version.outputs.changed != 'true'`, z. B. bei reinen `docs:`/`chore:`-Commits). Ein fehlendes Pre-Release ist in diesem Fall kein Fehler — `release-gate` behandelt daher drei Faelle:
+
+| Fall | `static-checks`/`build-and-test` | `version.changed` | `prerelease` | `release-gate` |
+|---|---|---|---|---|
+| Backmerge-Push | `skipped` | — | `skipped` | **passt trivial** |
+| Push ohne release-relevante Commits | `success` | `false` | `skipped` | **passt** (nichts zu gaten) |
+| Push mit release-relevanten Commits, Pre-Release gelingt | `success` | `true` | `success` | **passt** |
+| Push mit release-relevanten Commits, Pre-Release schlaegt fehl (oder static checks/build & test schlagen fehl) | `failure`/— | `true` | `failure`/`skipped` | **exit 1** |
 
 ### Job `release` (Push auf `main`)
 
