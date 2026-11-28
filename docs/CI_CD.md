@@ -34,6 +34,27 @@ Der Workflow `.github/workflows/pr-staging-ci.yml` laeuft fuer Pull Requests nac
 
 Pull Requests von `main` nach `staging` werden weiterhin ueber `detect-backmerge`/`back-merge-skip` erkannt; die Validierungs- und Testjobs werden fuer diesen Sonderfall uebersprungen.
 
+### Required Status Checks und Auto-Merge
+
+![Ablaufdiagramm der drei PR-Phasen (PR → staging, PR → main, PR Backmerge) mit ihren Checks; nur verify-source und ci-gate sind required](images/pr-pipeline-checks.svg)
+
+Nur zwei Status-Checks sind in der Branch Protection als *required* hinterlegt — alle anderen Checks laufen zwar, blockieren aber keinen Merge:
+
+- **`main`:** nur `verify-source` (`.github/workflows/verify-pr-source.yml`) — prueft, dass der Kopf-Branch des PR `staging` ist.
+- **`staging`:** nur `ci gate` (Job `ci-gate` in `pr-staging-ci.yml`).
+
+`static checks` und `build & test` sind bewusst **nicht** einzeln required: beide Jobs haengen an `detect-backmerge` und werden fuer einen Backmerge-PR (`main` → `staging`) per `if:` uebersprungen. Ein direkt auf einen dieser Jobs gerichteter required Check wuerde fuer einen Backmerge-PR nie einen Status melden und den Merge (inklusive Auto-Merge) dauerhaft blockieren.
+
+`ci-gate` loest das, indem er `if: always()` setzt — das hebt das implizite `success()`-Gate von `needs:` auf, der Job laeuft also immer, unabhaengig davon, ob `static-checks`/`build-and-test` erfolgreich waren, fehlschlugen oder uebersprungen wurden:
+
+| Fall | `static-checks`/`build-and-test` | `ci-gate` | Ergebnis |
+|---|---|---|---|
+| Feature-PR, beide gruen | `success` | laeuft | prueft Ergebnisse → beide `success` → **passt** |
+| Feature-PR, einer schlaegt fehl | `failure` | laeuft | prueft Ergebnisse → nicht `success` → **exit 1** |
+| Backmerge-PR | `skipped` | laeuft | erkennt `is_backmerge == true` → **passt trivial** |
+
+`os-interface tests` ist bewusst **nicht** Teil der `needs:` von `ci-gate` — der Job ist best-effort (`continue-on-error: true`) und darf Auto-Merge nicht zusaetzlich auf seine bis zu ~30-minuetige Laufzeit warten lassen.
+
 ### Job `release` (Push auf `main`)
 
 | # | Step | Zweck |

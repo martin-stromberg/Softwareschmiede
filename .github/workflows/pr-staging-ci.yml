@@ -271,3 +271,30 @@ jobs:
     steps:
       - name: Back-merge detected
         run: echo "Back-merge PR from main detected. Redundant checks are skipped."
+
+  ci-gate:
+    name: ci gate
+    # Single aggregate status for branch protection on staging. static-checks/build-and-test
+    # are skipped (if:) for back-merge PRs, so a required check pointed directly at either of
+    # them would never report a conclusion on that SHA and block merging (incl. auto-merge)
+    # forever. This job runs unconditionally (if: always() overrides the default needs ->
+    # success() gating, so it still runs even when its needs were skipped or failed) and
+    # evaluates the real outcome itself - trivially passing for back-merges, otherwise
+    # mirroring static-checks/build-and-test. os-interface-tests is deliberately not a
+    # dependency: it is best-effort (continue-on-error) and must not make auto-merge wait on
+    # its up to ~30 minute run.
+    needs: [detect-backmerge, static-checks, build-and-test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate result
+        run: |
+          if [[ "${{ needs.detect-backmerge.outputs.is_backmerge }}" == "true" ]]; then
+            echo "Back-merge - static checks/build & test were skipped by design, nothing to gate on."
+            exit 0
+          fi
+          if [[ "${{ needs.static-checks.result }}" != "success" || "${{ needs.build-and-test.result }}" != "success" ]]; then
+            echo "::error::static checks or build & test did not succeed."
+            exit 1
+          fi
+          echo "static checks and build & test both succeeded."
