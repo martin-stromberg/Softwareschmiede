@@ -80,3 +80,17 @@ mit Google Stitch generiert (Projekt `projects/7540435568831394111`, Design-Syst
 | Generierte HTML-Exporte | 13× vorhanden (`status.html` fehlt, nur visueller Referenzwert) |
 
 Artefakte: `docs/design/status-webseite-stitch/` (README mit allen Stitch-IDs).
+
+## Iteration 4 — Stitch: Aufgaben-Section nachgereicht
+
+Anwender-Feedback: Stitch-Entwurf besser, aber Informationen zu aktuellen Aufgaben
+fehlen. Fachliche Grundlage verifiziert: `StatusSnapshotWorkItem` (Titel, Status,
+RunStatus, Kind, Purpose, PausedUntilUtc, LastHeartbeatUtc, RepositoryName,
+IssueNumber/Url, PullRequests) + `StatusSnapshotScmEvent` werden je Instanz an den
+Status-Server geliefert — im Stitch-Entwurf fehlten beide Sections.
+
+Nachgeneriert im selben Stitch-Projekt/Design-System: `status-aufgaben` (Light +
+Dark), beide PNGs einzeln sichtgeprüft — Section 'Aktuelle Aufgaben' als Tabelle
+(TSK-ID, Status-Badges Läuft/Wartet auf Eingabe/Pausiert, Substatus, Art/Zweck,
+Instanz, Repository, Issue-/PR-Chips, letzter Heartbeat) + Feed 'Letzte
+SCM-Ereignisse'. Light|Dark-Composite erzeugt.

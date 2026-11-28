@@ -26,6 +26,11 @@ Ansichten (14): status, status-leer, login, register, profil, admin-benutzer,
 admin-benutzer-loeschen, admin-tokens, admin-tokens-leer, admin-token-widerrufen,
 admin-einstellungen, admin-update-installation, zugriff-verweigert, formular-abgelaufen.
 
+Zusätzlich: `status-aufgaben` — Status-Übersicht mit prominenter
+Section 'Aktuelle Aufgaben' (WorkItems: Titel, Status, Substatus, Art/Zweck,
+Instanz, Repository, Issue-/PR-Referenzen, Heartbeat) plus Feed 'Letzte
+SCM-Ereignisse'. Screen-IDs in `_gen_status-aufgaben*.json`.
+
 Hinweis: `status.html` fehlt (erster Screen — HTML nicht separat abgerufen).
 
 Die `.html`-Dateien sind statische Stitch-Exporte und **keine** lauffähigen Razor-Seiten;

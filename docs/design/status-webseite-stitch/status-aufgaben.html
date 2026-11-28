@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+
+<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><title>Softwareschmiede Status</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20;display:inline-block;vertical-align:middle;line-height:1;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"on-tertiary-container":"#c7ffca","surface-container-lowest":"#ffffff","primary-fixed-dim":"#b4c5ff","tertiary-container":"#007f36","on-primary-fixed":"#00174b","on-secondary-fixed-variant":"#3f465c","on-background":"#0b1c30","surface-tint":"#0053db","surface":"#f8f9ff","surface-container-low":"#eff4ff","secondary-container":"#dae2fd","primary-fixed":"#dbe1ff","primary-container":"#2563eb","on-error-container":"#93000a","on-error":"#ffffff","surface-container-high":"#dce9ff","on-secondary":"#ffffff","tertiary":"#006329","outline":"#737686","surface-container":"#e5eeff","secondary-fixed-dim":"#bec6e0","surface-container-highest":"#d3e4fe","on-tertiary-fixed-variant":"#005320","surface-bright":"#f8f9ff","on-primary":"#ffffff","tertiary-fixed-dim":"#62df7d","tertiary-fixed":"#7ffc97","primary":"#004ac6","secondary-fixed":"#dae2fd","error":"#ba1a1a","on-surface-variant":"#434655","on-primary-container":"#eeefff","inverse-primary":"#b4c5ff","on-primary-fixed-variant":"#003ea8","surface-variant":"#d3e4fe","on-surface":"#0b1c30","secondary":"#565e74","error-container":"#ffdad6","on-secondary-fixed":"#131b2e","outline-variant":"#c3c6d7","surface-dim":"#cbdbf5","on-secondary-container":"#5c647a","on-tertiary":"#ffffff","inverse-surface":"#213145","background":"#f8f9ff","on-tertiary-fixed":"#002109","inverse-on-surface":"#eaf1ff"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"space-sm":"0.5rem","space-md":"0.75rem","gutter-desktop":"1.5rem","space-xl":"1.5rem","space-lg":"1rem","gutter":"1rem","margin-desktop":"2rem","margin":"1rem","space-xs":"0.25rem"},"fontFamily":{"headline-sm":["Inter"],"code-sm":["JetBrains Mono"],"code-md":["JetBrains Mono"],"body-lg":["Inter"],"label-md":["Inter"],"label-lg":["Inter"],"headline-md":["Inter"],"headline-lg-mobile":["Inter"],"headline-lg":["Inter"],"body-md":["Inter"],"body-sm":["Inter"]},"fontSize":{"headline-sm":["1rem",{"lineHeight":"1.5rem","fontWeight":"600"}],"code-sm":["0.6875rem",{"lineHeight":"0.875rem","fontWeight":"400"}],"code-md":["0.8125rem",{"lineHeight":"1.125rem","fontWeight":"500"}],"body-lg":["0.9375rem",{"lineHeight":"1.5rem","fontWeight":"400"}],"label-md":["0.75rem",{"lineHeight":"1rem","letterSpacing":"0.02em","fontWeight":"500"}],"label-lg":["0.875rem",{"lineHeight":"1.25rem","fontWeight":"500"}],"headline-md":["1.25rem",{"lineHeight":"1.75rem","letterSpacing":"-0.01em","fontWeight":"600"}],"headline-lg-mobile":["1.375rem",{"lineHeight":"1.875rem","letterSpacing":"-0.015em","fontWeight":"600"}],"headline-lg":["1.75rem",{"lineHeight":"2.25rem","letterSpacing":"-0.02em","fontWeight":"600"}],"body-md":["0.875rem",{"lineHeight":"1.25rem","fontWeight":"400"}],"body-sm":["0.75rem",{"lineHeight":"1rem","fontWeight":"400"}]}}}}</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"><header class="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 w-full px-gutter-desktop max-w-[1600px] mx-auto flex items-center justify-between gap-space-lg"><div class="flex items-center gap-space-xl"><div class="flex items-center gap-space-sm"><div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-on-primary shadow-sm"><span class="material-symbols-outlined text-[20px]">dns</span></div><div class="flex items-center gap-space-xs"><span class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Softwareschmiede Status</span><span class="font-code-sm text-code-sm bg-surface-container-high text-primary px-1.5 py-0.5 rounded">PROD</span></div></div><nav class="hidden md:flex items-center gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-label-lg text-label-lg rounded-lg"><a aria-current="page" class="px-space-md py-space-xs transition-colors bg-primary-container text-on-primary-container font-label-lg text-label-lg rounded-lg" data-path="status" href="#">Status</a><a class="px-space-md py-space-xs font-label-lg text-label-lg rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="profil" href="#">Profil</a><div class="relative group"><button class="flex items-center gap-1 px-space-md py-space-xs font-label-lg text-label-lg rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" type="button"><span>Administration</span><span class="material-symbols-outlined text-[16px]">expand_more</span></button><div class="absolute left-0 top-full pt-1 hidden group-hover:block"><div class="bg-surface-container-lowest rounded-lg shadow-[0_4px_6px_-1px_rgba(15,23,42,0.08),0_2px_4px_-2px_rgba(15,23,42,0.05)] py-space-xs min-w-[160px]"><a class="block px-space-lg py-space-xs font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface" data-path="administration-services" href="#">Services verwalten</a><a class="block px-space-lg py-space-xs font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface" data-path="administration-benutzer" href="#">Benutzerverwaltung</a><a class="block px-space-lg py-space-xs font-body-sm text-body-sm text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface" data-path="administration-einstellungen" href="#">Systemkonfiguration</a></div></div></div></nav></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-sm pl-space-md bg-surface-container-low py-1 pr-2 rounded-full"><span class="font-code-md text-code-md text-on-surface">admin</span><div class="flex items-center gap-0.5 font-code-sm text-code-sm"><span class="bg-surface-container-highest text-on-surface-variant px-1.5 py-0.5 rounded-l text-[10px] uppercase font-semibold">ROLE</span><span class="bg-primary-container text-on-primary-container px-1.5 py-0.5 rounded-r text-[10px] uppercase font-semibold">ADMIN</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div><div class="h-5 w-px bg-outline-variant/40 hidden sm:block"></div><a class="flex items-center gap-1.5 px-space-sm py-1.5 rounded-lg text-on-surface-variant hover:bg-error-container hover:text-on-error-container transition-colors" data-path="login" href="#" title="Abmelden"><span class="material-symbols-outlined text-[20px]">logout</span><span class="font-label-md text-label-md hidden sm:inline">Abmelden</span></a></div></div></header><main class="w-full pt-16 flex-1 bg-surface"><div class="w-full max-w-[1600px] mx-auto px-gutter-desktop py-space-lg"><div class="flex flex-col w-full gap-space-xl">
+<!-- 1. Header & Quick Overview KPI Tiles -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-lg bg-surface-container-lowest p-space-lg rounded-xl shadow-sm">
+<div class="flex flex-col gap-space-xs">
+<div class="flex flex-wrap items-center gap-space-md">
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Status</h1>
+<div class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container font-code-sm text-code-sm">
+<span class="w-2 h-2 rounded-full bg-error animate-pulse"></span>
+<span>Teilweise veraltet</span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">
+        Übersicht aller registrierten App-Instanzen, aktiven Aufgaben und externer Datenquellen
+      </p>
+</div>
+<div class="flex items-stretch sm:items-center gap-space-md self-start lg:self-center">
+<!-- Latency Metric -->
+<div class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg bg-surface-container-low shadow-sm">
+<div class="flex flex-col">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase tracking-wider">Latenz Cluster</span>
+<div class="flex items-center gap-2 mt-0.5">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span class="font-code-md text-code-md text-on-surface font-semibold">14 ms</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-tertiary text-[20px]">speed</span>
+</div>
+<!-- Sync Status Metric -->
+<div class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg bg-surface-container-low shadow-sm">
+<div class="flex flex-col">
+<span class="font-code-sm text-code-sm text-on-surface-variant uppercase tracking-wider">Sync-Zyklus</span>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="font-body-md text-body-md text-on-surface font-medium">Aktiv</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">(30s)</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-primary text-[20px] animate-spin" style="animation-duration: 8s;">sync</span>
+</div>
+</div>
+</div>
+<!-- 2. Section 1: App-Instanzen -->
+<section class="flex flex-col gap-space-md">
+<div class="flex flex-wrap items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[20px]">hub</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">App-Instanzen</h2>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-code-sm text-code-sm">2 Instanzen registriert</span>
+</div>
+<div class="flex items-center gap-1.5 text-on-surface-variant font-code-sm text-code-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+<span>Auto-Discovery über Service-Mesh aktiv</span>
+</div>
+</div>
+<!-- Instance Cards Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-space-lg">
+<!-- Instance 1: WS-ENTWICKLUNG (Healthy) -->
+<div class="flex flex-col bg-surface-container-lowest rounded-xl p-space-lg shadow-sm gap-space-md">
+<div class="flex items-start justify-between gap-space-md">
+<div class="flex items-center gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[22px]">computer</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface">WS-ENTWICKLUNG</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-code-sm">Lokal</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Host: dev-node-01.intern</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="px-2 py-0.5 rounded-full bg-on-tertiary-container text-tertiary font-code-sm text-code-sm flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+              Online
+            </span>
+<span class="px-2 py-0.5 rounded bg-primary-container text-on-primary-container font-code-sm text-code-sm">v2.4.1</span>
+</div>
+</div>
+<!-- Telemetry Details Grid -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-space-sm bg-surface-container-low p-space-md rounded-lg">
+<div class="flex flex-col">
+<span class="font-code-sm text-code-sm text-on-surface-variant">Laufzeit</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">3 Tage 4 Std.</span>
+</div>
+<div class="flex flex-col">
+<span class="font-code-sm text-code-sm text-on-surface-variant">Letzter Kontakt</span>
+<span class="font-body-md text-body-md text-tertiary font-medium">vor 12 Sek.</span>
+</div>
+<div class="flex flex-col">
+<span class="font-code-sm text-code-sm text-on-surface-variant">Betriebssystem</span>
+<span class="font-body-md text-body-md text-on-surface">Windows 11</span>
+</div>
+<div class="flex flex-col">
+<span class="font-code-sm text-code-sm text-on-surface-variant">Aktive Sitzungen</span>
+<span class="font-code-md text-code-md text-on-surface font-semibold">2</span>
+</div>
+</div>
+<!-- Footer Meta -->
+<div class="flex items-center justify-between pt-space-xs text-on-surface-variant font-code-sm text-code-sm">
+<div class="flex items-center gap-1.5 text-tertiary">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+<span>Heartbeat stabil (HTTP 200 OK)</span>
+</div>
+<div class="flex items-center gap-space-md">
+<span>Commit: <span class="text-primary font-mono">#a1b2c3d</span></span>
+<span>PID: <span class="text-on-surface">10428</span></span>
+</div>
+</div>
+</div>
+<!-- Instance 2: WS-PROD-02 (Degraded/Outdated) -->
+<div class="flex flex-col bg-surface-container-lowest rounded-xl p-space-lg shadow-sm gap-space-md">
+<!-- Outdated Banner -->
+<div class="flex items-center gap-2 p-space-sm rounded-lg bg-error-container text-on-error-container">
+<span class="material-symbols-outlined text-error text-[18px]">warning</span>
+<span class="font-body-sm text-body-sm font-medium">Daten älter als 5 Minuten — Instanz möglicherweise offline oder entkoppelt</span>
+</div>
+<div class="flex items-start justify-between gap-space-md">
+<div class="flex items-center gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[22px]">dns</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface">WS-PROD-02</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-code-sm">Remote-Token</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">Host: srv-prod-de-02.cloud</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="px-2 py-0.5 rounded-full bg-error-container text-error font-code-sm text-code-sm flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+              Veraltet
+            </span>
+<span class="px-2 py-0.5 rounded bg-surface-container-highest text-on-surface-variant font-code-sm text-code-sm">v2.4.0</span>
+</div>
+</div>
+<!-- Telemetry Details Grid -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-space-sm bg-surface-container-low p-space-md rounded-lg">
+<div class="flex flex-col">
+<span class="font-code-sm text-code-sm text-on-surface-variant">Laufzeit</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">12 Tage</span>
+</div>
+<div class="flex flex-col">
+<span class="font-code-sm text-code-sm text-error">Letzter Kontakt</span>
+<span class="font-body-md text-body-md text-error font-semibold">vor 47 Min.</span>
+</div>
+<div class="flex flex-col">
+<span class="font-code-sm text-code-sm text-on-surface-variant">Betriebssystem</span>
+<span class="font-body-md text-body-md text-on-surface">Win Srv 2022</span>
+</div>
+<div class="flex flex-col">
+<span class="font-code-sm text-code-sm text-on-surface-variant">Aktive Sitzungen</span>
+<span class="font-code-md text-code-md text-on-surface font-semibold">0</span>
+</div>
+</div>
+<!-- Footer Meta -->
+<div class="flex items-center justify-between pt-space-xs text-on-surface-variant font-code-sm text-code-sm">
+<div class="flex items-center gap-1.5 text-error">
+<span class="material-symbols-outlined text-[16px]">error</span>
+<span>Ping-Timeout (10.142.0.4)</span>
+</div>
+<div class="flex items-center gap-space-md">
+<span>Commit: <span class="text-on-surface-variant font-mono">#d4e5f6g</span></span>
+<span>PID: <span class="text-on-surface-variant font-mono">--</span></span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. Section 2: Aktuelle Aufgaben (Prominent Table) -->
+<section class="flex flex-col bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<!-- Section Action Bar -->
+<div class="p-space-lg flex flex-col md:flex-row md:items-center justify-between gap-space-md bg-surface-container-low">
+<div class="flex items-center gap-space-md">
+<div class="w-8 h-8 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">assignment</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h2 class="font-headline-md text-headline-md text-on-surface">Aktuelle Aufgaben</h2>
+<span class="px-2 py-0.5 rounded-full bg-primary-container text-on-primary-container font-code-sm text-code-sm font-semibold">3 aktive Aufgaben</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Laufende Workflows und automatisierte Jobs der gekoppelten Instanzen</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-2.5 text-on-surface-variant text-[18px]">search</span>
+<input class="h-9 pl-8 pr-3 py-1 bg-surface-container-lowest rounded-lg font-body-sm text-body-sm text-on-surface placeholder:text-outline focus:outline-none shadow-sm min-w-[220px]" placeholder="Aufgaben filtern..." type="text"/>
+</div>
+<button class="flex items-center gap-1 h-9 px-3 bg-surface-container-highest text-on-surface hover:bg-surface-container-high rounded-lg font-label-md text-label-md transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">filter_list</span>
+<span>Filter</span>
+</button>
+</div>
+</div>
+<!-- Data Table Container -->
+<div class="overflow-x-auto w-full">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/70 text-on-surface-variant font-code-sm text-code-sm uppercase tracking-wider">
+<th class="py-3 px-space-lg font-medium">Aufgabe &amp; Titel</th>
+<th class="py-3 px-space-md font-medium">Status</th>
+<th class="py-3 px-space-md font-medium">Substatus</th>
+<th class="py-3 px-space-md font-medium">Art / Zweck</th>
+<th class="py-3 px-space-md font-medium">Instanz</th>
+<th class="py-3 px-space-md font-medium">Repository</th>
+<th class="py-3 px-space-md font-medium">Referenzen</th>
+<th class="py-3 px-space-lg font-medium text-right">Letzter Heartbeat</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-3.5 px-space-lg">
+<div class="flex items-center gap-2">
+<span class="font-code-sm text-code-sm text-primary font-mono bg-primary-fixed px-1.5 py-0.5 rounded">#TSK-8921</span>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">UI-Redesign Status-Webseite</span>
+</div>
+</td>
+<td class="py-3.5 px-space-md">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-on-tertiary-container text-tertiary font-code-sm text-code-sm font-semibold">
+<span class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
+                Läuft
+              </span>
+</td>
+<td class="py-3.5 px-space-md">
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-primary font-code-sm text-code-sm font-medium">
+                Running
+              </span>
+</td>
+<td class="py-3.5 px-space-md font-body-sm text-body-sm text-on-surface">
+              Feature-Implementation
+            </td>
+<td class="py-3.5 px-space-md font-code-sm text-code-sm text-on-surface-variant">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-primary">computer</span>
+<span>WS-ENTWICKLUNG</span>
+</div>
+</td>
+<td class="py-3.5 px-space-md font-code-sm text-code-sm text-on-surface">
+              Softwareschmiede
+            </td>
+<td class="py-3.5 px-space-md">
+<div class="flex items-center gap-1.5">
+<a class="px-1.5 py-0.5 bg-surface-container-high text-primary rounded font-code-sm text-code-sm hover:underline" href="#">#500</a>
+<a class="px-1.5 py-0.5 bg-surface-container-high text-primary rounded font-code-sm text-code-sm flex items-center gap-0.5 hover:underline" href="#">
+<span class="material-symbols-outlined text-[13px]">call_split</span>
+                  PR #510
+                </a>
+</div>
+</td>
+<td class="py-3.5 px-space-lg text-right font-code-sm text-code-sm text-tertiary font-medium">
+              vor 8 Sekunden
+            </td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-3.5 px-space-lg">
+<div class="flex items-center gap-2">
+<span class="font-code-sm text-code-sm text-primary font-mono bg-primary-fixed px-1.5 py-0.5 rounded">#TSK-8919</span>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Issue-Aufbereitung #498</span>
+</div>
+</td>
+<td class="py-3.5 px-space-md">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-code-sm text-code-sm font-semibold">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+                Wartet auf Eingabe
+              </span>
+</td>
+<td class="py-3.5 px-space-md">
+<span class="px-2 py-0.5 rounded bg-surface-container-highest text-on-surface-variant font-code-sm text-code-sm">
+                Idle / Awaiting Input
+              </span>
+</td>
+<td class="py-3.5 px-space-md font-body-sm text-body-sm text-on-surface">
+              Instruction / Spezifikation
+            </td>
+<td class="py-3.5 px-space-md font-code-sm text-code-sm text-on-surface-variant">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-primary">computer</span>
+<span>WS-ENTWICKLUNG</span>
+</div>
+</td>
+<td class="py-3.5 px-space-md font-code-sm text-code-sm text-on-surface">
+              Softwareschmiede
+            </td>
+<td class="py-3.5 px-space-md">
+<a class="px-1.5 py-0.5 bg-surface-container-high text-primary rounded font-code-sm text-code-sm hover:underline" href="#">#498</a>
+</td>
+<td class="py-3.5 px-space-lg text-right font-code-sm text-code-sm text-on-surface-variant">
+              vor 18 Sekunden
+            </td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low/40 transition-colors">
+<td class="py-3.5 px-space-lg">
+<div class="flex items-center gap-2">
+<span class="font-code-sm text-code-sm text-on-surface-variant font-mono bg-surface-container-highest px-1.5 py-0.5 rounded">#TSK-8912</span>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">SCM-Ereignis bearbeiten</span>
+</div>
+</td>
+<td class="py-3.5 px-space-md">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant font-code-sm text-code-sm font-semibold">
+<span class="w-2 h-2 rounded-full bg-outline"></span>
+                Pausiert
+              </span>
+</td>
+<td class="py-3.5 px-space-md">
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-code-sm">
+                Paused (bis 14:30 Uhr)
+              </span>
+</td>
+<td class="py-3.5 px-space-md font-body-sm text-body-sm text-on-surface">
+              Webhook Automation
+            </td>
+<td class="py-3.5 px-space-md font-code-sm text-code-sm text-on-surface-variant">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-secondary">dns</span>
+<span>WS-PROD-02</span>
+</div>
+</td>
+<td class="py-3.5 px-space-md font-code-sm text-code-sm text-on-surface">
+              Softwareschmiede
+            </td>
+<td class="py-3.5 px-space-md">
+<div class="flex items-center gap-1.5">
+<a class="px-1.5 py-0.5 bg-surface-container-high text-primary rounded font-code-sm text-code-sm hover:underline" href="#">#492</a>
+<a class="px-1.5 py-0.5 bg-surface-container-high text-primary rounded font-code-sm text-code-sm flex items-center gap-0.5 hover:underline" href="#">
+<span class="material-symbols-outlined text-[13px]">call_split</span>
+                  PR #504
+                </a>
+</div>
+</td>
+<td class="py-3.5 px-space-lg text-right font-code-sm text-code-sm text-error font-medium">
+              vor 47 Minuten
+            </td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer Status -->
+<div class="p-space-md px-space-lg flex flex-col sm:flex-row items-center justify-between gap-space-sm bg-surface-container-low/50 text-on-surface-variant font-body-sm text-body-sm">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span><strong>2 aktiv</strong>, 1 pausiert • Automatischer Aufgaben-Scheduler aktiv</span>
+</div>
+<div class="flex items-center gap-1 font-code-sm text-code-sm">
+<span>Aktualisierungsintervall:</span>
+<span class="font-medium text-on-surface">10s</span>
+</div>
+</div>
+</section>
+<!-- 4. Section 3: Letzte SCM-Ereignisse -->
+<section class="flex flex-col bg-surface-container-lowest rounded-xl p-space-lg shadow-sm gap-space-md">
+<div class="flex flex-wrap items-center justify-between gap-space-sm">
+<div>
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[20px]">dynamic_feed</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">Letzte SCM-Ereignisse</h2>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Eingehende Webhooks und Pipeline-Trigger der letzten Stunden</p>
+</div>
+<a class="font-label-md text-label-md text-primary hover:underline flex items-center gap-1" href="#">
+<span>Alle Audit-Logs</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+<!-- Audit Event Feed -->
+<div class="flex flex-col divide-y divide-surface-container">
+<!-- Event 1 -->
+<div class="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="flex items-center gap-1.5 shrink-0">
+<span class="px-2 py-0.5 rounded bg-on-tertiary-container text-tertiary font-code-sm text-code-sm font-semibold">Angenommen</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-code-sm">IssueComment</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface truncate">
+            Issue #500: Neuer Kommentar von <span class="font-semibold text-primary">admin</span> („Layout-Spezifikation angepasst“)
+          </span>
+</div>
+<div class="flex items-center gap-space-md shrink-0 self-end sm:self-center font-code-sm text-code-sm">
+<a class="text-primary hover:underline font-mono" href="#">#500</a>
+<span class="text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">desktop_windows</span>
+            WS-ENTWICKLUNG
+          </span>
+<span class="text-on-surface-variant w-24 text-right">Vor 2 Min.</span>
+</div>
+</div>
+<!-- Event 2 -->
+<div class="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="flex items-center gap-1.5 shrink-0">
+<span class="px-2 py-0.5 rounded bg-primary-fixed text-primary font-code-sm text-code-sm font-semibold">Abgeschlossen</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-code-sm">PullRequest</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface truncate">
+            PR #510: Review freigegeben &amp; CI/CD Pipeline erfolgreich durchgelaufen
+          </span>
+</div>
+<div class="flex items-center gap-space-md shrink-0 self-end sm:self-center font-code-sm text-code-sm">
+<a class="text-primary hover:underline font-mono" href="#">PR #510</a>
+<span class="text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">deployed_code</span>
+            GitHub Actions
+          </span>
+<span class="text-on-surface-variant w-24 text-right">Vor 1 Std.</span>
+</div>
+</div>
+<!-- Event 3 -->
+<div class="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="flex items-center gap-1.5 shrink-0">
+<span class="px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container font-code-sm text-code-sm font-semibold">In Warteschlange</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-code-sm">Push</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface truncate">
+            Commit a1b2c3d auf Branch main übertragen
+          </span>
+</div>
+<div class="flex items-center gap-space-md shrink-0 self-end sm:self-center font-code-sm text-code-sm">
+<span class="bg-surface-container-high px-1.5 py-0.5 rounded text-on-surface font-mono">main (a1b2c3d)</span>
+<span class="text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">person</span>
+            developer-1
+          </span>
+<span class="text-on-surface-variant w-24 text-right">Vor 1 Std. 14 Min.</span>
+</div>
+</div>
+<!-- Event 4 -->
+<div class="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="flex items-center gap-1.5 shrink-0">
+<span class="px-2 py-0.5 rounded bg-error-container text-on-error-container font-code-sm text-code-sm font-semibold">Abgewiesen</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-code-sm">WorkflowRun</span>
+</div>
+<span class="font-body-md text-body-md text-error truncate">
+            Fehlgeschlagene Signatur-Validierung von externer IP
+          </span>
+</div>
+<div class="flex items-center gap-space-md shrink-0 self-end sm:self-center font-code-sm text-code-sm">
+<span class="text-on-surface-variant font-mono">#89301</span>
+<span class="text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">shield</span>
+            Security Interceptor
+          </span>
+<span class="text-on-surface-variant w-24 text-right">Vor 2 Std.</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 5. Section 4: GitHub Integration (Dual Split Panel) -->
+<section class="flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[20px]">code</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">GitHub Integration</h2>
+<span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface font-code-sm text-code-sm">internal/schmiede-core</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant hidden sm:inline">API-Endpunkt: v3/REST</span>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-space-lg">
+<!-- Left Panel: Releases Feed -->
+<div class="flex flex-col bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+<div class="flex items-center justify-between pb-space-md">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px] text-primary">new_releases</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Releases</h3>
+</div>
+<a class="font-label-md text-label-md text-primary hover:underline flex items-center gap-1" href="#">
+<span>Auf GitHub ansehen</span>
+<span class="material-symbols-outlined text-[16px]">north_east</span>
+</a>
+</div>
+<div class="flex flex-col divide-y divide-surface-container">
+<!-- Release 1 -->
+<div class="py-space-md flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface font-mono">v2.4.1</span>
+<span class="px-2 py-0.5 rounded-full bg-on-tertiary-container text-tertiary font-code-sm text-code-sm font-semibold">Aktuell installiert</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant">18. Mai 2024</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Hotfix: WebSocket Verbindungsstabilität und erweiterte Socket-Ping Timeouts bei Instanzabbrüchen.
+            </p>
+</div>
+<!-- Release 2 -->
+<div class="py-space-md flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-headline-sm text-on-surface font-mono">v2.4.0</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">04. Mai 2024</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Feature: Multi-Token Authentifizierung für getrennte Lese- und Wartungszugriffe.
+            </p>
+</div>
+<!-- Release 3 -->
+<div class="py-space-md flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-headline-sm text-on-surface font-mono">v2.3.9</span>
+<span class="font-code-sm text-code-sm text-on-surface-variant">22. April 2024</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Performance-Optimierungen Backend-Worker und Reduktion der Polling-Last um 35%.
+            </p>
+</div>
+</div>
+<div class="mt-auto pt-space-md flex items-center justify-between text-on-surface-variant font-code-sm text-code-sm">
+<span>Zweig: <span class="font-medium text-on-surface">main (Synchronisiert)</span></span>
+<span>3 von 18 Tags gezeigt</span>
+</div>
+</div>
+<!-- Right Panel: Workflows & GitHub Rate Limit Error -->
+<div class="flex flex-col bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+<div class="flex items-center justify-between pb-space-md">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px] text-primary">play_circle</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Workflows</h3>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-code-sm text-code-sm font-semibold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+            Sync fehlgeschlagen
+          </span>
+</div>
+<!-- Prominent Red Warning Card -->
+<div class="flex flex-col items-center justify-center p-space-xl rounded-xl bg-error-container/40 text-center flex-1 my-auto gap-space-md">
+<div class="w-12 h-12 rounded-full bg-error-container text-error flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[28px]">cloud_off</span>
+</div>
+<div class="flex flex-col gap-space-xs max-w-md">
+<h4 class="font-headline-sm text-headline-sm text-on-surface">GitHub-Daten konnten nicht abgerufen werden</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              API-Ratenlimit erreicht oder Token ungültig. Bitte Verbindung in den Einstellungen prüfen oder in wenigen Minuten erneut versuchen.
+            </p>
+</div>
+<button class="mt-space-xs flex items-center gap-2 px-space-md py-space-sm rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-lg text-label-lg transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">replay</span>
+<span>Verbindung erneut testen</span>
+</button>
+</div>
+<div class="pt-space-md flex items-center justify-between text-on-surface-variant font-code-sm text-code-sm">
+<span class="text-error font-mono">HTTP_429_RATE_LIMITED</span>
+<span>Reset in: <span class="font-medium text-on-surface">18 Min.</span></span>
+</div>
+</div>
+</div>
+</section>
+</div></div></main><footer class="w-full bg-surface-container-low shadow-[0_-1px_8px_rgba(0,0,0,0.02)] mt-auto"><div class="w-full max-w-[1600px] mx-auto px-gutter-desktop h-14 flex items-center justify-between text-on-surface-variant"><div class="flex items-center gap-space-sm"><span class="relative flex h-2.5 w-2.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-75"></span><span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-tertiary"></span></span><span class="font-body-sm text-body-sm text-on-surface">Aktualisiert vor wenigen Sekunden</span><span class="text-outline-variant hidden sm:inline">•</span><span class="font-code-sm text-code-sm text-on-surface-variant hidden sm:inline">Systemstatus: 100% Betriebsbereit</span></div><div class="flex items-center gap-space-md"><button class="flex items-center gap-1.5 px-space-md py-1.5 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container-high hover:text-on-surface font-label-md text-label-md transition-colors shadow-sm" type="button"><span class="material-symbols-outlined text-[18px] text-primary">refresh</span><span>Aktualisieren</span></button></div></div></footer></body></html>
