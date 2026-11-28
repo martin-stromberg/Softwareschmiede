@@ -19,6 +19,7 @@ beschreibt [Installation & Konfiguration](installation.md) sowie
 | **Benutzerkonten** (Seite „Benutzer") | Weitere Konten mit frei wählbarem Benutzernamen, Passwort (mindestens 8 Zeichen) und Berechtigungsstufe — „Überwacher (nur lesen)" oder „Administration (Verwaltung)". |
 | **Relay-Tokens** (Seite „Tokens") | Zugangstokens für App-Instanzen, die Snapshots an den Server liefern. Jedes Token trägt eine frei vergebene Bezeichnung; der Klartext wird nur einmal angezeigt. |
 | **Sitzungsdauer** (Seite „Einstellungen") | Dauer der Anmeldesession in Minuten (erlaubt 5–43200, voreingestellt 480). Gilt anwendungsweit für alle Benutzer. |
+| **Updates** (Seite „Einstellungen") | Steuerung der Server-Aktualisierung aus den GitHub-Releases: Release-Kanal („Stable"/„Pre-Release"), Automatisierung („Aus"/„Nur prüfen"/„Prüfen und installieren"), tägliche Installationsuhrzeit sowie manuelle Aktionen (jetzt prüfen, jetzt installieren, Sperre zurücksetzen). |
 
 ## Vorgehen
 
@@ -35,6 +36,11 @@ beschreibt [Installation & Konfiguration](installation.md) sowie
    [Remote-Übersicht](../einstellungen/remote-uebersicht.md)).
 4. **Sitzungsdauer prüfen:** Auf der Seite **Einstellungen** die
    voreingestellte Sitzungsdauer bei Bedarf anpassen.
+5. **Updates konfigurieren (optional):** In der Sektion **Updates**
+   derselben Seite den gewünschten Release-Kanal und die Automatisierung
+   einstellen — oder alles auf „Aus" belassen und Updates nur manuell
+   auslösen (siehe [Ablauf für Anwender](ablauf-anwender.md), Abschnitt
+   „Server-Updates verwalten").
 
 ## Hinweise
 

@@ -77,6 +77,21 @@ angezeigt und nirgends gespeichert.
 Klartext nicht rechtzeitig kopiert, das Token **widerrufen** und ein neues
 anlegen — den neuen Klartext sofort übernehmen.
 
+## Die Seite ist kurzzeitig nicht erreichbar (Server-Update)
+
+**Symptom:** Die Status-Webseite lädt nicht oder der Aufruf bricht ab; kurz
+darauf ist sie wieder erreichbar und verlangt ggf. eine erneute Anmeldung.
+
+**Ursache:** Die Administration oder die eingestellte Automatisierung hat
+gerade ein Server-Update eingespielt — dafür wird der Server neu gestartet.
+Laufende Relay-Verbindungen der App-Instanzen verbinden sich danach
+selbstständig neu.
+
+**Lösung:** Typischerweise unter einer Minute warten und die Seite neu
+laden. Bleibt der Server dauerhaft unerreichbar, die Administration bzw. den
+Server-Betreiber informieren (siehe
+[Fehlerbehebung für Betreiber](troubleshooting.md)).
+
 ## Wann Hilfe nötig ist
 
 - **Passwort vergessen:** Die Administration kann das Konto löschen und neu

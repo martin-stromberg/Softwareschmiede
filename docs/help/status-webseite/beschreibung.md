@@ -55,7 +55,36 @@ legt die Administration an.
   Bestätigungsseite **widerrufen** werden — widerrufene Tokens bleiben in der
   Liste sichtbar, berechtigen aber nicht mehr zum Verbindungsaufbau.
 - **Einstellungen**: Die **Sitzungsdauer** der Anmeldung in Minuten
-  (5–43200, voreingestellt 480).
+  (5–43200, voreingestellt 480) sowie die Sektion **Updates** für die
+  automatische Aktualisierung des Servers.
+
+### Automatische Updates (Stufe Administration)
+
+Der Status-Server kann sich selbst aus den GitHub-Releases des
+Softwareschmiede-Repositories aktualisieren (Bibliothek `msTools.Updater`).
+Die Sektion **Updates** auf der Seite **Einstellungen** bündelt dafür:
+
+- **Statustabelle**: Installierte Version (aus der Datei
+  `release-metadata.json` des Pakets), aktueller **Zustand**, **verfügbare
+  Version**, **letzte Prüfung**, **letzter Fehler**, die
+  **Installationssperre** sowie der Pfad des **Update-Protokolls**.
+- **Kanal und Automatisierung**: Der **Release-Kanal** bestimmt, ob nur
+  endgültige Releases („Stable") oder auch Vorabversionen („Pre-Release")
+  berücksichtigt werden. Die **Automatisierung** steht auf „Aus" (nur
+  manuelle Aktionen), „Nur prüfen" (verfügbare Updates im Prüfzeitfenster
+  melden, nichts laden oder installieren) oder „Prüfen und installieren"
+  (zusätzlich täglich zur eingestellten **Installationsuhrzeit**
+  einspielen, voreingestellt 03:00).
+- **Aktionen**: „Jetzt nach Update suchen" (Prüfung plus Download mit
+  Integritätsprüfung), „Update jetzt installieren" — nur mit gesetzter
+  **Downtime-Bestätigung**, weil der Server während der Installation neu
+  startet — und „Update-Sperre zurücksetzen" (nur sichtbar, wenn ein
+  abgebrochener Installationsversuch eine verwaiste Sperre hinterlassen
+  hat). Die manuellen Aktionen laufen auch bei Automatisierung „Aus".
+
+Beim Dateiaustausch bleiben das `data`-Verzeichnis (Benutzer, Tokens,
+Einstellungen) und die `appsettings*.json`-Konfiguration unberührt — sie
+werden vorher gesichert und danach restauriert.
 
 ## Beispiele
 
@@ -70,6 +99,11 @@ legt die Administration an.
 - Ein Benutzer hat sein Passwort dreimal falsch eingegeben: Das Konto ist eine
   Stunde gesperrt — oder die Administration klickt in der Benutzerliste auf
   **Sperrung zurücksetzen** und der Benutzer kann sich sofort wieder anmelden.
+- Der Server soll nachts aktuelle Vorabversionen einspielen: Die Administration
+  stellt unter **Einstellungen → Updates** den Kanal „Pre-Release" und die
+  Automatisierung „Prüfen und installieren" mit der Installationsuhrzeit 03:00
+  ein — Updates werden im Prüfzeitfenster gesucht, geladen und täglich um
+  03:00 installiert.
 
 ## Einschränkungen
 
@@ -84,3 +118,8 @@ legt die Administration an.
   der Anwendung; der Server-Betreiber muss die gespeicherten Daten verwerfen und
   die Ersteinrichtung neu durchlaufen (siehe
   [Fehlerbehebung](troubleshooting.md)).
+- Die automatische Update-Funktion setzt ein Server-Paket voraus, das eine
+  `release-metadata.json` enthält — Pakete aus Releases vor Einführung dieser
+  Pipeline-Erweiterung melden die installierte Version als „unbekannt", und
+  die Update-Prüfung bleibt wirkungslos, bis einmal ein aktuelles Paket
+  (manuell) installiert wurde.

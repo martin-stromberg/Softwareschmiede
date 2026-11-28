@@ -288,12 +288,21 @@ public sealed class ScmEventValidationServiceTests
         => Assert.Equal(ScmEventValidationService.AssignerUnknownRejection,
             ScmEventValidationService.GetRejection(ObserveAssign("Beschreibung mit Auftrag", null, null)));
 
-    /// <summary>Die eigene-Antwort-Markierung gilt auch im Assign-Pfad — eine maschinell
-    /// gesetzte Beschreibung wird nicht erneut aufgenommen.</summary>
+    /// <summary>Die eigene-Antwort-Markierung ist im Assign-Pfad kein Ablehnungsgrund —
+    /// die berechtigte Zuweisung legitimiert auch eine maschinell gesetzte Beschreibung.</summary>
     [Fact]
-    public void GetRejection_AssignOwnResponseMarker_Rejected()
-        => Assert.Equal("Eigene Antwort", ScmEventValidationService.GetRejection(
+    public void GetRejection_AssignOwnResponseMarker_Accepted()
+        => Assert.Null(ScmEventValidationService.GetRejection(
             ObserveAssign("Auftrag\n<!-- softwareschmiede:action:abc -->", "42", "owner")));
+
+    /// <summary>Eine Marker-Beschreibung legitimiert keinen fremden Zuweisender: ohne frei
+    /// stehende Erwähnung scheitert der Texttrigger-Fallback bereits an `NoMentionRejection`,
+    /// sodass die spezifischere Zuweisungsbegründung führend bleibt. Dass der Marker den
+    /// Fallback zusätzlich selbst abwehrt, deckt `…_WithMentionAndMarker_StaysRejected` ab.</summary>
+    [Fact]
+    public void GetRejection_AssignForeignAssignerWithMarker_StaysRejected()
+        => Assert.Equal(ScmEventValidationService.AssignerNotAllowedRejection, ScmEventValidationService.GetRejection(
+            ObserveAssign("Auftrag\n<!-- softwareschmiede:action:abc -->", "U_9", "fremd")));
 
     private static ScmEventObservation ObserveAssign(string body, string? actorId, string? actorLogin)
     {

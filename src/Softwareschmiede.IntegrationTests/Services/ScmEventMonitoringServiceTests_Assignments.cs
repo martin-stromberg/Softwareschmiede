@@ -71,6 +71,44 @@ public sealed class ScmEventMonitoringServiceTests_Assignments
         Assert.Equal(ScmIncomingEventStatus.Verarbeitet, (await fixture.EventAsync(item.Id)).Status);
     }
 
+    /// <summary>Eine vom Überwachungskonto neu geschriebene, marker-tragende Beschreibung
+    /// (Issue-Aufbereitung via IssueBodyUpdate) wird bei berechtigter Zuweisung als
+    /// Auftragsinhalt aufgenommen und zugestellt — der Zuweisender-Kreis legitimiert,
+    /// nicht der Texttrigger.</summary>
+    [Fact]
+    public async Task Monitor_SeparatesAccount_AssignViewerAuthoredMarkerDescription_CreatesTaskAndDispatches()
+    {
+        await using var fixture = new ScmDispatchFixture(assignmentSource: true);
+        await fixture.InitializeAsync();
+        await AddRepositoryAsync(fixture);
+        await fixture.SetAccountModeAsync(ScmAccountMode.SeparateAccount);
+        ConfigureBotResolution(fixture);
+        fixture.ConfigureDescriptionObservations("Aufbereiteter Auftrag\n<!-- softwareschmiede:action:abc -->", "BOT", "scm-bot");
+        fixture.ConfigureIssue(7);
+        fixture.ConfigureAssignmentSource(new ScmAssignment("EV_1", DateTimeOffset.UtcNow, "U_1", "owner", "BOT", "scm-bot"));
+        using (var settingsScope = fixture.Services.CreateScope())
+            await settingsScope.ServiceProvider.GetRequiredService<PluginDefaultSettingsService>()
+                .SaveDefaultPluginPrefixAsync(PluginType.DevelopmentAutomation, ScmDispatchFixture.AiPrefix, TestContext.Current.CancellationToken);
+        fixture.AddNotification(new ScmNotification("T_1", "R_1", "github.com", "owner", "repo",
+            ScmReferenceKind.Issue, 7, "assign", DateTimeOffset.UtcNow));
+
+        await fixture.RunMonitorAsync(TestContext.Current.CancellationToken);
+
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoftwareschmiedeDbContext>();
+        var task = Assert.Single(await db.WorkItems.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        var item = Assert.Single(await db.ScmIncomingEvents.ToListAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(task.Id, item.WorkItemId);
+        Assert.Equal("Zugestellt", item.Status);
+        var observation = ScmEventStore.Observation(item);
+        Assert.Equal(ScmContentKind.Description, observation.ContentKind);
+        Assert.Equal(ScmNotification.AssignReason, observation.Trigger?.Reason);
+        Assert.Equal("owner", observation.Trigger?.ActorLogin);
+        Assert.Equal("BOT", observation.AuthorId);
+        Assert.Contains("<!-- softwareschmiede:action:abc -->", observation.Body);
+        Assert.Contains("Assignee-Zuweisung", Assert.Single(fixture.Prompts));
+    }
+
     /// <summary>Der assign-Auslöser gilt auch auf Pull Requests: die PR-Beschreibung wird über den
     /// Issue-Events-Pfad legitimiert und legt die Aufgabe mit PR-Verknüpfung an.</summary>
     [Fact]
@@ -361,9 +399,10 @@ public sealed class ScmEventMonitoringServiceTests_Assignments
     }
 
     /// <summary>Liefert die Description-Lesung zu einer assign-Notification gar keinen Text
-    /// (Batch leer — z. B. eine eigene, vom Plugin herausgefilterte Marker-Beschreibung),
-    /// landet die generische Leer-Batch-Diagnose als Inbox-Diagnose auf dem Quellen-Checkpoint
-    /// statt eines Snapshots.</summary>
+    /// (Batch leer — z. B. weil der Textstand der Beschreibung nach dem Watermark liegt;
+    /// eine remote nicht lesbare Beschreibung erzeugt stattdessen einen Permanent-Fehler),
+    /// landet die generische Leer-Batch-Diagnose als Inbox-Diagnose auf dem
+    /// Quellen-Checkpoint statt eines Snapshots.</summary>
     [Fact]
     public async Task Monitor_SeparatesAccount_AssignEmptyDescriptionBatch_Discarded()
     {

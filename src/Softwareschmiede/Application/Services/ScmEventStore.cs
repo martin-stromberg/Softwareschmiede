@@ -23,8 +23,9 @@ public sealed class ScmEventStore(SoftwareschmiedeDbContext db, ScmEventChangeNo
     /// <summary>Diagnose für Referenzen ohne zuordenbare lokale Aufgabe.</summary>
     public const string UnassignedDiagnostic = "Keine Aufgabe zugeordnet";
     /// <summary>Diagnose eines leeren Assign-Batches: Die Quelle lieferte keine verwertbare
-    /// Referenzbeschreibung — z. B. weil das Plugin eine eigene, marker-gekennzeichnete
-    /// Beschreibung bereits herausgefiltert hat oder die Beschreibung nicht lesbar ist.
+    /// Referenzbeschreibung — der pluginseitige Watermark-Vorfilter hat sie verworfen
+    /// (ihr Textstand liegt nach dem Watermark). Eine remote nicht lesbare Beschreibung
+    /// erzeugt dagegen einen Permanent-Fehler am Quellen-Checkpoint, keinen leeren Batch.
     /// Bewusst generischer als <see cref="ScmEventValidationService.AssignEmptyDescriptionRejection"/>:
     /// Eine tatsächlich leere Beschreibung trifft als Beobachtung mit leerem Text ein und wird
     /// je Beobachtung abgelehnt, ein gänzlich leerer Batch hat andere Ursachen.</summary>
@@ -140,9 +141,10 @@ public sealed class ScmEventStore(SoftwareschmiedeDbContext db, ScmEventChangeNo
         checkpoint.ErrorCode = null;
         // Assign-Ablehnungen werden zusätzlich als Inbox:-Diagnose auf den Quellen-Checkpoint
         // gehoben: die Snapshot-Diagnose allein hätte keine Sichtbarkeit in den
-        // Integrationshinweisen. Ein leerer Batch trägt keine verwertbare Beschreibung (u. a.
-        // eigene Marker-Texte filtert das Plugin bereits vor dem Batch heraus); ohne
-        // konkrete Ablehnung bleibt die Unzugeordnet-Diagnose. Mehrdeutigkeit bleibt führend.
+        // Integrationshinweisen. Ein leerer Batch trägt keine verwertbare Beschreibung
+        // (Textstand nach dem Watermark — eine remote nicht lesbare Beschreibung wird
+        // pluginseitig zum Permanent-Fehler, nicht zum leeren Batch); ohne konkrete
+        // Ablehnung bleibt die Unzugeordnet-Diagnose. Mehrdeutigkeit bleibt führend.
         checkpoint.Diagnostic = workItemId is null
             ? unassigned && unassignedRejection is not null
                 ? InboxDiscardDiagnosticPrefix + " " + (firstRejection ?? (batch.Observations.Count == 0

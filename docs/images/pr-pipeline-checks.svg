@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1060" role="img" aria-label="Ablaufdiagramm der drei PR-Phasen: Feature-Branch zu staging mit static checks, build and test (beide nicht required) und ci-gate (required, fasst beide zusammen, laeuft dank if: always() immer); staging zu main als Draft-PR mit verify-source und release gate als required Checks, wobei release gate aus dem vorausgegangenen Push auf staging stammt (gleicher Commit-SHA); main zurueck zu staging als automatischer Backmerge, in dem static checks/build and test/os-interface tests uebersprungen werden, ci-gate aber trivial erfolgreich durchlaeuft; eine Merge-Schleife fuehrt von main letztlich zurueck zu staging.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Arial, sans-serif; fill: #1b2430; }
+    .t-phase { font-weight: 700; font-size: 20px; }
+    .t-file { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px; fill: #5b6572; }
+    .t-trigger { font-size: 12px; font-style: italic; fill: #5b6572; }
+    .t-job { font-weight: 600; font-size: 14.5px; }
+    .t-detail { font-size: 11.5px; fill: #5b6572; }
+    .t-detail-skip { font-size: 11.5px; fill: #5b6572; font-style: italic; }
+    .t-arrow { font-size: 12px; fill: #5b6572; }
+    .t-pill { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-weight: 600; font-size: 14px; }
+    .t-badge { font-weight: 700; font-size: 14px; fill: #ffffff; }
+    .panel-box { fill: #ffffff; stroke: #c7ccd4; stroke-width: 2; }
+    .panel-divider { stroke: #c7ccd4; stroke-width: 1; }
+    .job-box { fill: #f7f8fa; stroke: #aab2bd; stroke-width: 1.5; }
+    .job-box.required { stroke: #c9460c; stroke-width: 2.5; }
+    .job-box.skip { fill: #f7f8fa; stroke: #aab2bd; stroke-width: 1.5; stroke-dasharray: 6 4; opacity: 0.55; }
+    .job-box.besteffort { stroke-dasharray: 6 4; }
+    .pill { fill: #ffffff; stroke: #2f5d8a; stroke-width: 2; }
+    .flow-line { stroke: #5b6572; stroke-width: 2; fill: none; }
+    .badge-circle { fill: #c9460c; }
+  </style>
+
+  <rect x="0" y="0" width="1800" height="1060" fill="#ffffff" />
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b6572" />
+    </marker>
+  </defs>
+
+  <!-- feature branch pill -->
+  <ellipse class="pill" cx="100" cy="520" rx="72" ry="46" />
+  <text class="t-pill" x="100" y="516" text-anchor="middle">feature/*</text>
+  <text class="t-arrow" x="100" y="534" text-anchor="middle">Branch</text>
+
+  <!-- arrow: feature -> box1 -->
+  <line class="flow-line" x1="172" y1="520" x2="216" y2="520" marker-end="url(#arrow)" />
+  <text class="t-arrow" x="194" y="505" text-anchor="middle">PR</text>
+
+  <!-- BOX 1: PR -> staging -->
+  <rect class="panel-box" x="220" y="90" width="340" height="820" rx="16" />
+  <text class="t-phase" x="244" y="122">PR → staging</text>
+  <text class="t-file" x="244" y="144">pr-staging-ci.yml</text>
+  <text class="t-trigger" x="244" y="163">Trigger: pull_request → staging</text>
+  <line class="panel-divider" x1="220" y1="174" x2="560" y2="174" />
+
+  <rect class="job-box" x="240" y="190" width="300" height="64" rx="8" />
+  <text class="t-job" x="256" y="215">detect-backmerge</text>
+  <text class="t-detail" x="256" y="237">prüft Merge-Herkunft → is_backmerge = false</text>
+
+  <rect class="job-box" x="240" y="270" width="300" height="130" rx="8" />
+  <text class="t-job" x="256" y="296">static checks</text>
+  <text class="t-detail" x="256" y="317">dotnet format · Security-Scan</text>
+  <text class="t-detail" x="256" y="334">Static Analysis (Warnings=Errors)</text>
+  <text class="t-detail" x="256" y="358">nicht required</text>
+
+  <rect class="job-box" x="240" y="416" width="300" height="130" rx="8" />
+  <text class="t-job" x="256" y="442">build &amp; test</text>
+  <text class="t-detail" x="256" y="463">Tests (Category≠OsInterface)</text>
+  <text class="t-detail" x="256" y="480">Coverage-Schwelle ≥ 70 %</text>
+  <text class="t-detail" x="256" y="504">nicht required</text>
+
+  <rect class="job-box besteffort" x="240" y="562" width="300" height="96" rx="8" />
+  <text class="t-job" x="256" y="588">os-interface tests</text>
+  <text class="t-detail" x="256" y="609">FlaUI / ConPTY / Clipboard</text>
+  <text class="t-detail-skip" x="256" y="630">continue-on-error, nie required</text>
+
+  <rect class="job-box required" x="240" y="680" width="300" height="90" rx="8" />
+  <circle class="badge-circle" cx="526" cy="686" r="15" />
+  <text class="t-badge" x="526" y="691" text-anchor="middle">!</text>
+  <text class="t-job" x="256" y="708">ci-gate</text>
+  <text class="t-detail" x="256" y="729">needs: static checks, build &amp; test</text>
+  <text class="t-detail" x="256" y="746">if: always() — nie überspringbar</text>
+  <text class="t-detail" x="256" y="763" fill="#c9460c" font-weight="600">required</text>
+
+  <!-- arrow: box1 -> staging pill -->
+  <line class="flow-line" x1="560" y1="520" x2="612" y2="520" marker-end="url(#arrow)" />
+  <text class="t-arrow" x="586" y="505" text-anchor="middle">merge</text>
+
+  <!-- staging pill -->
+  <ellipse class="pill" cx="680" cy="520" rx="72" ry="46" />
+  <text class="t-pill" x="680" y="516" text-anchor="middle">staging</text>
+  <text class="t-arrow" x="680" y="534" text-anchor="middle">Branch</text>
+
+  <!-- arrow: staging -> box2 -->
+  <line class="flow-line" x1="752" y1="520" x2="796" y2="520" marker-end="url(#arrow)" />
+  <text class="t-arrow" x="774" y="505" text-anchor="middle">push</text>
+
+  <!-- BOX 2: PR -> main -->
+  <rect class="panel-box" x="800" y="90" width="340" height="820" rx="16" />
+  <text class="t-phase" x="824" y="122">PR → main (Draft)</text>
+  <text class="t-file" x="824" y="144">verify-pr-source.yml</text>
+  <text class="t-trigger" x="824" y="163">Trigger: push staging → Auto-Draft-PR</text>
+  <line class="panel-divider" x1="800" y1="174" x2="1140" y2="174" />
+
+  <rect class="job-box required" x="820" y="270" width="300" height="100" rx="8" />
+  <circle class="badge-circle" cx="1106" cy="284" r="15" />
+  <text class="t-badge" x="1106" y="289" text-anchor="middle">!</text>
+  <text class="t-job" x="836" y="296">verify-source</text>
+  <text class="t-detail" x="836" y="317">Kopf-Branch muss "staging" sein</text>
+  <text class="t-detail" x="836" y="334">sonst: Abbruch der PR-Checks</text>
+  <text class="t-detail" x="836" y="352" fill="#c9460c" font-weight="600">required</text>
+
+  <rect class="job-box required" x="820" y="410" width="300" height="130" rx="8" />
+  <circle class="badge-circle" cx="1106" cy="424" r="15" />
+  <text class="t-badge" x="1106" y="429" text-anchor="middle">!</text>
+  <text class="t-job" x="836" y="436">release gate</text>
+  <text class="t-detail" x="836" y="457">needs: version, prerelease</text>
+  <text class="t-detail" x="836" y="474">läuft in staging-ci.yml (push)</text>
+  <text class="t-detail-skip" x="836" y="491">gleicher SHA wie Promotion-PR</text>
+  <text class="t-detail" x="836" y="512" fill="#c9460c" font-weight="600">required</text>
+
+  <text class="t-detail-skip" x="836" y="570">Backmerge / keine Versions­erhöhung</text>
+  <text class="t-detail-skip" x="836" y="587">→ passt trivial (nichts zu releasen)</text>
+
+  <!-- arrow: box2 -> main pill -->
+  <line class="flow-line" x1="1140" y1="520" x2="1192" y2="520" marker-end="url(#arrow)" />
+  <text class="t-arrow" x="1166" y="505" text-anchor="middle">merge</text>
+
+  <!-- main pill -->
+  <ellipse class="pill" cx="1260" cy="520" rx="72" ry="46" />
+  <text class="t-pill" x="1260" y="516" text-anchor="middle">main</text>
+  <text class="t-arrow" x="1260" y="534" text-anchor="middle">Branch</text>
+
+  <!-- arrow: main -> box3 -->
+  <line class="flow-line" x1="1332" y1="520" x2="1376" y2="520" marker-end="url(#arrow)" />
+  <text class="t-arrow" x="1354" y="505" text-anchor="middle">push</text>
+
+  <!-- BOX 3: PR Backmerge -->
+  <rect class="panel-box" x="1380" y="90" width="340" height="820" rx="16" />
+  <text class="t-phase" x="1404" y="122">PR Backmerge</text>
+  <text class="t-file" x="1404" y="144">pr-staging-ci.yml (dieselbe Datei)</text>
+  <text class="t-trigger" x="1404" y="163">Trigger: push main → Auto-PR main→staging</text>
+  <line class="panel-divider" x1="1380" y1="174" x2="1720" y2="174" />
+
+  <rect class="job-box" x="1400" y="190" width="300" height="64" rx="8" />
+  <text class="t-job" x="1416" y="215">detect-backmerge</text>
+  <text class="t-detail" x="1416" y="237">main ist Merge-Parent → is_backmerge = true</text>
+
+  <rect class="job-box" x="1400" y="270" width="300" height="64" rx="8" />
+  <text class="t-job" x="1416" y="295">back-merge-skip</text>
+  <text class="t-detail" x="1416" y="317">Platzhalter-Erfolg, keine echte Prüfung</text>
+
+  <rect class="job-box skip" x="1400" y="350" width="300" height="90" rx="8" />
+  <text class="t-job" x="1416" y="374">static checks</text>
+  <text class="t-detail-skip" x="1416" y="394">if: is_backmerge != true</text>
+  <text class="t-detail-skip" x="1416" y="410">→ übersprungen</text>
+
+  <rect class="job-box skip" x="1400" y="456" width="300" height="90" rx="8" />
+  <text class="t-job" x="1416" y="480">build &amp; test</text>
+  <text class="t-detail-skip" x="1416" y="500">if: is_backmerge != true</text>
+  <text class="t-detail-skip" x="1416" y="516">→ übersprungen</text>
+
+  <rect class="job-box skip" x="1400" y="562" width="300" height="90" rx="8" />
+  <text class="t-job" x="1416" y="586">os-interface tests</text>
+  <text class="t-detail-skip" x="1416" y="606">if: is_backmerge != true</text>
+  <text class="t-detail-skip" x="1416" y="622">→ übersprungen</text>
+
+  <rect class="job-box required" x="1400" y="680" width="300" height="90" rx="8" />
+  <circle class="badge-circle" cx="1686" cy="686" r="15" />
+  <text class="t-badge" x="1686" y="691" text-anchor="middle">!</text>
+  <text class="t-job" x="1416" y="708">ci-gate</text>
+  <text class="t-detail" x="1416" y="729">Backmerge-Pfad:</text>
+  <text class="t-detail" x="1416" y="746">immer trivial erfolgreich</text>
+  <text class="t-detail" x="1416" y="763" fill="#c9460c" font-weight="600">required</text>
+
+  <!-- loop arrow: box3 bottom back to staging pill (the backmerge closes the cycle) -->
+  <path class="flow-line" d="M 1550 912 C 1550 1000, 680 1000, 680 570" marker-end="url(#arrow)" />
+  <text class="t-arrow" x="1115" y="1000" text-anchor="middle">merge (Backmerge) — per Vorgabe: "Create a merge commit"</text>
+
+</svg>

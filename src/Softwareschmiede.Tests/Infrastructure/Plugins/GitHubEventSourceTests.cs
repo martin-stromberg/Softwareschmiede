@@ -190,6 +190,21 @@ public sealed class GitHubEventSourceTests
         Assert.Equal("C_2", Assert.Single(batch.Observations).RemoteNodeId);
     }
 
+    /// <summary>Eine eigene markierte Beschreibung wird anders als eigene markierte Kommentare
+    /// als Beobachtung geliefert — der Vorfilter greift nicht auf <see cref="ScmContentKind.Description"/>,
+    /// weil der Assign-Auslöser sie hostseitig legitimieren kann.</summary>
+    [Fact]
+    public async Task OwnMarkedDescription_IsDelivered()
+    {
+        var api = new FakeApi();
+        api.AddGraph(new { repository = new { issue = Node("I_7", "Aufbereiteter Auftrag\n<!-- softwareschmiede:action:abc -->") } });
+        var batch = await Plugin(api).ReadEventsAsync(Read(Issue, ScmContentKind.Description), TestContext.Current.CancellationToken);
+        var observation = Assert.Single(batch.Observations);
+        Assert.Equal("I_7", observation.RemoteNodeId);
+        Assert.Contains("<!-- softwareschmiede:action:abc -->", observation.Body);
+        api.AssertComplete();
+    }
+
     /// <summary>Reaktionsgruppen mit <c>viewerHasReacted</c> landen als ViewerReactions auf der Beobachtung.</summary>
     [Fact]
     public async Task ViewerReactions_MapFromReactionGroups()

@@ -159,3 +159,125 @@ Admin löschen und neu anlegen.
 
 **Umsetzung:** Anforderungs-Ausschluss; Absicherung gegen den unrettbaren
 Zustand ist der Letzter-Admin-Schutz.
+
+## Update-Einstellungen: Persistierte Admin-Werte gewinnen
+
+**Beschreibung:** Kanal, Automatisierungsmodus und Installationsuhrzeit der
+Update-Funktion sind anwendungsweite Admin-Einstellungen — wie die
+Sitzungsdauer liegen sie in der Datenbank, nicht in `appsettings.json`.
+
+**Bedingungen:**
+- `ServerSettings`-Schlüssel `UpdateChannel` (`stable`/`prerelease`),
+  `UpdateAutomationMode` (`off`/`check`/`install`), `UpdateInstallTime`
+  (`HH:mm`); Defaults `stable`/`off`/`03:00`, fehlende oder korrupte Werte
+  fallen darauf zurück.
+- Die `appsettings`-`Update:`-Sektion liefert nur technische Parameter
+  (Repository, Manifestname, Workspace, Zeitfenster, Neustart-Ziel).
+
+**Verhalten:**
+- `ApplyPersistedUpdateSettingsAsync` wendet die persistierten Werte bei
+  jedem Start vor `app.Run()` auf `AutoUpdateOptions` an — die
+  Bibliotheks-Hintergrunddienste lesen ihre Optionen erst beim Start und
+  sehen so die Admin-Werte.
+- `POST /admin/settings/update` persistiert und wendet sofort an
+  (`StatusServerUpdateService.ApplySettingsAsync`), inklusive Neuaufbau der
+  Update-Quelle beim Kanalwechsel — kein Neustart nötig.
+- `installTime` ist Pflicht bei Modus `install` (der Scheduler feuert ohne
+  `ScheduledInstallTime` nie), bei den anderen Modi optional.
+
+**Umsetzung:** `ServerSettingsService.GetUpdateSettingsAsync`/
+`SetUpdateSettingsAsync`, `StatusServerAutoUpdateOptionsMapper.ApplySettings`,
+`AutoUpdateApplicationExtensions.ApplyPersistedUpdateSettingsAsync`.
+
+## Manuelle Update-Aktionen laufen auch bei Modus „Aus"
+
+**Beschreibung:** `AutoUpdateOptions.Enabled` ist der Master-Schalter der
+Bibliothek — die Hintergrund-Automation darf bei Modus `off` nicht laufen,
+ein explizit angeklickter Admin-Button aber schon.
+
+**Bedingungen:** Modus `off` setzt `Enabled=false`; die manuellen Endpunkte
+`/admin/settings/update/check` und `…/install` bleiben bedienbar.
+
+**Verhalten:**
+- `RunWithManualOverrideAsync` setzt `Enabled` für die Dauer des manuellen
+  Laufs kurzzeitig auf `true` und stellt den Wert danach wieder her — die
+  Hintergrunddienste bleiben deaktiviert.
+- Der Override-Block läuft unter dem prozessweiten `s_manualOverrideLock`:
+  zwei parallele manuelle Läufe serialisieren sich, und der
+  `finally`-Restore kann keinen parallel gespeicherten Einstellungswert
+  überschreiben (derselbe Lock schützt `ApplySettingsAsync`).
+
+**Umsetzung:** `StatusServerUpdateService.RunWithManualOverrideAsync` +
+`s_manualOverrideLock`.
+
+## Separates Server-Manifest `statusserver-update.json`
+
+**Beschreibung:** Die Update-Prüfung des Servers liest ein eigenes
+Release-Asset-Manifest — das Desktop-`update.json` bleibt unverändert.
+
+**Bedingungen:**
+- Die Paketwahl (`IAutoUpdatePlatformResolver.SelectPackage`) erfolgt
+  ausschließlich über `platform` + `runtimeIdentifier` — zwei `win-x64`-
+  Assets (`release.zip` + `statusserver-win-x64.zip`) in einem Manifest
+  wären uneindeutig.
+- Die Release-Pipeline schreibt je RID eine `release-metadata.json` in die
+  StatusServer-Pakete (Versionsquelle via
+  `ReleaseMetadataInstalledVersionProvider`) und lädt
+  `statusserver-update.json` (Rezepte-Format: `platform`,
+  `runtimeIdentifier`, `assetName`, `assetUrl`, `sha256`, `sizeBytes`) als
+  zusätzliches Release-Asset hoch.
+
+**Verhalten:**
+- Ohne `release-metadata.json` meldet die Seite die installierte Version
+  als „unbekannt" und die Prüfung bleibt wirkungslos — Alt-Pakete sind erst
+  nach einem manuell eingespielten aktuellen Release update-fähig.
+- Gefundene Pakete werden per SHA-256 gegen das Manifest verifiziert, bevor
+  sie zur Installation bereitliegen.
+
+**Umsetzung:** `.github/actions/build-and-package/action.yml` (Schritte
+„Write StatusServer release metadata", „Create StatusServer update
+manifest"), `UpdateStatusMapper`/`IInstalledVersionProvider`.
+
+## Datenerhalt beim Update-Dateiaustausch
+
+**Beschreibung:** Datenbestand und lokale Konfiguration dürfen kein Update
+überstehen müssen — sie werden vom Installationsskript gesichert und
+restauriert.
+
+**Bedingungen:**
+- `PreserveFile("appsettings*.json")` und `PreserveFile("data/*")` (deckt
+  `statusserver.db` samt `-wal`/`-shm` direkt unter `data/`).
+- Ein per `Data:DatabasePath` konfigurierter SQLite-Pfad innerhalb des
+  Installationsverzeichnisses, aber außerhalb der `data/*`-Abdeckung, wird
+  samt `<pfad>-*`-Seitendateien zusätzlich geschützt; ein Pfad außerhalb des
+  Installationsverzeichnisses wird vom Austausch ohnehin nicht berührt.
+
+**Verhalten:** Das Skript sichert die geschützten Dateien vor dem Austausch
+und restauriert sie danach — Benutzer, Tokens, `ServerSettings` (inkl. der
+Update-Einstellungen) und lokale Konfigurationsanpassungen bleiben über
+jedes Update erhalten.
+
+**Umsetzung:** `AutoUpdateApplicationExtensions.SetInitialConfiguration` /
+`PreserveDatabaseFiles`.
+
+## Installations-Sperre nur bei Verwaistheit zurücksetzbar
+
+**Beschreibung:** `update.lock` verhindert parallele Installationsläufe;
+bleibt der Lock nach einem Prozessabbruch liegen, blockiert er alle
+weiteren Updates dauerhaft — der Admin darf ihn aber nur zurücksetzen, wenn
+er nachweislich verwaist ist.
+
+**Bedingungen:**
+- `IsLockStale` bewertet das Lock-Alter gegen
+  `Update:HealthTimeoutSeconds` (Default 120 s); ohne Lock oder bei
+  unverwaistem Lock schlägt der Reset fehl.
+- Die UI zeigt „aktiv" / „verwaist — Reset möglich" / „keine" und blendet
+  den Button **Update-Sperre zurücksetzen** nur bei `IsLockStale` ein.
+
+**Verhalten:** `ResetLockAsync` löscht den Lock über `DeleteLockAsync` und
+korrigiert den persistierten Status (`IsLocked=false`,
+`LockCreatedAt=null`) → `?msg=update-lock-reset`; sonst
+`?err=update-lock-reset-failed`.
+
+**Umsetzung:** `StatusServerUpdateService.ResetLockAsync` über
+`IAutoUpdatePackageStore` + `AutoUpdateStatusService`.

@@ -138,6 +138,130 @@ Nicht-WebSocket-Transporten den `Bearer`-Header und ruft
 Warn-Log + `Context.Abort()`; gültig → `RegisterInstance`/`PushSnapshot` wie
 gehabt.
 
+### 7. Automatische Updates (msTools.Updater)
+
+Der Self-Update-Pfad läuft über die Bibliothek `msTools.Updater` (Paket
+`0.11.0-rc.8`, eingebunden über die lokale NuGet-Quelle
+`external/msTools.Updater/` + `NuGet.config`) und eine dünne Adapterschicht
+im Ordner `Update/`.
+
+#### Start-Registrierung und persistierte Einstellungen
+
+1. `Program` bindet die `Update`-Sektion auf `StatusServerUpdateOptions`
+   und ruft `builder.UseAutoUpdate(cfg => cfg.SetInitialConfiguration(
+   updateOptions, databasePath, contentRootPath))` — die Extension führt
+   `BindConfiguration("Update")` (Bibliotheksoptionen aus derselben
+   Sektion), `WithUpdateUnitName("SoftwareschmiedeStatusServerUpdate")`,
+   `WithDownloadPath(WorkingDirectory)`, `WithSourceCheck(24*60,
+   BuildSourceCheckTimeRanges(start, end))`,
+   `PreserveFile("appsettings*.json")`, `PreserveFile("data/*")` sowie den
+   Datenschutz eines `Data:DatabasePath` innerhalb des
+   Anwendungsverzeichnisses (samt `-wal`/`-shm`/`-journal` über
+   `<pfad>-*`) und je `SourceType` `UseGithubSource` oder
+   `UseLocalFolderSource` aus.
+2. Zusätzlich registriert `Program` den benannten HttpClient
+   `StatusServerUpdate` (BaseAddress `https://api.github.com/`, UserAgent
+   `softwareschmiede-status-server/1.0`, Bearer aus `GitHub:Token`, falls
+   gesetzt) sowie `StatusServerUpdateSourceFactory` (Singleton),
+   `UpdateStatusMapper` (Singleton) und `StatusServerUpdateService`
+   (scoped).
+3. Nach `StatusServerDatabaseInitializer.InitializeAsync` und vor
+   `app.Run()` wendet `ApplyPersistedUpdateSettingsAsync` die in
+   `ServerSettings` persistierten Admin-Werte auf den
+   `AutoUpdateOptions`-Singleton an
+   (`StatusServerAutoUpdateOptionsMapper.ApplySettings`) und baut
+   `options.Source` über `StatusServerUpdateSourceFactory.ReplaceSource`
+   kanal- und token-bewusst neu — die Bibliotheks-Hintergrunddienste
+   lesen ihre Optionen erst beim Start und sehen so die Admin-Werte.
+   Fehler werden geloggt und geschluckt.
+
+#### Automatisierung (Bibliotheks-Hintergrunddienste)
+
+- `AutoUpdateCheckerService` prüft einmal täglich im konfigurierten
+  Zeitfenster (`SourceCheck.Interval` = 24×60 min, Ranges aus
+  `Update:SourceCheckStartTime`/`EndTime`, Default 20:00–06:00;
+  Über-Mitternacht-Fenster werden in zwei tageseigene Ranges gespalten).
+  Gefundene Pakete lädt er nur bei `EnableAutomaticDownload` (inkl.
+  SHA-256-Verifikation gegen `statusserver-update.json`) — nie installieren.
+- `AutoUpdateSchedulerService` installiert täglich zu
+  `ScheduledInstallTime` ein bereitliegendes Paket, sofern
+  `EnableAutomaticInstallation`.
+- Mapping (`ApplySettings`): `Off` → `Enabled=false`; `CheckOnly` →
+  `Enabled=true`, kein Auto-Download/-Install; `CheckAndInstall` → alle
+  Flags + `ScheduledInstallTime` aus der persistierten Uhrzeit.
+- Der Kanal steuert `AllowPrereleaseUpdates` und `includePrereleases`
+  der `AutoUpdateGithubSource` synchron — bei Kanalwechsel wird die
+  Quelle neu gebaut.
+
+#### Admin-Endpunkte (Policy `AdminOnly`, Antiforgery)
+
+- `POST /admin/settings/update` — validiert `channel`
+  (`stable`/`prerelease`), `mode` (`off`/`check`/`install`) und
+  `installTime` (`HH:mm`, Pflicht bei `mode=install`) über
+  `StatusServerUpdateSettingsCodec`; persistiert via
+  `ServerSettingsService.SetUpdateSettingsAsync` und wendet sie via
+  `StatusServerUpdateService.ApplySettingsAsync` sofort an → Redirect
+  `?msg=update-settings-saved`.
+- `POST /admin/settings/update/check` —
+  `StatusServerUpdateService.CheckAndDownloadAsync`:
+  `CheckForUpdateAsync`, bei Erfolg `DownloadAsync` → Redirect
+  `?msg=update-check-done` bzw. `?err=update-check-failed`.
+- `POST /admin/settings/update/install` — erfordert die Checkbox
+  `confirmDowntime` (sonst Fehlerseite); `StartInstallAsync` lädt bei
+  `UpdateAvailable` ohne Download nach und ruft
+  `InstallAsync(confirmDowntime: true, force: false)`. Ergebnis
+  `InstallationStarted` → statische Seite
+  `AdminPagesComposer.RenderUpdateInstallStarted` („Der Server startet
+  neu", kein Redirect — das Skript stoppt den Prozess); `Failed` →
+  `?err=update-install-failed`; sonst `?msg=update-install-not-started`.
+- `POST /admin/settings/update/lock-reset` — `ResetLockAsync` löscht den
+  Installations-Lock nur, wenn er existiert und `IsLockStale` gilt →
+  `?msg=update-lock-reset` bzw. `?err=update-lock-reset-failed`.
+- `GET /admin/settings` lädt `GetUpdateSettingsAsync` +
+  `StatusServerUpdateService.GetStatusAsync` (über
+  `IAutoUpdateOrchestrator.GetStatusAsync` inkl.
+  Neustart-Rekonziliation → `UpdateStatusMapper` →
+  `StatusServerUpdateStatus`) und rendert die Sektion „Updates" in
+  `AdminPagesComposer.RenderSettings`.
+
+#### Manuelle Aktionen bei deaktivierter Automation
+
+`StatusServerUpdateService.RunWithManualOverrideAsync` setzt
+`AutoUpdateOptions.Enabled` für explizit ausgelöste Admin-Klicks
+kurzzeitig auf `true` und stellt den Wert danach wieder her — unter dem
+prozessweiten `s_manualOverrideLock`, damit parallele manuelle Läufe
+sich nicht wechselseitig zurücksetzen und der `finally`-Restore keinen
+parallel gespeicherten Einstellungswert überschreibt.
+
+#### Installationsskript und Datenerhalt
+
+`InstallAsync` startet ein detached laufendes Skript außerhalb des
+Serverprozesses: Linux/systemd als Transient-Unit
+(`SoftwareschmiedeStatusServerUpdate`), Windows über ein abgelöstes
+Skript mit `app_offline.htm`-/Dienst-/Exe-Erkennung. Das Skript stoppt
+den Server, sichert die `PreserveFile`-Muster, entpackt/kopiert das
+Paket (mit Retry bei gesperrten Dateien), restauriert die geschützten
+Dateien und startet den Server wieder; Fehlschläge hinterlassen den
+Marker `update.failed`, den `GetStatusAsync` beim nächsten Aufruf
+rekonziliert. Der Status liegt in `updates/status.json`, das Skript-Log
+in `updates/update.log`, der Lock in `updates/update.lock`.
+
+Beteiligte Komponenten:
+- `StatusServerUpdateService` — Adapter der Admin-Aktionen über
+  `IAutoUpdateOrchestrator`, `AutoUpdateStatusService`,
+  `IAutoUpdatePackageStore`, `AutoUpdateOptions`
+- `StatusServerAutoUpdateOptionsMapper` — Mapping Admin-Einstellungen →
+  `AutoUpdateOptions`, Zeitfenster-Ranges
+- `StatusServerUpdateSourceFactory` — token-/kanalbewusste
+  `IAutoUpdateSource` (GitHub oder LocalFolder)
+- `UpdateStatusMapper` / `StatusServerUpdateStatus` — UI-DTO-Abbildung
+- `StatusServerUpdateSettingsCodec` — zentrale String↔Enum-Konvertierung
+- `AutoUpdateApplicationExtensions` — `SetInitialConfiguration` +
+  `ApplyPersistedUpdateSettingsAsync`
+- `ServerSettingsService` — Schlüssel `UpdateChannel`,
+  `UpdateAutomationMode`, `UpdateInstallTime` (Defaults `stable`,
+  `off`, `03:00`)
+
 ## Diagramm
 
 ```mermaid
@@ -173,3 +297,14 @@ flowchart TD
   `InvalidOperationException` — der Server startet nicht mit defekten Rollen.
 - **Relay-Token ungültig/widerrufen:** Warn-Log und `Context.Abort()` —
   kein Fehler-Rückkanal zum Client.
+- **Update-Fehlschläge:** Die Bibliothek signalisiert Fehler über
+  `AutoUpdateResult`/`AutoUpdateErrorCode` statt Exceptions — die Endpunkte
+  werten `Outcome` aus und leiten auf `?err=update-check-failed` /
+  `update-install-failed` / `update-lock-reset-failed` weiter; `LastError`
+  bleibt im persistierten Status (`updates/status.json`) sichtbar.
+  Fehlschläge des Installationsskripts hinterlassen den Marker
+  `update.failed`, den `GetStatusAsync` beim nächsten Aufruf zu State
+  `Failed` rekonziliert.
+- **Persistierte Update-Einstellungen korrupt:**
+  `ApplyPersistedUpdateSettingsAsync` loggt den Fehler und startet mit den
+  `appsettings`-Defaults — der Start wird nicht blockiert.

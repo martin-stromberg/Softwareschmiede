@@ -1,6 +1,8 @@
 using FluentAssertions;
+using Softwareschmiede.StatusServer.Data;
 using Softwareschmiede.StatusServer.Security;
 using Softwareschmiede.StatusServer.Tests.TestSupport;
+using Softwareschmiede.StatusServer.Update;
 
 namespace Softwareschmiede.StatusServer.Tests.Security;
 
@@ -62,5 +64,72 @@ public sealed class ServerSettingsServiceTests
         var sut = new ServerSettingsService(db.Context);
         var act = () => sut.SetSessionDurationAsync(minutes, TestContext.Current.CancellationToken);
         await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+    }
+
+    /// <summary>Ohne persistierte Werte gelten die Update-Defaults:
+    /// Kanal Stable, Modus Off, Installationszeit 03:00.</summary>
+    [Fact]
+    public async Task GetUpdateSettings_WithoutPersistedValues_ReturnsDefaults()
+    {
+        using var db = new StatusServerTestDb();
+        var sut = new ServerSettingsService(db.Context);
+
+        var settings = await sut.GetUpdateSettingsAsync(TestContext.Current.CancellationToken);
+
+        settings.Channel.Should().Be(StatusServerUpdateChannel.Stable);
+        settings.Mode.Should().Be(StatusServerAutomationMode.Off);
+        settings.ScheduledInstallTime.Should().Be(new TimeOnly(3, 0));
+    }
+
+    /// <summary>Korrupte persistierte Werte fallen pro Schlüssel auf die Defaults
+    /// zurück statt zu fehlschlagen.</summary>
+    [Fact]
+    public async Task GetUpdateSettings_CorruptValues_FallBackToDefaults()
+    {
+        using var db = new StatusServerTestDb();
+        db.Context.ServerSettings.AddRange(
+            new ServerSetting { Key = ServerSettingsService.UpdateChannelKey, Value = "bogus" },
+            new ServerSetting { Key = ServerSettingsService.UpdateAutomationModeKey, Value = "xyz" },
+            new ServerSetting { Key = ServerSettingsService.UpdateInstallTimeKey, Value = "keine-uhrzeit" });
+        await db.Context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        var sut = new ServerSettingsService(db.Context);
+
+        var settings = await sut.GetUpdateSettingsAsync(TestContext.Current.CancellationToken);
+
+        settings.Channel.Should().Be(StatusServerUpdateChannel.Stable);
+        settings.Mode.Should().Be(StatusServerAutomationMode.Off);
+        settings.ScheduledInstallTime.Should().Be(new TimeOnly(3, 0));
+    }
+
+    /// <summary>Ein gesetzter Einstellungssatz wird unter allen drei Schlüsseln
+    /// persistiert und vollständig zurückgegeben; ein erneutes Setzen aktualisiert
+    /// die vorhandenen Datensätze statt Duplikate anzulegen.</summary>
+    [Fact]
+    public async Task SetUpdateSettings_PersistsAllKeys_AndRoundtrips()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new StatusServerTestDb();
+        var sut = new ServerSettingsService(db.Context);
+        var settings = new StatusServerUpdateSettings(
+            StatusServerUpdateChannel.ReleaseCandidate,
+            StatusServerAutomationMode.CheckAndInstall,
+            new TimeOnly(4, 30));
+
+        await sut.SetUpdateSettingsAsync(settings, ct);
+
+        var keys = db.Context.ServerSettings.Select(s => s.Key).ToList();
+        keys.Should().BeEquivalentTo(
+            ServerSettingsService.UpdateChannelKey,
+            ServerSettingsService.UpdateAutomationModeKey,
+            ServerSettingsService.UpdateInstallTimeKey);
+
+        var roundtrip = await sut.GetUpdateSettingsAsync(ct);
+        roundtrip.Should().Be(settings);
+
+        // Zweites Setzen aktualisiert die bestehenden Datensätze (Upsert).
+        var updated = settings with { Mode = StatusServerAutomationMode.Off };
+        await sut.SetUpdateSettingsAsync(updated, ct);
+        db.Context.ServerSettings.Count().Should().Be(3);
+        (await sut.GetUpdateSettingsAsync(ct)).Mode.Should().Be(StatusServerAutomationMode.Off);
     }
 }
