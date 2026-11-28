@@ -21,7 +21,12 @@ jobs:
     # Softwareschmiede.App is a WPF application (net11.0-windows, UseWPF=true) and can only
     # be built and published on a Windows runner.
     runs-on: windows-latest
-    timeout-minutes: 30
+    # Der "OS interface tests (Softwareschmiede.Tests)"-Step allein braucht auf dem
+    # Windows-Runner strukturell 13-15 Minuten; erfolgreiche Laeufe liegen damit schon bei
+    # 26-30 Minuten Gesamtdauer - direkt am vorherigen Limit von 30 Minuten, ohne Puffer fuer
+    # normale Varianz. Lief am 2026-11-27 deshalb in einen Timeout (Run 46054203050), obwohl
+    # alle Steps bis dahin erfolgreich waren.
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
