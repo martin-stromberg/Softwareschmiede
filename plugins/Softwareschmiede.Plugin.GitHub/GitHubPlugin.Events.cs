@@ -381,7 +381,12 @@ public sealed partial class GitHubPlugin
         var repo = request.Reference.Repository;
         var authorId = String(author, "id");
         var authorLogin = String(author, "login");
-        if (IsViewer(repo, authorId, authorLogin) && body.Contains("<!-- softwareschmiede:", StringComparison.OrdinalIgnoreCase)) return;
+        // Marker-Vorfilter nur für Kommentar-Arten: Eigene marker-tragende Kommentare sind stets
+        // eigene Outputs und in keinem Pfad legitimierbar. Beschreibungen dagegen können über den
+        // Assign-Auslöser legitimiert werden — den sieht das Plugin im ScmEventReadRequest nicht,
+        // deshalb entscheidet der hostseitige Validator (Texttrigger-Pfad lehnt sie weiterhin ab).
+        if (request.ContentKind.IsCommentKind()
+            && IsViewer(repo, authorId, authorLogin) && body.Contains("<!-- softwareschmiede:", StringComparison.OrdinalIgnoreCase)) return;
         var reactionGroups = Object(node, "reactionGroups");
         if (reactionGroups.ValueKind != JsonValueKind.Array) throw Permanent("Unvollständige GitHub-Antwort.");
         var viewerReactions = reactionGroups.EnumerateArray()

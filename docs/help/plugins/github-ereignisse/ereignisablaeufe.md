@@ -114,7 +114,9 @@ opt-in).
    bestimmbar", sichtbar als `Inbox:`-Diagnose in den Integrationshinweisen.
 3. Ablehnungsprüfung (`GetAssignRejection`): Zuweisender ∈ {Repository-Owner, separates
    Konto, `github-actions[bot]`/`app/github-actions`} **und** Referenzbeschreibung nicht
-   leer **und** kein eigener Antwortmarker. Scheitert die Zuweisungsprüfung, fällt die
+   leer — der Zuweisender-Kreis legitimiert im Assign-Pfad auch eine eigene
+   marker-tragende Beschreibung (die Marker-Abwehr gilt hier nicht; sie wirkt nur im
+   Texttrigger-Pfad und im untenstehenden Fallback). Scheitert die Zuweisungsprüfung, fällt die
    Prüfung auf den regulären Texttrigger zurück (`GetRejection`): Eine davon unabhängig
    gültige frei stehende `@`-Erwähnung in derselben Beschreibung legitimiert die Aufnahme
    trotz abgelehnter Zuweisung — die Zuweisung gewinnt nur die Deduplizierung je
