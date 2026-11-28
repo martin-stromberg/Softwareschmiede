@@ -77,6 +77,14 @@ Beteiligte Komponenten:
   bei Erfolg `RefreshSignInAsync` (neuer Security Stamp, Session bleibt) und
   Post/Redirect/Get auf `/profile?msg=…`. `UserAdminService.DescribeErrors`
   übersetzt `IdentityResult`-Codes in deutsche Meldungen.
+- `POST /profile/theme` (Policy `PageAccess`, Antiforgery): parst
+  `form["theme"]` case-insensitiv gegen `ThemePreference` (`Enum.TryParse` +
+  `Enum.IsDefined`), setzt `user.Theme` und persistiert via
+  `UserManager.UpdateAsync` → Redirect `/profile?msg=theme-saved`. Ungültige
+  oder fehlende Werte rendern `AuthPagesComposer.RenderProfile` direkt mit
+  `isError`-Meldung „Unbekannte Anzeigeeinstellung." (kein Redirect, kein
+  Write). Die Anzeige-Eigenschaft berührt weder Security-Stamp noch Session —
+  `ValidatePrincipal` bleibt unverändert.
 
 ### 4. Cookie-Revalidierung je Request
 
@@ -96,6 +104,32 @@ Anfrage:
    (`now - IssuedUtc >= ExpiresUtc - now`) werden `IssuedUtc`/`ExpiresUtc` auf
    die aktuell konfigurierte Sitzungsdauer gesetzt und `ShouldRenew = true` —
    sonst würde jede Antwort neu signiert und die Sliding-Expiration wirkungslos.
+
+### 4a. Theme-Auslieferung (`data-theme` + CSS Custom Properties)
+
+`EndpointSecurityExtensions.BuildUserContextAsync` trägt `user?.Theme ??
+ThemePreference.Auto` in den `PageUserContext` (kein Mehr-DB-Zugriff — das
+`ApplicationUser`-Objekt liegt ohnehin vor). Beide HTML-Dokument-Pfade setzen
+die wirksame Einstellung als `data-theme="auto|light|dark"` am `<html>`-Tag
+(`PageShell.ThemeName`): `PageShell.BeginPage` über den optionalen Parameter
+`theme` (Default `Auto` — anonyme Composer-Aufrufe wie `RenderLogin`,
+`RenderRegister`, `RenderFormExpired` bleiben so auf „Automatisch"),
+`StatusPageComposer.Render` aus `user.Theme` an seinem eigenen
+`<html>`-Tag.
+
+Das Farbschema liegt vollständig im eingebetteten CSS: `PageShell.ThemeCss`
+definiert die Light-Palette als `:root`-Custom-Properties und den
+Dark-Deklarationsblock (`DarkThemeVars`) zweifach — unter
+`:root[data-theme="dark"]` sowie innerhalb
+`@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`,
+sodass `auto` dem System folgt (Fallback Light), explizites `light` aber auch
+bei dunkler Systemeinstellung gewinnt. `color-scheme` je Schema zieht native
+Controls (Scrollbars, Eingabefelder) mit. `PageShell.Css`, `PageShell.NavCss`
+und `StatusPageComposer.Css` referenzieren ausschließlich `var(--…)`; der
+`ThemeCss`-Block wird von `BeginPage` und `StatusPageComposer.Render`
+gemeinsam eingebettet, damit die Palette nur an einer Stelle gepflegt wird.
+Es gibt kein JavaScript — das Schema gilt jeweils ab dem ausgelieferten
+Dokument, also ab dem nächsten Seitenaufruf bzw. Meta-Refresh.
 
 ### 5. Admin-Verwaltung
 

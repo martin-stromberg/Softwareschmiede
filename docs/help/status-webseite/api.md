@@ -85,13 +85,23 @@ bereits Angemeldete auf `/` weiter.
 **Fehlerfälle:** generische Meldung bei falschen Daten; `IsLockedOut` →
 Sperr-Hinweis mit Restdauer; `IsDeactivated` → „Dieses Konto ist deaktiviert."
 
-### `GET /profile`, `POST /profile/password`
+### `GET /profile`, `POST /profile/password`, `POST /profile/theme`
 
-**Beschreibung:** Profilseite und Passwortänderung des eigenen Kontos
-(`UserManager.ChangePasswordAsync`, danach `RefreshSignInAsync`).
+**Beschreibung:** Profilseite mit Konto-Übersicht, Anzeige-Einstellung und
+Passwortänderung des eigenen Kontos. `POST /profile/password` ruft
+`UserManager.ChangePasswordAsync` (danach `RefreshSignInAsync`);
+`POST /profile/theme` speichert die Theme-Einstellung über
+`UserManager.UpdateAsync` in der `AspNetUsers`-Spalte `Theme`.
 
-**Formularfelder:** `currentPassword`, `newPassword`, `confirmPassword`,
-Antiforgery-Hidden-Feld. Erfolg → Redirect `/profile?msg=…`.
+**Formularfelder (password):** `currentPassword`, `newPassword`,
+`confirmPassword`, Antiforgery-Hidden-Feld. Erfolg → Redirect
+`/profile?msg=password-changed`.
+
+**Formularfelder (theme):** `theme` (`auto`/`light`/`dark`, case-insensitiv,
+`Enum.IsDefined`-Prüfung auf `ThemePreference`), Antiforgery-Hidden-Feld.
+Erfolg → Redirect `/profile?msg=theme-saved`; ungültige oder fehlende Werte
+rendern die Profilseite direkt mit der Fehlermeldung „Unbekannte
+Anzeigeeinstellung." (kein Redirect).
 
 ### `GET /access-denied`
 

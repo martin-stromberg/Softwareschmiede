@@ -30,6 +30,9 @@ public static class AuthEndpoints
         app.MapPost("/profile/password", PostProfilePassword)
             .RequireAuthorization(StatusRoles.PageAccessPolicy)
             .RequireAntiforgery();
+        app.MapPost("/profile/theme", PostProfileTheme)
+            .RequireAuthorization(StatusRoles.PageAccessPolicy)
+            .RequireAntiforgery();
         app.MapGet("/access-denied", GetAccessDenied).AllowAnonymous();
 
         return app;
@@ -216,6 +219,39 @@ public static class AuthEndpoints
             .BuildUserContextAsync(httpContext, userManager, antiforgery)
             .ConfigureAwait(false);
         return Results.Content(AuthPagesComposer.RenderProfile(userContext, message, isError), PageShell.HtmlContentType);
+    }
+
+    private static async Task<IResult> PostProfileTheme(
+        HttpContext httpContext,
+        UserManager<ApplicationUser> userManager,
+        IAntiforgery antiforgery)
+    {
+        var user = await userManager.GetUserAsync(httpContext.User).ConfigureAwait(false);
+        if (user is null)
+            return Results.Redirect($"{PageShell.BasePath}/login");
+
+        var form = await httpContext.Request.ReadFormAsync(httpContext.RequestAborted).ConfigureAwait(false);
+        var message = "Unbekannte Anzeigeeinstellung.";
+        if (Enum.TryParse<ThemePreference>(form["theme"].ToString(), ignoreCase: true, out var theme)
+            && Enum.IsDefined(theme))
+        {
+            user.Theme = theme;
+            var result = await userManager.UpdateAsync(user).ConfigureAwait(false);
+            if (result.Succeeded)
+            {
+                // Post/Redirect/Get — F5 sendet die Anzeige-Einstellung nicht erneut.
+                return Results.Redirect($"{PageShell.BasePath}/profile?msg={StatusMessages.ThemeSaved}");
+            }
+
+            message = UserAdminService.DescribeErrors(result);
+        }
+
+        var userContext = await EndpointSecurityExtensions
+            .BuildUserContextAsync(httpContext, userManager, antiforgery)
+            .ConfigureAwait(false);
+        return Results.Content(
+            AuthPagesComposer.RenderProfile(userContext, message, isError: true),
+            PageShell.HtmlContentType);
     }
 
     private static async Task<IResult> GetAccessDenied(

@@ -147,6 +147,41 @@ gilt der Default 480 Minuten; zulässig 5–43200.
 **Umsetzung:** `ServerSettingsService`,
 `StatusServerCookieEvents.SigningIn`/`ValidatePrincipal`.
 
+## Theme-Einstellung pro Benutzer — anonyme Seiten folgen dem System
+
+**Beschreibung:** Das Farbschema der Web-UI ist eine benutzergebundene,
+persistierte Einstellung (`ApplicationUser.Theme`, `ThemePreference`
+`Auto`/`Light`/`Dark`) — es gibt bewusst keinen serverweiten Standard und
+keinen Umschalter für anonyme Besucher.
+
+**Bedingungen:**
+- Vorgabe ist `Auto` (Ordinal `0`) — für alle Bestandskonten und für Seiten
+  ohne `PageUserContext` (Login, Registrierung, „Formular abgelaufen",
+  anonymes `RenderAccessDenied`).
+- `BuildUserContextAsync` übernimmt `user?.Theme ?? ThemePreference.Auto`
+  in den `PageUserContext`; die Composer reichen ihn als `data-theme` am
+  `<html>`-Tag aus (`PageShell.ThemeName`).
+
+**Verhalten:**
+- `auto`: `PageShell.ThemeCss` löst das Schema clientseitig über
+  `@media (prefers-color-scheme: dark)` auf — der Selektor
+  `:root:not([data-theme="light"])` stellt sicher, dass eine explizite
+  `light`-Wahl auch bei dunkler Systemeinstellung gewinnt. Ist keine
+  Systempräferenz auslesbar, gilt die `:root`-Light-Palette (Fallback
+  Light).
+- `light`/`dark`: erzwingen das Schema systemunabhängig via
+  `data-theme="light"` bzw. `:root[data-theme="dark"]`-Override.
+- Die Einstellung gilt ab dem nächsten Seitenaufruf — server-gerendert ohne
+  JavaScript, kein Live-Umschalten; die Änderung invalidiert keine Session
+  (kein Security-Stamp-Eingriff).
+- Ungültige Formularwerte werden abgewiesen (`Enum.TryParse` +
+  `Enum.IsDefined`), die Profilseite rendert direkt mit Fehlermeldung —
+  ohne Persistenz.
+
+**Umsetzung:** `AuthEndpoints.PostProfileTheme`,
+`PageShell.ThemeCss`/`DarkThemeVars`, `PageShell.BeginPage`,
+`StatusPageComposer.Render`.
+
 ## Kein Recovery-Weg
 
 **Beschreibung:** Bewusste Scope-Entscheidung: kein Passwort-Reset, keine

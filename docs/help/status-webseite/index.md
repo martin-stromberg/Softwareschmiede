@@ -1,6 +1,6 @@
 # Status-Webseite
 
-Die Status-Webseite des separat betriebenen Status-Servers zeigt den Gesamtzustand aller angebundenen Softwareschmiede-Instanzen im Browser. Der Zugang ist durch eine Anmeldung mit Benutzerkonten in zwei Berechtigungsstufen geschützt; Benutzer der Stufe Administration verwalten Benutzerkonten, Relay-Tokens, die Sitzungsdauer und die automatische Server-Aktualisierung direkt auf der Seite.
+Die Status-Webseite des separat betriebenen Status-Servers zeigt den Gesamtzustand aller angebundenen Softwareschmiede-Instanzen im Browser. Der Zugang ist durch eine Anmeldung mit Benutzerkonten in zwei Berechtigungsstufen geschützt; Benutzer der Stufe Administration verwalten Benutzerkonten, Relay-Tokens, die Sitzungsdauer und die automatische Server-Aktualisierung direkt auf der Seite. Jeder Benutzer wählt im Profil ein helles, dunkles oder automatisches Farbschema für die Darstellung.
 
 ## Inhalt
 

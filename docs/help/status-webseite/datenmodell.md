@@ -6,13 +6,13 @@
 
 Alle Entitäten liegen in der SQLite-Datenbank `data/statusserver.db` unter dem
 `StatusServerDbContext` (`IdentityDbContext<ApplicationUser, IdentityRole, string>`,
-Migration `20261127095016_InitialCreate`). `DateTimeOffset`-Spalten werden als
-Unix-Millisekunden (`long`) persistiert, damit SQLite-Sortierungen stimmen
-(Konvention des `SoftwareschmiedeDbContext`).
+Migrationen `20261127095016_InitialCreate`, `20261128095408_UserTheme`).
+`DateTimeOffset`-Spalten werden als Unix-Millisekunden (`long`) persistiert,
+damit SQLite-Sortierungen stimmen (Konvention des `SoftwareschmiedeDbContext`).
 
 ### `ApplicationUser` (Tabelle `AspNetUsers`)
 
-`IdentityUser`-Ableger mit einem zusätzlichen Flag.
+`IdentityUser`-Ableger mit zusätzlichen Flags/Einstellungen.
 
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|
@@ -22,6 +22,7 @@ Unix-Millisekunden (`long`) persistiert, damit SQLite-Sortierungen stimmen
 | `LockoutEnd` | DateTimeOffset? (Unix-ms) | Sperr-Ende; > now = gesperrt |
 | `AccessFailedCount` | int | Fehlversuchszähler (Lockout ab 3) |
 | `IsDeactivated` | bool | Deaktiviert: kein Login, bestehende Sessions sterben sofort |
+| `Theme` | int (`ThemePreference`-Ordinal) | Anzeige-Einstellung der Web-UI: `0` = Automatisch (System), `1` = Light, `2` = Dark; Default `0` |
 
 ### `IdentityRole` (Tabellen `AspNetRoles`, `AspNetUserRoles`)
 
@@ -77,6 +78,7 @@ erDiagram
         long LockoutEnd_unix_ms
         int AccessFailedCount
         bool IsDeactivated
+        int Theme
     }
     AspNetRoles {
         string Id PK

@@ -25,7 +25,7 @@ public static class AdminPagesComposer
         bool isError = false)
     {
         var sb = new StringBuilder(8_000);
-        PageShell.BeginPage(sb, "Benutzerverwaltung – Softwareschmiede-Status");
+        PageShell.BeginPage(sb, "Benutzerverwaltung – Softwareschmiede-Status", user.Theme);
         PageShell.AppendHeader(sb, "Benutzerverwaltung");
         PageShell.AppendNav(sb, user);
         sb.Append("<section>");
@@ -71,7 +71,7 @@ public static class AdminPagesComposer
         string? createdToken = null)
     {
         var sb = new StringBuilder(8_000);
-        PageShell.BeginPage(sb, "Relay-Tokens – Softwareschmiede-Status");
+        PageShell.BeginPage(sb, "Relay-Tokens – Softwareschmiede-Status", user.Theme);
         PageShell.AppendHeader(sb, "Relay-Tokens");
         PageShell.AppendNav(sb, user);
         sb.Append("<section>");
@@ -144,7 +144,7 @@ public static class AdminPagesComposer
     public static string RenderUserDeleteConfirm(PageUserContext user, string targetUserId, string targetUserName)
     {
         var sb = new StringBuilder(2_000);
-        PageShell.BeginPage(sb, "Benutzer löschen – Softwareschmiede-Status");
+        PageShell.BeginPage(sb, "Benutzer löschen – Softwareschmiede-Status", user.Theme);
         PageShell.AppendHeader(sb, "Benutzer löschen");
         PageShell.AppendNav(sb, user);
         sb.Append("<section><h1>Benutzer „").Append(PageShell.E(targetUserName)).Append("“ löschen?</h1>");
@@ -169,7 +169,7 @@ public static class AdminPagesComposer
     public static string RenderTokenRevokeConfirm(PageUserContext user, RelayToken token)
     {
         var sb = new StringBuilder(2_000);
-        PageShell.BeginPage(sb, "Token widerrufen – Softwareschmiede-Status");
+        PageShell.BeginPage(sb, "Token widerrufen – Softwareschmiede-Status", user.Theme);
         PageShell.AppendHeader(sb, "Token widerrufen");
         PageShell.AppendNav(sb, user);
         sb.Append("<section><h1>Token „").Append(PageShell.E(token.Label)).Append("“ widerrufen?</h1>");
@@ -205,7 +205,7 @@ public static class AdminPagesComposer
         bool isError = false)
     {
         var sb = new StringBuilder(8_000);
-        PageShell.BeginPage(sb, "Einstellungen – Softwareschmiede-Status");
+        PageShell.BeginPage(sb, "Einstellungen – Softwareschmiede-Status", user.Theme);
         PageShell.AppendHeader(sb, "Einstellungen");
         PageShell.AppendNav(sb, user);
         sb.Append("<section>");
@@ -241,7 +241,7 @@ public static class AdminPagesComposer
     public static string RenderUpdateInstallStarted(PageUserContext user, string updateLogPath)
     {
         var sb = new StringBuilder(2_000);
-        PageShell.BeginPage(sb, "Update wird installiert – Softwareschmiede-Status");
+        PageShell.BeginPage(sb, "Update wird installiert – Softwareschmiede-Status", user.Theme);
         PageShell.AppendHeader(sb, "Update wird installiert");
         PageShell.AppendNav(sb, user);
         sb.Append("<section><h1>Der Server startet neu</h1>");

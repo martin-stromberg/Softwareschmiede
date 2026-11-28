@@ -4,6 +4,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Softwareschmiede.StatusContracts;
+using Softwareschmiede.StatusServer.Data;
 using Softwareschmiede.StatusServer.Security;
 using Softwareschmiede.StatusServer.Tests.TestSupport;
 
@@ -136,6 +137,48 @@ public sealed class StatusServerUserFlowTests
                 (await seeder.IsRelayTokenValidAsync(validToken)).Should().BeTrue();
                 (await seeder.IsRelayTokenValidAsync(revokedToken)).Should().BeFalse();
                 (await seeder.GetSessionDurationAsync()).Should().Be(60);
+            }
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    /// <summary>Die Theme-Einstellung ist pro Benutzer persistiert: ein auf Dark
+    /// gestelltes Theme überlebt einen Server-Neustart auf derselben Datenbank
+    /// (E2E-Nachweis der AspNetUsers.Theme-Spalte über den Factory-Neustart).</summary>
+    [Fact]
+    public async Task Theme_SurvivesServerRestart()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"statusserver-e2e-{Guid.NewGuid():N}");
+        var dbPath = Path.Combine(dir, "statusserver.db");
+        try
+        {
+            await using (var factory = new StatusWebApplicationFactory { DatabasePathOverride = dbPath })
+            {
+                var seeder = new StatusServerDbSeeder(factory);
+                var ct = TestContext.Current.CancellationToken;
+                await seeder.CreateUserAsync("admin", "Geheim-123", StatusRoles.Administration);
+
+                using var client = AuthTestClient.Create(factory);
+                (await client.LoginAsync("admin", "Geheim-123", ct)).StatusCode.Should().Be(HttpStatusCode.Redirect);
+                await client.RefreshAntiforgeryAsync("/profile", ct);
+                (await client.PostFormAsync("/profile/theme",
+                    [new KeyValuePair<string, string>("theme", "dark")], cancellationToken: ct))
+                    .StatusCode.Should().Be(HttpStatusCode.Redirect);
+                (await seeder.GetUserThemeAsync("admin")).Should().Be(ThemePreference.Dark);
+            }
+
+            await using (var factory = new StatusWebApplicationFactory { DatabasePathOverride = dbPath })
+            {
+                var seeder = new StatusServerDbSeeder(factory);
+                var ct = TestContext.Current.CancellationToken;
+                using var client = AuthTestClient.Create(factory);
+                (await client.LoginAsync("admin", "Geheim-123", ct)).StatusCode.Should().Be(HttpStatusCode.Redirect);
+                (await seeder.GetUserThemeAsync("admin")).Should().Be(ThemePreference.Dark);
+                (await client.Http.GetStringAsync("/", ct)).Should().Contain("data-theme=\"dark\"");
             }
         }
         finally

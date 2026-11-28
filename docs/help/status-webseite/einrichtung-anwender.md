@@ -56,3 +56,6 @@ beschreibt [Installation & Konfiguration](installation.md) sowie
 - Eine verkürzte Sitzungsdauer wirkt erst bei der nächsten Verlängerung
   bestehender Anmeldungen — für sofortige Wirkung müssen sich die Benutzer
   ab- und neu anmelden.
+- Das Farbschema (hell/dunkel) ist keine Verwaltungseinstellung: Jeder
+  Benutzer wählt es selbst auf der Seite **Profil** unter **Anzeige →
+  Farbschema**; voreingestellt ist „Automatisch (System)".

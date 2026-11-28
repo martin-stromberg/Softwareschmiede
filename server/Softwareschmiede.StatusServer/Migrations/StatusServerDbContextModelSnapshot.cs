@@ -14,7 +14,7 @@ partial class StatusServerDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261127095016_InitialCreate";
+    public override string LastMigrationId => "20261128095408_UserTheme";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -196,6 +196,9 @@ partial class StatusServerDbContextModelSnapshot : ModelSnapshot
 
                 b.Property<string>("SecurityStamp")
                     .HasColumnType("TEXT");
+
+                b.Property<int>("Theme")
+                    .HasColumnType("INTEGER");
 
                 b.Property<bool>("TwoFactorEnabled")
                     .HasColumnType("INTEGER");
