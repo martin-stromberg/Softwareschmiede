@@ -1,0 +1,352 @@
+/* ==========================================================================
+   site.css — Komponenten-/Layout-CSS der Status-Webseite (Design-Entwurf #500)
+
+   Modernes Verwaltungs-/Dashboard-Layout: dunkle Topbar mit Wortmarke,
+   schwebende Navigations-Karte, großzügige Weißräume, Karten mit Radius
+   und dezentem Schatten, Pills mit Punkt-Indikator, ruhige Tabellen-Header
+   mit Zeilen-Hover, klare Fokus-Führung in Formularen.
+
+   Alle Farben kommen ausschließlich aus den Tokens in theme.css —
+   hier stehen keine Farb-Literale.
+   ========================================================================== */
+
+* { box-sizing: border-box; margin: 0; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.page { max-width: 1120px; margin: 0 auto; padding: 28px 20px 64px; }
+
+/* ---------- Topbar / Branding ---------- */
+
+header.top {
+  display: flex; align-items: center; gap: 10px 24px; flex-wrap: wrap;
+  background: var(--header-bg); color: var(--header-fg);
+  border-radius: var(--radius); padding: 18px 24px;
+  box-shadow: var(--shadow);
+}
+
+.brand-block { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+.brand {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 15px; font-weight: 700; letter-spacing: .02em;
+  color: var(--header-fg);
+}
+
+/* Grafischer Akzent rein per CSS: gedrehter, gerundeter Teal-Kachel. */
+.brand-mark {
+  width: 13px; height: 13px; flex: none;
+  background: var(--header-brand);
+  border-radius: 4px;
+  transform: rotate(45deg);
+}
+
+.brand-tag {
+  font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--header-brand);
+  border: 1px solid;              /* Rahmenfarbe = currentColor */
+  border-radius: 5px; padding: 1px 7px;
+}
+
+.brand-block h1 { font-size: 20px; font-weight: 600; color: var(--header-fg); }
+
+/* Rechte Seite der Topbar: Gesamt-Badge + Instanz-Tags */
+.top-aside {
+  margin-left: auto;
+  display: flex; flex-wrap: wrap; justify-content: flex-end;
+  align-items: center; gap: 8px;
+}
+
+.badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 13px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600;
+}
+.badge .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.badge.online { background: var(--badge-online-bg); color: var(--badge-online-fg); }
+.badge.online .dot { background: var(--badge-online-dot); }
+.badge.offline { background: var(--badge-offline-bg); color: var(--badge-offline-fg); }
+.badge.offline .dot { background: var(--badge-offline-dot); }
+.badge.stale { background: var(--badge-stale-bg); color: var(--badge-stale-fg); }
+.badge.stale .dot { background: var(--badge-stale-dot); }
+
+/* ---------- Navigation ---------- */
+
+nav.topnav {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 8px;
+  margin-top: 14px; box-shadow: var(--shadow-sm);
+}
+nav.topnav a.nav-link {
+  color: var(--label); font-weight: 600; font-size: 13px;
+  padding: 6px 12px; border-radius: var(--radius-sm);
+}
+nav.topnav a.nav-link:hover { background: var(--hover); color: var(--fg); text-decoration: none; }
+nav.topnav a.nav-link[aria-current="page"] { background: var(--accent-soft); color: var(--accent-soft-fg); }
+nav.topnav .nav-user { margin-left: auto; color: var(--muted); font-size: 12.5px; padding: 4px 8px; }
+nav.topnav form.nav-logout { display: inline; }
+nav.topnav form.nav-logout button {
+  background: none; border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm); color: var(--label);
+  font-size: 12.5px; font-weight: 600; padding: 5px 12px; cursor: pointer;
+}
+nav.topnav form.nav-logout button:hover { background: var(--hover); }
+
+/* ---------- Meta-Zeile ---------- */
+
+.meta-line { margin: 12px 4px 20px; font-size: 12.5px; color: var(--muted); }
+
+/* ---------- Karten / Sektionen ---------- */
+
+section {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 22px;
+  margin-bottom: 16px; margin-top: 16px;
+  box-shadow: var(--shadow);
+}
+section h1, section h2 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+section h2 { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+section h3 { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+/* Luft zwischen einem Formularblock und der nächsten Unterüberschrift. */
+section form + h2, section form + h3, section table + h3 { margin-top: 18px; }
+
+/* Zähler-Chip in Überschriften („… (n)" → Badge) */
+.count {
+  font-size: 11.5px; font-weight: 600;
+  color: var(--muted); background: var(--pause-bg);
+  border-radius: 999px; padding: 2px 9px;
+}
+
+/* Quellen-Badge (App / GitHub) */
+.src {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--src-fg); border-radius: 5px; padding: 3px 8px;
+}
+.src.app { background: var(--src-app); }
+.src.gh { background: var(--src-gh); }
+
+.gap-top { margin-top: 16px; }
+
+/* ---------- Tabellen ---------- */
+
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+
+th {
+  text-align: left; font-size: 11px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+  padding: 9px 10px; background: var(--th-bg);
+  border-bottom: 1px solid var(--border);
+}
+th:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+th:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+
+/* break-word: Wörter bleiben ganz, solange die Spalte Platz bietet — bricht aber
+   mitten im Wort, bevor etwas überläuft (Mobil sind die Zellen ohnehin blockiert). */
+td {
+  text-align: left; vertical-align: top;
+  padding: 10px; border-top: 1px solid var(--border-row);
+  overflow-wrap: break-word;
+}
+tr:first-child td { border-top: 0; }
+tr:hover td { background: var(--hover); }
+
+td.num {
+  width: 70px;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  color: var(--accent);
+}
+td.num, td.right { white-space: nowrap; }
+td.right, th.right { text-align: right; }
+td.muted { color: var(--muted); font-size: 12.5px; }
+/* Links brechen nur an Wortgrenzen. */
+td a { overflow-wrap: normal; }
+
+/* ---------- Status-Pills (mit Punkt-Indikator) ---------- */
+
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 600;
+  padding: 2px 10px; border-radius: 999px;
+  overflow-wrap: normal; white-space: normal;
+}
+.pill::before {
+  content: ""; flex: none;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+}
+.pill.run { background: var(--pill-run-bg); color: var(--pill-run-fg); }
+.pill.wait { background: var(--warn-bg); color: var(--warn-fg); }
+.pill.done { background: var(--ok-bg); color: var(--ok-fg); }
+.pill.err { background: var(--err-bg); color: var(--err-fg); }
+.pill.pause { background: var(--pause-bg); color: var(--pause-fg); }
+
+/* ---------- Instanz-Tags ---------- */
+
+.inst { font-size: 12px; color: var(--muted); font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+.inst.on-dark {
+  color: var(--inst-header);
+  border: 1px solid var(--header-line);
+  border-radius: 999px; padding: 3px 11px;
+}
+
+/* ---------- Hinweis- und Leer-Zustände ---------- */
+
+/* Farbkante links via inset-Schatten in Textfarbe — keine Extra-Tokens nötig. */
+.stale-note {
+  display: flex; align-items: center; gap: 9px;
+  background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-fg);
+  font-size: 12.5px; border-radius: var(--radius-sm);
+  padding: 9px 14px 9px 12px; margin-bottom: 14px;
+  box-shadow: inset 3px 0 0 var(--warn-strong);
+}
+
+.msg {
+  background: var(--ok-bg); border: 1px solid var(--ok-border); color: var(--ok-fg);
+  font-size: 13px; border-radius: var(--radius-sm);
+  padding: 9px 14px 9px 12px; margin-bottom: 14px;
+  box-shadow: inset 3px 0 0 currentColor;
+}
+.msg.err { background: var(--err-bg); border-color: var(--err-border); color: var(--err-fg); }
+
+.token-once {
+  background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-fg);
+  border-radius: var(--radius-sm); padding: 14px 18px; margin-bottom: 16px;
+  font-size: 13px;
+  box-shadow: inset 3px 0 0 var(--warn-strong);
+}
+.token-once code {
+  display: block; background: var(--surface);
+  border: 1px dashed var(--warn-strong); border-radius: var(--radius-sm);
+  padding: 10px 12px; margin-top: 10px;
+  font-family: Consolas, "Cascadia Mono", monospace; font-size: 14px;
+  color: var(--fg); overflow-wrap: anywhere;
+}
+
+.empty { color: var(--muted); font-size: 13px; padding: 14px 4px; }
+
+/* Abgedimmte Sektionen bei veralteter Instanz */
+.dim h2, .dim h3, .dim td { color: var(--muted); }
+
+/* ---------- Links ---------- */
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+a.action-link {
+  display: inline-block; font-size: 12px; font-weight: 600;
+  padding: 5px 11px; margin: 2px 6px 2px 0;
+  background: var(--surface); color: var(--label);
+  border: 1px solid var(--border-input); border-radius: var(--radius-sm);
+}
+a.action-link:hover { background: var(--hover); text-decoration: none; }
+a.action-link.danger { color: var(--danger); border-color: var(--danger-border); }
+a.action-link.danger:hover { background: var(--err-bg); }
+
+/* ---------- Formulare ---------- */
+
+form label {
+  display: block; font-size: 13px; font-weight: 600;
+  color: var(--label); margin-bottom: 12px;
+}
+form input[type="text"], form input[type="password"],
+form input[type="number"], form input[type="time"], form select {
+  display: block; width: 100%; max-width: 400px; margin-top: 5px;
+  padding: 8px 12px; font-size: 14px;
+  border: 1px solid var(--border-input); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--fg);
+}
+form input:focus, form select:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+form input[type="checkbox"] { accent-color: var(--accent); }
+
+/* Primär-Button */
+form button {
+  background: var(--accent); border: 0; border-radius: var(--radius-sm);
+  color: var(--button-fg); font-size: 13.5px; font-weight: 600;
+  padding: 9px 18px; cursor: pointer;
+}
+form button:hover { background: var(--accent-hover); }
+form button[disabled] { background: var(--muted-faint); cursor: not-allowed; }
+
+/* Inline-Aktionsformulare in Tabellen / Aktionszeilen: Ghost-Buttons */
+form.inline { display: inline; }
+form.inline button {
+  font-size: 12px; padding: 5px 11px; margin: 2px 6px 2px 0;
+  background: none; border: 1px solid var(--border-input);
+  color: var(--label);
+}
+form.inline button:hover { background: var(--hover); }
+form.inline button[disabled] {
+  background: none; color: var(--muted-faint);
+  border-color: var(--border); cursor: not-allowed;
+}
+form.inline label {
+  display: inline-block; font-weight: 500; font-size: 12.5px;
+  margin: 2px 8px 2px 0;
+}
+
+/* Danger-Button */
+form button.danger { background: var(--danger-strong); color: var(--danger-strong-fg); }
+form button.danger:hover { background: var(--danger-strong-hover); }
+
+/* Nicht auslösbare Aktion (z. B. „Sperrung zurücksetzen" bei ungesperrtem
+   Konto): erscheint als Platzhalter-Strich, nicht als ausgegrauter Button. */
+.action-na {
+  display: inline-block; font-size: 12px;
+  padding: 5px 11px; margin: 2px 6px 2px 0;
+  color: var(--muted-faint);
+}
+
+/* Sichtbare Begründung für gesperrte Aktionen in der Aktions-Zelle —
+   der title-Tooltip allein ist auf Touch/Tastatur unsichtbar. */
+.action-note {
+  display: block; font-size: 11.5px; color: var(--muted);
+  margin: 6px 0 0;
+}
+
+/* ---------- Sonstiges ---------- */
+
+code {
+  font-family: Consolas, "Cascadia Mono", monospace; font-size: .92em;
+  background: var(--pause-bg); padding: 1px 5px; border-radius: 4px;
+}
+.muted { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+strong { font-weight: 600; }
+
+footer { margin-top: 30px; font-size: 11.5px; color: var(--muted-faint); text-align: center; }
+
+/* ---------- Mobil (≤ 640 px): Zeilen werden zu Karten ---------- */
+
+@media (max-width: 640px) {
+  .page { padding: 14px 10px 44px; }
+  header.top { padding: 14px 16px; }
+  .brand-block h1 { font-size: 18px; }
+  .top-aside { margin-left: 0; justify-content: flex-start; }
+  section { padding: 14px; }
+
+  /* Tabelle → gestapelte Karten; Spalten-Beschriftung aus data-label. */
+  table, tr, td { display: block; }
+  th { display: none; }
+  tr { border-top: 1px solid var(--border-row); padding: 8px 0; }
+  tr:first-child { border-top: 0; }
+  td { border-top: 0; padding: 4px 2px; }
+  td[data-label]::before {
+    content: attr(data-label);
+    display: block; font-size: 10.5px; font-weight: 700;
+    letter-spacing: .05em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 2px;
+  }
+  td.num { width: auto; }
+  td.num, td.right { white-space: normal; }
+  td.right { text-align: left; }
+  tr:hover td { background: none; }
+}

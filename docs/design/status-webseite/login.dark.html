@@ -1,0 +1,32 @@
+<!doctype html><html lang="de" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Anmeldung – Softwareschmiede-Status</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="page">
+
+<header class="top">
+  <div class="brand-block">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>softwareschmiede<span class="brand-tag">status</span></span>
+    <h1>Anmeldung</h1>
+  </div>
+</header>
+
+<section>
+  <div class="msg err">Das Konto ist gesperrt. Die Sperrung endet automatisch nach einer Stunde oder kann durch die Administration aufgehoben werden.</div>
+  <form method="post" action="/login">
+    <input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA">
+    <label>Benutzername<input type="text" name="username" required autocomplete="username"></label>
+    <label>Passwort<input type="password" name="password" required autocomplete="current-password"></label>
+    <button type="submit">Anmelden</button>
+  </form>
+</section>
+
+<footer>softwareschmiede-status · server-gerendert</footer>
+</div>
+</body>
+</html>

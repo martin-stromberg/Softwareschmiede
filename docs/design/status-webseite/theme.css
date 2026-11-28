@@ -1,0 +1,156 @@
+/* ==========================================================================
+   theme.css — Neue Farbwelt für die Status-Webseite (Design-Entwurf, Issue #500)
+
+   Token-Namen entsprechen PageShell.ThemeCss (server/Softwareschmiede.StatusServer/
+   Pages/PageShell.cs) und sind 1:1 auf ThemeCss/DarkThemeVars mappbar.
+
+   Schema: kühles Navy-Slate-System mit Teal-Akzent — bewusst KEIN Indigo/Emerald.
+   Light = :root-Default (color-scheme: light),
+   Dark  = :root[data-theme="dark"] (color-scheme: dark).
+
+   Für die Produktiv-Umsetzung gilt zusätzlich die Mechanik aus ThemeCss:
+   der Dark-Block steht auch unter @media (prefers-color-scheme: dark)
+   → :root:not([data-theme="light"]) für data-theme="auto". In den Mockups
+   steuert das data-theme-Attribut explizit (light/dark).
+
+   Ergänzende Tokens (nicht in PageShell.ThemeCss, in der Umsetzung hinzuzufügen):
+     --radius / --radius-sm   Eckenradien für Karten und Controls
+     --shadow / --shadow-sm   Karten-/Element-Schatten
+     --header-brand           Akzentfarbe der Wortmarke auf der dunklen Topbar
+     --header-line            dezente Linie/Chip-Rahmen auf der dunklen Topbar
+     --accent-soft/-fg        getönte Accent-Fläche (aktiver Nav-Link, Hover-Tints)
+     --ring                   Fokus-Ring (transluzentes Accent)
+     --th-bg                  Tabellenkopf-Hintergrund
+     --danger-strong-fg       Textfarbe auf --danger-strong-Buttons (Dark:
+                              --button-fg ist dunkel, daher separater Token)
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* Flächen und Text */
+  --bg: #ecf0f5;
+  --fg: #1b2534;
+  --surface: #ffffff;
+  --border: #dbe3ec;
+  --border-input: #c2cedd;
+  --border-row: #e7edf3;
+  --label: #39465e;
+  --muted: #5c6a7f;
+  --muted-faint: #93a1b4;
+
+  /* Topbar (in beiden Schemata dunkel) */
+  --header-bg: #10273f;
+  --header-fg: #eef4fa;
+  --inst-header: #a9bfd4;
+  --header-brand: #2dd4bf;
+  --header-line: #ffffff2e;
+
+  /* Akzent / Aktionen */
+  --accent: #0e7490;
+  --accent-hover: #155e75;
+  --button-fg: #ffffff;
+  --accent-soft: #def2f6;
+  --accent-soft-fg: #0b5a6e;
+  --ring: #0e749033;
+
+  /* Danger */
+  --danger: #a52635;
+  --danger-strong: #c03748;
+  --danger-strong-hover: #a02f3e;
+  --danger-strong-fg: #ffffff;
+  --danger-border: #f0a5ae;
+
+  /* Statusfarben */
+  --ok-bg: #dbf5e7;
+  --ok-fg: #0f6a44;
+  --ok-border: #4fd6a355;
+  --err-bg: #fdebeb;
+  --err-fg: #a12633;
+  --err-border: #f2a6ad55;
+  --warn-bg: #fdf3d9;
+  --warn-fg: #8a5a08;
+  --warn-border: #e8b90f44;
+  --warn-strong: #d9a00a;
+  --pause-bg: #e3e9f0;
+  --pause-fg: #46546b;
+
+  /* Interaktion */
+  --hover: #eef3f8;
+  --th-bg: #f4f7fb;
+
+  /* Header-Badges (bewusst in beiden Schemata gleich — sitzen auf der
+     dunklen Topbar) */
+  --badge-online-bg: #0c6e51;
+  --badge-online-fg: #d8f7ea;
+  --badge-online-dot: #3ddc97;
+  --badge-offline-bg: #8e2430;
+  --badge-offline-fg: #fddfe2;
+  --badge-offline-dot: #f2717f;
+  --badge-stale-bg: #8a6207;
+  --badge-stale-fg: #fdf0cf;
+  --badge-stale-dot: #f3c244;
+
+  /* Quellen-Badges und „läuft"-Pill */
+  --src-fg: #ffffff;
+  --src-app: #0e7490;
+  --src-gh: #6941c6;
+  --pill-run-bg: #d7f2f1;
+  --pill-run-fg: #0d6470;
+
+  /* Ergänzende Form-/Schatten-Tokens */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px #10273f0f, 0 4px 14px #10273f0f;
+  --shadow-sm: 0 1px 2px #10273f14;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0d1622;
+  --fg: #e7edf5;
+  --surface: #16222f;
+  --border: #293a4d;
+  --border-input: #3a4d64;
+  --border-row: #233347;
+  --label: #c2cedd;
+  --muted: #93a5ba;
+  --muted-faint: #5e7085;
+
+  --header-bg: #0a1420;
+  --header-fg: #eef4fa;
+  --inst-header: #8fa7bd;
+  --header-brand: #2dd4bf;
+  --header-line: #ffffff24;
+
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --button-fg: #052824;
+  --accent-soft: #123c40;
+  --accent-soft-fg: #7ee9de;
+  --ring: #2dd4bf40;
+
+  --danger: #f07d8a;
+  --danger-strong-fg: #ffffff;
+
+  --ok-bg: #0f4a3b;
+  --ok-fg: #8beac8;
+  --err-bg: #582630;
+  --err-fg: #ffb9c0;
+  --warn-bg: #4b3b10;
+  --warn-fg: #f5d98b;
+  --pause-bg: #2b3a4d;
+  --pause-fg: #c0cddd;
+
+  --hover: #213040;
+  --th-bg: #131e2b;
+
+  --src-app: #1591ad;
+  --src-gh: #7c5cd6;
+  --pill-run-bg: #134a51;
+  --pill-run-fg: #7ee9de;
+
+  --shadow: 0 1px 2px #00000059, 0 6px 18px #00000059;
+  --shadow-sm: 0 1px 2px #00000066;
+}

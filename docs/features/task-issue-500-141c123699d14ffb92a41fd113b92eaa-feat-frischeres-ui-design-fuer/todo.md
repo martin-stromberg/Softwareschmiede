@@ -10,15 +10,15 @@ Branch: `task/issue-500-141c123699d14ffb92a41fd113b92eaa-feat-frischeres-ui-desi
 | [x] | 3 | Anforderung übersetzen (Unteragent) | `requirement.md` |
 | [x] | 4 | Bestandsaufnahme (Unteragent) | `inventory.md`, `inventory/` |
 | [x] | 5 | Umsetzungsplanung (Unteragent) | `plan.md` |
-| [ ] | 5a | Offene Punkte prüfen und ggf. Planung wiederholen | `plan.md` (aktualisiert) |
-| [ ] | 5b | Plan gegen Anforderung und Testbedarf prüfen (Unteragent) | `plan-check.md` |
-| [ ] | 5c | Planungscommit | – |
-| [ ] | 6 | Implementierung (Unteragent) | Design-Mockups + Screenshots |
-| [ ] | 7 | Plan-Review (Unteragent, bedingt) | `review.md` |
-| [ ] | 8 | Usability-Review (Unteragent, bei UI-Änderungen) | `review-usability.md` |
-| [ ] | 9 | Code-Review (Unteragent) | `review-code.md` |
-| [ ] | 10 | Sichtprüfung der Design-Screenshots | `test-results.md` |
-| [ ] | – | Iteration oder Abschluss entscheiden | – |
+| [x] | 5a | Offene Punkte prüfen und ggf. Planung wiederholen | `plan.md` (aktualisiert) |
+| [x] | 5b | Plan gegen Anforderung und Testbedarf prüfen (Unteragent) | `plan-check.md` |
+| [x] | 5c | Planungscommit | – |
+| [x] | 6 | Implementierung (Unteragent) | Design-Mockups + Screenshots |
+| [x] | 7 | Plan-Review (Unteragent, bedingt) | `review.md` |
+| [x] | 8 | Usability-Review (Unteragent, bei UI-Änderungen) | `review-usability.md` |
+| [x] | 9 | Code-Review (Unteragent) | `review-code.md` |
+| [x] | 10 | Sichtprüfung der Design-Screenshots | `test-results.md` |
+| [x] | – | Iteration oder Abschluss entscheiden | – |
 | [ ] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
 | [ ] | 12 | Dokumentation erstellen (Unteragent) | `docs/help/` |
 | [ ] | 12b | README aktualisieren (Unteragent) | `README.md` |

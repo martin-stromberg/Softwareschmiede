@@ -1,0 +1,45 @@
+<!doctype html><html lang="de" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Relay-Tokens – Softwareschmiede-Status</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="page">
+
+<header class="top">
+  <div class="brand-block">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>softwareschmiede<span class="brand-tag">status</span></span>
+    <h1>Relay-Tokens</h1>
+  </div>
+</header>
+
+<nav class="topnav">
+  <a class="nav-link" href="/">Status</a>
+  <a class="nav-link" href="/profile">Profil</a>
+  <a class="nav-link" href="/admin/users">Benutzer</a>
+  <a class="nav-link" href="/admin/tokens" aria-current="page">Tokens</a>
+  <a class="nav-link" href="/admin/settings">Einstellungen</a>
+  <span class="nav-user">martin · Administration</span>
+  <form class="nav-logout" method="post" action="/logout"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><button type="submit">Abmelden</button></form>
+</nav>
+
+<section>
+  <div class="empty">Noch keine Relay-Tokens vorhanden — der <code>/relay</code>-Endpunkt lehnt aktuell alle Verbindungen ab.</div>
+</section>
+
+<section>
+  <h2>Token anlegen</h2>
+  <form method="post" action="/admin/tokens">
+    <input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA">
+    <label>Bezeichnung<input type="text" name="label" required maxlength="200"></label>
+    <button type="submit">Token anlegen</button>
+  </form>
+</section>
+
+<footer>softwareschmiede-status · server-gerendert</footer>
+</div>
+</body>
+</html>

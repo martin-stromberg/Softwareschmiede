@@ -1,0 +1,57 @@
+<!doctype html><html lang="de" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="15">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Softwareschmiede-Status</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="page">
+
+<header class="top">
+  <div class="brand-block">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>softwareschmiede<span class="brand-tag">status</span></span>
+    <h1>Status-Übersicht</h1>
+  </div>
+  <div class="top-aside">
+    <span class="badge offline"><span class="dot"></span>keine Instanz</span>
+  </div>
+</header>
+
+<nav class="topnav">
+  <a class="nav-link" href="/" aria-current="page">Status</a>
+  <a class="nav-link" href="/profile">Profil</a>
+  <a class="nav-link" href="/admin/users">Benutzer</a>
+  <a class="nav-link" href="/admin/tokens">Tokens</a>
+  <a class="nav-link" href="/admin/settings">Einstellungen</a>
+  <span class="nav-user">martin · Administration</span>
+  <form class="nav-logout" method="post" action="/logout"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><button type="submit">Abmelden</button></form>
+</nav>
+
+<div class="meta-line">Stand 14:32:07 UTC · Aktualisierung alle 15 s · <a href="/status.json">/status.json</a></div>
+
+<div class="stale-note">Es hat sich noch keine App-Instanz am Relay registriert. Sobald in den App-Einstellungen die Remote-Übersicht aktiviert ist (Einstellungen → Automatisierung → Remote-Übersicht), erscheinen hier die App-Sektionen.</div>
+
+<section>
+  <h2>App-Instanzen</h2>
+  <div class="empty">Keine App-Instanz hat bisher Daten geliefert.</div>
+</section>
+
+<section>
+  <h2><a href="https://github.com/martin/softwareschmiede">softwareschmiede ↗</a> <span class="src gh">GitHub · 14:32:00 UTC</span> <span class="count">12 offene Issues</span></h2>
+  <h3>Offene Pull Requests <span class="count">1</span></h3>
+  <table>
+    <tr><td class="num"><a href="https://github.com/martin/softwareschmiede/pull/491">#491 ↗</a></td><td><a href="https://github.com/martin/softwareschmiede/pull/491">Status-Server: Token-Endpunkte ↗</a></td></tr>
+  </table>
+  <h3 class="gap-top">Letzte Releases <span class="count">1</span></h3>
+  <table>
+    <tr><td class="num"><a href="https://github.com/martin/softwareschmiede/releases/tag/v1.4.0">v1.4.0 ↗</a></td><td>Status-Server mit Relay-Hub</td><td class="muted">02.03.2025</td></tr>
+  </table>
+</section>
+
+<footer>softwareschmiede-status · server-gerendert · read-only</footer>
+</div>
+</body>
+</html>

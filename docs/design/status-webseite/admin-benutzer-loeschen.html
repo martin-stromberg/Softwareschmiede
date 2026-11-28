@@ -1,0 +1,42 @@
+<!doctype html><html lang="de" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Benutzer löschen – Softwareschmiede-Status</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="page">
+
+<header class="top">
+  <div class="brand-block">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>softwareschmiede<span class="brand-tag">status</span></span>
+    <h1>Benutzer löschen</h1>
+  </div>
+</header>
+
+<nav class="topnav">
+  <a class="nav-link" href="/">Status</a>
+  <a class="nav-link" href="/profile">Profil</a>
+  <a class="nav-link" href="/admin/users" aria-current="page">Benutzer</a>
+  <a class="nav-link" href="/admin/tokens">Tokens</a>
+  <a class="nav-link" href="/admin/settings">Einstellungen</a>
+  <span class="nav-user">martin · Administration</span>
+  <form class="nav-logout" method="post" action="/logout"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><button type="submit">Abmelden</button></form>
+</nav>
+
+<section>
+  <h1>Benutzer „stefan.b“ löschen?</h1>
+  <p class="muted">Das Konto wird <strong>unwiderruflich</strong> gelöscht — die betroffene Person kann sich danach nicht mehr anmelden. Diese Aktion kann nicht rückgängig gemacht werden.</p>
+  <form method="post" action="/admin/users/7c2f9e4a-1b5d-4a8c-9e3f-2d6b8a0c4e5f/delete">
+    <input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA">
+    <button type="submit" class="danger">Endgültig löschen</button>
+    <a href="/admin/users">Abbrechen</a>
+  </form>
+</section>
+
+<footer>softwareschmiede-status · server-gerendert</footer>
+</div>
+</body>
+</html>
