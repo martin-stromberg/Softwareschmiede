@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1060" role="img" aria-label="Ablaufdiagramm der drei PR-Phasen: Feature-Branch zu staging mit static checks, build and test (beide nicht required) und ci-gate (required, fasst beide zusammen, laeuft dank if: always() immer); staging zu main als Draft-PR mit verify-source als required Check; main zurueck zu staging als automatischer Backmerge, in dem static checks/build and test/os-interface tests uebersprungen werden, ci-gate aber trivial erfolgreich durchlaeuft; eine Merge-Schleife fuehrt von main letztlich zurueck zu staging.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1060" role="img" aria-label="Ablaufdiagramm der drei PR-Phasen: Feature-Branch zu staging mit static checks, build and test (beide nicht required) und ci-gate (required, fasst beide zusammen, laeuft dank if: always() immer); staging zu main als Draft-PR mit verify-source und release gate als required Checks, wobei release gate aus dem vorausgegangenen Push auf staging stammt (gleicher Commit-SHA); main zurueck zu staging als automatischer Backmerge, in dem static checks/build and test/os-interface tests uebersprungen werden, ci-gate aber trivial erfolgreich durchlaeuft; eine Merge-Schleife fuehrt von main letztlich zurueck zu staging.">
   <style>
     text { font-family: Inter, "Segoe UI", Arial, sans-serif; fill: #1b2430; }
     .t-phase { font-weight: 700; font-size: 20px; }
@@ -94,16 +94,25 @@
   <text class="t-trigger" x="824" y="163">Trigger: push staging → Auto-Draft-PR</text>
   <line class="panel-divider" x1="800" y1="174" x2="1140" y2="174" />
 
-  <rect class="job-box required" x="820" y="270" width="300" height="120" rx="8" />
+  <rect class="job-box required" x="820" y="270" width="300" height="100" rx="8" />
   <circle class="badge-circle" cx="1106" cy="284" r="15" />
   <text class="t-badge" x="1106" y="289" text-anchor="middle">!</text>
   <text class="t-job" x="836" y="296">verify-source</text>
   <text class="t-detail" x="836" y="317">Kopf-Branch muss "staging" sein</text>
   <text class="t-detail" x="836" y="334">sonst: Abbruch der PR-Checks</text>
-  <text class="t-detail" x="836" y="358" fill="#c9460c" font-weight="600">required</text>
+  <text class="t-detail" x="836" y="352" fill="#c9460c" font-weight="600">required</text>
 
-  <text class="t-detail-skip" x="836" y="430">Tests liefen bereits auf staging</text>
-  <text class="t-detail-skip" x="836" y="447">(staging-ci.yml, Pre-Release)</text>
+  <rect class="job-box required" x="820" y="410" width="300" height="130" rx="8" />
+  <circle class="badge-circle" cx="1106" cy="424" r="15" />
+  <text class="t-badge" x="1106" y="429" text-anchor="middle">!</text>
+  <text class="t-job" x="836" y="436">release gate</text>
+  <text class="t-detail" x="836" y="457">needs: version, prerelease</text>
+  <text class="t-detail" x="836" y="474">läuft in staging-ci.yml (push)</text>
+  <text class="t-detail-skip" x="836" y="491">gleicher SHA wie Promotion-PR</text>
+  <text class="t-detail" x="836" y="512" fill="#c9460c" font-weight="600">required</text>
+
+  <text class="t-detail-skip" x="836" y="570">Backmerge / keine Versions­erhöhung</text>
+  <text class="t-detail-skip" x="836" y="587">→ passt trivial (nichts zu releasen)</text>
 
   <!-- arrow: box2 -> main pill -->
   <line class="flow-line" x1="1140" y1="520" x2="1192" y2="520" marker-end="url(#arrow)" />
