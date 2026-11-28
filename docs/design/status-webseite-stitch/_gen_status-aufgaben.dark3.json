@@ -1,0 +1,377 @@
+{
+ "id": 1,
+ "jsonrpc": "2.0",
+ "result": {
+  "_meta": {
+   "ui": {
+    "resourceUri": "ui://stitch.googleapis.com/project-viewer",
+    "visibility": [
+     "model"
+    ]
+   }
+  },
+  "content": [
+   {
+    "text": "{\"projectId\":\"7540435568831394111\",\"sessionId\":\"14438829741588523379\",\"outputComponents\":[{\"design\":{\"screens\":[{\"screenshot\":{\"name\":\"projects/7540435568831394111/files/d2fcf975e2ce40adb36ce41699442e2a\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/7540435568831394111/files/d2fcf975e2ce40adb36ce41699442e2a:download\"},\"htmlCode\":{\"name\":\"projects/7540435568831394111/files/3f39b13dc7b344fbb3f6622c14ad44d2\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/7540435568831394111/files/3f39b13dc7b344fbb3f6622c14ad44d2:download\",\"mimeType\":\"text/html\"},\"id\":\"ca2c026c89e141ef8ecdc8f410bf0483\",\"generatedBy\":\"HatterAgent\",\"width\":\"2560\",\"height\":\"3270\",\"title\":\"Status-Dashboard (Dark Mode) \u2014 Softwareschmiede Status\",\"prompt\":\"Erstelle eine exakte Dark-Mode-Version dieser Status-Dashboard-Seite:\\n- Gleiche Inhalte, Struktur, Karten, Tabellen, Badges und Komponenten wie im Original.\\n- Farbschema vollst\u00e4ndig auf Dark Mode umstellen: sehr dunkler Hintergrund (fast schwarz / tiefes dunkles Navy wie #0b0f19 oder #0d1117, Kartenhintergr\u00fcnde in #111827 / #161e2e, Umrandungen/Borders dezent abgedunkelt in #1f2937 / #2d3748).\\n- Typografie und Texte auf helle Nuancen anpassen (\u00dcberschriften in fast Wei\u00df #f3f4f6, Flie\u00dftext/Labels in hellem Grau #9ca3af / #cbd5e1).\\n- Badges, Status-Indikatoren (Gr\u00fcn Online, Gelb/Orange Veraltet, Rot Fehler/Offline) mit dunklen Hintergrundt\u00f6nen und leuchtenden Texten f\u00fcr optimalen Dark-Mode-Kontrast abstimmen.\\n- Header, Navigation und Footer nahtlos in das dunkle Schema einbetten. Alle Daten, Tabellenzeilen (Aktuelle Aufgaben, Letzte SCM-Ereignisse, GitHub Releases & Workflows) detailgetreu beibehalten.\",\"name\":\"projects/7540435568831394111/screens/ca2c026c89e141ef8ecdc8f410bf0483\",\"theme\":{\"colorMode\":\"LIGHT\",\"font\":\"INTER\",\"roundness\":\"ROUND_FOUR\",\"customColor\":\"#2563eb\",\"headlineFont\":\"INTER\",\"bodyFont\":\"INTER\",\"labelFont\":\"JETBRAINS_MONO\",\"namedColors\":{\"on_secondary_fixed_variant\":\"#3f465c\",\"surface_container_high\":\"#dce9ff\",\"surface_container_low\":\"#eff4ff\",\"background\":\"#f8f9ff\",\"error\":\"#ba1a1a\",\"surface_dim\":\"#cbdbf5\",\"on_primary_fixed_variant\":\"#003ea8\",\"on_tertiary\":\"#ffffff\",\"tertiary\":\"#006329\",\"surface_variant\":\"#d3e4fe\",\"on_tertiary_container\":\"#c7ffca\",\"surface_bright\":\"#f8f9ff\",\"on_surface\":\"#0b1c30\",\"secondary_fixed_dim\":\"#bec6e0\",\"on_tertiary_fixed_variant\":\"#005320\",\"surface_container_lowest\":\"#ffffff\",\"tertiary_fixed_dim\":\"#62df7d\",\"tertiary_container\":\"#007f36\",\"on_secondary_fixed\":\"#131b2e\",\"inverse_on_surface\":\"#eaf1ff\",\"surface\":\"#f8f9ff\",\"surface_container\":\"#e5eeff\",\"error_container\":\"#ffdad6\",\"secondary\":\"#565e74\",\"primary_fixed\":\"#dbe1ff\",\"on_surface_variant\":\"#434655\",\"primary_container\":\"#2563eb\",\"surface_tint\":\"#0053db\",\"on_tertiary_fixed\":\"#002109\",\"on_error\":\"#ffffff\",\"on_primary_fixed\":\"#00174b\",\"outline\":\"#737686\",\"on_secondary_container\":\"#5c647a\",\"inverse_primary\":\"#b4c5ff\",\"primary\":\"#004ac6\",\"primary_fixed_dim\":\"#b4c5ff\",\"on_primary_container\":\"#eeefff\",\"tertiary_fixed\":\"#7ffc97\",\"on_primary\":\"#ffffff\",\"on_error_container\":\"#93000a\",\"on_secondary\":\"#ffffff\",\"secondary_container\":\"#dae2fd\",\"inverse_surface\":\"#213145\",\"outline_variant\":\"#c3c6d7\",\"secondary_fixed\":\"#dae2fd\",\"on_background\":\"#0b1c30\",\"surface_container_highest\":\"#d3e4fe\"},\"colorVariant\":\"FIDELITY\",\"overridePrimaryColor\":\"#2563eb\",\"overrideSecondaryColor\":\"#0f172a\",\"overrideTertiaryColor\":\"#16a34a\",\"overrideNeutralColor\":\"#64748b\",\"spacingScale\":2,\"typography\":{\"body-md\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.875rem\",\"fontWeight\":\"400\",\"lineHeight\":\"1.25rem\"},\"headline-lg-mobile\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1.375rem\",\"fontWeight\":\"600\",\"lineHeight\":\"1.875rem\",\"letterSpacing\":\"-0.015em\"},\"code-md\":{\"fontFamily\":\"JetBrains Mono\",\"fontSize\":\"0.8125rem\",\"fontWeight\":\"500\",\"lineHeight\":\"1.125rem\"},\"label-lg\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.875rem\",\"fontWeight\":\"500\",\"lineHeight\":\"1.25rem\"},\"body-sm\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.75rem\",\"fontWeight\":\"400\",\"lineHeight\":\"1rem\"},\"headline-sm\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1rem\",\"fontWeight\":\"600\",\"lineHeight\":\"1.5rem\"},\"headline-lg\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1.75rem\",\"fontWeight\":\"600\",\"lineHeight\":\"2.25rem\",\"letterSpacing\":\"-0.02em\"},\"code-sm\":{\"fontFamily\":\"JetBrains Mono\",\"fontSize\":\"0.6875rem\",\"fontWeight\":\"400\",\"lineHeight\":\"0.875rem\"},\"headline-md\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1.25rem\",\"fontWeight\":\"600\",\"lineHeight\":\"1.75rem\",\"letterSpacing\":\"-0.01em\"},\"body-lg\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.9375rem\",\"fontWeight\":\"400\",\"lineHeight\":\"1.5rem\"},\"label-md\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.75rem\",\"fontWeight\":\"500\",\"lineHeight\":\"1rem\",\"letterSpacing\":\"0.02em\"}},\"spacing\":{\"margin-desktop\":\"2rem\",\"gutter\":\"1rem\",\"gutter-desktop\":\"1.5rem\",\"space-md\":\"0.75rem\",\"space-sm\":\"0.5rem\",\"space-lg\":\"1rem\",\"margin\":\"1rem\",\"space-xl\":\"1.5rem\",\"space-xs\":\"0.25rem\"},\"headlineFontFamily\":\"Inter\",\"bodyFontFamily\":\"Inter\",\"labelFontFamily\":\"JetBrains Mono\"},\"deviceType\":\"DESKTOP\",\"screenType\":\"DESIGN\",\"screenMetadata\":{\"agentType\":\"PRO_AGENT\",\"status\":\"COMPLETE\"},\"designSystem\":{\"name\":\"assets/25e6f8dbb3604bef8ac4be3fa1415efc\",\"designSystem\":{\"displayName\":\"Precision Operations\",\"styleGuidelines\":\"## Brand & Style\\n\\nThis design system targets technical leads, sysadmins, and site reliability engineers operating mission-critical environments. The visual language conveys operational clarity, uncompromising stability, and high data utility. \\n\\nKey attributes:\\n- **Style Archetype:** Modern Corporate Engineering / Data-Dense Utility.\\n- **Aesthetic Tenets:** Information over decoration, zero layout ambiguity, surgical contrast, and structural rhythm.\\n- **Visual Personality:** Quiet, restrained, objective, and responsive. Surfaces operate as quiet scaffolding while system states take center stage.\\n\\n## Layout & Spacing\\n\\nThe dashboard uses a structured fluid grid combined with modular layout panes:\\n\\n- **Desktop (1024px+):** Collapsible persistent left navigation bar (240px fixed), fluid workspace spanning 12 columns with `1.5rem` gutters. Maximum canvas bounds cap at `1600px` for ultra-wide displays to maintain glanceability.\\n- **Tablet (768px - 1023px):** 8-column layout, left navigation reduces to an icon-only dock (64px), horizontal canvas margin at `1.5rem`.\\n- **Mobile (\\u003c768px):** 4-column layout with `1rem` margin and `1rem` gutter. Complex health tables convert to vertically stacked cards.\\n\\nVertical spacing operates on an absolute 4px base increment (`0.25rem`, `0.5rem`, `0.75rem`, `1rem`, `1.5rem`) to ensure tight component padding without dead space.\\n\\n## Elevation & Depth\\n\\nTo avoid visual noise across dense dashboards, this system relies on low-contrast structural outlines rather than heavy drop shadows:\\n\\n- **Level 0 (App Canvas):** Fills `#F8FAFC`. Zero elevation, zero shadows.\\n- **Level 1 (Card & Module Containers):** Surface `#FFFFFF`, bordered with a 1px solid `#E2E8F0`. Shadow: `0 1px 2px 0 rgba(15, 23, 42, 0.04)`.\\n- **Level 2 (Dropdowns, Popovers, Filter Menus):** Surface `#FFFFFF`, bordered with 1px solid `#CBD5E1`. Shadow: `0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05)`.\\n- **Level 3 (Modal Dialogs & Critical Incident Overlays):** Surface `#FFFFFF`, borderless with full-bleed scrim (`rgba(15, 23, 42, 0.45)`). Shadow: `0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08)`.\\n\\n## Components\\n\\n### Buttons\\n- **Primary:** Solid `#2563EB` fill, white `#FFFFFF` text, `0.25rem` radius, `0.5rem 0.875rem` padding. Subtle brightness decrease on hover (`#1D4ED8`). Focus ring: 2px offset with `#93C5FD`.\\n- **Secondary:** White `#FFFFFF` fill, 1px `#E2E8F0` border, `#0F172A` text. Hover state switches background to `#F8FAFC`.\\n- **Destructive/Action:** `#DC2626` fill or transparent with `#DC2626` text for secondary destructive triggers.\\n\\n### Status Badges & Pills\\n- **Geometry:** Height 22px, padding `0 0.5rem`, font `JetBrains Mono` (`code-sm`), weight 500.\\n- **Healthy:** `#DCFCE7` background, `#16A34A` text, `#BBF7D0` 1px border. Accompanied by a 6px solid green dot.\\n- **Warning (\\\"Teilweise veraltet\\\"):** `#FEF3C7` background, `#D97706` text, `#FDE68A` 1px border. Accompanied by a 6px warning amber dot.\\n- **Critical / Fetch Error:** `#FEE2E2` background, `#DC2626` text, `#FECACA` 1px border. Accompanied by a 6px pulsing red dot.\\n\\n### Data Tables & Service Lists\\n- **Headers:** Surface `#F8FAFC`, bottom border 1px `#E2E8F0`, uppercase text in `#475569`, tracking `0.05em`, size `0.6875rem`.\\n- **Rows:** White `#FFFFFF` background, 1px bottom border `#F1F5F9`. Height fixed at 44px for high density.\\n- **Hover State:** Row background transitions to `#F8FAFC` instantly without motion delays.\\n\\n### Input Fields & Search Bars\\n- **Frame:** Height 36px, `0.25rem` radius, 1px border `#E2E8F0`, background `#FFFFFF`.\\n- **Focus:** 1px border `#2563EB`, box-shadow `0 0 0 1px #2563EB`.\\n- **Monospace Input:** Used specifically for token filters and Git revision queries using `code-md`.\\n\\n### Cards & Metrics\\n- **Metric Cards:** `#FFFFFF` background, 1px `#E2E8F0` border, `1rem` internal padding. Key metric in `headline-lg` (`#0F172A`), subtitle in `body-sm` (`#475569`), status badge positioned top-right.\\n- **Dividers:** Clean 1px `#E2E8F0` rules. Never use double borders or styled drop-lines.\",\"theme\":{\"colorMode\":\"LIGHT\",\"font\":\"INTER\",\"roundness\":\"ROUND_FOUR\",\"customColor\":\"#2563eb\",\"headlineFont\":\"INTER\",\"bodyFont\":\"INTER\",\"labelFont\":\"JETBRAINS_MONO\",\"namedColors\":{\"surface\":\"#f8f9ff\",\"primary_fixed\":\"#dbe1ff\",\"inverse_on_surface\":\"#eaf1ff\",\"secondary_fixed\":\"#dae2fd\",\"secondary_fixed_dim\":\"#bec6e0\",\"inverse_surface\":\"#213145\",\"outline_variant\":\"#c3c6d7\",\"on_tertiary\":\"#ffffff\",\"on_secondary_fixed\":\"#131b2e\",\"tertiary_container\":\"#007f36\",\"tertiary_fixed_dim\":\"#62df7d\",\"on_primary_container\":\"#eeefff\",\"surface_dim\":\"#cbdbf5\",\"tertiary_fixed\":\"#7ffc97\",\"on_surface\":\"#0b1c30\",\"on_secondary\":\"#ffffff\",\"inverse_primary\":\"#b4c5ff\",\"on_secondary_container\":\"#5c647a\",\"surface_container_low\":\"#eff4ff\",\"on_tertiary_fixed_variant\":\"#005320\",\"secondary\":\"#565e74\",\"surface_container\":\"#e5eeff\",\"surface_tint\":\"#0053db\",\"on_tertiary_container\":\"#c7ffca\",\"on_background\":\"#0b1c30\",\"tertiary\":\"#006329\",\"background\":\"#f8f9ff\",\"error_container\":\"#ffdad6\",\"on_tertiary_fixed\":\"#002109\",\"surface_container_lowest\":\"#ffffff\",\"on_error_container\":\"#93000a\",\"error\":\"#ba1a1a\",\"surface_bright\":\"#f8f9ff\",\"primary\":\"#004ac6\",\"primary_container\":\"#2563eb\",\"secondary_container\":\"#dae2fd\",\"on_primary\":\"#ffffff\",\"surface_variant\":\"#d3e4fe\",\"outline\":\"#737686\",\"surface_container_high\":\"#dce9ff\",\"on_surface_variant\":\"#434655\",\"on_primary_fixed_variant\":\"#003ea8\",\"primary_fixed_dim\":\"#b4c5ff\",\"on_error\":\"#ffffff\",\"surface_container_highest\":\"#d3e4fe\",\"on_secondary_fixed_variant\":\"#3f465c\",\"on_primary_fixed\":\"#00174b\"},\"colorVariant\":\"FIDELITY\",\"overridePrimaryColor\":\"#2563eb\",\"overrideSecondaryColor\":\"#0f172a\",\"overrideTertiaryColor\":\"#16a34a\",\"overrideNeutralColor\":\"#64748b\",\"spacingScale\":2,\"typography\":{\"headline-lg-mobile\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1.375rem\",\"fontWeight\":\"600\",\"lineHeight\":\"1.875rem\",\"letterSpacing\":\"-0.015em\"},\"headline-sm\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1rem\",\"fontWeight\":\"600\",\"lineHeight\":\"1.5rem\"},\"headline-lg\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1.75rem\",\"fontWeight\":\"600\",\"lineHeight\":\"2.25rem\",\"letterSpacing\":\"-0.02em\"},\"body-sm\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.75rem\",\"fontWeight\":\"400\",\"lineHeight\":\"1rem\"},\"code-md\":{\"fontFamily\":\"JetBrains Mono\",\"fontSize\":\"0.8125rem\",\"fontWeight\":\"500\",\"lineHeight\":\"1.125rem\"},\"headline-md\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1.25rem\",\"fontWeight\":\"600\",\"lineHeight\":\"1.75rem\",\"letterSpacing\":\"-0.01em\"},\"body-lg\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.9375rem\",\"fontWeight\":\"400\",\"lineHeight\":\"1.5rem\"},\"code-sm\":{\"fontFamily\":\"JetBrains Mono\",\"fontSize\":\"0.6875rem\",\"fontWeight\":\"400\",\"lineHeight\":\"0.875rem\"},\"label-lg\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.875rem\",\"fontWeight\":\"500\",\"lineHeight\":\"1.25rem\"},\"label-md\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.75rem\",\"fontWeight\":\"500\",\"lineHeight\":\"1rem\",\"letterSpacing\":\"0.02em\"},\"body-md\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.875rem\",\"fontWeight\":\"400\",\"lineHeight\":\"1.25rem\"}},\"spacing\":{\"space-xl\":\"1.5rem\",\"margin\":\"1rem\",\"margin-desktop\":\"2rem\",\"space-xs\":\"0.25rem\",\"space-sm\":\"0.5rem\",\"space-lg\":\"1rem\",\"space-md\":\"0.75rem\",\"gutter-desktop\":\"1.5rem\",\"gutter\":\"1rem\"},\"headlineFontFamily\":\"Inter\",\"bodyFontFamily\":\"Inter\",\"labelFontFamily\":\"JetBrains Mono\"}},\"version\":\"1\"}}],\"theme\":{}}},{\"text\":\"Ich habe die exakte Dark-Mode-Variante des Status-Dashboards erstellt:\\n\\n- **Farbschema & Kontraste:** Tiefer, dunkler Navy-Hintergrund (`#0b0f19` / Slate-Navy) mit abgestuften Kartenoberfl\u00e4chen (`#111827`) und subtilen Trennlinien (`#1f2937`).\\n- **Typografie:** Klare, kontrastreiche helle Textfarben (Prim\u00e4rtexte in reinem/off-wei\u00dfem Ton, sekund\u00e4re Metadaten und Bezeichner in dezentem Graublau).\\n- **Status-Indikatoren & Badges:** Angepasste Dark-Mode-Farbt\u00f6ne f\u00fcr Statusanzeigen (Smaragdgr\u00fcn f\u00fcr `Online`/`Aktiv`, Bernstein/Gelb f\u00fcr `Veraltet`/`Wartet`, ged\u00e4mpftes Rot f\u00fcr Fehlermeldungen) mit optimaler Lesbarkeit auf dunklem Grund.\\n- **Vollst\u00e4ndige Strukturtreue:** S\u00e4mtliche Komponenten, die Instanzen-\u00dcbersicht, die Tabelle der aktiven Aufgaben, das SCM-Audit-Protokoll sowie die GitHub-Integrationskarten wurden 1:1 beibehalten.\"},{\"suggestion\":\"Akzentfarben f\u00fcr Buttons oder Badges noch kr\u00e4ftiger gestalten?\"},{\"suggestion\":\"Den Header farblich noch st\u00e4rker vom Hauptbereich abheben?\"},{\"suggestion\":\"Ein Farbschema-Umschalter (Toggle) in der Navigationsleiste erg\u00e4nzen?\"}]}",
+    "type": "text"
+   }
+  ],
+  "structuredContent": {
+   "outputComponents": [
+    {
+     "design": {
+      "screens": [
+       {
+        "designSystem": {
+         "designSystem": {
+          "displayName": "Precision Operations",
+          "styleGuidelines": "## Brand & Style\n\nThis design system targets technical leads, sysadmins, and site reliability engineers operating mission-critical environments. The visual language conveys operational clarity, uncompromising stability, and high data utility. \n\nKey attributes:\n- **Style Archetype:** Modern Corporate Engineering / Data-Dense Utility.\n- **Aesthetic Tenets:** Information over decoration, zero layout ambiguity, surgical contrast, and structural rhythm.\n- **Visual Personality:** Quiet, restrained, objective, and responsive. Surfaces operate as quiet scaffolding while system states take center stage.\n\n## Layout & Spacing\n\nThe dashboard uses a structured fluid grid combined with modular layout panes:\n\n- **Desktop (1024px+):** Collapsible persistent left navigation bar (240px fixed), fluid workspace spanning 12 columns with `1.5rem` gutters. Maximum canvas bounds cap at `1600px` for ultra-wide displays to maintain glanceability.\n- **Tablet (768px - 1023px):** 8-column layout, left navigation reduces to an icon-only dock (64px), horizontal canvas margin at `1.5rem`.\n- **Mobile (<768px):** 4-column layout with `1rem` margin and `1rem` gutter. Complex health tables convert to vertically stacked cards.\n\nVertical spacing operates on an absolute 4px base increment (`0.25rem`, `0.5rem`, `0.75rem`, `1rem`, `1.5rem`) to ensure tight component padding without dead space.\n\n## Elevation & Depth\n\nTo avoid visual noise across dense dashboards, this system relies on low-contrast structural outlines rather than heavy drop shadows:\n\n- **Level 0 (App Canvas):** Fills `#F8FAFC`. Zero elevation, zero shadows.\n- **Level 1 (Card & Module Containers):** Surface `#FFFFFF`, bordered with a 1px solid `#E2E8F0`. Shadow: `0 1px 2px 0 rgba(15, 23, 42, 0.04)`.\n- **Level 2 (Dropdowns, Popovers, Filter Menus):** Surface `#FFFFFF`, bordered with 1px solid `#CBD5E1`. Shadow: `0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05)`.\n- **Level 3 (Modal Dialogs & Critical Incident Overlays):** Surface `#FFFFFF`, borderless with full-bleed scrim (`rgba(15, 23, 42, 0.45)`). Shadow: `0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08)`.\n\n## Components\n\n### Buttons\n- **Primary:** Solid `#2563EB` fill, white `#FFFFFF` text, `0.25rem` radius, `0.5rem 0.875rem` padding. Subtle brightness decrease on hover (`#1D4ED8`). Focus ring: 2px offset with `#93C5FD`.\n- **Secondary:** White `#FFFFFF` fill, 1px `#E2E8F0` border, `#0F172A` text. Hover state switches background to `#F8FAFC`.\n- **Destructive/Action:** `#DC2626` fill or transparent with `#DC2626` text for secondary destructive triggers.\n\n### Status Badges & Pills\n- **Geometry:** Height 22px, padding `0 0.5rem`, font `JetBrains Mono` (`code-sm`), weight 500.\n- **Healthy:** `#DCFCE7` background, `#16A34A` text, `#BBF7D0` 1px border. Accompanied by a 6px solid green dot.\n- **Warning (\"Teilweise veraltet\"):** `#FEF3C7` background, `#D97706` text, `#FDE68A` 1px border. Accompanied by a 6px warning amber dot.\n- **Critical / Fetch Error:** `#FEE2E2` background, `#DC2626` text, `#FECACA` 1px border. Accompanied by a 6px pulsing red dot.\n\n### Data Tables & Service Lists\n- **Headers:** Surface `#F8FAFC`, bottom border 1px `#E2E8F0`, uppercase text in `#475569`, tracking `0.05em`, size `0.6875rem`.\n- **Rows:** White `#FFFFFF` background, 1px bottom border `#F1F5F9`. Height fixed at 44px for high density.\n- **Hover State:** Row background transitions to `#F8FAFC` instantly without motion delays.\n\n### Input Fields & Search Bars\n- **Frame:** Height 36px, `0.25rem` radius, 1px border `#E2E8F0`, background `#FFFFFF`.\n- **Focus:** 1px border `#2563EB`, box-shadow `0 0 0 1px #2563EB`.\n- **Monospace Input:** Used specifically for token filters and Git revision queries using `code-md`.\n\n### Cards & Metrics\n- **Metric Cards:** `#FFFFFF` background, 1px `#E2E8F0` border, `1rem` internal padding. Key metric in `headline-lg` (`#0F172A`), subtitle in `body-sm` (`#475569`), status badge positioned top-right.\n- **Dividers:** Clean 1px `#E2E8F0` rules. Never use double borders or styled drop-lines.",
+          "theme": {
+           "bodyFont": "INTER",
+           "bodyFontFamily": "Inter",
+           "colorMode": "LIGHT",
+           "colorVariant": "FIDELITY",
+           "customColor": "#2563eb",
+           "font": "INTER",
+           "headlineFont": "INTER",
+           "headlineFontFamily": "Inter",
+           "labelFont": "JETBRAINS_MONO",
+           "labelFontFamily": "JetBrains Mono",
+           "namedColors": {
+            "background": "#f8f9ff",
+            "error": "#ba1a1a",
+            "error_container": "#ffdad6",
+            "inverse_on_surface": "#eaf1ff",
+            "inverse_primary": "#b4c5ff",
+            "inverse_surface": "#213145",
+            "on_background": "#0b1c30",
+            "on_error": "#ffffff",
+            "on_error_container": "#93000a",
+            "on_primary": "#ffffff",
+            "on_primary_container": "#eeefff",
+            "on_primary_fixed": "#00174b",
+            "on_primary_fixed_variant": "#003ea8",
+            "on_secondary": "#ffffff",
+            "on_secondary_container": "#5c647a",
+            "on_secondary_fixed": "#131b2e",
+            "on_secondary_fixed_variant": "#3f465c",
+            "on_surface": "#0b1c30",
+            "on_surface_variant": "#434655",
+            "on_tertiary": "#ffffff",
+            "on_tertiary_container": "#c7ffca",
+            "on_tertiary_fixed": "#002109",
+            "on_tertiary_fixed_variant": "#005320",
+            "outline": "#737686",
+            "outline_variant": "#c3c6d7",
+            "primary": "#004ac6",
+            "primary_container": "#2563eb",
+            "primary_fixed": "#dbe1ff",
+            "primary_fixed_dim": "#b4c5ff",
+            "secondary": "#565e74",
+            "secondary_container": "#dae2fd",
+            "secondary_fixed": "#dae2fd",
+            "secondary_fixed_dim": "#bec6e0",
+            "surface": "#f8f9ff",
+            "surface_bright": "#f8f9ff",
+            "surface_container": "#e5eeff",
+            "surface_container_high": "#dce9ff",
+            "surface_container_highest": "#d3e4fe",
+            "surface_container_low": "#eff4ff",
+            "surface_container_lowest": "#ffffff",
+            "surface_dim": "#cbdbf5",
+            "surface_tint": "#0053db",
+            "surface_variant": "#d3e4fe",
+            "tertiary": "#006329",
+            "tertiary_container": "#007f36",
+            "tertiary_fixed": "#7ffc97",
+            "tertiary_fixed_dim": "#62df7d"
+           },
+           "overrideNeutralColor": "#64748b",
+           "overridePrimaryColor": "#2563eb",
+           "overrideSecondaryColor": "#0f172a",
+           "overrideTertiaryColor": "#16a34a",
+           "roundness": "ROUND_FOUR",
+           "spacing": {
+            "gutter": "1rem",
+            "gutter-desktop": "1.5rem",
+            "margin": "1rem",
+            "margin-desktop": "2rem",
+            "space-lg": "1rem",
+            "space-md": "0.75rem",
+            "space-sm": "0.5rem",
+            "space-xl": "1.5rem",
+            "space-xs": "0.25rem"
+           },
+           "spacingScale": 2,
+           "typography": {
+            "body-lg": {
+             "fontFamily": "Inter",
+             "fontSize": "0.9375rem",
+             "fontWeight": "400",
+             "lineHeight": "1.5rem"
+            },
+            "body-md": {
+             "fontFamily": "Inter",
+             "fontSize": "0.875rem",
+             "fontWeight": "400",
+             "lineHeight": "1.25rem"
+            },
+            "body-sm": {
+             "fontFamily": "Inter",
+             "fontSize": "0.75rem",
+             "fontWeight": "400",
+             "lineHeight": "1rem"
+            },
+            "code-md": {
+             "fontFamily": "JetBrains Mono",
+             "fontSize": "0.8125rem",
+             "fontWeight": "500",
+             "lineHeight": "1.125rem"
+            },
+            "code-sm": {
+             "fontFamily": "JetBrains Mono",
+             "fontSize": "0.6875rem",
+             "fontWeight": "400",
+             "lineHeight": "0.875rem"
+            },
+            "headline-lg": {
+             "fontFamily": "Inter",
+             "fontSize": "1.75rem",
+             "fontWeight": "600",
+             "letterSpacing": "-0.02em",
+             "lineHeight": "2.25rem"
+            },
+            "headline-lg-mobile": {
+             "fontFamily": "Inter",
+             "fontSize": "1.375rem",
+             "fontWeight": "600",
+             "letterSpacing": "-0.015em",
+             "lineHeight": "1.875rem"
+            },
+            "headline-md": {
+             "fontFamily": "Inter",
+             "fontSize": "1.25rem",
+             "fontWeight": "600",
+             "letterSpacing": "-0.01em",
+             "lineHeight": "1.75rem"
+            },
+            "headline-sm": {
+             "fontFamily": "Inter",
+             "fontSize": "1rem",
+             "fontWeight": "600",
+             "lineHeight": "1.5rem"
+            },
+            "label-lg": {
+             "fontFamily": "Inter",
+             "fontSize": "0.875rem",
+             "fontWeight": "500",
+             "lineHeight": "1.25rem"
+            },
+            "label-md": {
+             "fontFamily": "Inter",
+             "fontSize": "0.75rem",
+             "fontWeight": "500",
+             "letterSpacing": "0.02em",
+             "lineHeight": "1rem"
+            }
+           }
+          }
+         },
+         "name": "assets/25e6f8dbb3604bef8ac4be3fa1415efc",
+         "version": "1"
+        },
+        "deviceType": "DESKTOP",
+        "generatedBy": "HatterAgent",
+        "height": "3270",
+        "htmlCode": {
+         "downloadUrl": "https://stitch.googleapis.com/v1/projects/7540435568831394111/files/3f39b13dc7b344fbb3f6622c14ad44d2:download",
+         "mimeType": "text/html",
+         "name": "projects/7540435568831394111/files/3f39b13dc7b344fbb3f6622c14ad44d2"
+        },
+        "id": "ca2c026c89e141ef8ecdc8f410bf0483",
+        "name": "projects/7540435568831394111/screens/ca2c026c89e141ef8ecdc8f410bf0483",
+        "prompt": "Erstelle eine exakte Dark-Mode-Version dieser Status-Dashboard-Seite:\n- Gleiche Inhalte, Struktur, Karten, Tabellen, Badges und Komponenten wie im Original.\n- Farbschema vollst\u00e4ndig auf Dark Mode umstellen: sehr dunkler Hintergrund (fast schwarz / tiefes dunkles Navy wie #0b0f19 oder #0d1117, Kartenhintergr\u00fcnde in #111827 / #161e2e, Umrandungen/Borders dezent abgedunkelt in #1f2937 / #2d3748).\n- Typografie und Texte auf helle Nuancen anpassen (\u00dcberschriften in fast Wei\u00df #f3f4f6, Flie\u00dftext/Labels in hellem Grau #9ca3af / #cbd5e1).\n- Badges, Status-Indikatoren (Gr\u00fcn Online, Gelb/Orange Veraltet, Rot Fehler/Offline) mit dunklen Hintergrundt\u00f6nen und leuchtenden Texten f\u00fcr optimalen Dark-Mode-Kontrast abstimmen.\n- Header, Navigation und Footer nahtlos in das dunkle Schema einbetten. Alle Daten, Tabellenzeilen (Aktuelle Aufgaben, Letzte SCM-Ereignisse, GitHub Releases & Workflows) detailgetreu beibehalten.",
+        "screenMetadata": {
+         "agentType": "PRO_AGENT",
+         "status": "COMPLETE"
+        },
+        "screenType": "DESIGN",
+        "screenshot": {
+         "downloadUrl": "https://stitch.googleapis.com/v1/projects/7540435568831394111/files/d2fcf975e2ce40adb36ce41699442e2a:download",
+         "name": "projects/7540435568831394111/files/d2fcf975e2ce40adb36ce41699442e2a"
+        },
+        "theme": {
+         "bodyFont": "INTER",
+         "bodyFontFamily": "Inter",
+         "colorMode": "LIGHT",
+         "colorVariant": "FIDELITY",
+         "customColor": "#2563eb",
+         "font": "INTER",
+         "headlineFont": "INTER",
+         "headlineFontFamily": "Inter",
+         "labelFont": "JETBRAINS_MONO",
+         "labelFontFamily": "JetBrains Mono",
+         "namedColors": {
+          "background": "#f8f9ff",
+          "error": "#ba1a1a",
+          "error_container": "#ffdad6",
+          "inverse_on_surface": "#eaf1ff",
+          "inverse_primary": "#b4c5ff",
+          "inverse_surface": "#213145",
+          "on_background": "#0b1c30",
+          "on_error": "#ffffff",
+          "on_error_container": "#93000a",
+          "on_primary": "#ffffff",
+          "on_primary_container": "#eeefff",
+          "on_primary_fixed": "#00174b",
+          "on_primary_fixed_variant": "#003ea8",
+          "on_secondary": "#ffffff",
+          "on_secondary_container": "#5c647a",
+          "on_secondary_fixed": "#131b2e",
+          "on_secondary_fixed_variant": "#3f465c",
+          "on_surface": "#0b1c30",
+          "on_surface_variant": "#434655",
+          "on_tertiary": "#ffffff",
+          "on_tertiary_container": "#c7ffca",
+          "on_tertiary_fixed": "#002109",
+          "on_tertiary_fixed_variant": "#005320",
+          "outline": "#737686",
+          "outline_variant": "#c3c6d7",
+          "primary": "#004ac6",
+          "primary_container": "#2563eb",
+          "primary_fixed": "#dbe1ff",
+          "primary_fixed_dim": "#b4c5ff",
+          "secondary": "#565e74",
+          "secondary_container": "#dae2fd",
+          "secondary_fixed": "#dae2fd",
+          "secondary_fixed_dim": "#bec6e0",
+          "surface": "#f8f9ff",
+          "surface_bright": "#f8f9ff",
+          "surface_container": "#e5eeff",
+          "surface_container_high": "#dce9ff",
+          "surface_container_highest": "#d3e4fe",
+          "surface_container_low": "#eff4ff",
+          "surface_container_lowest": "#ffffff",
+          "surface_dim": "#cbdbf5",
+          "surface_tint": "#0053db",
+          "surface_variant": "#d3e4fe",
+          "tertiary": "#006329",
+          "tertiary_container": "#007f36",
+          "tertiary_fixed": "#7ffc97",
+          "tertiary_fixed_dim": "#62df7d"
+         },
+         "overrideNeutralColor": "#64748b",
+         "overridePrimaryColor": "#2563eb",
+         "overrideSecondaryColor": "#0f172a",
+         "overrideTertiaryColor": "#16a34a",
+         "roundness": "ROUND_FOUR",
+         "spacing": {
+          "gutter": "1rem",
+          "gutter-desktop": "1.5rem",
+          "margin": "1rem",
+          "margin-desktop": "2rem",
+          "space-lg": "1rem",
+          "space-md": "0.75rem",
+          "space-sm": "0.5rem",
+          "space-xl": "1.5rem",
+          "space-xs": "0.25rem"
+         },
+         "spacingScale": 2,
+         "typography": {
+          "body-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "0.9375rem",
+           "fontWeight": "400",
+           "lineHeight": "1.5rem"
+          },
+          "body-md": {
+           "fontFamily": "Inter",
+           "fontSize": "0.875rem",
+           "fontWeight": "400",
+           "lineHeight": "1.25rem"
+          },
+          "body-sm": {
+           "fontFamily": "Inter",
+           "fontSize": "0.75rem",
+           "fontWeight": "400",
+           "lineHeight": "1rem"
+          },
+          "code-md": {
+           "fontFamily": "JetBrains Mono",
+           "fontSize": "0.8125rem",
+           "fontWeight": "500",
+           "lineHeight": "1.125rem"
+          },
+          "code-sm": {
+           "fontFamily": "JetBrains Mono",
+           "fontSize": "0.6875rem",
+           "fontWeight": "400",
+           "lineHeight": "0.875rem"
+          },
+          "headline-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "1.75rem",
+           "fontWeight": "600",
+           "letterSpacing": "-0.02em",
+           "lineHeight": "2.25rem"
+          },
+          "headline-lg-mobile": {
+           "fontFamily": "Inter",
+           "fontSize": "1.375rem",
+           "fontWeight": "600",
+           "letterSpacing": "-0.015em",
+           "lineHeight": "1.875rem"
+          },
+          "headline-md": {
+           "fontFamily": "Inter",
+           "fontSize": "1.25rem",
+           "fontWeight": "600",
+           "letterSpacing": "-0.01em",
+           "lineHeight": "1.75rem"
+          },
+          "headline-sm": {
+           "fontFamily": "Inter",
+           "fontSize": "1rem",
+           "fontWeight": "600",
+           "lineHeight": "1.5rem"
+          },
+          "label-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "0.875rem",
+           "fontWeight": "500",
+           "lineHeight": "1.25rem"
+          },
+          "label-md": {
+           "fontFamily": "Inter",
+           "fontSize": "0.75rem",
+           "fontWeight": "500",
+           "letterSpacing": "0.02em",
+           "lineHeight": "1rem"
+          }
+         }
+        },
+        "title": "Status-Dashboard (Dark Mode) \u2014 Softwareschmiede Status",
+        "width": "2560"
+       }
+      ],
+      "theme": {}
+     }
+    },
+    {
+     "text": "Ich habe die exakte Dark-Mode-Variante des Status-Dashboards erstellt:\n\n- **Farbschema & Kontraste:** Tiefer, dunkler Navy-Hintergrund (`#0b0f19` / Slate-Navy) mit abgestuften Kartenoberfl\u00e4chen (`#111827`) und subtilen Trennlinien (`#1f2937`).\n- **Typografie:** Klare, kontrastreiche helle Textfarben (Prim\u00e4rtexte in reinem/off-wei\u00dfem Ton, sekund\u00e4re Metadaten und Bezeichner in dezentem Graublau).\n- **Status-Indikatoren & Badges:** Angepasste Dark-Mode-Farbt\u00f6ne f\u00fcr Statusanzeigen (Smaragdgr\u00fcn f\u00fcr `Online`/`Aktiv`, Bernstein/Gelb f\u00fcr `Veraltet`/`Wartet`, ged\u00e4mpftes Rot f\u00fcr Fehlermeldungen) mit optimaler Lesbarkeit auf dunklem Grund.\n- **Vollst\u00e4ndige Strukturtreue:** S\u00e4mtliche Komponenten, die Instanzen-\u00dcbersicht, die Tabelle der aktiven Aufgaben, das SCM-Audit-Protokoll sowie die GitHub-Integrationskarten wurden 1:1 beibehalten."
+    },
+    {
+     "suggestion": "Akzentfarben f\u00fcr Buttons oder Badges noch kr\u00e4ftiger gestalten?"
+    },
+    {
+     "suggestion": "Den Header farblich noch st\u00e4rker vom Hauptbereich abheben?"
+    },
+    {
+     "suggestion": "Ein Farbschema-Umschalter (Toggle) in der Navigationsleiste erg\u00e4nzen?"
+    }
+   ],
+   "projectId": "7540435568831394111",
+   "sessionId": "14438829741588523379"
+  }
+ }
+}

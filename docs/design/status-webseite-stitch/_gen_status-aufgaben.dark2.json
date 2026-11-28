@@ -1,0 +1,377 @@
+{
+ "id": 1,
+ "jsonrpc": "2.0",
+ "result": {
+  "_meta": {
+   "ui": {
+    "resourceUri": "ui://stitch.googleapis.com/project-viewer",
+    "visibility": [
+     "model"
+    ]
+   }
+  },
+  "content": [
+   {
+    "text": "{\"projectId\":\"7540435568831394111\",\"sessionId\":\"2167004309216807930\",\"outputComponents\":[{\"design\":{\"screens\":[{\"screenshot\":{\"name\":\"projects/7540435568831394111/files/8eeaa620759e4d73925a2aff33110b52\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/7540435568831394111/files/8eeaa620759e4d73925a2aff33110b52:download\"},\"htmlCode\":{\"name\":\"projects/7540435568831394111/files/053708ec6d4d46bca7fa03e3d42fa862\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/7540435568831394111/files/053708ec6d4d46bca7fa03e3d42fa862:download\",\"mimeType\":\"text/html\"},\"id\":\"b570d4858a3a4a6fb3db7ffc0eb22b05\",\"generatedBy\":\"HatterAgent\",\"width\":\"2560\",\"height\":\"3334\",\"title\":\"Status-Dashboard \u2014 Farbvariante (Smaragd & Schiefer)\",\"prompt\":\"Create exactly 1 distinct, balanced color scheme variation for this Status Dashboard (keep all German text, cards, server instances, tasks table, SCM log, and GitHub cards intact).\\n\\nColor scheme focus:\\n- Shift from the standard blue/neutral tone to a modern, refined Emerald & Deep Teal / Nordic Slate operational color palette.\\n- Surface background: crisp cool clean white/soft sage-tinted neutral surface (`#f8faf9` / `#f1f5f3`).\\n- Primary brand and active highlights: rich deep emerald teal (`#059669` / `#0f766e` / `#047857`) for key active pills, navigation active indicator, and primary buttons.\\n- Status badges: crisp high-contrast emerald green for healthy/online, warm amber/ochre (`#d97706` / `#b45309`) for warnings/outdated, and subtle coral/rose for errors.\\n- Card borders, subtle divider lines, and table rows with crisp, balanced slate-emerald accents.\\n- Preserve 100% of the original content, layout structure, information density, German copy, and UI components verbatim.\",\"name\":\"projects/7540435568831394111/screens/b570d4858a3a4a6fb3db7ffc0eb22b05\",\"theme\":{\"colorMode\":\"LIGHT\",\"font\":\"INTER\",\"roundness\":\"ROUND_FOUR\",\"customColor\":\"#2563eb\",\"headlineFont\":\"INTER\",\"bodyFont\":\"INTER\",\"labelFont\":\"JETBRAINS_MONO\",\"namedColors\":{\"on_error_container\":\"#93000a\",\"inverse_primary\":\"#b4c5ff\",\"surface_container_lowest\":\"#ffffff\",\"inverse_surface\":\"#213145\",\"on_tertiary_fixed\":\"#002109\",\"tertiary\":\"#006329\",\"on_tertiary_fixed_variant\":\"#005320\",\"surface_container\":\"#e5eeff\",\"inverse_on_surface\":\"#eaf1ff\",\"secondary_fixed_dim\":\"#bec6e0\",\"on_background\":\"#0b1c30\",\"tertiary_fixed\":\"#7ffc97\",\"outline_variant\":\"#c3c6d7\",\"surface_variant\":\"#d3e4fe\",\"surface\":\"#f8f9ff\",\"surface_bright\":\"#f8f9ff\",\"on_primary_fixed\":\"#00174b\",\"surface_container_low\":\"#eff4ff\",\"on_secondary_container\":\"#5c647a\",\"primary\":\"#004ac6\",\"background\":\"#f8f9ff\",\"on_tertiary_container\":\"#c7ffca\",\"error_container\":\"#ffdad6\",\"primary_fixed\":\"#dbe1ff\",\"tertiary_fixed_dim\":\"#62df7d\",\"on_surface\":\"#0b1c30\",\"secondary\":\"#565e74\",\"on_secondary_fixed\":\"#131b2e\",\"on_secondary_fixed_variant\":\"#3f465c\",\"on_surface_variant\":\"#434655\",\"on_primary_fixed_variant\":\"#003ea8\",\"primary_container\":\"#2563eb\",\"secondary_fixed\":\"#dae2fd\",\"on_secondary\":\"#ffffff\",\"outline\":\"#737686\",\"on_primary_container\":\"#eeefff\",\"primary_fixed_dim\":\"#b4c5ff\",\"on_primary\":\"#ffffff\",\"surface_dim\":\"#cbdbf5\",\"on_tertiary\":\"#ffffff\",\"surface_tint\":\"#0053db\",\"secondary_container\":\"#dae2fd\",\"tertiary_container\":\"#007f36\",\"surface_container_highest\":\"#d3e4fe\",\"error\":\"#ba1a1a\",\"on_error\":\"#ffffff\",\"surface_container_high\":\"#dce9ff\"},\"colorVariant\":\"FIDELITY\",\"overridePrimaryColor\":\"#2563eb\",\"overrideSecondaryColor\":\"#0f172a\",\"overrideTertiaryColor\":\"#16a34a\",\"overrideNeutralColor\":\"#64748b\",\"spacingScale\":2,\"typography\":{\"headline-lg\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1.75rem\",\"fontWeight\":\"600\",\"lineHeight\":\"2.25rem\",\"letterSpacing\":\"-0.02em\"},\"code-md\":{\"fontFamily\":\"JetBrains Mono\",\"fontSize\":\"0.8125rem\",\"fontWeight\":\"500\",\"lineHeight\":\"1.125rem\"},\"label-md\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.75rem\",\"fontWeight\":\"500\",\"lineHeight\":\"1rem\",\"letterSpacing\":\"0.02em\"},\"body-lg\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.9375rem\",\"fontWeight\":\"400\",\"lineHeight\":\"1.5rem\"},\"code-sm\":{\"fontFamily\":\"JetBrains Mono\",\"fontSize\":\"0.6875rem\",\"fontWeight\":\"400\",\"lineHeight\":\"0.875rem\"},\"body-md\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.875rem\",\"fontWeight\":\"400\",\"lineHeight\":\"1.25rem\"},\"headline-md\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1.25rem\",\"fontWeight\":\"600\",\"lineHeight\":\"1.75rem\",\"letterSpacing\":\"-0.01em\"},\"body-sm\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.75rem\",\"fontWeight\":\"400\",\"lineHeight\":\"1rem\"},\"headline-lg-mobile\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1.375rem\",\"fontWeight\":\"600\",\"lineHeight\":\"1.875rem\",\"letterSpacing\":\"-0.015em\"},\"headline-sm\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1rem\",\"fontWeight\":\"600\",\"lineHeight\":\"1.5rem\"},\"label-lg\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.875rem\",\"fontWeight\":\"500\",\"lineHeight\":\"1.25rem\"}},\"spacing\":{\"space-sm\":\"0.5rem\",\"space-xl\":\"1.5rem\",\"margin-desktop\":\"2rem\",\"space-lg\":\"1rem\",\"gutter-desktop\":\"1.5rem\",\"gutter\":\"1rem\",\"space-xs\":\"0.25rem\",\"margin\":\"1rem\",\"space-md\":\"0.75rem\"},\"headlineFontFamily\":\"Inter\",\"bodyFontFamily\":\"Inter\",\"labelFontFamily\":\"JetBrains Mono\"},\"deviceType\":\"DESKTOP\",\"screenType\":\"DESIGN\",\"screenMetadata\":{\"agentType\":\"PRO_AGENT\",\"status\":\"COMPLETE\"},\"designSystem\":{\"name\":\"assets/25e6f8dbb3604bef8ac4be3fa1415efc\",\"designSystem\":{\"displayName\":\"Precision Operations\",\"styleGuidelines\":\"## Brand & Style\\n\\nThis design system targets technical leads, sysadmins, and site reliability engineers operating mission-critical environments. The visual language conveys operational clarity, uncompromising stability, and high data utility. \\n\\nKey attributes:\\n- **Style Archetype:** Modern Corporate Engineering / Data-Dense Utility.\\n- **Aesthetic Tenets:** Information over decoration, zero layout ambiguity, surgical contrast, and structural rhythm.\\n- **Visual Personality:** Quiet, restrained, objective, and responsive. Surfaces operate as quiet scaffolding while system states take center stage.\\n\\n## Layout & Spacing\\n\\nThe dashboard uses a structured fluid grid combined with modular layout panes:\\n\\n- **Desktop (1024px+):** Collapsible persistent left navigation bar (240px fixed), fluid workspace spanning 12 columns with `1.5rem` gutters. Maximum canvas bounds cap at `1600px` for ultra-wide displays to maintain glanceability.\\n- **Tablet (768px - 1023px):** 8-column layout, left navigation reduces to an icon-only dock (64px), horizontal canvas margin at `1.5rem`.\\n- **Mobile (\\u003c768px):** 4-column layout with `1rem` margin and `1rem` gutter. Complex health tables convert to vertically stacked cards.\\n\\nVertical spacing operates on an absolute 4px base increment (`0.25rem`, `0.5rem`, `0.75rem`, `1rem`, `1.5rem`) to ensure tight component padding without dead space.\\n\\n## Elevation & Depth\\n\\nTo avoid visual noise across dense dashboards, this system relies on low-contrast structural outlines rather than heavy drop shadows:\\n\\n- **Level 0 (App Canvas):** Fills `#F8FAFC`. Zero elevation, zero shadows.\\n- **Level 1 (Card & Module Containers):** Surface `#FFFFFF`, bordered with a 1px solid `#E2E8F0`. Shadow: `0 1px 2px 0 rgba(15, 23, 42, 0.04)`.\\n- **Level 2 (Dropdowns, Popovers, Filter Menus):** Surface `#FFFFFF`, bordered with 1px solid `#CBD5E1`. Shadow: `0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05)`.\\n- **Level 3 (Modal Dialogs & Critical Incident Overlays):** Surface `#FFFFFF`, borderless with full-bleed scrim (`rgba(15, 23, 42, 0.45)`). Shadow: `0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08)`.\\n\\n## Components\\n\\n### Buttons\\n- **Primary:** Solid `#2563EB` fill, white `#FFFFFF` text, `0.25rem` radius, `0.5rem 0.875rem` padding. Subtle brightness decrease on hover (`#1D4ED8`). Focus ring: 2px offset with `#93C5FD`.\\n- **Secondary:** White `#FFFFFF` fill, 1px `#E2E8F0` border, `#0F172A` text. Hover state switches background to `#F8FAFC`.\\n- **Destructive/Action:** `#DC2626` fill or transparent with `#DC2626` text for secondary destructive triggers.\\n\\n### Status Badges & Pills\\n- **Geometry:** Height 22px, padding `0 0.5rem`, font `JetBrains Mono` (`code-sm`), weight 500.\\n- **Healthy:** `#DCFCE7` background, `#16A34A` text, `#BBF7D0` 1px border. Accompanied by a 6px solid green dot.\\n- **Warning (\\\"Teilweise veraltet\\\"):** `#FEF3C7` background, `#D97706` text, `#FDE68A` 1px border. Accompanied by a 6px warning amber dot.\\n- **Critical / Fetch Error:** `#FEE2E2` background, `#DC2626` text, `#FECACA` 1px border. Accompanied by a 6px pulsing red dot.\\n\\n### Data Tables & Service Lists\\n- **Headers:** Surface `#F8FAFC`, bottom border 1px `#E2E8F0`, uppercase text in `#475569`, tracking `0.05em`, size `0.6875rem`.\\n- **Rows:** White `#FFFFFF` background, 1px bottom border `#F1F5F9`. Height fixed at 44px for high density.\\n- **Hover State:** Row background transitions to `#F8FAFC` instantly without motion delays.\\n\\n### Input Fields & Search Bars\\n- **Frame:** Height 36px, `0.25rem` radius, 1px border `#E2E8F0`, background `#FFFFFF`.\\n- **Focus:** 1px border `#2563EB`, box-shadow `0 0 0 1px #2563EB`.\\n- **Monospace Input:** Used specifically for token filters and Git revision queries using `code-md`.\\n\\n### Cards & Metrics\\n- **Metric Cards:** `#FFFFFF` background, 1px `#E2E8F0` border, `1rem` internal padding. Key metric in `headline-lg` (`#0F172A`), subtitle in `body-sm` (`#475569`), status badge positioned top-right.\\n- **Dividers:** Clean 1px `#E2E8F0` rules. Never use double borders or styled drop-lines.\",\"theme\":{\"colorMode\":\"LIGHT\",\"font\":\"INTER\",\"roundness\":\"ROUND_FOUR\",\"customColor\":\"#2563eb\",\"headlineFont\":\"INTER\",\"bodyFont\":\"INTER\",\"labelFont\":\"JETBRAINS_MONO\",\"namedColors\":{\"secondary_fixed_dim\":\"#bec6e0\",\"inverse_on_surface\":\"#eaf1ff\",\"inverse_surface\":\"#213145\",\"on_secondary_fixed_variant\":\"#3f465c\",\"surface_container_lowest\":\"#ffffff\",\"on_surface\":\"#0b1c30\",\"on_secondary_container\":\"#5c647a\",\"inverse_primary\":\"#b4c5ff\",\"outline\":\"#737686\",\"secondary\":\"#565e74\",\"on_secondary\":\"#ffffff\",\"surface_container_highest\":\"#d3e4fe\",\"background\":\"#f8f9ff\",\"on_error_container\":\"#93000a\",\"surface_bright\":\"#f8f9ff\",\"surface_container_low\":\"#eff4ff\",\"surface_tint\":\"#0053db\",\"error_container\":\"#ffdad6\",\"tertiary_fixed_dim\":\"#62df7d\",\"tertiary_fixed\":\"#7ffc97\",\"surface_container\":\"#e5eeff\",\"on_primary_fixed\":\"#00174b\",\"on_error\":\"#ffffff\",\"on_tertiary_container\":\"#c7ffca\",\"on_tertiary_fixed\":\"#002109\",\"surface_variant\":\"#d3e4fe\",\"outline_variant\":\"#c3c6d7\",\"surface_dim\":\"#cbdbf5\",\"tertiary\":\"#006329\",\"on_tertiary\":\"#ffffff\",\"error\":\"#ba1a1a\",\"on_primary_fixed_variant\":\"#003ea8\",\"secondary_container\":\"#dae2fd\",\"on_primary\":\"#ffffff\",\"on_surface_variant\":\"#434655\",\"secondary_fixed\":\"#dae2fd\",\"on_secondary_fixed\":\"#131b2e\",\"surface_container_high\":\"#dce9ff\",\"surface\":\"#f8f9ff\",\"primary_fixed_dim\":\"#b4c5ff\",\"on_background\":\"#0b1c30\",\"on_tertiary_fixed_variant\":\"#005320\",\"primary_fixed\":\"#dbe1ff\",\"on_primary_container\":\"#eeefff\",\"primary\":\"#004ac6\",\"tertiary_container\":\"#007f36\",\"primary_container\":\"#2563eb\"},\"colorVariant\":\"FIDELITY\",\"overridePrimaryColor\":\"#2563eb\",\"overrideSecondaryColor\":\"#0f172a\",\"overrideTertiaryColor\":\"#16a34a\",\"overrideNeutralColor\":\"#64748b\",\"spacingScale\":2,\"typography\":{\"body-sm\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.75rem\",\"fontWeight\":\"400\",\"lineHeight\":\"1rem\"},\"headline-lg-mobile\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1.375rem\",\"fontWeight\":\"600\",\"lineHeight\":\"1.875rem\",\"letterSpacing\":\"-0.015em\"},\"headline-md\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1.25rem\",\"fontWeight\":\"600\",\"lineHeight\":\"1.75rem\",\"letterSpacing\":\"-0.01em\"},\"label-md\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.75rem\",\"fontWeight\":\"500\",\"lineHeight\":\"1rem\",\"letterSpacing\":\"0.02em\"},\"headline-sm\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1rem\",\"fontWeight\":\"600\",\"lineHeight\":\"1.5rem\"},\"code-md\":{\"fontFamily\":\"JetBrains Mono\",\"fontSize\":\"0.8125rem\",\"fontWeight\":\"500\",\"lineHeight\":\"1.125rem\"},\"headline-lg\":{\"fontFamily\":\"Inter\",\"fontSize\":\"1.75rem\",\"fontWeight\":\"600\",\"lineHeight\":\"2.25rem\",\"letterSpacing\":\"-0.02em\"},\"label-lg\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.875rem\",\"fontWeight\":\"500\",\"lineHeight\":\"1.25rem\"},\"body-lg\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.9375rem\",\"fontWeight\":\"400\",\"lineHeight\":\"1.5rem\"},\"body-md\":{\"fontFamily\":\"Inter\",\"fontSize\":\"0.875rem\",\"fontWeight\":\"400\",\"lineHeight\":\"1.25rem\"},\"code-sm\":{\"fontFamily\":\"JetBrains Mono\",\"fontSize\":\"0.6875rem\",\"fontWeight\":\"400\",\"lineHeight\":\"0.875rem\"}},\"spacing\":{\"space-sm\":\"0.5rem\",\"space-xl\":\"1.5rem\",\"gutter-desktop\":\"1.5rem\",\"space-lg\":\"1rem\",\"margin\":\"1rem\",\"margin-desktop\":\"2rem\",\"gutter\":\"1rem\",\"space-md\":\"0.75rem\",\"space-xs\":\"0.25rem\"},\"headlineFontFamily\":\"Inter\",\"bodyFontFamily\":\"Inter\",\"labelFontFamily\":\"JetBrains Mono\"}},\"version\":\"1\"}}],\"theme\":{}}},{\"text\":\"Ich habe genau 1 ausgewogene Farbvariante f\u00fcr das Status-Dashboard erstellt:\\n\\n### **Status-Dashboard \u2014 Farbvariante (Smaragd & Schiefer)**\\n- **Prim\u00e4rfarbton & Akzente:** Umstellung vom Standard-Blau auf ein pr\u00e4zises, ruhiges Smaragd- & Tief-Teal (`#0f766e` / `#059669`) f\u00fcr Navigations-Elemente, Prim\u00e4r-Aktionen und fokussierte Status-Indikatoren.\\n- **Hintergrund & Oberfl\u00e4chen:** Subtil k\u00fchl get\u00f6nte, extrem klare Oberfl\u00e4chen mit dezenten Schiefer- und Eukalyptus-Nuancen f\u00fcr optimale Lesbarkeit im Leitstand.\\n- **Status-Hierarchie:** Ausgewogene, augenschonende Indikatoren mit klarem Kontrast (Smaragdgr\u00fcn f\u00fcr gesunde Instanzen, Bernstein/Ocker f\u00fcr veraltete Heartbeats und sanftes Koralle f\u00fcr Fehlerzust\u00e4nde).\\n- **Inhaltliche Treue:** S\u00e4mtliche Tabellen, Instanz-Karten, GitHub-Integrationen und SCM-Logs bleiben in voller Informationsdichte und Struktur 1:1 erhalten.\"},{\"suggestion\":\"Eine weitere Farbvariante (z. B. warmes Bernstein & Graphit) testen\"},{\"suggestion\":\"Die Variante auf mobile Bildschirmbreite adaptieren\"},{\"suggestion\":\"Detailanpassungen an Schriftst\u00e4rken oder Kartenkontrasten vornehmen\"}]}",
+    "type": "text"
+   }
+  ],
+  "structuredContent": {
+   "outputComponents": [
+    {
+     "design": {
+      "screens": [
+       {
+        "designSystem": {
+         "designSystem": {
+          "displayName": "Precision Operations",
+          "styleGuidelines": "## Brand & Style\n\nThis design system targets technical leads, sysadmins, and site reliability engineers operating mission-critical environments. The visual language conveys operational clarity, uncompromising stability, and high data utility. \n\nKey attributes:\n- **Style Archetype:** Modern Corporate Engineering / Data-Dense Utility.\n- **Aesthetic Tenets:** Information over decoration, zero layout ambiguity, surgical contrast, and structural rhythm.\n- **Visual Personality:** Quiet, restrained, objective, and responsive. Surfaces operate as quiet scaffolding while system states take center stage.\n\n## Layout & Spacing\n\nThe dashboard uses a structured fluid grid combined with modular layout panes:\n\n- **Desktop (1024px+):** Collapsible persistent left navigation bar (240px fixed), fluid workspace spanning 12 columns with `1.5rem` gutters. Maximum canvas bounds cap at `1600px` for ultra-wide displays to maintain glanceability.\n- **Tablet (768px - 1023px):** 8-column layout, left navigation reduces to an icon-only dock (64px), horizontal canvas margin at `1.5rem`.\n- **Mobile (<768px):** 4-column layout with `1rem` margin and `1rem` gutter. Complex health tables convert to vertically stacked cards.\n\nVertical spacing operates on an absolute 4px base increment (`0.25rem`, `0.5rem`, `0.75rem`, `1rem`, `1.5rem`) to ensure tight component padding without dead space.\n\n## Elevation & Depth\n\nTo avoid visual noise across dense dashboards, this system relies on low-contrast structural outlines rather than heavy drop shadows:\n\n- **Level 0 (App Canvas):** Fills `#F8FAFC`. Zero elevation, zero shadows.\n- **Level 1 (Card & Module Containers):** Surface `#FFFFFF`, bordered with a 1px solid `#E2E8F0`. Shadow: `0 1px 2px 0 rgba(15, 23, 42, 0.04)`.\n- **Level 2 (Dropdowns, Popovers, Filter Menus):** Surface `#FFFFFF`, bordered with 1px solid `#CBD5E1`. Shadow: `0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05)`.\n- **Level 3 (Modal Dialogs & Critical Incident Overlays):** Surface `#FFFFFF`, borderless with full-bleed scrim (`rgba(15, 23, 42, 0.45)`). Shadow: `0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08)`.\n\n## Components\n\n### Buttons\n- **Primary:** Solid `#2563EB` fill, white `#FFFFFF` text, `0.25rem` radius, `0.5rem 0.875rem` padding. Subtle brightness decrease on hover (`#1D4ED8`). Focus ring: 2px offset with `#93C5FD`.\n- **Secondary:** White `#FFFFFF` fill, 1px `#E2E8F0` border, `#0F172A` text. Hover state switches background to `#F8FAFC`.\n- **Destructive/Action:** `#DC2626` fill or transparent with `#DC2626` text for secondary destructive triggers.\n\n### Status Badges & Pills\n- **Geometry:** Height 22px, padding `0 0.5rem`, font `JetBrains Mono` (`code-sm`), weight 500.\n- **Healthy:** `#DCFCE7` background, `#16A34A` text, `#BBF7D0` 1px border. Accompanied by a 6px solid green dot.\n- **Warning (\"Teilweise veraltet\"):** `#FEF3C7` background, `#D97706` text, `#FDE68A` 1px border. Accompanied by a 6px warning amber dot.\n- **Critical / Fetch Error:** `#FEE2E2` background, `#DC2626` text, `#FECACA` 1px border. Accompanied by a 6px pulsing red dot.\n\n### Data Tables & Service Lists\n- **Headers:** Surface `#F8FAFC`, bottom border 1px `#E2E8F0`, uppercase text in `#475569`, tracking `0.05em`, size `0.6875rem`.\n- **Rows:** White `#FFFFFF` background, 1px bottom border `#F1F5F9`. Height fixed at 44px for high density.\n- **Hover State:** Row background transitions to `#F8FAFC` instantly without motion delays.\n\n### Input Fields & Search Bars\n- **Frame:** Height 36px, `0.25rem` radius, 1px border `#E2E8F0`, background `#FFFFFF`.\n- **Focus:** 1px border `#2563EB`, box-shadow `0 0 0 1px #2563EB`.\n- **Monospace Input:** Used specifically for token filters and Git revision queries using `code-md`.\n\n### Cards & Metrics\n- **Metric Cards:** `#FFFFFF` background, 1px `#E2E8F0` border, `1rem` internal padding. Key metric in `headline-lg` (`#0F172A`), subtitle in `body-sm` (`#475569`), status badge positioned top-right.\n- **Dividers:** Clean 1px `#E2E8F0` rules. Never use double borders or styled drop-lines.",
+          "theme": {
+           "bodyFont": "INTER",
+           "bodyFontFamily": "Inter",
+           "colorMode": "LIGHT",
+           "colorVariant": "FIDELITY",
+           "customColor": "#2563eb",
+           "font": "INTER",
+           "headlineFont": "INTER",
+           "headlineFontFamily": "Inter",
+           "labelFont": "JETBRAINS_MONO",
+           "labelFontFamily": "JetBrains Mono",
+           "namedColors": {
+            "background": "#f8f9ff",
+            "error": "#ba1a1a",
+            "error_container": "#ffdad6",
+            "inverse_on_surface": "#eaf1ff",
+            "inverse_primary": "#b4c5ff",
+            "inverse_surface": "#213145",
+            "on_background": "#0b1c30",
+            "on_error": "#ffffff",
+            "on_error_container": "#93000a",
+            "on_primary": "#ffffff",
+            "on_primary_container": "#eeefff",
+            "on_primary_fixed": "#00174b",
+            "on_primary_fixed_variant": "#003ea8",
+            "on_secondary": "#ffffff",
+            "on_secondary_container": "#5c647a",
+            "on_secondary_fixed": "#131b2e",
+            "on_secondary_fixed_variant": "#3f465c",
+            "on_surface": "#0b1c30",
+            "on_surface_variant": "#434655",
+            "on_tertiary": "#ffffff",
+            "on_tertiary_container": "#c7ffca",
+            "on_tertiary_fixed": "#002109",
+            "on_tertiary_fixed_variant": "#005320",
+            "outline": "#737686",
+            "outline_variant": "#c3c6d7",
+            "primary": "#004ac6",
+            "primary_container": "#2563eb",
+            "primary_fixed": "#dbe1ff",
+            "primary_fixed_dim": "#b4c5ff",
+            "secondary": "#565e74",
+            "secondary_container": "#dae2fd",
+            "secondary_fixed": "#dae2fd",
+            "secondary_fixed_dim": "#bec6e0",
+            "surface": "#f8f9ff",
+            "surface_bright": "#f8f9ff",
+            "surface_container": "#e5eeff",
+            "surface_container_high": "#dce9ff",
+            "surface_container_highest": "#d3e4fe",
+            "surface_container_low": "#eff4ff",
+            "surface_container_lowest": "#ffffff",
+            "surface_dim": "#cbdbf5",
+            "surface_tint": "#0053db",
+            "surface_variant": "#d3e4fe",
+            "tertiary": "#006329",
+            "tertiary_container": "#007f36",
+            "tertiary_fixed": "#7ffc97",
+            "tertiary_fixed_dim": "#62df7d"
+           },
+           "overrideNeutralColor": "#64748b",
+           "overridePrimaryColor": "#2563eb",
+           "overrideSecondaryColor": "#0f172a",
+           "overrideTertiaryColor": "#16a34a",
+           "roundness": "ROUND_FOUR",
+           "spacing": {
+            "gutter": "1rem",
+            "gutter-desktop": "1.5rem",
+            "margin": "1rem",
+            "margin-desktop": "2rem",
+            "space-lg": "1rem",
+            "space-md": "0.75rem",
+            "space-sm": "0.5rem",
+            "space-xl": "1.5rem",
+            "space-xs": "0.25rem"
+           },
+           "spacingScale": 2,
+           "typography": {
+            "body-lg": {
+             "fontFamily": "Inter",
+             "fontSize": "0.9375rem",
+             "fontWeight": "400",
+             "lineHeight": "1.5rem"
+            },
+            "body-md": {
+             "fontFamily": "Inter",
+             "fontSize": "0.875rem",
+             "fontWeight": "400",
+             "lineHeight": "1.25rem"
+            },
+            "body-sm": {
+             "fontFamily": "Inter",
+             "fontSize": "0.75rem",
+             "fontWeight": "400",
+             "lineHeight": "1rem"
+            },
+            "code-md": {
+             "fontFamily": "JetBrains Mono",
+             "fontSize": "0.8125rem",
+             "fontWeight": "500",
+             "lineHeight": "1.125rem"
+            },
+            "code-sm": {
+             "fontFamily": "JetBrains Mono",
+             "fontSize": "0.6875rem",
+             "fontWeight": "400",
+             "lineHeight": "0.875rem"
+            },
+            "headline-lg": {
+             "fontFamily": "Inter",
+             "fontSize": "1.75rem",
+             "fontWeight": "600",
+             "letterSpacing": "-0.02em",
+             "lineHeight": "2.25rem"
+            },
+            "headline-lg-mobile": {
+             "fontFamily": "Inter",
+             "fontSize": "1.375rem",
+             "fontWeight": "600",
+             "letterSpacing": "-0.015em",
+             "lineHeight": "1.875rem"
+            },
+            "headline-md": {
+             "fontFamily": "Inter",
+             "fontSize": "1.25rem",
+             "fontWeight": "600",
+             "letterSpacing": "-0.01em",
+             "lineHeight": "1.75rem"
+            },
+            "headline-sm": {
+             "fontFamily": "Inter",
+             "fontSize": "1rem",
+             "fontWeight": "600",
+             "lineHeight": "1.5rem"
+            },
+            "label-lg": {
+             "fontFamily": "Inter",
+             "fontSize": "0.875rem",
+             "fontWeight": "500",
+             "lineHeight": "1.25rem"
+            },
+            "label-md": {
+             "fontFamily": "Inter",
+             "fontSize": "0.75rem",
+             "fontWeight": "500",
+             "letterSpacing": "0.02em",
+             "lineHeight": "1rem"
+            }
+           }
+          }
+         },
+         "name": "assets/25e6f8dbb3604bef8ac4be3fa1415efc",
+         "version": "1"
+        },
+        "deviceType": "DESKTOP",
+        "generatedBy": "HatterAgent",
+        "height": "3334",
+        "htmlCode": {
+         "downloadUrl": "https://stitch.googleapis.com/v1/projects/7540435568831394111/files/053708ec6d4d46bca7fa03e3d42fa862:download",
+         "mimeType": "text/html",
+         "name": "projects/7540435568831394111/files/053708ec6d4d46bca7fa03e3d42fa862"
+        },
+        "id": "b570d4858a3a4a6fb3db7ffc0eb22b05",
+        "name": "projects/7540435568831394111/screens/b570d4858a3a4a6fb3db7ffc0eb22b05",
+        "prompt": "Create exactly 1 distinct, balanced color scheme variation for this Status Dashboard (keep all German text, cards, server instances, tasks table, SCM log, and GitHub cards intact).\n\nColor scheme focus:\n- Shift from the standard blue/neutral tone to a modern, refined Emerald & Deep Teal / Nordic Slate operational color palette.\n- Surface background: crisp cool clean white/soft sage-tinted neutral surface (`#f8faf9` / `#f1f5f3`).\n- Primary brand and active highlights: rich deep emerald teal (`#059669` / `#0f766e` / `#047857`) for key active pills, navigation active indicator, and primary buttons.\n- Status badges: crisp high-contrast emerald green for healthy/online, warm amber/ochre (`#d97706` / `#b45309`) for warnings/outdated, and subtle coral/rose for errors.\n- Card borders, subtle divider lines, and table rows with crisp, balanced slate-emerald accents.\n- Preserve 100% of the original content, layout structure, information density, German copy, and UI components verbatim.",
+        "screenMetadata": {
+         "agentType": "PRO_AGENT",
+         "status": "COMPLETE"
+        },
+        "screenType": "DESIGN",
+        "screenshot": {
+         "downloadUrl": "https://stitch.googleapis.com/v1/projects/7540435568831394111/files/8eeaa620759e4d73925a2aff33110b52:download",
+         "name": "projects/7540435568831394111/files/8eeaa620759e4d73925a2aff33110b52"
+        },
+        "theme": {
+         "bodyFont": "INTER",
+         "bodyFontFamily": "Inter",
+         "colorMode": "LIGHT",
+         "colorVariant": "FIDELITY",
+         "customColor": "#2563eb",
+         "font": "INTER",
+         "headlineFont": "INTER",
+         "headlineFontFamily": "Inter",
+         "labelFont": "JETBRAINS_MONO",
+         "labelFontFamily": "JetBrains Mono",
+         "namedColors": {
+          "background": "#f8f9ff",
+          "error": "#ba1a1a",
+          "error_container": "#ffdad6",
+          "inverse_on_surface": "#eaf1ff",
+          "inverse_primary": "#b4c5ff",
+          "inverse_surface": "#213145",
+          "on_background": "#0b1c30",
+          "on_error": "#ffffff",
+          "on_error_container": "#93000a",
+          "on_primary": "#ffffff",
+          "on_primary_container": "#eeefff",
+          "on_primary_fixed": "#00174b",
+          "on_primary_fixed_variant": "#003ea8",
+          "on_secondary": "#ffffff",
+          "on_secondary_container": "#5c647a",
+          "on_secondary_fixed": "#131b2e",
+          "on_secondary_fixed_variant": "#3f465c",
+          "on_surface": "#0b1c30",
+          "on_surface_variant": "#434655",
+          "on_tertiary": "#ffffff",
+          "on_tertiary_container": "#c7ffca",
+          "on_tertiary_fixed": "#002109",
+          "on_tertiary_fixed_variant": "#005320",
+          "outline": "#737686",
+          "outline_variant": "#c3c6d7",
+          "primary": "#004ac6",
+          "primary_container": "#2563eb",
+          "primary_fixed": "#dbe1ff",
+          "primary_fixed_dim": "#b4c5ff",
+          "secondary": "#565e74",
+          "secondary_container": "#dae2fd",
+          "secondary_fixed": "#dae2fd",
+          "secondary_fixed_dim": "#bec6e0",
+          "surface": "#f8f9ff",
+          "surface_bright": "#f8f9ff",
+          "surface_container": "#e5eeff",
+          "surface_container_high": "#dce9ff",
+          "surface_container_highest": "#d3e4fe",
+          "surface_container_low": "#eff4ff",
+          "surface_container_lowest": "#ffffff",
+          "surface_dim": "#cbdbf5",
+          "surface_tint": "#0053db",
+          "surface_variant": "#d3e4fe",
+          "tertiary": "#006329",
+          "tertiary_container": "#007f36",
+          "tertiary_fixed": "#7ffc97",
+          "tertiary_fixed_dim": "#62df7d"
+         },
+         "overrideNeutralColor": "#64748b",
+         "overridePrimaryColor": "#2563eb",
+         "overrideSecondaryColor": "#0f172a",
+         "overrideTertiaryColor": "#16a34a",
+         "roundness": "ROUND_FOUR",
+         "spacing": {
+          "gutter": "1rem",
+          "gutter-desktop": "1.5rem",
+          "margin": "1rem",
+          "margin-desktop": "2rem",
+          "space-lg": "1rem",
+          "space-md": "0.75rem",
+          "space-sm": "0.5rem",
+          "space-xl": "1.5rem",
+          "space-xs": "0.25rem"
+         },
+         "spacingScale": 2,
+         "typography": {
+          "body-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "0.9375rem",
+           "fontWeight": "400",
+           "lineHeight": "1.5rem"
+          },
+          "body-md": {
+           "fontFamily": "Inter",
+           "fontSize": "0.875rem",
+           "fontWeight": "400",
+           "lineHeight": "1.25rem"
+          },
+          "body-sm": {
+           "fontFamily": "Inter",
+           "fontSize": "0.75rem",
+           "fontWeight": "400",
+           "lineHeight": "1rem"
+          },
+          "code-md": {
+           "fontFamily": "JetBrains Mono",
+           "fontSize": "0.8125rem",
+           "fontWeight": "500",
+           "lineHeight": "1.125rem"
+          },
+          "code-sm": {
+           "fontFamily": "JetBrains Mono",
+           "fontSize": "0.6875rem",
+           "fontWeight": "400",
+           "lineHeight": "0.875rem"
+          },
+          "headline-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "1.75rem",
+           "fontWeight": "600",
+           "letterSpacing": "-0.02em",
+           "lineHeight": "2.25rem"
+          },
+          "headline-lg-mobile": {
+           "fontFamily": "Inter",
+           "fontSize": "1.375rem",
+           "fontWeight": "600",
+           "letterSpacing": "-0.015em",
+           "lineHeight": "1.875rem"
+          },
+          "headline-md": {
+           "fontFamily": "Inter",
+           "fontSize": "1.25rem",
+           "fontWeight": "600",
+           "letterSpacing": "-0.01em",
+           "lineHeight": "1.75rem"
+          },
+          "headline-sm": {
+           "fontFamily": "Inter",
+           "fontSize": "1rem",
+           "fontWeight": "600",
+           "lineHeight": "1.5rem"
+          },
+          "label-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "0.875rem",
+           "fontWeight": "500",
+           "lineHeight": "1.25rem"
+          },
+          "label-md": {
+           "fontFamily": "Inter",
+           "fontSize": "0.75rem",
+           "fontWeight": "500",
+           "letterSpacing": "0.02em",
+           "lineHeight": "1rem"
+          }
+         }
+        },
+        "title": "Status-Dashboard \u2014 Farbvariante (Smaragd & Schiefer)",
+        "width": "2560"
+       }
+      ],
+      "theme": {}
+     }
+    },
+    {
+     "text": "Ich habe genau 1 ausgewogene Farbvariante f\u00fcr das Status-Dashboard erstellt:\n\n### **Status-Dashboard \u2014 Farbvariante (Smaragd & Schiefer)**\n- **Prim\u00e4rfarbton & Akzente:** Umstellung vom Standard-Blau auf ein pr\u00e4zises, ruhiges Smaragd- & Tief-Teal (`#0f766e` / `#059669`) f\u00fcr Navigations-Elemente, Prim\u00e4r-Aktionen und fokussierte Status-Indikatoren.\n- **Hintergrund & Oberfl\u00e4chen:** Subtil k\u00fchl get\u00f6nte, extrem klare Oberfl\u00e4chen mit dezenten Schiefer- und Eukalyptus-Nuancen f\u00fcr optimale Lesbarkeit im Leitstand.\n- **Status-Hierarchie:** Ausgewogene, augenschonende Indikatoren mit klarem Kontrast (Smaragdgr\u00fcn f\u00fcr gesunde Instanzen, Bernstein/Ocker f\u00fcr veraltete Heartbeats und sanftes Koralle f\u00fcr Fehlerzust\u00e4nde).\n- **Inhaltliche Treue:** S\u00e4mtliche Tabellen, Instanz-Karten, GitHub-Integrationen und SCM-Logs bleiben in voller Informationsdichte und Struktur 1:1 erhalten."
+    },
+    {
+     "suggestion": "Eine weitere Farbvariante (z. B. warmes Bernstein & Graphit) testen"
+    },
+    {
+     "suggestion": "Die Variante auf mobile Bildschirmbreite adaptieren"
+    },
+    {
+     "suggestion": "Detailanpassungen an Schriftst\u00e4rken oder Kartenkontrasten vornehmen"
+    }
+   ],
+   "projectId": "7540435568831394111",
+   "sessionId": "2167004309216807930"
+  }
+ }
+}

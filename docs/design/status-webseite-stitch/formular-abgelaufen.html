@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+
+<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><title>Softwareschmiede Status</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base { html, body { margin: 0; padding: 0; } body { overscroll-behavior: none; } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; }</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "tertiary-fixed-dim": "#62df7d", "surface": "#f8f9ff", "secondary-fixed": "#dae2fd", "outline-variant": "#c3c6d7", "on-primary-fixed": "#00174b", "on-primary-fixed-variant": "#003ea8", "inverse-primary": "#b4c5ff", "on-secondary-container": "#5c647a", "secondary-container": "#dae2fd", "surface-dim": "#cbdbf5", "surface-variant": "#d3e4fe", "on-tertiary": "#ffffff", "inverse-surface": "#213145", "primary-fixed-dim": "#b4c5ff", "on-secondary-fixed-variant": "#3f465c", "error-container": "#ffdad6", "on-primary-container": "#eeefff", "surface-container-highest": "#d3e4fe", "on-error": "#ffffff", "surface-tint": "#0053db", "surface-container-low": "#eff4ff", "secondary-fixed-dim": "#bec6e0", "surface-container": "#e5eeff", "on-surface-variant": "#434655", "on-secondary-fixed": "#131b2e", "primary-container": "#2563eb", "surface-container-lowest": "#ffffff", "outline": "#737686", "secondary": "#565e74", "tertiary-fixed": "#7ffc97", "primary-fixed": "#dbe1ff", "on-primary": "#ffffff", "inverse-on-surface": "#eaf1ff", "tertiary": "#006329", "on-error-container": "#93000a", "on-surface": "#0b1c30", "on-tertiary-container": "#c7ffca", "error": "#ba1a1a", "surface-bright": "#f8f9ff", "background": "#f8f9ff", "on-tertiary-fixed-variant": "#005320", "tertiary-container": "#007f36", "primary": "#004ac6", "on-tertiary-fixed": "#002109", "surface-container-high": "#dce9ff", "on-secondary": "#ffffff", "on-background": "#0b1c30" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "margin": "1rem", "space-lg": "1rem", "space-md": "0.75rem", "margin-desktop": "2rem", "gutter": "1rem", "space-sm": "0.5rem", "space-xs": "0.25rem", "gutter-desktop": "1.5rem", "space-xl": "1.5rem" }, "fontFamily": { "label-lg": [ "Inter" ], "headline-sm": [ "Inter" ], "body-sm": [ "Inter" ], "headline-lg": [ "Inter" ], "label-md": [ "Inter" ], "headline-lg-mobile": [ "Inter" ], "code-sm": [ "JetBrains Mono" ], "code-md": [ "JetBrains Mono" ], "body-md": [ "Inter" ], "body-lg": [ "Inter" ], "headline-md": [ "Inter" ] }, "fontSize": { "label-lg": [ "0.875rem", { "lineHeight": "1.25rem", "fontWeight": "500" } ], "headline-sm": [ "1rem", { "lineHeight": "1.5rem", "fontWeight": "600" } ], "body-sm": [ "0.75rem", { "lineHeight": "1rem", "fontWeight": "400" } ], "headline-lg": [ "1.75rem", { "lineHeight": "2.25rem", "letterSpacing": "-0.02em", "fontWeight": "600" } ], "label-md": [ "0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.02em", "fontWeight": "500" } ], "headline-lg-mobile": [ "1.375rem", { "lineHeight": "1.875rem", "letterSpacing": "-0.015em", "fontWeight": "600" } ], "code-sm": [ "0.6875rem", { "lineHeight": "0.875rem", "fontWeight": "400" } ], "code-md": [ "0.8125rem", { "lineHeight": "1.125rem", "fontWeight": "500" } ], "body-md": [ "0.875rem", { "lineHeight": "1.25rem", "fontWeight": "400" } ], "body-lg": [ "0.9375rem", { "lineHeight": "1.5rem", "fontWeight": "400" } ], "headline-md": [ "1.25rem", { "lineHeight": "1.75rem", "letterSpacing": "-0.01em", "fontWeight": "600" } ] } } } };</script></head><body class="bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between"><header class="fixed top-0 left-0 w-full z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-14 w-full px-gutter-desktop max-w-[1600px] mx-auto flex items-center justify-between"><div class="flex items-center gap-space-xl"><a class="flex items-center gap-space-sm text-on-surface select-none" data-path="status" href="#"><span class="material-symbols-outlined text-primary text-[22px]">terminal</span><span class="font-headline-sm text-headline-sm tracking-tight text-on-surface">Softwareschmiede Status</span></a><nav class="hidden md:flex items-center gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-label-lg rounded-lg"><a class="px-space-md py-space-xs rounded-lg font-label-lg text-label-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="status" href="#">Status</a><a class="px-space-md py-space-xs rounded-lg font-label-lg text-label-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="profil" href="#">Profil</a><div class="relative group"><button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-lg font-label-lg text-label-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors group-hover:text-on-surface" type="button"><span>Administration</span><span class="material-symbols-outlined text-[16px] transition-transform group-hover:rotate-180">expand_more</span></button><div class="absolute left-0 top-full pt-1 hidden group-hover:block z-50"><div class="w-48 bg-surface-container-lowest rounded-xl shadow-[0_4px_16px_rgba(15,23,42,0.08)] py-space-xs"><a class="block px-space-md py-space-sm font-label-lg text-label-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="benutzer" href="#">Benutzer</a><a class="block px-space-md py-space-sm font-label-lg text-label-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="tokens" href="#">Tokens</a><a class="px-space-md py-space-xs rounded-lg font-label-lg text-label-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="einstellungen" href="#">Einstellungen</a></div></div></div></nav></div><div class="flex items-center gap-space-lg"><div class="flex items-center gap-space-sm"><div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-container-highest"><span class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></span><span class="font-code-sm text-code-sm text-on-surface-variant">admin ROLE</span></div><button aria-label="Benutzerprofil" class="w-8 h-8 rounded-full bg-primary flex items-center justify-center hover:opacity-90 transition-opacity" type="button"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></button></div><a class="font-label-lg text-label-lg text-on-surface-variant hover:text-error transition-colors flex items-center gap-1" data-path="login" href="#"><span class="material-symbols-outlined text-[18px]">logout</span><span>Abmelden</span></a></div></div></header><main class="w-full pt-14 bg-surface flex-1"><div class="flex flex-col w-full">
+<!-- Sub-Header / Operational Breadcrumb Strip -->
+<div class="w-full bg-surface-container-lowest shadow-sm">
+<div class="max-w-[1600px] mx-auto px-gutter-desktop py-space-sm flex flex-wrap items-center justify-between gap-space-sm">
+<nav aria-label="Breadcrumb" class="flex items-center gap-space-xs font-label-md text-label-md text-on-surface-variant">
+<span class="hover:text-on-surface transition-colors cursor-pointer" data-path="status">Softwareschmiede</span>
+<span class="text-outline-variant font-code-sm">/</span>
+<span class="hover:text-on-surface transition-colors cursor-pointer">Sicherheit</span>
+<span class="text-outline-variant font-code-sm">/</span>
+<span class="font-code-md text-code-md text-on-surface font-medium">Formular abgelaufen</span>
+</nav>
+<div class="flex items-center gap-space-xs">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container font-code-sm text-code-sm text-secondary tracking-wide uppercase">
+          SEC-CSRF-TOKEN-EXPIRED
+        </span>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-error-container/60 font-code-sm text-code-sm text-on-error-container font-medium tracking-wide">
+<span class="w-1.5 h-1.5 rounded-full bg-error animate-pulse"></span>
+          HTTP 419 / SESSION TIMEOUT
+        </span>
+</div>
+</div>
+</div>
+<!-- Main Canvas Content -->
+<div class="w-full max-w-[1600px] mx-auto px-gutter-desktop py-12 flex flex-col items-center justify-center">
+<!-- Centered Card Container (Max-Width ~680px) with Decorative Security Glow -->
+<div class="relative w-full max-w-[680px]">
+<!-- Subtle Backlight Security Halo -->
+<div class="absolute -top-10 left-1/2 -translate-x-1/2 w-80 h-36 bg-gradient-to-b from-error/10 via-primary/5 to-transparent blur-2xl pointer-events-none rounded-full"></div>
+<!-- Surface Card -->
+<div class="relative bg-surface-container-lowest rounded-xl shadow-xl overflow-hidden">
+<!-- Top Status Bar Highlight (Red/Amber Warning Indicating Expired Signature) -->
+<div class="h-1.5 w-full bg-gradient-to-r from-error via-amber-500 to-error"></div>
+<div class="p-6 md:p-8 flex flex-col items-center text-center">
+<!-- Security Badge Icon -->
+<div class="relative mb-5 flex items-center justify-center">
+<div class="w-16 h-16 rounded-xl bg-error-container/40 flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[34px] text-error">history_toggle_off</span>
+</div>
+<div class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-surface-container-lowest shadow-md flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px] text-error font-bold">lock_clock</span>
+</div>
+</div>
+<!-- Main Heading -->
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight mb-2">
+            Formular abgelaufen
+          </h1>
+<!-- Monospace Technical Badge -->
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded bg-surface-container-high font-code-md text-code-md text-on-surface-variant font-medium tracking-tight mb-4">
+<span class="text-error font-semibold">HTTP 419</span>
+<span class="text-outline-variant font-normal">|</span>
+<span>TOKEN-LIFETIME: 120 MIN ABGELAUFEN</span>
+</div>
+<!-- Human-Readable Explanation -->
+<p class="font-body-lg text-body-lg text-secondary max-w-[520px] mb-6">
+            Das Sicherheitstoken des Formulars ist nicht mehr gültig. Bitte laden Sie die Seite neu und versuchen Sie es erneut.
+          </p>
+<!-- Technical Diagnostic Block (Structured SRE Spec) -->
+<div class="w-full text-left rounded-lg bg-surface-container-low p-4 sm:p-5 mb-5 shadow-inner">
+<div class="flex items-center justify-between pb-3 mb-3 border-b border-surface-container">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[16px]">verified_user</span>
+<span class="font-code-sm text-code-sm text-secondary font-semibold uppercase tracking-wider">Sicherheitsdiagnose</span>
+</div>
+<span class="font-code-sm text-code-sm text-on-surface-variant bg-surface-container-lowest px-2 py-0.5 rounded shadow-sm">SEC-CSRF-VAL-03</span>
+</div>
+<!-- Monospace Spec Matrix -->
+<div class="space-y-2.5 font-code-md text-code-md">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+<span class="text-secondary font-normal font-code-sm text-code-sm">Angemeldeter Benutzer:</span>
+<div class="flex items-center gap-1.5 font-medium text-on-surface">
+<span class="w-2 h-2 rounded-full bg-tertiary-container"></span>
+<span>admin</span>
+</div>
+</div>
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+<span class="text-secondary font-normal font-code-sm text-code-sm">Sicherheitsmechanismus:</span>
+<span class="text-on-surface font-medium text-right truncate">CSRF-Token (Double Submit Cookie / Anti-Forgery)</span>
+</div>
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+<span class="text-secondary font-normal font-code-sm text-code-sm">Token-Ausstellung:</span>
+<span class="text-on-surface-variant font-medium text-right">Vor 2 Std. 14 Min. <span class="text-secondary font-normal">(Gültigkeit: max. 60 Min.)</span></span>
+</div>
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pt-1">
+<span class="text-secondary font-normal font-code-sm text-code-sm">Validierungsstatus:</span>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-error-container font-code-sm text-code-sm text-on-error-container font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                  Abgelaufen (Invalid Signature)
+                </span>
+</div>
+</div>
+</div>
+<!-- Incident Notice / Advisory Box -->
+<div class="w-full text-left rounded-lg bg-secondary-container/40 p-4 mb-6 flex items-start gap-3">
+<span class="material-symbols-outlined text-on-secondary-fixed-variant text-[20px] shrink-0 mt-0.5">info</span>
+<div class="flex flex-col gap-0.5">
+<span class="font-label-lg text-label-lg text-on-secondary-fixed font-semibold">Häufige Ursache</span>
+<p class="font-body-sm text-body-sm text-on-secondary-fixed-variant">
+                Die Seite war zu lange geöffnet. Zum Schutz vor unbefugten Aktionen laufen Formularübertragungen nach längerer Inaktivität automatisch ab.
+              </p>
+</div>
+</div>
+<!-- Action Buttons / CTA Row -->
+<div class="w-full flex flex-col sm:flex-row items-center justify-center gap-space-md pt-2">
+<a class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-space-lg py-2.5 rounded-lg bg-primary-container text-on-primary font-label-lg text-label-lg shadow-sm hover:bg-primary transition-all duration-150" data-path="status" href="#">
+<span class="material-symbols-outlined text-[18px]">arrow_back</span>
+<span>Zur Status-Übersicht</span>
+</a>
+<button class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-space-lg py-2.5 rounded-lg bg-surface-container-high text-on-surface hover:bg-surface-variant font-label-lg text-label-lg transition-all duration-150 shadow-sm" onclick="window.location.reload()" type="button">
+<span class="material-symbols-outlined text-[18px] text-secondary">refresh</span>
+<span>Formular neu laden</span>
+</button>
+</div>
+</div>
+<!-- Technical Footer Audit Strip -->
+<div class="w-full bg-surface-container-low px-6 py-3 flex flex-wrap items-center justify-between gap-2">
+<div class="flex items-center gap-1.5 text-secondary">
+<span class="material-symbols-outlined text-[16px] text-tertiary">shield</span>
+<span class="font-code-sm text-code-sm">CSRF-Schutzrichtlinie aktiv (RFC 6749)</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant font-code-sm text-code-sm">
+<span>Session-Audit-ID:</span>
+<span class="font-mono bg-surface-container-lowest px-1.5 py-0.5 rounded text-on-surface font-medium">#89312</span>
+</div>
+</div>
+</div>
+<!-- Additional Technical Context Link for Operators -->
+<div class="mt-4 flex items-center justify-center gap-4 text-secondary font-label-md text-label-md">
+<a class="hover:text-primary transition-colors flex items-center gap-1" href="#">
+<span class="material-symbols-outlined text-[16px]">menu_book</span>
+<span>Dokumentation: Form-Lifecycle &amp; Session-Timeouts</span>
+</a>
+<span>•</span>
+<a class="hover:text-primary transition-colors flex items-center gap-1" href="#">
+<span class="material-symbols-outlined text-[16px]">bug_report</span>
+<span>Incident melden</span>
+</a>
+</div>
+</div>
+</div>
+</div></main><footer class="w-full bg-surface-container-low shadow-[0_-1px_6px_rgba(0,0,0,0.02)]"><div class="h-12 w-full px-gutter-desktop max-w-[1600px] mx-auto flex items-center justify-between"><div class="flex items-center gap-space-sm"><span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-tertiary-container"></span></span><span class="font-code-sm text-code-sm text-on-surface-variant">Aktualisiert vor wenigen Sekunden</span></div><button class="inline-flex items-center gap-space-xs px-space-md py-1 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-md text-label-md transition-colors" type="button"><span class="material-symbols-outlined text-[16px]">sync</span><span>Aktualisieren</span></button></div></footer></body></html>

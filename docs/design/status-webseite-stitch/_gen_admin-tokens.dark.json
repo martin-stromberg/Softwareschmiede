@@ -1,0 +1,357 @@
+{
+ "projectId": "7540435568831394111",
+ "sessionId": "3926837711063528504",
+ "outputComponents": [
+  {
+   "design": {
+    "screens": [
+     {
+      "screenshot": {
+       "name": "projects/7540435568831394111/files/9cdb3c4374ef450a8452b862b799d4f7",
+       "downloadUrl": "https://stitch.googleapis.com/v1/projects/7540435568831394111/files/9cdb3c4374ef450a8452b862b799d4f7:download"
+      },
+      "htmlCode": {
+       "name": "projects/7540435568831394111/files/e631717c8a354369955d49a242a69abe",
+       "downloadUrl": "https://stitch.googleapis.com/v1/projects/7540435568831394111/files/e631717c8a354369955d49a242a69abe:download",
+       "mimeType": "text/html"
+      },
+      "id": "8d8ae8a2910a405bbd9662159abe7ad6",
+      "generatedBy": "HatterAgent",
+      "width": "2560",
+      "height": "2404",
+      "title": "Token-Verwaltung (Dark Mode) — Softwareschmiede Status",
+      "prompt": "Convert the entire screen to dark mode (Dark Theme), identical in layout and verbatim content:\n- Match the visual style, background, borders, and dark atmosphere of the other Dark Mode screens in this project (such as SCREEN_6 'Benutzerverwaltung (Dark Mode)' and SCREEN_10 'Profil (Dark Mode)').\n- Set the global background to deep dark slate/navy (#0b0f19 / #0d121f) with the subtle technical grid pattern.\n- Top navigation bar & footer: dark navy/slate background (#0f172a / #111827), dark border lines (#1e293b), white/light text and badges matching SCREEN_6.\n- All cards, panels, inputs, and tables: dark container surfaces (#131c2e, #182238) with refined subtle borders (#22314e / #334155).\n- Typography: primary text in bright off-white (#f8fafc / #f1f5f9), secondary text in soft muted blue-gray (#94a3b8 / #64748b).\n- Keep all German content, labels, tags, breadcrumbs ('Softwareschmiede / Administration / Token-Verwaltung SEC-TOKENS-01'), metric counters (3 registriert, 2 aktiv, 1 widerrufen), dismissible success notification alert ('Neues Token „Ops-Server“ wurde erstellt' with copy token button), active & archived tokens table ('OPS-SERVER', 'TEST-INTEGRATION', 'ALT-BACKUP'), 'Neues Token erstellen' right column form, and the CURL code example box.\n- Maintain existing status semantic badges: Green for 'Aktiv', gray/muted for 'Widerrufen', and vibrant blue for primary CTA buttons.",
+      "name": "projects/7540435568831394111/screens/8d8ae8a2910a405bbd9662159abe7ad6",
+      "theme": {
+       "colorMode": "LIGHT",
+       "font": "INTER",
+       "roundness": "ROUND_FOUR",
+       "customColor": "#2563eb",
+       "headlineFont": "INTER",
+       "bodyFont": "INTER",
+       "labelFont": "JETBRAINS_MONO",
+       "namedColors": {
+        "surface_container": "#e5eeff",
+        "tertiary_container": "#007f36",
+        "inverse_on_surface": "#eaf1ff",
+        "secondary_fixed_dim": "#bec6e0",
+        "on_tertiary_fixed": "#002109",
+        "surface_bright": "#f8f9ff",
+        "tertiary_fixed": "#7ffc97",
+        "primary_fixed": "#dbe1ff",
+        "error": "#ba1a1a",
+        "primary_container": "#2563eb",
+        "surface_container_high": "#dce9ff",
+        "surface_container_lowest": "#ffffff",
+        "outline": "#737686",
+        "on_primary_fixed": "#00174b",
+        "on_tertiary_container": "#c7ffca",
+        "outline_variant": "#c3c6d7",
+        "on_primary_fixed_variant": "#003ea8",
+        "surface_container_low": "#eff4ff",
+        "on_secondary_fixed": "#131b2e",
+        "on_error_container": "#93000a",
+        "on_secondary": "#ffffff",
+        "secondary_container": "#dae2fd",
+        "on_secondary_container": "#5c647a",
+        "on_tertiary": "#ffffff",
+        "background": "#f8f9ff",
+        "primary": "#004ac6",
+        "tertiary": "#006329",
+        "on_primary_container": "#eeefff",
+        "on_tertiary_fixed_variant": "#005320",
+        "inverse_surface": "#213145",
+        "on_primary": "#ffffff",
+        "on_background": "#0b1c30",
+        "secondary_fixed": "#dae2fd",
+        "surface_variant": "#d3e4fe",
+        "surface_dim": "#cbdbf5",
+        "on_surface": "#0b1c30",
+        "on_error": "#ffffff",
+        "secondary": "#565e74",
+        "surface_tint": "#0053db",
+        "surface_container_highest": "#d3e4fe",
+        "inverse_primary": "#b4c5ff",
+        "on_secondary_fixed_variant": "#3f465c",
+        "on_surface_variant": "#434655",
+        "error_container": "#ffdad6",
+        "primary_fixed_dim": "#b4c5ff",
+        "tertiary_fixed_dim": "#62df7d",
+        "surface": "#f8f9ff"
+       },
+       "colorVariant": "FIDELITY",
+       "overridePrimaryColor": "#2563eb",
+       "overrideSecondaryColor": "#0f172a",
+       "overrideTertiaryColor": "#16a34a",
+       "overrideNeutralColor": "#64748b",
+       "spacingScale": 2,
+       "typography": {
+        "body-md": {
+         "fontFamily": "Inter",
+         "fontSize": "0.875rem",
+         "fontWeight": "400",
+         "lineHeight": "1.25rem"
+        },
+        "label-lg": {
+         "fontFamily": "Inter",
+         "fontSize": "0.875rem",
+         "fontWeight": "500",
+         "lineHeight": "1.25rem"
+        },
+        "code-sm": {
+         "fontFamily": "JetBrains Mono",
+         "fontSize": "0.6875rem",
+         "fontWeight": "400",
+         "lineHeight": "0.875rem"
+        },
+        "headline-sm": {
+         "fontFamily": "Inter",
+         "fontSize": "1rem",
+         "fontWeight": "600",
+         "lineHeight": "1.5rem"
+        },
+        "headline-md": {
+         "fontFamily": "Inter",
+         "fontSize": "1.25rem",
+         "fontWeight": "600",
+         "lineHeight": "1.75rem",
+         "letterSpacing": "-0.01em"
+        },
+        "code-md": {
+         "fontFamily": "JetBrains Mono",
+         "fontSize": "0.8125rem",
+         "fontWeight": "500",
+         "lineHeight": "1.125rem"
+        },
+        "headline-lg": {
+         "fontFamily": "Inter",
+         "fontSize": "1.75rem",
+         "fontWeight": "600",
+         "lineHeight": "2.25rem",
+         "letterSpacing": "-0.02em"
+        },
+        "headline-lg-mobile": {
+         "fontFamily": "Inter",
+         "fontSize": "1.375rem",
+         "fontWeight": "600",
+         "lineHeight": "1.875rem",
+         "letterSpacing": "-0.015em"
+        },
+        "label-md": {
+         "fontFamily": "Inter",
+         "fontSize": "0.75rem",
+         "fontWeight": "500",
+         "lineHeight": "1rem",
+         "letterSpacing": "0.02em"
+        },
+        "body-sm": {
+         "fontFamily": "Inter",
+         "fontSize": "0.75rem",
+         "fontWeight": "400",
+         "lineHeight": "1rem"
+        },
+        "body-lg": {
+         "fontFamily": "Inter",
+         "fontSize": "0.9375rem",
+         "fontWeight": "400",
+         "lineHeight": "1.5rem"
+        }
+       },
+       "spacing": {
+        "space-lg": "1rem",
+        "space-xl": "1.5rem",
+        "margin-desktop": "2rem",
+        "gutter-desktop": "1.5rem",
+        "space-xs": "0.25rem",
+        "space-sm": "0.5rem",
+        "gutter": "1rem",
+        "margin": "1rem",
+        "space-md": "0.75rem"
+       },
+       "headlineFontFamily": "Inter",
+       "bodyFontFamily": "Inter",
+       "labelFontFamily": "JetBrains Mono"
+      },
+      "deviceType": "DESKTOP",
+      "screenType": "DESIGN",
+      "screenMetadata": {
+       "agentType": "PRO_AGENT",
+       "status": "COMPLETE"
+      },
+      "designSystem": {
+       "name": "assets/25e6f8dbb3604bef8ac4be3fa1415efc",
+       "designSystem": {
+        "displayName": "Precision Operations",
+        "styleGuidelines": "## Brand & Style\n\nThis design system targets technical leads, sysadmins, and site reliability engineers operating mission-critical environments. The visual language conveys operational clarity, uncompromising stability, and high data utility. \n\nKey attributes:\n- **Style Archetype:** Modern Corporate Engineering / Data-Dense Utility.\n- **Aesthetic Tenets:** Information over decoration, zero layout ambiguity, surgical contrast, and structural rhythm.\n- **Visual Personality:** Quiet, restrained, objective, and responsive. Surfaces operate as quiet scaffolding while system states take center stage.\n\n## Layout & Spacing\n\nThe dashboard uses a structured fluid grid combined with modular layout panes:\n\n- **Desktop (1024px+):** Collapsible persistent left navigation bar (240px fixed), fluid workspace spanning 12 columns with `1.5rem` gutters. Maximum canvas bounds cap at `1600px` for ultra-wide displays to maintain glanceability.\n- **Tablet (768px - 1023px):** 8-column layout, left navigation reduces to an icon-only dock (64px), horizontal canvas margin at `1.5rem`.\n- **Mobile (<768px):** 4-column layout with `1rem` margin and `1rem` gutter. Complex health tables convert to vertically stacked cards.\n\nVertical spacing operates on an absolute 4px base increment (`0.25rem`, `0.5rem`, `0.75rem`, `1rem`, `1.5rem`) to ensure tight component padding without dead space.\n\n## Elevation & Depth\n\nTo avoid visual noise across dense dashboards, this system relies on low-contrast structural outlines rather than heavy drop shadows:\n\n- **Level 0 (App Canvas):** Fills `#F8FAFC`. Zero elevation, zero shadows.\n- **Level 1 (Card & Module Containers):** Surface `#FFFFFF`, bordered with a 1px solid `#E2E8F0`. Shadow: `0 1px 2px 0 rgba(15, 23, 42, 0.04)`.\n- **Level 2 (Dropdowns, Popovers, Filter Menus):** Surface `#FFFFFF`, bordered with 1px solid `#CBD5E1`. Shadow: `0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05)`.\n- **Level 3 (Modal Dialogs & Critical Incident Overlays):** Surface `#FFFFFF`, borderless with full-bleed scrim (`rgba(15, 23, 42, 0.45)`). Shadow: `0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08)`.\n\n## Components\n\n### Buttons\n- **Primary:** Solid `#2563EB` fill, white `#FFFFFF` text, `0.25rem` radius, `0.5rem 0.875rem` padding. Subtle brightness decrease on hover (`#1D4ED8`). Focus ring: 2px offset with `#93C5FD`.\n- **Secondary:** White `#FFFFFF` fill, 1px `#E2E8F0` border, `#0F172A` text. Hover state switches background to `#F8FAFC`.\n- **Destructive/Action:** `#DC2626` fill or transparent with `#DC2626` text for secondary destructive triggers.\n\n### Status Badges & Pills\n- **Geometry:** Height 22px, padding `0 0.5rem`, font `JetBrains Mono` (`code-sm`), weight 500.\n- **Healthy:** `#DCFCE7` background, `#16A34A` text, `#BBF7D0` 1px border. Accompanied by a 6px solid green dot.\n- **Warning (\"Teilweise veraltet\"):** `#FEF3C7` background, `#D97706` text, `#FDE68A` 1px border. Accompanied by a 6px warning amber dot.\n- **Critical / Fetch Error:** `#FEE2E2` background, `#DC2626` text, `#FECACA` 1px border. Accompanied by a 6px pulsing red dot.\n\n### Data Tables & Service Lists\n- **Headers:** Surface `#F8FAFC`, bottom border 1px `#E2E8F0`, uppercase text in `#475569`, tracking `0.05em`, size `0.6875rem`.\n- **Rows:** White `#FFFFFF` background, 1px bottom border `#F1F5F9`. Height fixed at 44px for high density.\n- **Hover State:** Row background transitions to `#F8FAFC` instantly without motion delays.\n\n### Input Fields & Search Bars\n- **Frame:** Height 36px, `0.25rem` radius, 1px border `#E2E8F0`, background `#FFFFFF`.\n- **Focus:** 1px border `#2563EB`, box-shadow `0 0 0 1px #2563EB`.\n- **Monospace Input:** Used specifically for token filters and Git revision queries using `code-md`.\n\n### Cards & Metrics\n- **Metric Cards:** `#FFFFFF` background, 1px `#E2E8F0` border, `1rem` internal padding. Key metric in `headline-lg` (`#0F172A`), subtitle in `body-sm` (`#475569`), status badge positioned top-right.\n- **Dividers:** Clean 1px `#E2E8F0` rules. Never use double borders or styled drop-lines.",
+        "theme": {
+         "colorMode": "LIGHT",
+         "font": "INTER",
+         "roundness": "ROUND_FOUR",
+         "customColor": "#2563eb",
+         "headlineFont": "INTER",
+         "bodyFont": "INTER",
+         "labelFont": "JETBRAINS_MONO",
+         "namedColors": {
+          "tertiary_fixed": "#7ffc97",
+          "on_error": "#ffffff",
+          "on_surface_variant": "#434655",
+          "error_container": "#ffdad6",
+          "outline": "#737686",
+          "tertiary_fixed_dim": "#62df7d",
+          "on_primary_fixed": "#00174b",
+          "primary_fixed_dim": "#b4c5ff",
+          "surface_bright": "#f8f9ff",
+          "inverse_primary": "#b4c5ff",
+          "secondary_fixed_dim": "#bec6e0",
+          "on_tertiary": "#ffffff",
+          "tertiary": "#006329",
+          "on_background": "#0b1c30",
+          "surface_variant": "#d3e4fe",
+          "secondary_fixed": "#dae2fd",
+          "on_primary_container": "#eeefff",
+          "on_secondary_fixed_variant": "#3f465c",
+          "inverse_surface": "#213145",
+          "secondary_container": "#dae2fd",
+          "error": "#ba1a1a",
+          "surface_container_high": "#dce9ff",
+          "on_secondary": "#ffffff",
+          "surface_dim": "#cbdbf5",
+          "on_secondary_fixed": "#131b2e",
+          "on_error_container": "#93000a",
+          "surface_container_highest": "#d3e4fe",
+          "surface": "#f8f9ff",
+          "outline_variant": "#c3c6d7",
+          "on_surface": "#0b1c30",
+          "secondary": "#565e74",
+          "on_tertiary_fixed": "#002109",
+          "on_secondary_container": "#5c647a",
+          "on_primary_fixed_variant": "#003ea8",
+          "on_primary": "#ffffff",
+          "surface_container": "#e5eeff",
+          "surface_container_lowest": "#ffffff",
+          "on_tertiary_container": "#c7ffca",
+          "surface_tint": "#0053db",
+          "primary_fixed": "#dbe1ff",
+          "primary": "#004ac6",
+          "on_tertiary_fixed_variant": "#005320",
+          "surface_container_low": "#eff4ff",
+          "background": "#f8f9ff",
+          "inverse_on_surface": "#eaf1ff",
+          "tertiary_container": "#007f36",
+          "primary_container": "#2563eb"
+         },
+         "colorVariant": "FIDELITY",
+         "overridePrimaryColor": "#2563eb",
+         "overrideSecondaryColor": "#0f172a",
+         "overrideTertiaryColor": "#16a34a",
+         "overrideNeutralColor": "#64748b",
+         "spacingScale": 2,
+         "typography": {
+          "label-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "0.875rem",
+           "fontWeight": "500",
+           "lineHeight": "1.25rem"
+          },
+          "code-md": {
+           "fontFamily": "JetBrains Mono",
+           "fontSize": "0.8125rem",
+           "fontWeight": "500",
+           "lineHeight": "1.125rem"
+          },
+          "code-sm": {
+           "fontFamily": "JetBrains Mono",
+           "fontSize": "0.6875rem",
+           "fontWeight": "400",
+           "lineHeight": "0.875rem"
+          },
+          "body-md": {
+           "fontFamily": "Inter",
+           "fontSize": "0.875rem",
+           "fontWeight": "400",
+           "lineHeight": "1.25rem"
+          },
+          "headline-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "1.75rem",
+           "fontWeight": "600",
+           "lineHeight": "2.25rem",
+           "letterSpacing": "-0.02em"
+          },
+          "body-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "0.9375rem",
+           "fontWeight": "400",
+           "lineHeight": "1.5rem"
+          },
+          "label-md": {
+           "fontFamily": "Inter",
+           "fontSize": "0.75rem",
+           "fontWeight": "500",
+           "lineHeight": "1rem",
+           "letterSpacing": "0.02em"
+          },
+          "body-sm": {
+           "fontFamily": "Inter",
+           "fontSize": "0.75rem",
+           "fontWeight": "400",
+           "lineHeight": "1rem"
+          },
+          "headline-lg-mobile": {
+           "fontFamily": "Inter",
+           "fontSize": "1.375rem",
+           "fontWeight": "600",
+           "lineHeight": "1.875rem",
+           "letterSpacing": "-0.015em"
+          },
+          "headline-sm": {
+           "fontFamily": "Inter",
+           "fontSize": "1rem",
+           "fontWeight": "600",
+           "lineHeight": "1.5rem"
+          },
+          "headline-md": {
+           "fontFamily": "Inter",
+           "fontSize": "1.25rem",
+           "fontWeight": "600",
+           "lineHeight": "1.75rem",
+           "letterSpacing": "-0.01em"
+          }
+         },
+         "spacing": {
+          "space-md": "0.75rem",
+          "margin-desktop": "2rem",
+          "gutter-desktop": "1.5rem",
+          "space-sm": "0.5rem",
+          "space-xs": "0.25rem",
+          "gutter": "1rem",
+          "margin": "1rem",
+          "space-xl": "1.5rem",
+          "space-lg": "1rem"
+         },
+         "headlineFontFamily": "Inter",
+         "bodyFontFamily": "Inter",
+         "labelFontFamily": "JetBrains Mono"
+        }
+       },
+       "version": "1"
+      }
+     }
+    ],
+    "theme": {}
+   }
+  },
+  {
+   "text": "Die Dark-Mode-Variante der **Token-Verwaltung** wurde erfolgreich erstellt.\n\n### Design-Anpassungen im Überblick:\n- **Farbschema & Oberflächen:** Dunkle, technisch-präzise Oberflächenfarben (`#0B0F19` Hintergrund mit subtilem technischem Raster) abgestimmt auf die bestehenden Dark-Theme-Screens des Systems (wie Benutzerverwaltung und Profil).\n- **Kontraste & Typografie:** Klare, kontrastreiche Typografie mit hellem Fließtext (`#F1F5F9`) und gedämpften Sekundärbeschriftungen (`#94A3B8`).\n- **Komponenten & Status-Semantik:** \n  - Die Benachrichtigungsbox für das neu erstellte Token („Ops-Server“) wurde mit dunklem Cyan/Blau-Container und leuchtendem Key-Feld harmonisch eingepasst.\n  - Tabellenzeilen, Filter-Eingabefelder, Status-Badges (*Aktiv*, *Widerrufen*) und Aktions-Buttons behalten ihre exakten semantischen Farben bei.\n  - Die Formular-Sektion „Neues Token erstellen“ und das cURL-Beispielfenster wurden mit passenden dunklen Eingabefeldern und kontrastierendem Monospace-Syntax-Highlighting formatiert."
+  },
+  {
+   "suggestion": "Details zu Hover- oder Fokus-Zuständen der Buttons anpassen"
+  },
+  {
+   "suggestion": "Eine kompakte Tabellenansicht testen"
+  },
+  {
+   "suggestion": "Weitere Screens ins Dark Theme überführen"
+  }
+ ]
+}

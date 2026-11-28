@@ -1,0 +1,52 @@
+<!doctype html><html lang="de" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Profil – Softwareschmiede-Status</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="page">
+
+<header class="top">
+  <div class="brand-block">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>softwareschmiede<span class="brand-tag">status</span></span>
+    <h1>Profil</h1>
+  </div>
+</header>
+
+<nav class="topnav">
+  <a class="nav-link" href="/">Status</a>
+  <a class="nav-link" href="/profile" aria-current="page">Profil</a>
+  <a class="nav-link" href="/admin/users">Benutzer</a>
+  <a class="nav-link" href="/admin/tokens">Tokens</a>
+  <a class="nav-link" href="/admin/settings">Einstellungen</a>
+  <span class="nav-user">martin · Administration</span>
+  <form class="nav-logout" method="post" action="/logout"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><button type="submit">Abmelden</button></form>
+</nav>
+
+<section>
+  <h2>Konto</h2>
+  <p class="muted">Angemeldet als <strong>martin</strong> · Stufe Administration</p>
+  <div class="msg">Das Passwort wurde geändert.</div>
+  <h2>Anzeige</h2>
+  <form method="post" action="/profile/theme">
+    <input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA">
+    <label>Farbschema<select name="theme"><option value="auto" selected>Automatisch (System)</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+    <button type="submit">Anzeige speichern</button>
+  </form>
+  <h2>Passwort ändern</h2>
+  <form method="post" action="/profile/password">
+    <input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA">
+    <label>Aktuelles Passwort<input type="password" name="currentPassword" required autocomplete="current-password"></label>
+    <label>Neues Passwort (mindestens 8 Zeichen)<input type="password" name="newPassword" required minlength="8" autocomplete="new-password"></label>
+    <label>Neues Passwort wiederholen<input type="password" name="confirmPassword" required autocomplete="new-password"></label>
+    <button type="submit">Passwort ändern</button>
+  </form>
+</section>
+
+<footer>softwareschmiede-status · server-gerendert</footer>
+</div>
+</body>
+</html>

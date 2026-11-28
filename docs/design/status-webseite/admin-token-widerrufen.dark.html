@@ -1,0 +1,42 @@
+<!doctype html><html lang="de" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Token widerrufen – Softwareschmiede-Status</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="page">
+
+<header class="top">
+  <div class="brand-block">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>softwareschmiede<span class="brand-tag">status</span></span>
+    <h1>Token widerrufen</h1>
+  </div>
+</header>
+
+<nav class="topnav">
+  <a class="nav-link" href="/">Status</a>
+  <a class="nav-link" href="/profile">Profil</a>
+  <a class="nav-link" href="/admin/users">Benutzer</a>
+  <a class="nav-link" href="/admin/tokens" aria-current="page">Tokens</a>
+  <a class="nav-link" href="/admin/settings">Einstellungen</a>
+  <span class="nav-user">martin · Administration</span>
+  <form class="nav-logout" method="post" action="/logout"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><button type="submit">Abmelden</button></form>
+</nav>
+
+<section>
+  <h1>Token „Laptop Martin“ widerrufen?</h1>
+  <p class="muted">Das Token wird <strong>unwiderruflich</strong> ungültig — die damit verbundenen App-Instanzen können sich danach nicht mehr am Relay anmelden; für eine erneute Anbindung muss ein neues Token hinterlegt werden.</p>
+  <form method="post" action="/admin/tokens/12/revoke">
+    <input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA">
+    <button type="submit" class="danger">Token endgültig widerrufen</button>
+    <a href="/admin/tokens">Abbrechen</a>
+  </form>
+</section>
+
+<footer>softwareschmiede-status · server-gerendert</footer>
+</div>
+</body>
+</html>

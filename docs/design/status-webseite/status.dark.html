@@ -1,0 +1,118 @@
+<!doctype html><html lang="de" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="15">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Softwareschmiede-Status</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="page">
+
+<header class="top">
+  <div class="brand-block">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>softwareschmiede<span class="brand-tag">status</span></span>
+    <h1>Status-Übersicht</h1>
+  </div>
+  <div class="top-aside">
+    <span class="badge stale"><span class="dot"></span>teilweise veraltet</span>
+    <span class="inst on-dark">Instanz „build-server-01“ · 3f8a2c1e…</span>
+    <span class="inst on-dark">Instanz „laptop-martin“ · 9d04b7f2…</span>
+  </div>
+</header>
+
+<nav class="topnav">
+  <a class="nav-link" href="/" aria-current="page">Status</a>
+  <a class="nav-link" href="/profile">Profil</a>
+  <a class="nav-link" href="/admin/users">Benutzer</a>
+  <a class="nav-link" href="/admin/tokens">Tokens</a>
+  <a class="nav-link" href="/admin/settings">Einstellungen</a>
+  <span class="nav-user">martin · Administration</span>
+  <form class="nav-logout" method="post" action="/logout"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><button type="submit">Abmelden</button></form>
+</nav>
+
+<div class="meta-line">Stand 14:32:07 UTC · Aktualisierung alle 15 s · <a href="/status.json">/status.json</a></div>
+
+<!-- Instanz build-server-01: verbunden, aktuell -->
+<section>
+  <h2>Laufende Aufgaben <span class="count">2</span> <span class="src app">App · 14:32:01 UTC</span> <span class="inst">Instanz build-server-01</span></h2>
+  <table>
+    <tr><td class="num"><a href="https://github.com/martin/softwareschmiede/issues/482">#482 ↗</a></td><td>Status-Server: Endpunkte für Token-Verwaltung ergänzen <span class="inst">softwareschmiede</span></td><td><span class="pill run">läuft</span></td><td class="muted">Umsetzung · Heartbeat 14:31:58 UTC</td><td class="right"><a href="https://github.com/martin/softwareschmiede/pull/491">PR #491 ↗</a> <a href="https://github.com/martin/softwareschmiede/issues/482">Issue ↗</a></td></tr>
+    <tr><td class="num"><a href="https://github.com/martin/softwareschmiede/issues/497">#497 ↗</a></td><td>Dokumentation: Bedienkonzept der Status-Seite aktualisieren <span class="inst">softwareschmiede-docs</span></td><td><span class="pill run">läuft</span></td><td class="muted">Umsetzung · Heartbeat 14:31:55 UTC</td><td class="right"><a href="https://github.com/martin/softwareschmiede/issues/497">Issue ↗</a></td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>Wartet auf Anwender <span class="count">2</span> <span class="src app">App · 14:32:01 UTC</span> <span class="inst">Instanz build-server-01</span></h2>
+  <table>
+    <tr><td class="num"><a href="https://github.com/martin/softwareschmiede/issues/503">#503 ↗</a></td><td>E2E-Test für den Update-Prozess schlägt unter Last fehl <span class="inst">softwareschmiede</span></td><td><span class="pill wait">Wartet auf Eingabe</span></td><td class="muted">Prüfung · Heartbeat 14:30:12 UTC</td><td class="right"><a href="https://github.com/martin/softwareschmiede/issues/503">Issue ↗</a></td></tr>
+    <tr><td class="muted">14:28:40</td><td><a href="https://github.com/martin/softwareschmiede/pull/488">PR #488 – Review angefordert ↗</a></td><td><span class="pill wait">Wartend</span></td><td class="muted">Review durch martin ausstehend</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>Letzte SCM-Ereignisse <span class="count">4</span> <span class="src app">App · 14:32:01 UTC</span> <span class="inst">Instanz build-server-01</span></h2>
+  <table>
+    <tr><td class="muted">14:28:40</td><td><a href="https://github.com/martin/softwareschmiede/pull/488">PR #488 – Review angefordert ↗</a></td><td><span class="pill wait">Wartend</span></td><td class="muted">Review durch martin ausstehend</td></tr>
+    <tr><td class="muted">14:15:03</td><td><a href="https://github.com/martin/softwareschmiede/issues/500">Issue #500 – Umsetzung gestartet ↗</a></td><td><span class="pill done">Aufgenommen</span></td><td class="muted"></td></tr>
+    <tr><td class="muted">13:57:21</td><td><a href="https://github.com/martin/softwareschmiede/pull/481">PR #481 – Merge abgeschlossen ↗</a></td><td><span class="pill done">Verarbeitet</span></td><td class="muted">Staging aktualisiert</td></tr>
+    <tr><td class="muted">13:40:09</td><td><a href="https://github.com/martin/softwareschmiede/issues/492">Issue #492 – Duplikat ↗</a></td><td><span class="pill err">Abgelehnt</span></td><td class="muted">Bereits in #489 umgesetzt</td></tr>
+  </table>
+</section>
+
+<!-- Instanz laptop-martin: stale -->
+<div class="stale-note">Instanz „laptop-martin“ liefert seit 12:58:44 UTC keinen Snapshot – Daten ggf. veraltet.</div>
+
+<section class="dim">
+  <h2>Laufende Aufgaben <span class="count">1</span> <span class="src app">App · 12:58:44 UTC</span> <span class="inst">Instanz laptop-martin</span></h2>
+  <table>
+    <tr><td class="num"><a href="https://github.com/martin/softwareschmiede/issues/460">#460 ↗</a></td><td>Automatisierte UI-Tests für die Einstellungsseiten erweitern <span class="inst">softwareschmiede</span></td><td><span class="pill run">läuft</span></td><td class="muted">Umsetzung · Heartbeat 12:57:10 UTC</td><td class="right"><a href="https://github.com/martin/softwareschmiede/issues/460">Issue ↗</a></td></tr>
+  </table>
+</section>
+
+<section class="dim">
+  <h2>Wartet auf Anwender <span class="count">1</span> <span class="src app">App · 12:58:44 UTC</span> <span class="inst">Instanz laptop-martin</span></h2>
+  <table>
+    <tr><td class="num"><a href="https://github.com/martin/softwareschmiede/issues/455">#455 ↗</a></td><td>Lokale Suchindexierung im Feature-Branch testen <span class="inst">softwareschmiede</span></td><td><span class="pill pause">pausiert</span></td><td class="muted">Analyse · pausiert bis 15:00:00 UTC</td><td class="right"><a href="https://github.com/martin/softwareschmiede/issues/455">Issue ↗</a></td></tr>
+  </table>
+</section>
+
+<section class="dim">
+  <h2>Letzte SCM-Ereignisse <span class="count">1</span> <span class="src app">App · 12:58:44 UTC</span> <span class="inst">Instanz laptop-martin</span></h2>
+  <table>
+    <tr><td class="muted">12:45:33</td><td><a href="https://github.com/martin/softwareschmiede/pull/472">PR #472 – CI-Lauf fehlgeschlagen ↗</a></td><td><span class="pill err">Fehlgeschlagen</span></td><td class="muted">Format-Check fehlgeschlagen</td></tr>
+  </table>
+</section>
+
+<!-- GitHub-Repositories -->
+<section>
+  <h2><a href="https://github.com/martin/softwareschmiede">softwareschmiede ↗</a> <span class="src gh">GitHub · 14:32:00 UTC</span> <span class="count">12 offene Issues</span></h2>
+  <h3>Offene Pull Requests <span class="count">2</span></h3>
+  <table>
+    <tr><td class="num"><a href="https://github.com/martin/softwareschmiede/pull/491">#491 ↗</a></td><td><a href="https://github.com/martin/softwareschmiede/pull/491">Status-Server: Token-Endpunkte ↗</a></td></tr>
+    <tr><td class="num"><a href="https://github.com/martin/softwareschmiede/pull/488">#488 ↗</a></td><td><a href="https://github.com/martin/softwareschmiede/pull/488">Status-Seite: Theme-Unterstützung ↗</a></td></tr>
+  </table>
+  <h3 class="gap-top">Letzte Releases <span class="count">2</span></h3>
+  <table>
+    <tr><td class="num"><a href="https://github.com/martin/softwareschmiede/releases/tag/v1.4.0">v1.4.0 ↗</a></td><td>Status-Server mit Relay-Hub</td><td class="muted">02.03.2025</td></tr>
+    <tr><td class="num"><a href="https://github.com/martin/softwareschmiede/releases/tag/v1.3.2">v1.3.2 ↗</a></td><td>Bugfix-Release</td><td class="muted">18.02.2025</td></tr>
+  </table>
+</section>
+
+<div class="stale-note">GitHub-Abruf für softwareschmiede-docs fehlgeschlagen (14:30:55 UTC): HTTP 503 – Service Unavailable</div>
+
+<section>
+  <h2><a href="https://github.com/martin/softwareschmiede-docs">softwareschmiede-docs ↗</a> <span class="src gh">GitHub · 13:15:02 UTC</span> <span class="count">3 offene Issues</span></h2>
+  <h3>Offene Pull Requests <span class="count">0</span></h3>
+  <div class="empty">Keine offenen Pull Requests.</div>
+  <h3 class="gap-top">Letzte Releases <span class="count">1</span></h3>
+  <table>
+    <tr><td class="num"><a href="https://github.com/martin/softwareschmiede-docs/releases/tag/v0.9.1">v0.9.1 ↗</a></td><td>Dokumentations-Paket</td><td class="muted">10.01.2025</td></tr>
+  </table>
+</section>
+
+<footer>softwareschmiede-status · server-gerendert · read-only</footer>
+</div>
+</body>
+</html>

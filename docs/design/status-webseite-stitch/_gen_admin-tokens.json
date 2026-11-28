@@ -1,0 +1,357 @@
+{
+ "projectId": "7540435568831394111",
+ "sessionId": "15265967104330458489",
+ "outputComponents": [
+  {
+   "design": {
+    "screens": [
+     {
+      "screenshot": {
+       "name": "projects/7540435568831394111/files/b8c84f069e614d349f8fa7129b142fea",
+       "downloadUrl": "https://stitch.googleapis.com/v1/projects/7540435568831394111/files/b8c84f069e614d349f8fa7129b142fea:download"
+      },
+      "htmlCode": {
+       "name": "projects/7540435568831394111/files/c9df261dc4b64a329e7dece88c79c219",
+       "downloadUrl": "https://stitch.googleapis.com/v1/projects/7540435568831394111/files/c9df261dc4b64a329e7dece88c79c219:download",
+       "mimeType": "text/html"
+      },
+      "id": "08a3adc01261458b84db5c45e8e2b656",
+      "generatedBy": "figaro_agent",
+      "width": "2560",
+      "height": "2314",
+      "title": "Token-Verwaltung — Softwareschmiede Status",
+      "prompt": "Design the 'Token-Verwaltung' admin page for 'Softwareschmiede Status' matching the exact visual style, typography (Inter + monospace accents), badges, and card styles of the existing screens (like Benutzerverwaltung and Profil).\n\nPage Structure & Content:\n1. Breadcrumb: 'Softwareschmiede / Administration / Token-Verwaltung' with a small monospace badge 'SEC-TOKENS-01'.\n2. Header:\n   - Title: 'Token-Verwaltung' (h1, bold, crisp, dark slate)\n   - Subtitle: 'Verwaltung von API-Zugriffstokens für App-Instanzen zur automatisierten Übermittlung von Status- und Telemetriedaten.'\n   - Right side header summary badge/widget:\n     - 'TOKEN-KONTROLLE AKTIV' with green pulsing dot and 'HASH: SHA-256'\n     - Counter stats inline: '3 registriert', '2 aktiv', '1 widerrufen'\n3. Prominent One-Time Secret Notice Box (Amber / Warning callout style):\n   - Strong amber/warning border and soft amber background (`bg-amber-50 border border-amber-200 text-amber-900`)\n   - Left side: Key/Shield icon in amber circle or badge\n   - Text heading / alert: 'Neues Token „Ops-Server“ wurde erstellt. Token jetzt kopieren — er wird nur einmal angezeigt.'\n   - Token string display box:\n     - Monospace font input/field: `stk_live_9f4c82a17b03e482d90f7192a83e6012` (masked partially or showing `stk_live_9f4c82a17b03e482...`) with styling: `font-mono bg-white border border-amber-300 rounded px-3 py-2 text-sm text-slate-800 tracking-wider flex-1`\n     - Action button: 'Kopieren' (or 'Token kopieren') with copy icon, plus small badge 'Einmalig sichtbar'\n   - Subtext: 'Aus Sicherheitsgründen wird dieser Klartext-Schlüssel nicht in unserer Datenbank gespeichert. Bei Verlust muss ein neues Token erzeugt werden.'\n\n4. Token List Table Card:\n   - Card container with subtle border and crisp white background, header with title 'Aktive & archivierte Tokens' and count badge '3 Tokens'.\n   - Table columns:\n     - Name (with code tag or subtle mono badge)\n     - Erstellt\n     - Zuletzt verwendet\n     - Status\n     - Aktionen\n   - Rows:\n     - Row 1:\n       - Name: `OPS-SERVER` (badge/label: 'Primäre Telemetrie')\n       - Erstellt: `10.11.2026`\n       - Zuletzt verwendet: `vor 3 Minuten` (mit grünem Signalpunkt)\n       - Status: Pill 'Aktiv' (soft green pill with green dot)\n       - Aktionen: Button 'Widerrufen' (outline/subtle destructive styling with slash/ban or trash icon)\n     - Row 2:\n       - Name: `TEST-INTEGRATION` (badge/label: 'CI/CD Pipeline')\n       - Erstellt: `02.09.2026`\n       - Zuletzt verwendet: `18.10.2026`\n       - Status: Pill 'Aktiv' (soft green pill with green dot)\n       - Aktionen: Button 'Widerrufen'\n     - Row 3:\n       - Name: `ALT-BACKUP` (badge/label: 'Archiviert')\n       - Erstellt: `14.04.2025`\n       - Zuletzt verwendet: `vor 120 Tagen`\n       - Status: Pill 'Widerrufen' (muted grey/slate styling: `bg-slate-100 text-slate-500 border border-slate-200`)\n       - Aktionen: Text 'Keine Aktion' oder '-' in muted text\n   - Table footer: Information notice 'Tokens übertragen Statusberichte verschlüsselt über TLS 1.3 / mTLS.' and export link 'Exportieren (Audit-Log)'.\n\n5. Card 'Token erstellen':\n   - Heading: 'Neues Token erstellen' with key-plus icon\n   - Subtext: 'Erstellen Sie ein neues Secret-Token für eine Serverinstanz oder ein Überwachungsskript.'\n   - Grid form:\n     - Input field: 'Token-Bezeichnung / Name *' (e.g. Placeholder 'z. B. PROD-K8S-CLUSTER-01', mono style allowed)\n     - Input field / dropdown: 'Gültigkeitsdauer' (e.g. 'Unbegrenzt (bis Widerruf)' or '90 Tage')\n     - Button: Primary blue button 'Token erstellen' with plus/key icon.\n   - Info callout below: 'Das generierte Token besitzt standardmäßig Lese- und Schreibrechte für Instanz-Heartbeats.'\n\nMaintain total consistency with design system and other screens (clean shadows, slate/blue accents, mono badges like `SEC-ACTION-DEL`, precise alignments).",
+      "name": "projects/7540435568831394111/screens/08a3adc01261458b84db5c45e8e2b656",
+      "theme": {
+       "colorMode": "LIGHT",
+       "font": "INTER",
+       "roundness": "ROUND_FOUR",
+       "customColor": "#2563eb",
+       "headlineFont": "INTER",
+       "bodyFont": "INTER",
+       "labelFont": "JETBRAINS_MONO",
+       "namedColors": {
+        "tertiary": "#006329",
+        "surface_bright": "#f8f9ff",
+        "surface_container_lowest": "#ffffff",
+        "surface_container": "#e5eeff",
+        "outline": "#737686",
+        "on_tertiary": "#ffffff",
+        "on_secondary_container": "#5c647a",
+        "primary_fixed_dim": "#b4c5ff",
+        "outline_variant": "#c3c6d7",
+        "on_tertiary_fixed_variant": "#005320",
+        "error": "#ba1a1a",
+        "on_primary_fixed": "#00174b",
+        "on_tertiary_fixed": "#002109",
+        "on_surface": "#0b1c30",
+        "surface_container_highest": "#d3e4fe",
+        "primary_container": "#2563eb",
+        "on_primary_container": "#eeefff",
+        "primary": "#004ac6",
+        "surface_variant": "#d3e4fe",
+        "tertiary_fixed": "#7ffc97",
+        "on_error": "#ffffff",
+        "surface_container_low": "#eff4ff",
+        "tertiary_fixed_dim": "#62df7d",
+        "primary_fixed": "#dbe1ff",
+        "surface_tint": "#0053db",
+        "on_primary_fixed_variant": "#003ea8",
+        "surface_container_high": "#dce9ff",
+        "surface": "#f8f9ff",
+        "error_container": "#ffdad6",
+        "secondary_fixed": "#dae2fd",
+        "on_secondary_fixed": "#131b2e",
+        "surface_dim": "#cbdbf5",
+        "on_background": "#0b1c30",
+        "on_tertiary_container": "#c7ffca",
+        "on_primary": "#ffffff",
+        "inverse_primary": "#b4c5ff",
+        "on_error_container": "#93000a",
+        "inverse_on_surface": "#eaf1ff",
+        "on_secondary_fixed_variant": "#3f465c",
+        "on_surface_variant": "#434655",
+        "inverse_surface": "#213145",
+        "secondary": "#565e74",
+        "secondary_container": "#dae2fd",
+        "tertiary_container": "#007f36",
+        "on_secondary": "#ffffff",
+        "background": "#f8f9ff",
+        "secondary_fixed_dim": "#bec6e0"
+       },
+       "colorVariant": "FIDELITY",
+       "overridePrimaryColor": "#2563eb",
+       "overrideSecondaryColor": "#0f172a",
+       "overrideTertiaryColor": "#16a34a",
+       "overrideNeutralColor": "#64748b",
+       "spacingScale": 2,
+       "typography": {
+        "headline-lg-mobile": {
+         "fontFamily": "Inter",
+         "fontSize": "1.375rem",
+         "fontWeight": "600",
+         "lineHeight": "1.875rem",
+         "letterSpacing": "-0.015em"
+        },
+        "headline-md": {
+         "fontFamily": "Inter",
+         "fontSize": "1.25rem",
+         "fontWeight": "600",
+         "lineHeight": "1.75rem",
+         "letterSpacing": "-0.01em"
+        },
+        "body-md": {
+         "fontFamily": "Inter",
+         "fontSize": "0.875rem",
+         "fontWeight": "400",
+         "lineHeight": "1.25rem"
+        },
+        "body-sm": {
+         "fontFamily": "Inter",
+         "fontSize": "0.75rem",
+         "fontWeight": "400",
+         "lineHeight": "1rem"
+        },
+        "code-sm": {
+         "fontFamily": "JetBrains Mono",
+         "fontSize": "0.6875rem",
+         "fontWeight": "400",
+         "lineHeight": "0.875rem"
+        },
+        "headline-sm": {
+         "fontFamily": "Inter",
+         "fontSize": "1rem",
+         "fontWeight": "600",
+         "lineHeight": "1.5rem"
+        },
+        "label-lg": {
+         "fontFamily": "Inter",
+         "fontSize": "0.875rem",
+         "fontWeight": "500",
+         "lineHeight": "1.25rem"
+        },
+        "label-md": {
+         "fontFamily": "Inter",
+         "fontSize": "0.75rem",
+         "fontWeight": "500",
+         "lineHeight": "1rem",
+         "letterSpacing": "0.02em"
+        },
+        "body-lg": {
+         "fontFamily": "Inter",
+         "fontSize": "0.9375rem",
+         "fontWeight": "400",
+         "lineHeight": "1.5rem"
+        },
+        "code-md": {
+         "fontFamily": "JetBrains Mono",
+         "fontSize": "0.8125rem",
+         "fontWeight": "500",
+         "lineHeight": "1.125rem"
+        },
+        "headline-lg": {
+         "fontFamily": "Inter",
+         "fontSize": "1.75rem",
+         "fontWeight": "600",
+         "lineHeight": "2.25rem",
+         "letterSpacing": "-0.02em"
+        }
+       },
+       "spacing": {
+        "gutter-desktop": "1.5rem",
+        "margin": "1rem",
+        "space-md": "0.75rem",
+        "space-lg": "1rem",
+        "margin-desktop": "2rem",
+        "gutter": "1rem",
+        "space-sm": "0.5rem",
+        "space-xl": "1.5rem",
+        "space-xs": "0.25rem"
+       },
+       "headlineFontFamily": "Inter",
+       "bodyFontFamily": "Inter",
+       "labelFontFamily": "JetBrains Mono"
+      },
+      "deviceType": "DESKTOP",
+      "screenType": "DESIGN",
+      "screenMetadata": {
+       "agentType": "PRO_AGENT",
+       "status": "COMPLETE"
+      },
+      "designSystem": {
+       "name": "assets/25e6f8dbb3604bef8ac4be3fa1415efc",
+       "designSystem": {
+        "displayName": "Precision Operations",
+        "styleGuidelines": "## Brand & Style\n\nThis design system targets technical leads, sysadmins, and site reliability engineers operating mission-critical environments. The visual language conveys operational clarity, uncompromising stability, and high data utility. \n\nKey attributes:\n- **Style Archetype:** Modern Corporate Engineering / Data-Dense Utility.\n- **Aesthetic Tenets:** Information over decoration, zero layout ambiguity, surgical contrast, and structural rhythm.\n- **Visual Personality:** Quiet, restrained, objective, and responsive. Surfaces operate as quiet scaffolding while system states take center stage.\n\n## Layout & Spacing\n\nThe dashboard uses a structured fluid grid combined with modular layout panes:\n\n- **Desktop (1024px+):** Collapsible persistent left navigation bar (240px fixed), fluid workspace spanning 12 columns with `1.5rem` gutters. Maximum canvas bounds cap at `1600px` for ultra-wide displays to maintain glanceability.\n- **Tablet (768px - 1023px):** 8-column layout, left navigation reduces to an icon-only dock (64px), horizontal canvas margin at `1.5rem`.\n- **Mobile (<768px):** 4-column layout with `1rem` margin and `1rem` gutter. Complex health tables convert to vertically stacked cards.\n\nVertical spacing operates on an absolute 4px base increment (`0.25rem`, `0.5rem`, `0.75rem`, `1rem`, `1.5rem`) to ensure tight component padding without dead space.\n\n## Elevation & Depth\n\nTo avoid visual noise across dense dashboards, this system relies on low-contrast structural outlines rather than heavy drop shadows:\n\n- **Level 0 (App Canvas):** Fills `#F8FAFC`. Zero elevation, zero shadows.\n- **Level 1 (Card & Module Containers):** Surface `#FFFFFF`, bordered with a 1px solid `#E2E8F0`. Shadow: `0 1px 2px 0 rgba(15, 23, 42, 0.04)`.\n- **Level 2 (Dropdowns, Popovers, Filter Menus):** Surface `#FFFFFF`, bordered with 1px solid `#CBD5E1`. Shadow: `0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05)`.\n- **Level 3 (Modal Dialogs & Critical Incident Overlays):** Surface `#FFFFFF`, borderless with full-bleed scrim (`rgba(15, 23, 42, 0.45)`). Shadow: `0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08)`.\n\n## Components\n\n### Buttons\n- **Primary:** Solid `#2563EB` fill, white `#FFFFFF` text, `0.25rem` radius, `0.5rem 0.875rem` padding. Subtle brightness decrease on hover (`#1D4ED8`). Focus ring: 2px offset with `#93C5FD`.\n- **Secondary:** White `#FFFFFF` fill, 1px `#E2E8F0` border, `#0F172A` text. Hover state switches background to `#F8FAFC`.\n- **Destructive/Action:** `#DC2626` fill or transparent with `#DC2626` text for secondary destructive triggers.\n\n### Status Badges & Pills\n- **Geometry:** Height 22px, padding `0 0.5rem`, font `JetBrains Mono` (`code-sm`), weight 500.\n- **Healthy:** `#DCFCE7` background, `#16A34A` text, `#BBF7D0` 1px border. Accompanied by a 6px solid green dot.\n- **Warning (\"Teilweise veraltet\"):** `#FEF3C7` background, `#D97706` text, `#FDE68A` 1px border. Accompanied by a 6px warning amber dot.\n- **Critical / Fetch Error:** `#FEE2E2` background, `#DC2626` text, `#FECACA` 1px border. Accompanied by a 6px pulsing red dot.\n\n### Data Tables & Service Lists\n- **Headers:** Surface `#F8FAFC`, bottom border 1px `#E2E8F0`, uppercase text in `#475569`, tracking `0.05em`, size `0.6875rem`.\n- **Rows:** White `#FFFFFF` background, 1px bottom border `#F1F5F9`. Height fixed at 44px for high density.\n- **Hover State:** Row background transitions to `#F8FAFC` instantly without motion delays.\n\n### Input Fields & Search Bars\n- **Frame:** Height 36px, `0.25rem` radius, 1px border `#E2E8F0`, background `#FFFFFF`.\n- **Focus:** 1px border `#2563EB`, box-shadow `0 0 0 1px #2563EB`.\n- **Monospace Input:** Used specifically for token filters and Git revision queries using `code-md`.\n\n### Cards & Metrics\n- **Metric Cards:** `#FFFFFF` background, 1px `#E2E8F0` border, `1rem` internal padding. Key metric in `headline-lg` (`#0F172A`), subtitle in `body-sm` (`#475569`), status badge positioned top-right.\n- **Dividers:** Clean 1px `#E2E8F0` rules. Never use double borders or styled drop-lines.",
+        "theme": {
+         "colorMode": "LIGHT",
+         "font": "INTER",
+         "roundness": "ROUND_FOUR",
+         "customColor": "#2563eb",
+         "headlineFont": "INTER",
+         "bodyFont": "INTER",
+         "labelFont": "JETBRAINS_MONO",
+         "namedColors": {
+          "secondary_fixed": "#dae2fd",
+          "error_container": "#ffdad6",
+          "outline": "#737686",
+          "tertiary_fixed_dim": "#62df7d",
+          "on_tertiary": "#ffffff",
+          "primary_fixed": "#dbe1ff",
+          "surface_tint": "#0053db",
+          "on_tertiary_container": "#c7ffca",
+          "inverse_surface": "#213145",
+          "secondary_fixed_dim": "#bec6e0",
+          "inverse_primary": "#b4c5ff",
+          "on_secondary_fixed_variant": "#3f465c",
+          "on_primary_fixed_variant": "#003ea8",
+          "secondary_container": "#dae2fd",
+          "on_surface": "#0b1c30",
+          "primary": "#004ac6",
+          "on_primary_container": "#eeefff",
+          "surface_container_high": "#dce9ff",
+          "primary_container": "#2563eb",
+          "on_tertiary_fixed_variant": "#005320",
+          "surface_dim": "#cbdbf5",
+          "on_primary_fixed": "#00174b",
+          "outline_variant": "#c3c6d7",
+          "inverse_on_surface": "#eaf1ff",
+          "surface_bright": "#f8f9ff",
+          "surface_container_low": "#eff4ff",
+          "on_surface_variant": "#434655",
+          "tertiary": "#006329",
+          "on_error_container": "#93000a",
+          "on_tertiary_fixed": "#002109",
+          "primary_fixed_dim": "#b4c5ff",
+          "surface_container_highest": "#d3e4fe",
+          "surface": "#f8f9ff",
+          "on_secondary": "#ffffff",
+          "background": "#f8f9ff",
+          "tertiary_container": "#007f36",
+          "surface_container": "#e5eeff",
+          "surface_variant": "#d3e4fe",
+          "error": "#ba1a1a",
+          "surface_container_lowest": "#ffffff",
+          "on_secondary_container": "#5c647a",
+          "on_background": "#0b1c30",
+          "on_secondary_fixed": "#131b2e",
+          "tertiary_fixed": "#7ffc97",
+          "on_error": "#ffffff",
+          "on_primary": "#ffffff",
+          "secondary": "#565e74"
+         },
+         "colorVariant": "FIDELITY",
+         "overridePrimaryColor": "#2563eb",
+         "overrideSecondaryColor": "#0f172a",
+         "overrideTertiaryColor": "#16a34a",
+         "overrideNeutralColor": "#64748b",
+         "spacingScale": 2,
+         "typography": {
+          "body-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "0.9375rem",
+           "fontWeight": "400",
+           "lineHeight": "1.5rem"
+          },
+          "headline-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "1.75rem",
+           "fontWeight": "600",
+           "lineHeight": "2.25rem",
+           "letterSpacing": "-0.02em"
+          },
+          "code-md": {
+           "fontFamily": "JetBrains Mono",
+           "fontSize": "0.8125rem",
+           "fontWeight": "500",
+           "lineHeight": "1.125rem"
+          },
+          "body-md": {
+           "fontFamily": "Inter",
+           "fontSize": "0.875rem",
+           "fontWeight": "400",
+           "lineHeight": "1.25rem"
+          },
+          "headline-sm": {
+           "fontFamily": "Inter",
+           "fontSize": "1rem",
+           "fontWeight": "600",
+           "lineHeight": "1.5rem"
+          },
+          "headline-md": {
+           "fontFamily": "Inter",
+           "fontSize": "1.25rem",
+           "fontWeight": "600",
+           "lineHeight": "1.75rem",
+           "letterSpacing": "-0.01em"
+          },
+          "code-sm": {
+           "fontFamily": "JetBrains Mono",
+           "fontSize": "0.6875rem",
+           "fontWeight": "400",
+           "lineHeight": "0.875rem"
+          },
+          "label-md": {
+           "fontFamily": "Inter",
+           "fontSize": "0.75rem",
+           "fontWeight": "500",
+           "lineHeight": "1rem",
+           "letterSpacing": "0.02em"
+          },
+          "body-sm": {
+           "fontFamily": "Inter",
+           "fontSize": "0.75rem",
+           "fontWeight": "400",
+           "lineHeight": "1rem"
+          },
+          "label-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "0.875rem",
+           "fontWeight": "500",
+           "lineHeight": "1.25rem"
+          },
+          "headline-lg-mobile": {
+           "fontFamily": "Inter",
+           "fontSize": "1.375rem",
+           "fontWeight": "600",
+           "lineHeight": "1.875rem",
+           "letterSpacing": "-0.015em"
+          }
+         },
+         "spacing": {
+          "gutter": "1rem",
+          "margin-desktop": "2rem",
+          "space-lg": "1rem",
+          "space-md": "0.75rem",
+          "gutter-desktop": "1.5rem",
+          "margin": "1rem",
+          "space-sm": "0.5rem",
+          "space-xl": "1.5rem",
+          "space-xs": "0.25rem"
+         },
+         "headlineFontFamily": "Inter",
+         "bodyFontFamily": "Inter",
+         "labelFontFamily": "JetBrains Mono"
+        }
+       },
+       "version": "1"
+      }
+     }
+    ],
+    "theme": {}
+   }
+  },
+  {
+   "text": "Ich habe die Administrationsseite **„Token-Verwaltung“** für **Softwareschmiede Status** erstellt, abgestimmt auf das Designsystem und die bestehenden Screens des Projekts:\n\n### Gestaltungsdetails & Komponenten:\n1. **App-Shell & Navigation**:\n   - Konsistenter Header mit Logo, Navigation (*Status*, *Profil*, *Administration* mit Dropdown-Kontext), Benutzeranzeige `admin ROLE` sowie *Abmelden*.\n   - Integrierte Breadcrumb `Softwareschmiede / Administration / Token-Verwaltung` inklusive Sicherheits-Identifier `SEC-TOKENS-01`.\n2. **Prominenter Einmal-Secret-Hinweis (Amber Callout)**:\n   - Klare, auffällige Notice-Box für das soeben erstellte Token `Ops-Server` mit dem Hinweis „*Token jetzt kopieren — er wird nur einmal angezeigt.*“.\n   - Monospace-Feld mit dem Token-String `stk_live_9f4c82a17b03e482d90f7192a83e6012` und praktischem Kopier-Button (*Token kopieren*) sowie Badge *Einmalig sichtbar*.\n3. **Token-Übersichtstabelle**:\n   - Spalten: *Name & Verwendungszweck*, *Erstellt*, *Zuletzt verwendet*, *Status* und *Aktionen*.\n   - **`OPS-SERVER`**: Aktiv (grüne Pill, Heartbeat vor 3 Minuten), Aktion: *Widerrufen*.\n   - **`TEST-INTEGRATION`**: Aktiv (grüne Pill, zuletzt 18.10.2026), Aktion: *Widerrufen*.\n   - **`ALT-BACKUP`**: Widerrufen (gedecktes, neutrales Grau), keine weiteren Aktionen.\n   - Status-Zähler im Header (3 registriert, 2 aktiv, 1 widerrufen) und Schnellfilter-Suchleiste.\n4. **Formular „Neues Token erstellen“**:\n   - Eingabefeld für den Token-Namen (`z. B. PROD-K8S-CLUSTER-01`), Dropdown für die Gültigkeitsdauer und Scope-Auswahl.\n   - Primärer Aktions-Button *Token erstellen* sowie eine cURL-Testanleitung für Instanz-Heartbeats."
+  },
+  {
+   "suggestion": "Dialog zum Bestätigen beim Klick auf „Widerrufen“ entwerfen"
+  },
+  {
+   "suggestion": "Detailansicht / Audit-Log für ein einzelnes Token gestalten"
+  },
+  {
+   "suggestion": "Mobiles Layout für die Token-Verwaltung anlegen"
+  }
+ ]
+}

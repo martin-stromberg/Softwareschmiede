@@ -1,0 +1,357 @@
+{
+ "projectId": "7540435568831394111",
+ "sessionId": "16330524171974792821",
+ "outputComponents": [
+  {
+   "design": {
+    "screens": [
+     {
+      "screenshot": {
+       "name": "projects/7540435568831394111/files/2da0a2d91c524891867f0a8e57f6ad44",
+       "downloadUrl": "https://stitch.googleapis.com/v1/projects/7540435568831394111/files/2da0a2d91c524891867f0a8e57f6ad44:download"
+      },
+      "htmlCode": {
+       "name": "projects/7540435568831394111/files/1be874be8a0e4711b24af62e4b045806",
+       "downloadUrl": "https://stitch.googleapis.com/v1/projects/7540435568831394111/files/1be874be8a0e4711b24af62e4b045806:download",
+       "mimeType": "text/html"
+      },
+      "id": "c1d6b4a9e5c2419880c0656ee6991eb4",
+      "generatedBy": "figaro_agent",
+      "width": "2560",
+      "height": "2768",
+      "title": "Status-Dashboard (Empty State) — Softwareschmiede",
+      "prompt": "Erstelle die Empty-State-Variante des Status-Dashboards ('Status-Dashboard (Empty State) — Softwareschmiede') basierend auf dem bestehenden Dashboard-Layout.\n\nSpezifische Anforderungen:\n1. Header-Bereich im Screen Content:\n   - Titel: \"Status\" mit Status-Badge daneben: \"Keine Daten\" (neutraler Grauton/gedämpftes Badge, z. B. grauer Dot oder neutraler Status-Badge).\n   - Untertitel: \"Übersicht aller registrierten App-Instanzen und externer Datenquellen\".\n   - Rechts oben Metriken-Kompaktleiste wie im Original:\n     - LATENZ CLUSTER: \"-- ms\" (oder \"N/A\")\n     - SYNC-ZYKLUS: \"Aktiv (30s)\"\n\n2. Sektion \"App-Instanzen\":\n   - Überschrift: \"App-Instanzen\" mit Badge \"0 Instanzen registriert\". Rechts: \"Auto-Discovery über Service-Mesh\".\n   - Zentraler Empty-State-Bereich / Karte im gleichen card-look:\n     - Großzügige, elegante Card mit zentriertem Icon (z. B. Server-Icon / Terminal / Box mit dezenter Umrandung oder Blueprint-Stil).\n     - Überschrift: \"Keine App-Instanzen registriert\".\n     - Begleittext: \"Es wurden noch keine aktiven Instanzen über das Netzwerk oder API-Tokens gemeldet.\"\n     - Direkt integriertes Setup-Panel / Anleitungspanel \"Remote-Übersicht aktivieren\":\n       - Subtile abgesetzte Box (bg-surface-container-low / border-outline-variant).\n       - Titel mit Icon: \"Remote-Übersicht aktivieren\"\n       - Schritt-für-Schritt-Anleitung:\n         1. \"Token erstellen\": In den Administrationseinstellungen ein neues API-Zugriffstoken generieren.\n         2. \"Token hinterlegen\": Den Schlüssel in der Konfiguration der Ziel-Instanz (z. B. `config.yaml` oder Umgebungsvariable `WS_STATUS_TOKEN`) hinterlegen.\n         3. \"Verbindung prüfen\": Die Instanz verbindet sich automatisch und erscheint hier im Dashboard.\n       - Primäre Action-Buttons: \"Token in Einstellungen erstellen\" (Button mit Link/Icon zu Administration -> Tokens) und sekundärer Button \"Dokumentation anzeigen\".\n\n3. Sektion \"GitHub\":\n   - Bleibt befüllt wie in der bestehenden Ansicht!\n   - Überschrift \"GitHub\", Subtext: \"Release-Tracking & Automatisierungen\", rechts: \"Repository: internal/schmiede-core\".\n   - 2 Spalten:\n     - Linke Spalte \"Releases\":\n       - Header mit Link \"Auf GitHub ansehen\"\n       - v2.4.1 (Badge \"Aktuell installiert\", Datum: 18. Mai 2024, Text: \"Hotfix: WebSocket Verbindungsstabilität\")\n       - v2.4.0 (Datum: 04. Mai 2024, Text: \"Feature: Multi-Token Authentifizierung\")\n       - v2.3.9 (Datum: 22. April 2024, Text: \"Performance-Optimierungen Backend-Worker\")\n       - Fußzeile: \"Zweig: main (Synchronisiert)\" und \"3 von 18 Tags gezeigt\".\n     - Rechte Spalte \"Workflows\":\n       - Badge z. B. \"Sync aktiv\" oder \"Keine aktiven Workflows\" bzw. reguläre Workflow-Übersicht (z. B. Build & Test erfolgreich, CI/CD Pipeline bereit).\n\n4. Fußzeile / Footer im Shell-Content:\n   - \"Aktualisiert vor 5 Sekunden\" mit dezentem Status-Dot.\n   - Button \"Aktualisieren\" mit Refresh-Icon.\n\nStrikte Einhaltung des Design-Systems Precision Operations (Farben, Inter Font, Border-Radii, Tailwind-Klassen, Monospace für Versionen/Hashes/Codes).",
+      "name": "projects/7540435568831394111/screens/c1d6b4a9e5c2419880c0656ee6991eb4",
+      "theme": {
+       "colorMode": "LIGHT",
+       "font": "INTER",
+       "roundness": "ROUND_FOUR",
+       "customColor": "#2563eb",
+       "headlineFont": "INTER",
+       "bodyFont": "INTER",
+       "labelFont": "JETBRAINS_MONO",
+       "namedColors": {
+        "tertiary": "#006329",
+        "tertiary_fixed": "#7ffc97",
+        "inverse_surface": "#213145",
+        "on_surface_variant": "#434655",
+        "surface_bright": "#f8f9ff",
+        "on_secondary_fixed_variant": "#3f465c",
+        "on_secondary_container": "#5c647a",
+        "on_secondary_fixed": "#131b2e",
+        "secondary_container": "#dae2fd",
+        "on_primary_fixed_variant": "#003ea8",
+        "inverse_primary": "#b4c5ff",
+        "surface_tint": "#0053db",
+        "tertiary_container": "#007f36",
+        "on_secondary": "#ffffff",
+        "outline": "#737686",
+        "primary_fixed_dim": "#b4c5ff",
+        "surface_container_highest": "#d3e4fe",
+        "error_container": "#ffdad6",
+        "on_surface": "#0b1c30",
+        "primary_container": "#2563eb",
+        "background": "#f8f9ff",
+        "surface_variant": "#d3e4fe",
+        "outline_variant": "#c3c6d7",
+        "primary": "#004ac6",
+        "on_background": "#0b1c30",
+        "error": "#ba1a1a",
+        "surface_container_high": "#dce9ff",
+        "on_error_container": "#93000a",
+        "inverse_on_surface": "#eaf1ff",
+        "surface_container_lowest": "#ffffff",
+        "secondary_fixed_dim": "#bec6e0",
+        "surface": "#f8f9ff",
+        "secondary_fixed": "#dae2fd",
+        "on_tertiary_fixed_variant": "#005320",
+        "primary_fixed": "#dbe1ff",
+        "secondary": "#565e74",
+        "on_error": "#ffffff",
+        "on_tertiary": "#ffffff",
+        "surface_container": "#e5eeff",
+        "surface_dim": "#cbdbf5",
+        "on_primary": "#ffffff",
+        "on_tertiary_fixed": "#002109",
+        "tertiary_fixed_dim": "#62df7d",
+        "on_tertiary_container": "#c7ffca",
+        "on_primary_fixed": "#00174b",
+        "on_primary_container": "#eeefff",
+        "surface_container_low": "#eff4ff"
+       },
+       "colorVariant": "FIDELITY",
+       "overridePrimaryColor": "#2563eb",
+       "overrideSecondaryColor": "#0f172a",
+       "overrideTertiaryColor": "#16a34a",
+       "overrideNeutralColor": "#64748b",
+       "spacingScale": 2,
+       "typography": {
+        "body-lg": {
+         "fontFamily": "Inter",
+         "fontSize": "0.9375rem",
+         "fontWeight": "400",
+         "lineHeight": "1.5rem"
+        },
+        "code-sm": {
+         "fontFamily": "JetBrains Mono",
+         "fontSize": "0.6875rem",
+         "fontWeight": "400",
+         "lineHeight": "0.875rem"
+        },
+        "body-md": {
+         "fontFamily": "Inter",
+         "fontSize": "0.875rem",
+         "fontWeight": "400",
+         "lineHeight": "1.25rem"
+        },
+        "headline-lg-mobile": {
+         "fontFamily": "Inter",
+         "fontSize": "1.375rem",
+         "fontWeight": "600",
+         "lineHeight": "1.875rem",
+         "letterSpacing": "-0.015em"
+        },
+        "code-md": {
+         "fontFamily": "JetBrains Mono",
+         "fontSize": "0.8125rem",
+         "fontWeight": "500",
+         "lineHeight": "1.125rem"
+        },
+        "label-lg": {
+         "fontFamily": "Inter",
+         "fontSize": "0.875rem",
+         "fontWeight": "500",
+         "lineHeight": "1.25rem"
+        },
+        "headline-lg": {
+         "fontFamily": "Inter",
+         "fontSize": "1.75rem",
+         "fontWeight": "600",
+         "lineHeight": "2.25rem",
+         "letterSpacing": "-0.02em"
+        },
+        "headline-sm": {
+         "fontFamily": "Inter",
+         "fontSize": "1rem",
+         "fontWeight": "600",
+         "lineHeight": "1.5rem"
+        },
+        "body-sm": {
+         "fontFamily": "Inter",
+         "fontSize": "0.75rem",
+         "fontWeight": "400",
+         "lineHeight": "1rem"
+        },
+        "label-md": {
+         "fontFamily": "Inter",
+         "fontSize": "0.75rem",
+         "fontWeight": "500",
+         "lineHeight": "1rem",
+         "letterSpacing": "0.02em"
+        },
+        "headline-md": {
+         "fontFamily": "Inter",
+         "fontSize": "1.25rem",
+         "fontWeight": "600",
+         "lineHeight": "1.75rem",
+         "letterSpacing": "-0.01em"
+        }
+       },
+       "spacing": {
+        "space-xl": "1.5rem",
+        "space-sm": "0.5rem",
+        "space-lg": "1rem",
+        "gutter-desktop": "1.5rem",
+        "margin-desktop": "2rem",
+        "gutter": "1rem",
+        "space-md": "0.75rem",
+        "space-xs": "0.25rem",
+        "margin": "1rem"
+       },
+       "headlineFontFamily": "Inter",
+       "bodyFontFamily": "Inter",
+       "labelFontFamily": "JetBrains Mono"
+      },
+      "deviceType": "DESKTOP",
+      "screenType": "DESIGN",
+      "screenMetadata": {
+       "agentType": "PRO_AGENT",
+       "status": "COMPLETE"
+      },
+      "designSystem": {
+       "name": "assets/25e6f8dbb3604bef8ac4be3fa1415efc",
+       "designSystem": {
+        "displayName": "Precision Operations",
+        "styleGuidelines": "## Brand & Style\n\nThis design system targets technical leads, sysadmins, and site reliability engineers operating mission-critical environments. The visual language conveys operational clarity, uncompromising stability, and high data utility. \n\nKey attributes:\n- **Style Archetype:** Modern Corporate Engineering / Data-Dense Utility.\n- **Aesthetic Tenets:** Information over decoration, zero layout ambiguity, surgical contrast, and structural rhythm.\n- **Visual Personality:** Quiet, restrained, objective, and responsive. Surfaces operate as quiet scaffolding while system states take center stage.\n\n## Layout & Spacing\n\nThe dashboard uses a structured fluid grid combined with modular layout panes:\n\n- **Desktop (1024px+):** Collapsible persistent left navigation bar (240px fixed), fluid workspace spanning 12 columns with `1.5rem` gutters. Maximum canvas bounds cap at `1600px` for ultra-wide displays to maintain glanceability.\n- **Tablet (768px - 1023px):** 8-column layout, left navigation reduces to an icon-only dock (64px), horizontal canvas margin at `1.5rem`.\n- **Mobile (<768px):** 4-column layout with `1rem` margin and `1rem` gutter. Complex health tables convert to vertically stacked cards.\n\nVertical spacing operates on an absolute 4px base increment (`0.25rem`, `0.5rem`, `0.75rem`, `1rem`, `1.5rem`) to ensure tight component padding without dead space.\n\n## Elevation & Depth\n\nTo avoid visual noise across dense dashboards, this system relies on low-contrast structural outlines rather than heavy drop shadows:\n\n- **Level 0 (App Canvas):** Fills `#F8FAFC`. Zero elevation, zero shadows.\n- **Level 1 (Card & Module Containers):** Surface `#FFFFFF`, bordered with a 1px solid `#E2E8F0`. Shadow: `0 1px 2px 0 rgba(15, 23, 42, 0.04)`.\n- **Level 2 (Dropdowns, Popovers, Filter Menus):** Surface `#FFFFFF`, bordered with 1px solid `#CBD5E1`. Shadow: `0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05)`.\n- **Level 3 (Modal Dialogs & Critical Incident Overlays):** Surface `#FFFFFF`, borderless with full-bleed scrim (`rgba(15, 23, 42, 0.45)`). Shadow: `0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08)`.\n\n## Components\n\n### Buttons\n- **Primary:** Solid `#2563EB` fill, white `#FFFFFF` text, `0.25rem` radius, `0.5rem 0.875rem` padding. Subtle brightness decrease on hover (`#1D4ED8`). Focus ring: 2px offset with `#93C5FD`.\n- **Secondary:** White `#FFFFFF` fill, 1px `#E2E8F0` border, `#0F172A` text. Hover state switches background to `#F8FAFC`.\n- **Destructive/Action:** `#DC2626` fill or transparent with `#DC2626` text for secondary destructive triggers.\n\n### Status Badges & Pills\n- **Geometry:** Height 22px, padding `0 0.5rem`, font `JetBrains Mono` (`code-sm`), weight 500.\n- **Healthy:** `#DCFCE7` background, `#16A34A` text, `#BBF7D0` 1px border. Accompanied by a 6px solid green dot.\n- **Warning (\"Teilweise veraltet\"):** `#FEF3C7` background, `#D97706` text, `#FDE68A` 1px border. Accompanied by a 6px warning amber dot.\n- **Critical / Fetch Error:** `#FEE2E2` background, `#DC2626` text, `#FECACA` 1px border. Accompanied by a 6px pulsing red dot.\n\n### Data Tables & Service Lists\n- **Headers:** Surface `#F8FAFC`, bottom border 1px `#E2E8F0`, uppercase text in `#475569`, tracking `0.05em`, size `0.6875rem`.\n- **Rows:** White `#FFFFFF` background, 1px bottom border `#F1F5F9`. Height fixed at 44px for high density.\n- **Hover State:** Row background transitions to `#F8FAFC` instantly without motion delays.\n\n### Input Fields & Search Bars\n- **Frame:** Height 36px, `0.25rem` radius, 1px border `#E2E8F0`, background `#FFFFFF`.\n- **Focus:** 1px border `#2563EB`, box-shadow `0 0 0 1px #2563EB`.\n- **Monospace Input:** Used specifically for token filters and Git revision queries using `code-md`.\n\n### Cards & Metrics\n- **Metric Cards:** `#FFFFFF` background, 1px `#E2E8F0` border, `1rem` internal padding. Key metric in `headline-lg` (`#0F172A`), subtitle in `body-sm` (`#475569`), status badge positioned top-right.\n- **Dividers:** Clean 1px `#E2E8F0` rules. Never use double borders or styled drop-lines.",
+        "theme": {
+         "colorMode": "LIGHT",
+         "font": "INTER",
+         "roundness": "ROUND_FOUR",
+         "customColor": "#2563eb",
+         "headlineFont": "INTER",
+         "bodyFont": "INTER",
+         "labelFont": "JETBRAINS_MONO",
+         "namedColors": {
+          "secondary": "#565e74",
+          "inverse_surface": "#213145",
+          "on_tertiary": "#ffffff",
+          "on_tertiary_fixed_variant": "#005320",
+          "primary": "#004ac6",
+          "surface_dim": "#cbdbf5",
+          "surface": "#f8f9ff",
+          "tertiary": "#006329",
+          "on_secondary_fixed_variant": "#3f465c",
+          "on_tertiary_container": "#c7ffca",
+          "on_surface_variant": "#434655",
+          "inverse_primary": "#b4c5ff",
+          "surface_container_low": "#eff4ff",
+          "surface_container_high": "#dce9ff",
+          "on_secondary_fixed": "#131b2e",
+          "surface_container_lowest": "#ffffff",
+          "primary_container": "#2563eb",
+          "error_container": "#ffdad6",
+          "on_surface": "#0b1c30",
+          "tertiary_container": "#007f36",
+          "secondary_container": "#dae2fd",
+          "outline_variant": "#c3c6d7",
+          "primary_fixed_dim": "#b4c5ff",
+          "background": "#f8f9ff",
+          "surface_variant": "#d3e4fe",
+          "on_background": "#0b1c30",
+          "inverse_on_surface": "#eaf1ff",
+          "error": "#ba1a1a",
+          "surface_tint": "#0053db",
+          "on_primary_fixed": "#00174b",
+          "on_secondary_container": "#5c647a",
+          "on_primary_container": "#eeefff",
+          "on_error_container": "#93000a",
+          "primary_fixed": "#dbe1ff",
+          "on_primary_fixed_variant": "#003ea8",
+          "secondary_fixed": "#dae2fd",
+          "tertiary_fixed_dim": "#62df7d",
+          "tertiary_fixed": "#7ffc97",
+          "on_primary": "#ffffff",
+          "surface_bright": "#f8f9ff",
+          "outline": "#737686",
+          "on_error": "#ffffff",
+          "surface_container": "#e5eeff",
+          "secondary_fixed_dim": "#bec6e0",
+          "on_tertiary_fixed": "#002109",
+          "surface_container_highest": "#d3e4fe",
+          "on_secondary": "#ffffff"
+         },
+         "colorVariant": "FIDELITY",
+         "overridePrimaryColor": "#2563eb",
+         "overrideSecondaryColor": "#0f172a",
+         "overrideTertiaryColor": "#16a34a",
+         "overrideNeutralColor": "#64748b",
+         "spacingScale": 2,
+         "typography": {
+          "headline-sm": {
+           "fontFamily": "Inter",
+           "fontSize": "1rem",
+           "fontWeight": "600",
+           "lineHeight": "1.5rem"
+          },
+          "body-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "0.9375rem",
+           "fontWeight": "400",
+           "lineHeight": "1.5rem"
+          },
+          "code-sm": {
+           "fontFamily": "JetBrains Mono",
+           "fontSize": "0.6875rem",
+           "fontWeight": "400",
+           "lineHeight": "0.875rem"
+          },
+          "body-md": {
+           "fontFamily": "Inter",
+           "fontSize": "0.875rem",
+           "fontWeight": "400",
+           "lineHeight": "1.25rem"
+          },
+          "label-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "0.875rem",
+           "fontWeight": "500",
+           "lineHeight": "1.25rem"
+          },
+          "code-md": {
+           "fontFamily": "JetBrains Mono",
+           "fontSize": "0.8125rem",
+           "fontWeight": "500",
+           "lineHeight": "1.125rem"
+          },
+          "headline-md": {
+           "fontFamily": "Inter",
+           "fontSize": "1.25rem",
+           "fontWeight": "600",
+           "lineHeight": "1.75rem",
+           "letterSpacing": "-0.01em"
+          },
+          "headline-lg-mobile": {
+           "fontFamily": "Inter",
+           "fontSize": "1.375rem",
+           "fontWeight": "600",
+           "lineHeight": "1.875rem",
+           "letterSpacing": "-0.015em"
+          },
+          "body-sm": {
+           "fontFamily": "Inter",
+           "fontSize": "0.75rem",
+           "fontWeight": "400",
+           "lineHeight": "1rem"
+          },
+          "label-md": {
+           "fontFamily": "Inter",
+           "fontSize": "0.75rem",
+           "fontWeight": "500",
+           "lineHeight": "1rem",
+           "letterSpacing": "0.02em"
+          },
+          "headline-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "1.75rem",
+           "fontWeight": "600",
+           "lineHeight": "2.25rem",
+           "letterSpacing": "-0.02em"
+          }
+         },
+         "spacing": {
+          "gutter": "1rem",
+          "space-xs": "0.25rem",
+          "space-md": "0.75rem",
+          "margin-desktop": "2rem",
+          "margin": "1rem",
+          "space-xl": "1.5rem",
+          "gutter-desktop": "1.5rem",
+          "space-sm": "0.5rem",
+          "space-lg": "1rem"
+         },
+         "headlineFontFamily": "Inter",
+         "bodyFontFamily": "Inter",
+         "labelFontFamily": "JetBrains Mono"
+        }
+       },
+       "version": "1"
+      }
+     }
+    ],
+    "theme": {}
+   }
+  },
+  {
+   "text": "Der Empty-State für das Status-Dashboard (**„Status-Dashboard (Empty State) — Softwareschmiede“**) wurde erfolgreich erstellt.\n\n### Highlights des Designs:\n- **Konsistente Shell & Navigation:** Header mit Logo und Schriftzug „Softwareschmiede Status“, Navigationseinträgen *Status*, *Profil*, *Administration* (inkl. Dropdown-Indikator) sowie Benutzerkennung *admin* und Abmelde-Aktion.\n- **Header & System-Indikatoren:** Status-Badge zeigt dezent **„Keine Daten“**, Metriken-Kompaktleiste mit Cluster-Latenz (`-- ms`) und aktivem Sync-Intervall (`Aktiv (30s)`).\n- **Empty-State für App-Instanzen:**\n  - Übersichtskarte mit Zähler **„0 Instanzen registriert“** und zentralem Status-Icon samt Hinweistext.\n  - Integriertes Anleitungs-Panel **„Remote-Übersicht aktivieren“** mit den geforderten 3 Schritten (Token generieren, in Konfiguration/YAML hinterlegen, Verbindung verifizieren).\n  - Prominente Call-to-Action-Buttons: *„Token in Einstellungen erstellen“* und *„Dokumentation anzeigen“*.\n- **Aktive GitHub-Sektion:** Unverändert befüllt mit Release-Verlauf (inkl. Badge **„Aktuell installiert“** auf `v2.4.1`) und CI/CD-Workflow-Status.\n- **Footer-Bar:** Zeitstempel *„Aktualisiert vor 5 Sekunden“* inklusive Button *„Aktualisieren“*."
+  },
+  {
+   "suggestion": "Detail-Ansicht für einen Klick auf 'Token in Einstellungen erstellen' gestalten"
+  },
+  {
+   "suggestion": "Hover- oder Filter-Zustände für die GitHub-Workflows ergänzen"
+  },
+  {
+   "suggestion": "Mobile responsive Variante des Empty-States anlegen"
+  }
+ ]
+}

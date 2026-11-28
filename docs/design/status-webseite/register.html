@@ -1,0 +1,34 @@
+<!doctype html><html lang="de" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ersteinrichtung – Softwareschmiede-Status</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="page">
+
+<header class="top">
+  <div class="brand-block">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>softwareschmiede<span class="brand-tag">status</span></span>
+    <h1>Ersteinrichtung</h1>
+  </div>
+</header>
+
+<section>
+  <p class="muted">Es existiert noch kein Benutzerkonto. Lege jetzt das Administratorkonto an — die Registrierung schließt sich danach dauerhaft.</p>
+  <form method="post" action="/register">
+    <input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA">
+    <label>Benutzername<input type="text" name="username" required autocomplete="username" pattern="[a-zA-Z0-9._@+-]+" title="Erlaubte Zeichen: a–z, A–Z, 0–9 sowie -._@+ (keine Umlaute, keine Leerzeichen)."></label>
+    <p class="muted">Erlaubte Zeichen: a–z, A–Z, 0–9 sowie -._@+ (keine Umlaute, keine Leerzeichen).</p>
+    <label>Passwort (mindestens 8 Zeichen)<input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
+    <label>Passwort wiederholen<input type="password" name="confirmPassword" required autocomplete="new-password"></label>
+    <button type="submit">Administratorkonto anlegen</button>
+  </form>
+</section>
+
+<footer>softwareschmiede-status · server-gerendert</footer>
+</div>
+</body>
+</html>

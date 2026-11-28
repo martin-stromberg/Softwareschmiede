@@ -1,0 +1,68 @@
+<!doctype html><html lang="de" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Benutzerverwaltung – Softwareschmiede-Status</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="page">
+
+<header class="top">
+  <div class="brand-block">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>softwareschmiede<span class="brand-tag">status</span></span>
+    <h1>Benutzerverwaltung</h1>
+  </div>
+</header>
+
+<nav class="topnav">
+  <a class="nav-link" href="/">Status</a>
+  <a class="nav-link" href="/profile">Profil</a>
+  <a class="nav-link" href="/admin/users" aria-current="page">Benutzer</a>
+  <a class="nav-link" href="/admin/tokens">Tokens</a>
+  <a class="nav-link" href="/admin/settings">Einstellungen</a>
+  <span class="nav-user">martin · Administration</span>
+  <form class="nav-logout" method="post" action="/logout"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><button type="submit">Abmelden</button></form>
+</nav>
+
+<section>
+  <table>
+    <tr><th>Benutzername</th><th>Stufe</th><th>Status</th><th>Aktionen</th></tr>
+    <tr>
+      <td data-label="Benutzername"><strong>martin</strong> <span class="pill pause">letzter Admin</span></td>
+      <td data-label="Stufe">Administration</td>
+      <td data-label="Status"><span class="pill done">aktiv</span></td>
+      <td data-label="Aktionen"><form class="inline" method="post" action="/admin/users/4b8e1c2d-7f3a-4d9e-b2c1-5a6f8e9d0a1b/role"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><input type="hidden" name="role" value="Ueberwacher"><button type="submit" disabled title="Der letzte aktive Administrator kann nicht herabgestuft werden.">Zu Überwacher herabstufen</button></form><form class="inline" method="post" action="/admin/users/4b8e1c2d-7f3a-4d9e-b2c1-5a6f8e9d0a1b/deactivate"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><button type="submit" disabled title="Der letzte aktive Administrator kann nicht deaktiviert werden.">Deaktivieren</button></form><span class="action-na" title="Nur möglich, solange das Konto gesperrt ist.">—</span><form class="inline"><button type="button" disabled title="Der letzte aktive Administrator kann nicht gelöscht werden.">Löschen</button></form><div class="action-note">Letztes Administratorkonto — Aktionen gesperrt.</div></td>
+    </tr>
+    <tr>
+      <td data-label="Benutzername"><strong>stefan.b</strong></td>
+      <td data-label="Stufe">Überwacher</td>
+      <td data-label="Status"><span class="pill wait">gesperrt bis 13.03.2025 15:42 UTC</span></td>
+      <td data-label="Aktionen"><form class="inline" method="post" action="/admin/users/7c2f9e4a-1b5d-4a8c-9e3f-2d6b8a0c4e5f/role"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><input type="hidden" name="role" value="Administration"><button type="submit">Zu Administration befördern</button></form><form class="inline" method="post" action="/admin/users/7c2f9e4a-1b5d-4a8c-9e3f-2d6b8a0c4e5f/deactivate"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><button type="submit">Deaktivieren</button></form><form class="inline" method="post" action="/admin/users/7c2f9e4a-1b5d-4a8c-9e3f-2d6b8a0c4e5f/unlock"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><button type="submit">Sperrung zurücksetzen</button></form><a class="action-link danger" href="/admin/users/7c2f9e4a-1b5d-4a8c-9e3f-2d6b8a0c4e5f/delete">Löschen</a></td>
+    </tr>
+    <tr>
+      <td data-label="Benutzername"><strong>gast</strong></td>
+      <td data-label="Stufe">Überwacher</td>
+      <td data-label="Status"><span class="pill err">deaktiviert</span></td>
+      <td data-label="Aktionen"><form class="inline" method="post" action="/admin/users/a1d3b5c7-9e2f-4b6d-8c0a-3f5e7d9b1c2d/role"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><input type="hidden" name="role" value="Administration"><button type="submit">Zu Administration befördern</button></form><form class="inline" method="post" action="/admin/users/a1d3b5c7-9e2f-4b6d-8c0a-3f5e7d9b1c2d/activate"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><button type="submit">Aktivieren</button></form><span class="action-na" title="Nur möglich, solange das Konto gesperrt ist.">—</span><a class="action-link danger" href="/admin/users/a1d3b5c7-9e2f-4b6d-8c0a-3f5e7d9b1c2d/delete">Löschen</a></td>
+    </tr>
+  </table>
+</section>
+
+<section>
+  <h2>Benutzer anlegen</h2>
+  <form method="post" action="/admin/users">
+    <input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA">
+    <label>Benutzername<input type="text" name="username" required autocomplete="off" pattern="[a-zA-Z0-9._@+-]+" title="Erlaubte Zeichen: a–z, A–Z, 0–9 sowie -._@+ (keine Umlaute, keine Leerzeichen)."></label>
+    <p class="muted">Erlaubte Zeichen: a–z, A–Z, 0–9 sowie -._@+ (keine Umlaute, keine Leerzeichen).</p>
+    <label>Passwort (mindestens 8 Zeichen)<input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
+    <label>Berechtigungsstufe<select name="role"><option value="Ueberwacher">Überwacher (nur lesen)</option><option value="Administration">Administration (Verwaltung)</option></select></label>
+    <button type="submit">Benutzer anlegen</button>
+  </form>
+</section>
+
+<footer>softwareschmiede-status · server-gerendert</footer>
+</div>
+</body>
+</html>

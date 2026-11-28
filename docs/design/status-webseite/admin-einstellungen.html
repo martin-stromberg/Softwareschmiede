@@ -1,0 +1,78 @@
+<!doctype html><html lang="de" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Einstellungen – Softwareschmiede-Status</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="page">
+
+<header class="top">
+  <div class="brand-block">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>softwareschmiede<span class="brand-tag">status</span></span>
+    <h1>Einstellungen</h1>
+  </div>
+</header>
+
+<nav class="topnav">
+  <a class="nav-link" href="/">Status</a>
+  <a class="nav-link" href="/profile">Profil</a>
+  <a class="nav-link" href="/admin/users">Benutzer</a>
+  <a class="nav-link" href="/admin/tokens">Tokens</a>
+  <a class="nav-link" href="/admin/settings" aria-current="page">Einstellungen</a>
+  <span class="nav-user">martin · Administration</span>
+  <form class="nav-logout" method="post" action="/logout"><input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA"><button type="submit">Abmelden</button></form>
+</nav>
+
+<section>
+  <h2>Sitzungsdauer</h2>
+  <p class="muted">Dauer der Anmeldesession in Minuten (5–43200). Gilt ab der nächsten Ausstellung bzw. Erneuerung der Anmelde-Cookies.</p>
+  <form method="post" action="/admin/settings/session-duration">
+    <input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA">
+    <label>Sitzungsdauer in Minuten<input type="number" name="minutes" required min="5" max="43200" value="1440"></label>
+    <button type="submit">Speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Updates</h2>
+  <table>
+    <tr><th>Feld</th><th>Wert</th></tr>
+    <tr><td data-label="Feld">Installierte Version</td><td data-label="Wert">1.4.0</td></tr>
+    <tr><td data-label="Feld">Zustand</td><td data-label="Wert">Update verfügbar</td></tr>
+    <tr><td data-label="Feld">Verfügbare Version</td><td data-label="Wert">1.5.0</td></tr>
+    <tr><td data-label="Feld">Letzte Prüfung</td><td data-label="Wert">13.03.2025 13:58</td></tr>
+    <tr><td data-label="Feld">Letzter Fehler</td><td data-label="Wert"><span class="pill err">Download fehlgeschlagen: HTTP 404</span></td></tr>
+    <tr><td data-label="Feld">Installationssperre</td><td data-label="Wert"><span class="pill pause">verwaist — Reset möglich</span></td></tr>
+    <tr><td data-label="Feld">Update-Protokoll</td><td data-label="Wert"><code>C:\ProgramData\Softwareschmiede\StatusServer\update-install.log</code></td></tr>
+  </table>
+  <form class="inline" method="post" action="/admin/settings/update/lock-reset">
+    <input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA">
+    <button type="submit">Update-Sperre zurücksetzen</button>
+  </form>
+  <h3 class="gap-top">Kanal und Automatisierung</h3>
+  <form method="post" action="/admin/settings/update">
+    <input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA">
+    <label>Release-Kanal<select name="channel"><option value="stable" selected>Stable (nur endgültige Releases)</option><option value="prerelease">Pre-Release (inkl. Vorabversionen)</option></select></label>
+    <label>Automatisierung<select name="mode"><option value="off">Aus — nur manuelle Aktionen</option><option value="check" selected>Nur prüfen — verfügbare Updates melden</option><option value="install">Prüfen und installieren — täglich zur angegebenen Uhrzeit</option></select></label>
+    <label>Installationsuhrzeit (bei „Prüfen und installieren“)<input type="time" name="installTime" value="03:00"></label>
+    <button type="submit">Update-Einstellungen speichern</button>
+  </form>
+  <h3 class="gap-top">Aktionen</h3>
+  <form class="inline" method="post" action="/admin/settings/update/check">
+    <input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA">
+    <button type="submit">Jetzt nach Update suchen</button>
+  </form>
+  <form class="inline" method="post" action="/admin/settings/update/install">
+    <input type="hidden" name="__RequestVerificationToken" value="CfDJ8M0cKk9xYzVvV7pQaU2nN0sOm9iOqRAF3eBx1pTqYw8hA">
+    <label><input type="checkbox" name="confirmDowntime" value="true"> Downtime bestätigen — der Server wird während der Installation neu gestartet</label>
+    <button type="submit" class="danger">Update jetzt installieren</button>
+  </form>
+</section>
+
+<footer>softwareschmiede-status · server-gerendert</footer>
+</div>
+</body>
+</html>
