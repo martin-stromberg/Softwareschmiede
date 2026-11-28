@@ -1,0 +1,357 @@
+{
+ "projectId": "7540435568831394111",
+ "sessionId": "9695782732597438373",
+ "outputComponents": [
+  {
+   "design": {
+    "screens": [
+     {
+      "screenshot": {
+       "name": "projects/7540435568831394111/files/404d569c49334069a86d26b34e0802b9",
+       "downloadUrl": "https://stitch.googleapis.com/v1/projects/7540435568831394111/files/404d569c49334069a86d26b34e0802b9:download"
+      },
+      "htmlCode": {
+       "name": "projects/7540435568831394111/files/4006d08eaf714a2896856c432b899e22",
+       "downloadUrl": "https://stitch.googleapis.com/v1/projects/7540435568831394111/files/4006d08eaf714a2896856c432b899e22:download",
+       "mimeType": "text/html"
+      },
+      "id": "d5f93f78bec54dafb00207755d7cc3af",
+      "generatedBy": "figaro_agent",
+      "width": "2560",
+      "height": "3200",
+      "title": "Profil — Softwareschmiede Status",
+      "prompt": "Page title and breadcrumb / header: 'Profil' with subtext 'Verwaltung des persönlichen Administrator-Kontos und Systemeinstellungen'.\n\nAt the top of the content area, above the stacked cards:\n- A prominent green success notification / alert banner:\n  - Checkmark icon (green circle with check), bold text 'Passwort wurde geändert.', subtle green background, crisp border, dismiss button or indicator.\n\nLayout: Centered, clean stacked container (max-w-4xl or max-w-3xl) with generous spacing and the technical aesthetic of 'Precision Operations' (subtle borders, tech badges, clean mono accents where fitting).\n\nCard 1: 'Kontoinformation'\n- Header: Section title 'Kontoinformation' with an account/user icon and badge 'System-Konto'.\n- Subtitle: 'Übersicht über die Stammdaten und Aktivität Ihres Administrator-Zugangs.'\n- Key-Value rows with clean divided rows or key-value grid:\n  - Benutzername: 'admin' (with monospace styling or badge)\n  - Rolle: 'Administrator' (with a primary blue role badge)\n  - Erstellt: '12.03.2026'\n  - Letzte Anmeldung: 'heute 09:41' (with a subtle active status dot / indicator)\n\nCard 2: 'Farbschema'\n- Header: Section title 'Farbschema' with a palette/theme icon.\n- Subtitle: 'Wählen Sie das Erscheinungsbild der Benutzeroberfläche.'\n- Three selectable option tiles / radio cards arranged horizontally in a 3-column grid:\n  1. 'Automatisch' — Selected state (blue active border, check icon or filled radio), description: 'Folgt der Systemeinstellung', visual preview thumbnail (split light/dark abstract window).\n  2. 'Hell' — Default light state, description: 'Helle Benutzeroberfläche für gut beleuchtete Umgebungen', visual preview thumbnail (light clean window).\n  3. 'Dunkel' — Dark state, description: 'Kontrastreiche dunkle Ansicht für blendfreies Arbeiten', visual preview thumbnail (dark sleek window).\n- Action footer: Button 'Schema speichern' (primary blue styled button).\n\nCard 3: 'Passwort ändern'\n- Header: Section title 'Passwort ändern' with a key/lock icon.\n- Subtitle: 'Aktualisieren Sie Ihr persönliches Passwort für erhöhte Sicherheit.'\n- Form fields with clean tech labels and visibility toggle icons:\n  - Field 1: 'Aktuelles Passwort' (input type password with eye toggle icon and placeholder '••••••••••••')\n  - Field 2: 'Neues Passwort' (input type password with eye toggle, helper hint 'Mindestens 12 Zeichen — Groß-, Kleinbuchstaben und Sonderzeichen')\n  - Field 3: 'Neues Passwort wiederholen' (input type password with eye toggle and placeholder 'Neues Passwort erneut eingeben')\n- Action button: 'Passwort ändern' (button with key/shield icon).\n\nKeep strict visual continuity with {{DATA:DESIGN_SYSTEM:DESIGN_SYSTEM_1}} and the other Softwareschmiede screens (crisp borders, light surface tokens, monospace metadata accents, consistent button styles).",
+      "name": "projects/7540435568831394111/screens/d5f93f78bec54dafb00207755d7cc3af",
+      "theme": {
+       "colorMode": "LIGHT",
+       "font": "INTER",
+       "roundness": "ROUND_FOUR",
+       "customColor": "#2563eb",
+       "headlineFont": "INTER",
+       "bodyFont": "INTER",
+       "labelFont": "JETBRAINS_MONO",
+       "namedColors": {
+        "on_error": "#ffffff",
+        "on_tertiary_fixed_variant": "#005320",
+        "on_primary_fixed_variant": "#003ea8",
+        "on_tertiary_fixed": "#002109",
+        "surface_bright": "#f8f9ff",
+        "primary_fixed_dim": "#b4c5ff",
+        "on_tertiary_container": "#c7ffca",
+        "surface_container_high": "#dce9ff",
+        "on_primary": "#ffffff",
+        "surface_container_low": "#eff4ff",
+        "secondary_container": "#dae2fd",
+        "background": "#f8f9ff",
+        "primary_container": "#2563eb",
+        "tertiary_fixed": "#7ffc97",
+        "on_secondary_fixed_variant": "#3f465c",
+        "surface_variant": "#d3e4fe",
+        "surface_container_lowest": "#ffffff",
+        "on_secondary_fixed": "#131b2e",
+        "inverse_surface": "#213145",
+        "surface_container": "#e5eeff",
+        "on_surface": "#0b1c30",
+        "tertiary_fixed_dim": "#62df7d",
+        "inverse_primary": "#b4c5ff",
+        "surface": "#f8f9ff",
+        "on_secondary_container": "#5c647a",
+        "error_container": "#ffdad6",
+        "secondary_fixed_dim": "#bec6e0",
+        "outline": "#737686",
+        "surface_dim": "#cbdbf5",
+        "secondary": "#565e74",
+        "on_secondary": "#ffffff",
+        "surface_tint": "#0053db",
+        "on_background": "#0b1c30",
+        "surface_container_highest": "#d3e4fe",
+        "on_error_container": "#93000a",
+        "error": "#ba1a1a",
+        "primary_fixed": "#dbe1ff",
+        "on_primary_container": "#eeefff",
+        "on_surface_variant": "#434655",
+        "outline_variant": "#c3c6d7",
+        "tertiary": "#006329",
+        "on_primary_fixed": "#00174b",
+        "tertiary_container": "#007f36",
+        "inverse_on_surface": "#eaf1ff",
+        "primary": "#004ac6",
+        "on_tertiary": "#ffffff",
+        "secondary_fixed": "#dae2fd"
+       },
+       "colorVariant": "FIDELITY",
+       "overridePrimaryColor": "#2563eb",
+       "overrideSecondaryColor": "#0f172a",
+       "overrideTertiaryColor": "#16a34a",
+       "overrideNeutralColor": "#64748b",
+       "spacingScale": 2,
+       "typography": {
+        "code-md": {
+         "fontFamily": "JetBrains Mono",
+         "fontSize": "0.8125rem",
+         "fontWeight": "500",
+         "lineHeight": "1.125rem"
+        },
+        "headline-md": {
+         "fontFamily": "Inter",
+         "fontSize": "1.25rem",
+         "fontWeight": "600",
+         "lineHeight": "1.75rem",
+         "letterSpacing": "-0.01em"
+        },
+        "code-sm": {
+         "fontFamily": "JetBrains Mono",
+         "fontSize": "0.6875rem",
+         "fontWeight": "400",
+         "lineHeight": "0.875rem"
+        },
+        "body-lg": {
+         "fontFamily": "Inter",
+         "fontSize": "0.9375rem",
+         "fontWeight": "400",
+         "lineHeight": "1.5rem"
+        },
+        "headline-sm": {
+         "fontFamily": "Inter",
+         "fontSize": "1rem",
+         "fontWeight": "600",
+         "lineHeight": "1.5rem"
+        },
+        "headline-lg": {
+         "fontFamily": "Inter",
+         "fontSize": "1.75rem",
+         "fontWeight": "600",
+         "lineHeight": "2.25rem",
+         "letterSpacing": "-0.02em"
+        },
+        "body-md": {
+         "fontFamily": "Inter",
+         "fontSize": "0.875rem",
+         "fontWeight": "400",
+         "lineHeight": "1.25rem"
+        },
+        "label-md": {
+         "fontFamily": "Inter",
+         "fontSize": "0.75rem",
+         "fontWeight": "500",
+         "lineHeight": "1rem",
+         "letterSpacing": "0.02em"
+        },
+        "label-lg": {
+         "fontFamily": "Inter",
+         "fontSize": "0.875rem",
+         "fontWeight": "500",
+         "lineHeight": "1.25rem"
+        },
+        "body-sm": {
+         "fontFamily": "Inter",
+         "fontSize": "0.75rem",
+         "fontWeight": "400",
+         "lineHeight": "1rem"
+        },
+        "headline-lg-mobile": {
+         "fontFamily": "Inter",
+         "fontSize": "1.375rem",
+         "fontWeight": "600",
+         "lineHeight": "1.875rem",
+         "letterSpacing": "-0.015em"
+        }
+       },
+       "spacing": {
+        "space-xs": "0.25rem",
+        "gutter-desktop": "1.5rem",
+        "gutter": "1rem",
+        "space-xl": "1.5rem",
+        "space-lg": "1rem",
+        "margin-desktop": "2rem",
+        "space-md": "0.75rem",
+        "margin": "1rem",
+        "space-sm": "0.5rem"
+       },
+       "headlineFontFamily": "Inter",
+       "bodyFontFamily": "Inter",
+       "labelFontFamily": "JetBrains Mono"
+      },
+      "deviceType": "DESKTOP",
+      "screenType": "DESIGN",
+      "screenMetadata": {
+       "agentType": "PRO_AGENT",
+       "status": "COMPLETE"
+      },
+      "designSystem": {
+       "name": "assets/25e6f8dbb3604bef8ac4be3fa1415efc",
+       "designSystem": {
+        "displayName": "Precision Operations",
+        "styleGuidelines": "## Brand & Style\n\nThis design system targets technical leads, sysadmins, and site reliability engineers operating mission-critical environments. The visual language conveys operational clarity, uncompromising stability, and high data utility. \n\nKey attributes:\n- **Style Archetype:** Modern Corporate Engineering / Data-Dense Utility.\n- **Aesthetic Tenets:** Information over decoration, zero layout ambiguity, surgical contrast, and structural rhythm.\n- **Visual Personality:** Quiet, restrained, objective, and responsive. Surfaces operate as quiet scaffolding while system states take center stage.\n\n## Layout & Spacing\n\nThe dashboard uses a structured fluid grid combined with modular layout panes:\n\n- **Desktop (1024px+):** Collapsible persistent left navigation bar (240px fixed), fluid workspace spanning 12 columns with `1.5rem` gutters. Maximum canvas bounds cap at `1600px` for ultra-wide displays to maintain glanceability.\n- **Tablet (768px - 1023px):** 8-column layout, left navigation reduces to an icon-only dock (64px), horizontal canvas margin at `1.5rem`.\n- **Mobile (<768px):** 4-column layout with `1rem` margin and `1rem` gutter. Complex health tables convert to vertically stacked cards.\n\nVertical spacing operates on an absolute 4px base increment (`0.25rem`, `0.5rem`, `0.75rem`, `1rem`, `1.5rem`) to ensure tight component padding without dead space.\n\n## Elevation & Depth\n\nTo avoid visual noise across dense dashboards, this system relies on low-contrast structural outlines rather than heavy drop shadows:\n\n- **Level 0 (App Canvas):** Fills `#F8FAFC`. Zero elevation, zero shadows.\n- **Level 1 (Card & Module Containers):** Surface `#FFFFFF`, bordered with a 1px solid `#E2E8F0`. Shadow: `0 1px 2px 0 rgba(15, 23, 42, 0.04)`.\n- **Level 2 (Dropdowns, Popovers, Filter Menus):** Surface `#FFFFFF`, bordered with 1px solid `#CBD5E1`. Shadow: `0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.05)`.\n- **Level 3 (Modal Dialogs & Critical Incident Overlays):** Surface `#FFFFFF`, borderless with full-bleed scrim (`rgba(15, 23, 42, 0.45)`). Shadow: `0 20px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08)`.\n\n## Components\n\n### Buttons\n- **Primary:** Solid `#2563EB` fill, white `#FFFFFF` text, `0.25rem` radius, `0.5rem 0.875rem` padding. Subtle brightness decrease on hover (`#1D4ED8`). Focus ring: 2px offset with `#93C5FD`.\n- **Secondary:** White `#FFFFFF` fill, 1px `#E2E8F0` border, `#0F172A` text. Hover state switches background to `#F8FAFC`.\n- **Destructive/Action:** `#DC2626` fill or transparent with `#DC2626` text for secondary destructive triggers.\n\n### Status Badges & Pills\n- **Geometry:** Height 22px, padding `0 0.5rem`, font `JetBrains Mono` (`code-sm`), weight 500.\n- **Healthy:** `#DCFCE7` background, `#16A34A` text, `#BBF7D0` 1px border. Accompanied by a 6px solid green dot.\n- **Warning (\"Teilweise veraltet\"):** `#FEF3C7` background, `#D97706` text, `#FDE68A` 1px border. Accompanied by a 6px warning amber dot.\n- **Critical / Fetch Error:** `#FEE2E2` background, `#DC2626` text, `#FECACA` 1px border. Accompanied by a 6px pulsing red dot.\n\n### Data Tables & Service Lists\n- **Headers:** Surface `#F8FAFC`, bottom border 1px `#E2E8F0`, uppercase text in `#475569`, tracking `0.05em`, size `0.6875rem`.\n- **Rows:** White `#FFFFFF` background, 1px bottom border `#F1F5F9`. Height fixed at 44px for high density.\n- **Hover State:** Row background transitions to `#F8FAFC` instantly without motion delays.\n\n### Input Fields & Search Bars\n- **Frame:** Height 36px, `0.25rem` radius, 1px border `#E2E8F0`, background `#FFFFFF`.\n- **Focus:** 1px border `#2563EB`, box-shadow `0 0 0 1px #2563EB`.\n- **Monospace Input:** Used specifically for token filters and Git revision queries using `code-md`.\n\n### Cards & Metrics\n- **Metric Cards:** `#FFFFFF` background, 1px `#E2E8F0` border, `1rem` internal padding. Key metric in `headline-lg` (`#0F172A`), subtitle in `body-sm` (`#475569`), status badge positioned top-right.\n- **Dividers:** Clean 1px `#E2E8F0` rules. Never use double borders or styled drop-lines.",
+        "theme": {
+         "colorMode": "LIGHT",
+         "font": "INTER",
+         "roundness": "ROUND_FOUR",
+         "customColor": "#2563eb",
+         "headlineFont": "INTER",
+         "bodyFont": "INTER",
+         "labelFont": "JETBRAINS_MONO",
+         "namedColors": {
+          "on_secondary_fixed": "#131b2e",
+          "surface": "#f8f9ff",
+          "surface_tint": "#0053db",
+          "outline_variant": "#c3c6d7",
+          "on_secondary": "#ffffff",
+          "outline": "#737686",
+          "on_primary_container": "#eeefff",
+          "secondary_fixed": "#dae2fd",
+          "surface_container_low": "#eff4ff",
+          "on_error": "#ffffff",
+          "surface_container_high": "#dce9ff",
+          "on_surface": "#0b1c30",
+          "surface_container": "#e5eeff",
+          "inverse_primary": "#b4c5ff",
+          "on_secondary_fixed_variant": "#3f465c",
+          "error_container": "#ffdad6",
+          "on_tertiary_fixed_variant": "#005320",
+          "on_tertiary_container": "#c7ffca",
+          "primary": "#004ac6",
+          "secondary_container": "#dae2fd",
+          "tertiary_fixed": "#7ffc97",
+          "background": "#f8f9ff",
+          "primary_container": "#2563eb",
+          "on_primary_fixed": "#00174b",
+          "secondary": "#565e74",
+          "secondary_fixed_dim": "#bec6e0",
+          "tertiary_container": "#007f36",
+          "tertiary": "#006329",
+          "inverse_on_surface": "#eaf1ff",
+          "on_error_container": "#93000a",
+          "on_tertiary": "#ffffff",
+          "on_primary_fixed_variant": "#003ea8",
+          "surface_container_highest": "#d3e4fe",
+          "surface_variant": "#d3e4fe",
+          "on_background": "#0b1c30",
+          "on_surface_variant": "#434655",
+          "inverse_surface": "#213145",
+          "on_secondary_container": "#5c647a",
+          "primary_fixed": "#dbe1ff",
+          "on_tertiary_fixed": "#002109",
+          "surface_container_lowest": "#ffffff",
+          "primary_fixed_dim": "#b4c5ff",
+          "tertiary_fixed_dim": "#62df7d",
+          "surface_bright": "#f8f9ff",
+          "error": "#ba1a1a",
+          "on_primary": "#ffffff",
+          "surface_dim": "#cbdbf5"
+         },
+         "colorVariant": "FIDELITY",
+         "overridePrimaryColor": "#2563eb",
+         "overrideSecondaryColor": "#0f172a",
+         "overrideTertiaryColor": "#16a34a",
+         "overrideNeutralColor": "#64748b",
+         "spacingScale": 2,
+         "typography": {
+          "body-md": {
+           "fontFamily": "Inter",
+           "fontSize": "0.875rem",
+           "fontWeight": "400",
+           "lineHeight": "1.25rem"
+          },
+          "body-sm": {
+           "fontFamily": "Inter",
+           "fontSize": "0.75rem",
+           "fontWeight": "400",
+           "lineHeight": "1rem"
+          },
+          "headline-lg-mobile": {
+           "fontFamily": "Inter",
+           "fontSize": "1.375rem",
+           "fontWeight": "600",
+           "lineHeight": "1.875rem",
+           "letterSpacing": "-0.015em"
+          },
+          "headline-sm": {
+           "fontFamily": "Inter",
+           "fontSize": "1rem",
+           "fontWeight": "600",
+           "lineHeight": "1.5rem"
+          },
+          "headline-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "1.75rem",
+           "fontWeight": "600",
+           "lineHeight": "2.25rem",
+           "letterSpacing": "-0.02em"
+          },
+          "label-md": {
+           "fontFamily": "Inter",
+           "fontSize": "0.75rem",
+           "fontWeight": "500",
+           "lineHeight": "1rem",
+           "letterSpacing": "0.02em"
+          },
+          "code-md": {
+           "fontFamily": "JetBrains Mono",
+           "fontSize": "0.8125rem",
+           "fontWeight": "500",
+           "lineHeight": "1.125rem"
+          },
+          "label-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "0.875rem",
+           "fontWeight": "500",
+           "lineHeight": "1.25rem"
+          },
+          "body-lg": {
+           "fontFamily": "Inter",
+           "fontSize": "0.9375rem",
+           "fontWeight": "400",
+           "lineHeight": "1.5rem"
+          },
+          "headline-md": {
+           "fontFamily": "Inter",
+           "fontSize": "1.25rem",
+           "fontWeight": "600",
+           "lineHeight": "1.75rem",
+           "letterSpacing": "-0.01em"
+          },
+          "code-sm": {
+           "fontFamily": "JetBrains Mono",
+           "fontSize": "0.6875rem",
+           "fontWeight": "400",
+           "lineHeight": "0.875rem"
+          }
+         },
+         "spacing": {
+          "gutter-desktop": "1.5rem",
+          "space-xs": "0.25rem",
+          "gutter": "1rem",
+          "margin-desktop": "2rem",
+          "space-md": "0.75rem",
+          "space-sm": "0.5rem",
+          "space-lg": "1rem",
+          "margin": "1rem",
+          "space-xl": "1.5rem"
+         },
+         "headlineFontFamily": "Inter",
+         "bodyFontFamily": "Inter",
+         "labelFontFamily": "JetBrains Mono"
+        }
+       },
+       "version": "1"
+      }
+     }
+    ],
+    "theme": {}
+   }
+  },
+  {
+   "text": "Die Seite **„Profil — Softwareschmiede Status“** wurde erfolgreich erstellt und fügt sich nahtlos in das bestehende Designsystem ein:\n\n### Highlights des Designs:\n- **Einheitliche Navigation:** Top-Navigationsleiste mit aktivem Menüpunkt *Profil*, Status-Link, Administrations-Dropdown (*Benutzer*, *Tokens*, *Einstellungen*) sowie Benutzerstatus (*admin* mit Role-Badge und Abmelden-Button).\n- **Erfolgsmeldung:** Prominenter grüner Erfolgsbanner (*„Passwort wurde geändert.“*) oberhalb der Inhaltskarten.\n- **Drei strukturierte Karten:**\n  1. **Kontoinformation:** Übersichtliche Key-Value-Einträge für *Benutzername* (`admin`), *Rolle* (`Administrator`), *Erstellt* (`12.03.2026`) und *Letzte Anmeldung* (`heute 09:41`).\n  2. **Farbschema:** Drei interaktive Auswahlkacheln (*Automatisch* [aktiv ausgewählt mit Miniaturvorschau], *Hell* und *Dunkel*) inklusive Speicher-Button *„Schema speichern“*.\n  3. **Passwort ändern:** Eingabefelder für *Aktuelles Passwort*, *Neues Passwort* (mit Passwortstärken-Indikator und Hinweis auf Mindestlänge) sowie *Neues Passwort wiederholen* mit dem Aktionsbutton *„Passwort ändern“*.\n- **Visuelle Kontinuität:** Präzise technische Typografie, dezent abgerundete Karten, konsistente Status-Dots und Sicherheits-Metadaten passend zu den anderen Screens der Softwareschmiede."
+  },
+  {
+   "suggestion": "Benutzer-Verwaltung Screen gestalten"
+  },
+  {
+   "suggestion": "API-Tokens Seite erstellen"
+  },
+  {
+   "suggestion": "Einstellungen-Seite gestalten"
+  }
+ ]
+}

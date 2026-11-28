@@ -64,3 +64,19 @@ Keine.
 ## Gesamtstatus
 
 Keine Fehler — Screenshot-Nachweis vollständig, Sichtprüfung dokumentiert.
+
+## Iteration 3 — Stitch-Entwurf (Nachforderung via Issue-Kommentar)
+
+Nach dem Anwender-Kommentar vom 2025-… (Datenverständlichkeit, expliziter Wunsch nach
+Google Stitch) wurde ein zweiter, vom bisherigen Layout unabhängiger Entwurf komplett
+mit Google Stitch generiert (Projekt `projects/7540435568831394111`, Design-System
+"Precision Operations" `assets/25e6f8dbb3604bef8ac4be3fa1415efc`).
+
+| Nachweis | Ergebnis |
+|---|---|
+| 14 Light-Screens (Stitch PNG) | einzeln sichtgeprüft — konsistente Navigation, deutsche Texte, gute Lesbarkeit |
+| 14 Dark-Varianten (`generate_variants`, COLOR_SCHEME) | einzeln sichtgeprüft — konsistentes Dark-Theme, keine Layoutdefekte |
+| 14 Composite-PNGs (Light\|Dark) | lokal erzeugt; `status.composite.png` stichprobenartig verifiziert |
+| Generierte HTML-Exporte | 13× vorhanden (`status.html` fehlt, nur visueller Referenzwert) |
+
+Artefakte: `docs/design/status-webseite-stitch/` (README mit allen Stitch-IDs).

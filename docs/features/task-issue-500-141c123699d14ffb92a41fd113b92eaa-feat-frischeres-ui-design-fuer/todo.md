@@ -36,3 +36,22 @@ Endstand dieses Laufs: Design-Entwurf erstellt, geprueft und im Issue #500 zur
 Abnahme vorgelegt (Draft-PR #510). Feature-Verzeichnis bleibt bestehen — die
 Umsetzung in den Composer-Klassen folgt in einem weiteren Lauf nach
 Anwender-Bestaetigung; erst dann wird das Verzeichnis aufgeraeumt.
+
+## Iteration 2 (Anwender-Feedback: Google Stitch verbindlich)
+
+| Status | Schritt | Beschreibung | Artefakt |
+|--------|---------|--------------|----------|
+| [x] | – | Anforderung revidiert (Stitch verbindlich, Ziel: Daten-Verständlichkeit) | `requirement.md` Rev. 2 |
+| [ ] | 6' | Stitch-Generierung aller Ansichten + Downloads | `docs/design/status-webseite-stitch/` |
+| [ ] | 8' | Usability-/Sichtprüfung der Stitch-Screenshots | `test-results.md` (ergänzt) |
+| [ ] | – | Issue-Kommentar mit eingebetteten Screenshots | – |
+
+## Iteration 3 (Stitch)
+
+- [x] Stitch-API angebunden (MCP-Endpunkt, Key aus Benutzer-Umgebungsvariable)
+- [x] Projekt + Design-System "Precision Operations" erstellt
+- [x] 14 Light-Screens generiert, heruntergeladen, sichtgeprüft
+- [x] 14 Dark-Varianten generiert, heruntergeladen, sichtgeprüft
+- [x] Light|Dark-Composites + README erstellt
+- [ ] Commit + Push, Issue-Kommentar mit eingebetteten Screenshots
+- [ ] Anwender-Entscheidung abwarten: manueller Entwurf vs. Stitch-Entwurf

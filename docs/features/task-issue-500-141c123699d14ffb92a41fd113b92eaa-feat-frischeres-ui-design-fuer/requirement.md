@@ -59,3 +59,16 @@ In diesem Lauf werden **keine** Produktivcode-Artefakte geändert; betroffen sin
 - **Verifizierter Randfall „Weiterleitung zur Registrierung":** Die vom Anwender erwartete automatische Weiterleitung ist im Code nur teilweise vorhanden — `StatusServerCookieEvents.RedirectToLogin` (`server/Softwareschmiede.StatusServer/Security/StatusServerCookieEvents.cs:113-122`) leitet unauthentifizierte Aufrufe **geschützter** Seiten bei fehlendem Benutzerkonto auf `/register` um. Ein **direkter** `GET /login` rendert dagegen auch ohne vorhandenes Benutzerkonto das Login-Formular (`AuthEndpoints.GetLogin`, `AuthEndpoints.cs:97-106` prüft nur den bereits-angemeldeten Fall). Zu klären bzw. für die spätere Umsetzung zu vermerken, ob `/login` bei null Benutzern ebenfalls auf `/register` weiterleiten soll — für die Mockups ohne sichtbare Konsequenz.
 - **Werkzeug/Ergebnisformat:** Das Issue nennt Google Stitch als Werkzeug; verbindlich ist das Ergebnis (Mockups + Screenshots aller Ansichten in beiden Schemata). Falls Stitch nicht verfügbar ist, werden gleichwertige HTML/CSS-Mockups direkt erstellt — Annahme, bei Abweichung mit dem Anwender abstimmen.
 - **Umfang der darzustellenden Nebenzustände:** Neben den 18 Hauptbildern (9 Ansichten × 2 Schemata) ist zu entscheiden, welche Nebenzustände als eigene Screenshots nötig sind (Status-Übersicht: Leer-Zustand vs. befüllt; Benutzerliste: Pill „letzter Admin"/deaktivierte Schutz-Aktionen; Token-Seite: Einmal-Klartext-Hinweis vs. Leer-Zustand; Einstellungen: verwaiste Installationssperre). Vorschlag: in die Screenshots der jeweiligen Ansicht integrieren, nur bei deutlich abweichendem Layout separat zeigen.
+
+---
+
+## Revision 2 — Anwender-Feedback zum ersten Entwurf (Issue-Kommentar, 2026-11-28)
+
+Der erste, handerstellte Entwurf wurde vom Anwender als besser als der Ist-Stand bewertet, aber verworfen: **Das Verständnis der angezeigten Daten ist schwer** — die Informationsarchitektur trägt nicht ausreichend. Der Anwender besteht jetzt ausdrücklich auf der ursprünglich im Issue genannten Vorgehensweise: **Google Stitch** soll ein vom aktuellen Layout unabhängiges Design vorschlagen (API-Key liegt in der Benutzerumgebung als `GOOGLE_STITCH`).
+
+### Geänderte Anforderung
+
+- **Werkzeug jetzt verbindlich:** Alle Ansichten werden über die Stitch-MCP-API (`stitch.googleapis.com/mcp`) generiert — Screens + HTML je Ansicht, gemeinsames Design-System pro Projekt für Konsistenz.
+- **Primäres Ziel:** Daten-Verständlichkeit — klare visuelle Hierarchie, sofort erfassbare Status-Semantik, scannbare Gruppierung statt Tabellenwüsten.
+- **Ergebnisumfang unverändert:** Screenshots aller Ansichten als Issue-Kommentar zur Abnahme; Code-Umsetzung weiterhin erst nach Bestätigung. Dark-Varianten werden über Stitch-Varianten/edit_screens erzeugt, soweit machbar.
+- **Inventar-Grundlage unverändert:** Inhalte/Funktionsumfang je Ansicht bleibt exakt der dokumentierte Ist-Funktionsumfang (siehe inventory/); Stitch gestaltet nur die Darstellung neu. Prompts beschreiben die realen Datenfelder je Ansicht.
