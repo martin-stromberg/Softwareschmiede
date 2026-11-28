@@ -20,9 +20,9 @@ Branch: `task/issue-500-141c123699d14ffb92a41fd113b92eaa-feat-frischeres-ui-desi
 | [x] | 10 | Sichtprüfung der Design-Screenshots | `test-results.md` |
 | [x] | – | Iteration oder Abschluss entscheiden | – |
 | [ ] | 11 | Folgeaufgaben dokumentieren (bei Schleifenabbruch) | `continue.md` |
-| [ ] | 12 | Dokumentation erstellen (Unteragent) | `docs/help/` |
-| [ ] | 12b | README aktualisieren (Unteragent) | `README.md` |
-| [ ] | 12c | Release Notes aktualisieren (Unteragent) | `docs/RELEASE_NOTES.md` |
+| [x] | 12 | Dokumentation — nicht anwendbar (Design-Lauf ohne ausgeliefertes Feature; `docs/design/status-webseite/README.md` deckt die Artefakte) | – |
+| [x] | 12b | README — nicht anwendbar (kein Produktivfeature) | – |
+| [x] | 12c | Release Notes — nicht anwendbar (Zwischenschritt, nichts ausgeliefert) | – |
 | [ ] | – | Feature-Verzeichnis löschen | – |
 | [ ] | – | Commit durchführen | – |
 
@@ -31,3 +31,8 @@ Design-Entwurf nur ein Zwischenschritt ist — Screenshots aller Ansichten
 werden im Issue gezeigt, die Code-Umsetzung folgt erst nach seiner
 Bestätigung. Dieser Lauf endet daher mit Design-Artefakten + Issue-Kommentar;
 die eigentliche Umsetzung im StatusServer ist ein späterer Schritt.
+
+Endstand dieses Laufs: Design-Entwurf erstellt, geprueft und im Issue #500 zur
+Abnahme vorgelegt (Draft-PR #510). Feature-Verzeichnis bleibt bestehen — die
+Umsetzung in den Composer-Klassen folgt in einem weiteren Lauf nach
+Anwender-Bestaetigung; erst dann wird das Verzeichnis aufgeraeumt.
