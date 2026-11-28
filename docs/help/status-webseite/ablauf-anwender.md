@@ -44,7 +44,23 @@
 3. Klicke **Passwort ändern** — die Bestätigung „Das Passwort wurde geändert."
    erscheint; die Anmeldung bleibt bestehen.
 
-### 4. Benutzer verwalten (Stufe Administration)
+### 4. Farbschema einstellen
+
+1. Klicke in der Navigationszeile auf **Profil**.
+2. Wähle unter **Anzeige → Farbschema** eine der drei Einstellungen:
+   **Automatisch (System)** (folgt der Hell-/Dunkel-Einstellung des Geräts,
+   voreingestellt), **Light** oder **Dark**.
+3. Klicke **Anzeige speichern** — die Bestätigung „Die Anzeigeeinstellung
+   wurde gespeichert." erscheint; alle Seiten erscheinen ab dem nächsten
+   Aufruf im gewählten Schema.
+
+> **Hinweis:** Die Einstellung gilt nur für das eigene Konto und bleibt über
+> Abmeldungen und Server-Neustarts erhalten. Die Status-Übersicht lädt sich
+> ohnehin regelmäßig selbst neu — dort wirkt der Wechsel spätestens mit dem
+> nächsten automatischen Refresh. Nicht angemeldete Seiten (z. B. die
+> Anmeldung selbst) folgen immer der Systemeinstellung.
+
+### 5. Benutzer verwalten (Stufe Administration)
 
 1. Klicke in der Navigationszeile auf **Benutzer**.
 2. **Anlegen:** Unten im Abschnitt **Benutzer anlegen** Benutzername, Passwort
@@ -63,7 +79,7 @@
 > **Hinweis:** Beim letzten aktiven Administrator sind Deaktivieren, Löschen
 > und Herabstufen abgeblockt — das Konto ist mit „letzter Admin" markiert.
 
-### 5. Relay-Token für eine App-Instanz anlegen (Stufe Administration)
+### 6. Relay-Token für eine App-Instanz anlegen (Stufe Administration)
 
 1. Klicke in der Navigationszeile auf **Tokens**.
 2. Gib im Abschnitt **Token anlegen** eine **Bezeichnung** ein (z. B. den Namen
@@ -77,7 +93,7 @@
 > abrufbar. Ein Refresh zeigt stattdessen den Hinweis, dass die Anzeige bereits
 > erfolgt ist.
 
-### 6. Relay-Token widerrufen (Stufe Administration)
+### 7. Relay-Token widerrufen (Stufe Administration)
 
 1. Klicke auf **Tokens** und in der Zeile des Tokens auf **Widerrufen**.
 2. Bestätige auf der Bestätigungsseite mit **Token endgültig widerrufen** —
@@ -85,7 +101,7 @@
 3. Das Token bleibt als „widerrufen" in der Liste sichtbar; App-Instanzen, die
    es weiterhin senden, werden abgelehnt.
 
-### 7. Sitzungsdauer einstellen (Stufe Administration)
+### 8. Sitzungsdauer einstellen (Stufe Administration)
 
 1. Klicke auf **Einstellungen**.
 2. Trage unter **Sitzungsdauer** die Dauer der Anmeldesession in Minuten ein
@@ -94,7 +110,7 @@
    Anmeldung — laufende Sitzungen werden bei ihrer nächsten Erneuerung
    angepasst.
 
-### 8. Server-Updates verwalten (Stufe Administration)
+### 9. Server-Updates verwalten (Stufe Administration)
 
 Der Status-Server kann sich aus den GitHub-Releases selbst aktualisieren.
 
@@ -131,7 +147,7 @@ Der Status-Server kann sich aus den GitHub-Releases selbst aktualisieren.
 > die Update-Prüfung bleibt dann wirkungslos; einmal ein aktuelles Paket
 > installieren (siehe [Fehlerbehebung](troubleshooting.md)).
 
-### 9. Abmelden
+### 10. Abmelden
 
 Klicke in der Navigationszeile auf **Abmelden** — die Anmeldung endet und die
 Anmeldeseite erscheint.
@@ -148,4 +164,6 @@ erhalten.
 
 Die Seiten sind vollständig tastaturbedienbare HTML-Formulare ohne JavaScript:
 Beschriftete Eingabefelder, Pflichtfeld- und Längenprüfung direkt im Browser,
-Links und Schaltflächen sind per Tab erreichbar.
+Links und Schaltflächen sind per Tab erreichbar. Über die Einstellung
+**Farbschema** im Profil lässt sich die Seite dauerhaft dunkel darstellen —
+die Auswahlliste ist ebenfalls beschriftet und tastaturbedienbar.

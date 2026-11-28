@@ -92,6 +92,27 @@ laden. Bleibt der Server dauerhaft unerreichbar, die Administration bzw. den
 Server-Betreiber informieren (siehe
 [Fehlerbehebung für Betreiber](troubleshooting.md)).
 
+## Das Farbschema wechselt nicht wie erwartet
+
+**Symptom:** Nach dem Speichern einer neuen Anzeige-Einstellung bleibt die
+Seite zunächst im alten Farbschema — oder sie folgt weiter der
+Systemeinstellung, obwohl Light bzw. Dark gewählt wurde.
+
+**Ursache:** Das Farbschema wird beim Aufruf jeder Seite vom Server
+festgelegt; eine bereits geöffnete Seite schaltet nicht im laufenden Bild
+um. Steht die Einstellung auf „Automatisch (System)", folgt die Darstellung
+außerdem bewusst der Hell-/Dunkel-Einstellung des Geräts — sie ändert sich
+nur, wenn sich diese Systemeinstellung ändert.
+
+**Lösung:**
+
+1. Die Seite einmal neu laden — ab dann gilt das gespeicherte Schema.
+2. Soll die Seite unabhängig von der Geräteeinstellung hell bzw. dunkel
+   bleiben, im Profil unter **Anzeige → Farbschema** „Light" oder „Dark"
+   wählen statt „Automatisch (System)".
+3. Seiten ohne Anmeldung (z. B. die Anmeldung selbst) folgen immer der
+   Systemeinstellung — dort gibt es keine manuelle Auswahl.
+
 ## Wann Hilfe nötig ist
 
 - **Passwort vergessen:** Die Administration kann das Konto löschen und neu

@@ -36,11 +36,12 @@ public sealed class StatusPageComposer
     {
         var now = _timeProvider.GetUtcNow();
         var sb = new StringBuilder(16_000);
-        sb.Append("<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\">");
+        sb.Append("<!doctype html><html lang=\"de\" data-theme=\"").Append(PageShell.ThemeName(user.Theme)).Append("\">");
+        sb.Append("<head><meta charset=\"utf-8\">");
         sb.Append("<meta http-equiv=\"refresh\" content=\"").Append(refreshSeconds).Append("\">");
         sb.Append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">");
         sb.Append("<title>Softwareschmiede-Status</title><style>");
-        sb.Append(Css).Append(PageShell.NavCss);
+        sb.Append(PageShell.ThemeCss).Append(Css).Append(PageShell.NavCss);
         sb.Append("</style></head><body><div class=\"page\">");
 
         RenderHeader(sb, instances, now);
@@ -87,7 +88,7 @@ public sealed class StatusPageComposer
             .Append(badge.Item2).Append("</span>");
         foreach (var i in instances)
         {
-            sb.Append("<span class=\"inst\" style=\"color:#cbd5e1\">Instanz „")
+            sb.Append("<span class=\"inst on-dark\">Instanz „")
                 .Append(E(i.InstanceName ?? "(ohne Namen)"))
                 .Append("“ · ")
                 .Append(E(ShortId(i.InstanceId)))
@@ -285,7 +286,7 @@ public sealed class StatusPageComposer
             sb.Append("</table>");
         }
 
-        sb.Append("<h3 class=\"count\" style=\"margin-top:12px\">Letzte Releases (")
+        sb.Append("<h3 class=\"count gap-top\">Letzte Releases (")
             .Append(repo.Releases.Count).Append(")</h3>");
         if (repo.Releases.Count == 0)
             sb.Append("<div class=\"empty\">Keine Releases.</div>");
@@ -340,51 +341,53 @@ public sealed class StatusPageComposer
 
     private const string Css = """
 * { box-sizing: border-box; margin: 0; }
-body { font-family: "Segoe UI", system-ui, sans-serif; background: #f4f5f7; color: #1f2430; }
+body { font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--fg); }
 .page { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
 header.top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  background: #1f2937; color: #f8fafc; padding: 16px 24px; border-radius: 10px; }
+  background: var(--header-bg); color: var(--header-fg); padding: 16px 24px; border-radius: 10px; }
 header.top h1 { font-size: 20px; font-weight: 600; flex: 1; }
 .badge { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px;
   border-radius: 999px; font-size: 13px; font-weight: 600; }
 .badge .dot { width: 9px; height: 9px; border-radius: 50%; }
-.badge.online { background: #065f46; color: #d1fae5; } .badge.online .dot { background: #34d399; }
-.badge.offline { background: #7f1d1d; color: #fee2e2; } .badge.offline .dot { background: #f87171; }
-.badge.stale { background: #78350f; color: #fef3c7; } .badge.stale .dot { background: #fbbf24; }
-.meta-line { margin: 10px 4px 22px; font-size: 12.5px; color: #6b7280; }
-section { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+.badge.online { background: var(--badge-online-bg); color: var(--badge-online-fg); } .badge.online .dot { background: var(--badge-online-dot); }
+.badge.offline { background: var(--badge-offline-bg); color: var(--badge-offline-fg); } .badge.offline .dot { background: var(--badge-offline-dot); }
+.badge.stale { background: var(--badge-stale-bg); color: var(--badge-stale-fg); } .badge.stale .dot { background: var(--badge-stale-dot); }
+.meta-line { margin: 10px 4px 22px; font-size: 12.5px; color: var(--muted); }
+section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
   padding: 16px 20px; margin-bottom: 16px; }
 section h2 { font-size: 15px; font-weight: 600; margin-bottom: 10px;
   display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 section h3 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-.src { font-size: 11px; font-weight: 500; color: #fff; border-radius: 4px; padding: 1px 7px; }
-.src.app { background: #4f46e5; } .src.gh { background: #0d9488; }
-.count { color: #6b7280; font-weight: 500; }
+.src { font-size: 11px; font-weight: 500; color: var(--src-fg); border-radius: 4px; padding: 1px 7px; }
+.src.app { background: var(--src-app); } .src.gh { background: var(--src-gh); }
+.count { color: var(--muted); font-weight: 500; }
+.count.gap-top { margin-top: 12px; }
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 /* anywhere statt break-word: nur anywhere fließt in die min-content-Breite der
    Tabelle ein — sonst wird die Seite auf Mobilgeräten breiter als der Viewport. */
-td, th { text-align: left; padding: 7px 8px; border-top: 1px solid #f0f1f3; overflow-wrap: anywhere; }
+td, th { text-align: left; padding: 7px 8px; border-top: 1px solid var(--border-row); overflow-wrap: anywhere; }
 tr:first-child td { border-top: 0; }
-td.num { width: 70px; font-family: Consolas, monospace; color: #4f46e5; }
+td.num { width: 70px; font-family: Consolas, monospace; color: var(--accent); }
 td.num, td.right { white-space: nowrap; }
 td.right, th.right { text-align: right; }
-td.muted { color: #6b7280; font-size: 12.5px; }
+td.muted { color: var(--muted); font-size: 12.5px; }
 .pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; overflow-wrap: normal; }
-.pill.run { background: #e0e7ff; color: #3730a3; }
-.pill.wait { background: #fef3c7; color: #92400e; }
-.pill.done { background: #d1fae5; color: #065f46; }
-.pill.err { background: #fee2e2; color: #991b1b; }
-.pill.pause { background: #e5e7eb; color: #4b5563; }
-a { color: #4f46e5; text-decoration: none; }
+.pill.run { background: var(--pill-run-bg); color: var(--pill-run-fg); }
+.pill.wait { background: var(--warn-bg); color: var(--warn-fg); }
+.pill.done { background: var(--ok-bg); color: var(--ok-fg); }
+.pill.err { background: var(--err-bg); color: var(--err-fg); }
+.pill.pause { background: var(--pause-bg); color: var(--pause-fg); }
+a { color: var(--accent); text-decoration: none; }
 /* Links brechen nur an Wortgrenzen — „IssueComm ent“-Zeilenumbrüche vermeiden. */
 td a { overflow-wrap: normal; }
-.inst { font-size: 12px; color: #6b7280; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
-.stale-note { display: flex; align-items: center; gap: 8px; background: #fef3c7;
-  border: 1px solid #f59e0b55; color: #92400e; font-size: 12.5px;
+.inst { font-size: 12px; color: var(--muted); font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+.inst.on-dark { color: var(--inst-header); }
+.stale-note { display: flex; align-items: center; gap: 8px; background: var(--warn-bg);
+  border: 1px solid var(--warn-border); color: var(--warn-fg); font-size: 12.5px;
   border-radius: 8px; padding: 8px 14px; margin-bottom: 14px; }
-.dim td { color: #6b7280; }
-.empty { color: #6b7280; font-size: 13px; padding: 10px 4px; }
-footer { margin-top: 26px; font-size: 11.5px; color: #9ca3af; text-align: center; }
+.dim td { color: var(--muted); }
+.empty { color: var(--muted); font-size: 13px; padding: 10px 4px; }
+footer { margin-top: 26px; font-size: 11.5px; color: var(--muted-faint); text-align: center; }
 @media (max-width: 600px) {
   .page { padding: 12px 8px 40px; }
   header.top { padding: 12px 14px; }

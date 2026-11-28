@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Softwareschmiede.StatusServer.Data;
 using Softwareschmiede.StatusServer.Pages;
 
 namespace Softwareschmiede.StatusServer.Tests.Pages;
@@ -7,8 +8,8 @@ namespace Softwareschmiede.StatusServer.Tests.Pages;
 /// Profil- und Access-Denied-Seiten).</summary>
 public sealed class AuthPagesComposerTests
 {
-    private static PageUserContext User(bool isAdmin = true)
-        => new("tester", isAdmin, "token-value", "__RequestVerificationToken");
+    private static PageUserContext User(bool isAdmin = true, ThemePreference theme = ThemePreference.Auto)
+        => new("tester", isAdmin, "token-value", "__RequestVerificationToken", theme);
 
     /// <summary>Die Registrierungsseite enthält das Formular mit allen Feldern
     /// inkl. Antiforgery-Hidden-Feld.</summary>
@@ -75,11 +76,48 @@ public sealed class AuthPagesComposerTests
         var html = AuthPagesComposer.RenderProfile(User());
 
         html.Should().Contain("tester");
+        html.Should().Contain("action=\"/profile/theme\"");
         html.Should().Contain("action=\"/profile/password\"");
         html.Should().Contain("name=\"currentPassword\"");
         html.Should().Contain("name=\"newPassword\"");
         html.Should().Contain("name=\"confirmPassword\"");
         html.Should().Contain("action=\"/logout\"");
+    }
+
+    /// <summary>Die Anzeige-Sektion enthält das Theme-Auswahlfeld mit den drei
+    /// Optionen, der aktuelle Wert ist vorselektiert, das POST-Formular trägt
+    /// das Antiforgery-Feld.</summary>
+    [Fact]
+    public void RenderProfile_ShowsThemeSelectWithCurrentValue()
+    {
+        var html = AuthPagesComposer.RenderProfile(User(theme: ThemePreference.Dark));
+
+        html.Should().Contain("action=\"/profile/theme\"");
+        html.Should().Contain("<select name=\"theme\">");
+        html.Should().Contain("<option value=\"auto\">Automatisch (System)</option>");
+        html.Should().Contain("<option value=\"light\">Light</option>");
+        html.Should().Contain("<option value=\"dark\" selected>Dark</option>");
+        html.Should().Contain("name=\"__RequestVerificationToken\" value=\"token-value\"");
+    }
+
+    /// <summary>Ein Benutzer mit Dark-Einstellung erhält <c>data-theme="dark"</c>
+    /// am <c>&lt;html&gt;</c>-Tag der Profilseite.</summary>
+    [Fact]
+    public void RenderProfile_DarkTheme_SetsDataThemeAttribute()
+    {
+        var html = AuthPagesComposer.RenderProfile(User(theme: ThemePreference.Dark));
+
+        html.Should().Contain("<html lang=\"de\" data-theme=\"dark\">");
+    }
+
+    /// <summary>Anonyme Seiten (hier: Login) rendern immer mit
+    /// <c>data-theme="auto"</c> — das System-Schema des Betrachters entscheidet.</summary>
+    [Fact]
+    public void RenderLogin_Anonymous_RendersAutoTheme()
+    {
+        var html = AuthPagesComposer.RenderLogin("__RequestVerificationToken", "tok-2");
+
+        html.Should().Contain("<html lang=\"de\" data-theme=\"auto\">");
     }
 
     /// <summary>Die Profilseite zeigt die Stufe als deutschen Anzeigenamen,

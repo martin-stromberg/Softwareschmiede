@@ -29,7 +29,8 @@ internal static class EndpointSecurityExtensions
             user?.UserName,
             roles.Contains(StatusRoles.Administration),
             tokens.RequestToken!,
-            tokens.FormFieldName);
+            tokens.FormFieldName,
+            user?.Theme ?? ThemePreference.Auto);
     }
 
     /// <summary>Hängt einen Endpoint-Filter an, der das Antiforgery-Token der

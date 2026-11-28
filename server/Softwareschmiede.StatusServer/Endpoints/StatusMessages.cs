@@ -36,6 +36,9 @@ internal static class StatusMessages
     /// <summary>„Das Passwort wurde geändert."</summary>
     public const string PasswordChanged = "password-changed";
 
+    /// <summary>„Die Anzeigeeinstellung wurde gespeichert."</summary>
+    public const string ThemeSaved = "theme-saved";
+
     /// <summary>„Der Benutzer wurde nicht gefunden." (Fehlerschlüssel)</summary>
     public const string UserNotFound = "user-not-found";
 
@@ -76,6 +79,7 @@ internal static class StatusMessages
             [TokenRevoked] = "Das Token wurde widerrufen.",
             [SettingsSaved] = "Die Sitzungsdauer wurde gespeichert.",
             [PasswordChanged] = "Das Passwort wurde geändert.",
+            [ThemeSaved] = "Die Anzeigeeinstellung wurde gespeichert.",
             [UserNotFound] = "Der Benutzer wurde nicht gefunden.",
             [TokenNotFound] = "Das Token wurde nicht gefunden.",
             [UpdateSettingsSaved] = "Die Update-Einstellungen wurden gespeichert.",
