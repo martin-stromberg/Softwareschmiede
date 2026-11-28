@@ -53,5 +53,5 @@ Anwender-Bestaetigung; erst dann wird das Verzeichnis aufgeraeumt.
 - [x] 14 Light-Screens generiert, heruntergeladen, sichtgeprüft
 - [x] 14 Dark-Varianten generiert, heruntergeladen, sichtgeprüft
 - [x] Light|Dark-Composites + README erstellt
-- [ ] Commit + Push, Issue-Kommentar mit eingebetteten Screenshots
+- [x] Commit + Push (78ab85a2), Issue-Kommentar mit 14 eingebetteten Composites
 - [ ] Anwender-Entscheidung abwarten: manueller Entwurf vs. Stitch-Entwurf
